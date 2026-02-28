@@ -13,15 +13,15 @@ defmodule YogMaxFlowTest do
   test "residual_graph_construction_test" do
     _network =
       Yog.directed()
-      |> Yog.add_edge(from: 0, to: 1, weight: 10)
+      |> Yog.add_edge(from: 0, to: 1, with: 10)
 
     # Manually build residual graph to test
     residual =
       Yog.new(:directed)
       |> Yog.add_node(0, nil)
       |> Yog.add_node(1, nil)
-      |> Yog.add_edge(from: 0, to: 1, weight: 10)
-      |> Yog.add_edge(from: 1, to: 0, weight: 0)
+      |> Yog.add_edge(from: 0, to: 1, with: 10)
+      |> Yog.add_edge(from: 1, to: 0, with: 0)
 
     successors_0 = Yog.successors(residual, 0)
     successors_1 = Yog.successors(residual, 1)
@@ -34,8 +34,8 @@ defmodule YogMaxFlowTest do
   test "simple_flow_test" do
     network =
       Yog.directed()
-      |> Yog.add_edge(from: 0, to: 1, weight: 10)
-      |> Yog.add_edge(from: 1, to: 2, weight: 5)
+      |> Yog.add_edge(from: 0, to: 1, with: 10)
+      |> Yog.add_edge(from: 1, to: 2, with: 5)
 
     result =
       MaxFlow.edmonds_karp(
@@ -56,10 +56,10 @@ defmodule YogMaxFlowTest do
   test "parallel_paths_test" do
     network =
       Yog.directed()
-      |> Yog.add_edge(from: 0, to: 1, weight: 10)
-      |> Yog.add_edge(from: 0, to: 2, weight: 10)
-      |> Yog.add_edge(from: 1, to: 3, weight: 4)
-      |> Yog.add_edge(from: 2, to: 3, weight: 9)
+      |> Yog.add_edge(from: 0, to: 1, with: 10)
+      |> Yog.add_edge(from: 0, to: 2, with: 10)
+      |> Yog.add_edge(from: 1, to: 3, with: 4)
+      |> Yog.add_edge(from: 2, to: 3, with: 9)
 
     result =
       MaxFlow.edmonds_karp(
@@ -81,15 +81,15 @@ defmodule YogMaxFlowTest do
   test "complex_network_test" do
     network =
       Yog.directed()
-      |> Yog.add_edge(from: 0, to: 1, weight: 10)
-      |> Yog.add_edge(from: 0, to: 2, weight: 10)
-      |> Yog.add_edge(from: 1, to: 2, weight: 2)
-      |> Yog.add_edge(from: 1, to: 3, weight: 4)
-      |> Yog.add_edge(from: 1, to: 4, weight: 8)
-      |> Yog.add_edge(from: 2, to: 4, weight: 9)
-      |> Yog.add_edge(from: 3, to: 5, weight: 10)
-      |> Yog.add_edge(from: 4, to: 3, weight: 6)
-      |> Yog.add_edge(from: 4, to: 5, weight: 10)
+      |> Yog.add_edge(from: 0, to: 1, with: 10)
+      |> Yog.add_edge(from: 0, to: 2, with: 10)
+      |> Yog.add_edge(from: 1, to: 2, with: 2)
+      |> Yog.add_edge(from: 1, to: 3, with: 4)
+      |> Yog.add_edge(from: 1, to: 4, with: 8)
+      |> Yog.add_edge(from: 2, to: 4, with: 9)
+      |> Yog.add_edge(from: 3, to: 5, with: 10)
+      |> Yog.add_edge(from: 4, to: 3, with: 6)
+      |> Yog.add_edge(from: 4, to: 5, with: 10)
 
     result =
       MaxFlow.edmonds_karp(
@@ -111,16 +111,16 @@ defmodule YogMaxFlowTest do
     # From Cormen et al. "Introduction to Algorithms"
     network =
       Yog.directed()
-      |> Yog.add_edge(from: 0, to: 1, weight: 16)
-      |> Yog.add_edge(from: 0, to: 2, weight: 13)
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
-      |> Yog.add_edge(from: 1, to: 3, weight: 12)
-      |> Yog.add_edge(from: 2, to: 1, weight: 4)
-      |> Yog.add_edge(from: 2, to: 4, weight: 14)
-      |> Yog.add_edge(from: 3, to: 2, weight: 9)
-      |> Yog.add_edge(from: 3, to: 5, weight: 20)
-      |> Yog.add_edge(from: 4, to: 3, weight: 7)
-      |> Yog.add_edge(from: 4, to: 5, weight: 4)
+      |> Yog.add_edge(from: 0, to: 1, with: 16)
+      |> Yog.add_edge(from: 0, to: 2, with: 13)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
+      |> Yog.add_edge(from: 1, to: 3, with: 12)
+      |> Yog.add_edge(from: 2, to: 1, with: 4)
+      |> Yog.add_edge(from: 2, to: 4, with: 14)
+      |> Yog.add_edge(from: 3, to: 2, with: 9)
+      |> Yog.add_edge(from: 3, to: 5, with: 20)
+      |> Yog.add_edge(from: 4, to: 3, with: 7)
+      |> Yog.add_edge(from: 4, to: 5, with: 4)
 
     result =
       MaxFlow.edmonds_karp(
@@ -141,8 +141,8 @@ defmodule YogMaxFlowTest do
   test "no_path_test" do
     network =
       Yog.directed()
-      |> Yog.add_edge(from: 0, to: 1, weight: 10)
-      |> Yog.add_edge(from: 2, to: 3, weight: 10)
+      |> Yog.add_edge(from: 0, to: 1, with: 10)
+      |> Yog.add_edge(from: 2, to: 3, with: 10)
 
     result =
       MaxFlow.edmonds_karp(
@@ -161,7 +161,7 @@ defmodule YogMaxFlowTest do
 
   # Single edge network
   test "single_edge_test" do
-    network = Yog.directed() |> Yog.add_edge(from: 0, to: 1, weight: 42)
+    network = Yog.directed() |> Yog.add_edge(from: 0, to: 1, with: 42)
 
     result =
       MaxFlow.edmonds_karp(
@@ -182,8 +182,8 @@ defmodule YogMaxFlowTest do
   test "source_equals_sink_test" do
     network =
       Yog.directed()
-      |> Yog.add_edge(from: 0, to: 1, weight: 10)
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
+      |> Yog.add_edge(from: 0, to: 1, with: 10)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
 
     result =
       MaxFlow.edmonds_karp(
@@ -204,9 +204,9 @@ defmodule YogMaxFlowTest do
   test "zero_capacity_edges_test" do
     network =
       Yog.directed()
-      |> Yog.add_edge(from: 0, to: 1, weight: 0)
-      |> Yog.add_edge(from: 0, to: 2, weight: 10)
-      |> Yog.add_edge(from: 2, to: 1, weight: 10)
+      |> Yog.add_edge(from: 0, to: 1, with: 0)
+      |> Yog.add_edge(from: 0, to: 2, with: 10)
+      |> Yog.add_edge(from: 2, to: 1, with: 10)
 
     result =
       MaxFlow.edmonds_karp(
@@ -231,15 +231,15 @@ defmodule YogMaxFlowTest do
     network =
       Yog.directed()
       # Source to left partition
-      |> Yog.add_edge(from: 0, to: 1, weight: 1)
-      |> Yog.add_edge(from: 0, to: 2, weight: 1)
+      |> Yog.add_edge(from: 0, to: 1, with: 1)
+      |> Yog.add_edge(from: 0, to: 2, with: 1)
       # Left to right edges (potential matches)
-      |> Yog.add_edge(from: 1, to: 3, weight: 1)
-      |> Yog.add_edge(from: 1, to: 4, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 1)
+      |> Yog.add_edge(from: 1, to: 4, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
       # Right partition to sink
-      |> Yog.add_edge(from: 3, to: 5, weight: 1)
-      |> Yog.add_edge(from: 4, to: 5, weight: 1)
+      |> Yog.add_edge(from: 3, to: 5, with: 1)
+      |> Yog.add_edge(from: 4, to: 5, with: 1)
 
     result =
       MaxFlow.edmonds_karp(
@@ -261,10 +261,10 @@ defmodule YogMaxFlowTest do
   test "min_cut_simple_test" do
     network =
       Yog.directed()
-      |> Yog.add_edge(from: 0, to: 1, weight: 10)
-      |> Yog.add_edge(from: 0, to: 2, weight: 10)
-      |> Yog.add_edge(from: 1, to: 3, weight: 4)
-      |> Yog.add_edge(from: 2, to: 3, weight: 9)
+      |> Yog.add_edge(from: 0, to: 1, with: 10)
+      |> Yog.add_edge(from: 0, to: 2, with: 10)
+      |> Yog.add_edge(from: 1, to: 3, with: 4)
+      |> Yog.add_edge(from: 2, to: 3, with: 9)
 
     result =
       MaxFlow.edmonds_karp(
@@ -294,9 +294,9 @@ defmodule YogMaxFlowTest do
   test "min_cut_partitioning_test" do
     network =
       Yog.directed()
-      |> Yog.add_edge(from: 0, to: 1, weight: 10)
-      |> Yog.add_edge(from: 1, to: 2, weight: 5)
-      |> Yog.add_edge(from: 2, to: 3, weight: 15)
+      |> Yog.add_edge(from: 0, to: 1, with: 10)
+      |> Yog.add_edge(from: 1, to: 2, with: 5)
+      |> Yog.add_edge(from: 2, to: 3, with: 15)
 
     result =
       MaxFlow.edmonds_karp(
@@ -325,9 +325,9 @@ defmodule YogMaxFlowTest do
   test "triangle_with_cycle_test" do
     network =
       Yog.directed()
-      |> Yog.add_edge(from: 0, to: 1, weight: 10)
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
-      |> Yog.add_edge(from: 0, to: 2, weight: 5)
+      |> Yog.add_edge(from: 0, to: 1, with: 10)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
+      |> Yog.add_edge(from: 0, to: 2, with: 5)
 
     result =
       MaxFlow.edmonds_karp(
@@ -350,9 +350,9 @@ defmodule YogMaxFlowTest do
   test "multiple_bottlenecks_test" do
     network =
       Yog.directed()
-      |> Yog.add_edge(from: 0, to: 1, weight: 100)
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 100)
+      |> Yog.add_edge(from: 0, to: 1, with: 100)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 100)
 
     result =
       MaxFlow.edmonds_karp(
@@ -374,10 +374,10 @@ defmodule YogMaxFlowTest do
   test "diamond_network_test" do
     network =
       Yog.directed()
-      |> Yog.add_edge(from: 0, to: 1, weight: 10)
-      |> Yog.add_edge(from: 0, to: 2, weight: 10)
-      |> Yog.add_edge(from: 1, to: 3, weight: 10)
-      |> Yog.add_edge(from: 2, to: 3, weight: 10)
+      |> Yog.add_edge(from: 0, to: 1, with: 10)
+      |> Yog.add_edge(from: 0, to: 2, with: 10)
+      |> Yog.add_edge(from: 1, to: 3, with: 10)
+      |> Yog.add_edge(from: 2, to: 3, with: 10)
 
     result =
       MaxFlow.edmonds_karp(
@@ -398,11 +398,11 @@ defmodule YogMaxFlowTest do
   test "limited_intermediate_capacity_test" do
     network =
       Yog.directed()
-      |> Yog.add_edge(from: 0, to: 1, weight: 100)
-      |> Yog.add_edge(from: 0, to: 2, weight: 100)
-      |> Yog.add_edge(from: 1, to: 3, weight: 5)
-      |> Yog.add_edge(from: 2, to: 3, weight: 7)
-      |> Yog.add_edge(from: 3, to: 4, weight: 8)
+      |> Yog.add_edge(from: 0, to: 1, with: 100)
+      |> Yog.add_edge(from: 0, to: 2, with: 100)
+      |> Yog.add_edge(from: 1, to: 3, with: 5)
+      |> Yog.add_edge(from: 2, to: 3, with: 7)
+      |> Yog.add_edge(from: 3, to: 4, with: 8)
 
     result =
       MaxFlow.edmonds_karp(

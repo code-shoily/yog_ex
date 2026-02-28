@@ -14,11 +14,11 @@ defmodule NetworkCableLayout do
       |> Yog.add_node(2, "Building B")
       |> Yog.add_node(3, "Building C")
       |> Yog.add_node(4, "Building D")
-      |> Yog.add_edge(from: 1, to: 2, weight: 100)
-      |> Yog.add_edge(from: 1, to: 3, weight: 150)
-      |> Yog.add_edge(from: 2, to: 3, weight: 50)
-      |> Yog.add_edge(from: 2, to: 4, weight: 200)
-      |> Yog.add_edge(from: 3, to: 4, weight: 100)
+      |> Yog.add_edge(from: 1, to: 2, with: 100)
+      |> Yog.add_edge(from: 1, to: 3, with: 150)
+      |> Yog.add_edge(from: 2, to: 3, with: 50)
+      |> Yog.add_edge(from: 2, to: 4, with: 200)
+      |> Yog.add_edge(from: 3, to: 4, with: 100)
 
     cables = Yog.MST.kruskal(
       in: buildings,

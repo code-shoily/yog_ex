@@ -9,8 +9,8 @@ defmodule YogTraversalTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
 
     assert Yog.Traversal.walk(in: graph, from: 1, using: :breadth_first) == [1, 2, 3]
   end
@@ -23,10 +23,10 @@ defmodule YogTraversalTest do
       |> Yog.add_node(3, "Right")
       |> Yog.add_node(4, "LL")
       |> Yog.add_node(5, "LR")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 1, to: 3, weight: 1)
-      |> Yog.add_edge(from: 2, to: 4, weight: 1)
-      |> Yog.add_edge(from: 2, to: 5, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 1)
+      |> Yog.add_edge(from: 2, to: 4, with: 1)
+      |> Yog.add_edge(from: 2, to: 5, with: 1)
 
     result = Yog.Traversal.walk(in: graph, from: 1, using: :breadth_first)
 
@@ -42,9 +42,9 @@ defmodule YogTraversalTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 1, with: 1)
 
     result = Yog.Traversal.walk(in: graph, from: 1, using: :breadth_first)
     assert result == [1, 2, 3]
@@ -70,8 +70,8 @@ defmodule YogTraversalTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
 
     result = Yog.Traversal.walk(in: graph, from: 2, using: :breadth_first)
 
@@ -87,8 +87,8 @@ defmodule YogTraversalTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
 
     assert Yog.Traversal.walk(in: graph, from: 1, using: :depth_first) == [1, 2, 3]
   end
@@ -101,10 +101,10 @@ defmodule YogTraversalTest do
       |> Yog.add_node(3, "Right")
       |> Yog.add_node(4, "LL")
       |> Yog.add_node(5, "LR")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 1, to: 3, weight: 1)
-      |> Yog.add_edge(from: 2, to: 4, weight: 1)
-      |> Yog.add_edge(from: 2, to: 5, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 1)
+      |> Yog.add_edge(from: 2, to: 4, with: 1)
+      |> Yog.add_edge(from: 2, to: 5, with: 1)
 
     result = Yog.Traversal.walk(in: graph, from: 1, using: :depth_first)
 
@@ -119,9 +119,9 @@ defmodule YogTraversalTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 1, with: 1)
 
     result = Yog.Traversal.walk(in: graph, from: 1, using: :depth_first)
     assert result == [1, 2, 3]
@@ -143,10 +143,10 @@ defmodule YogTraversalTest do
       |> Yog.add_node(2, "Left")
       |> Yog.add_node(3, "Right")
       |> Yog.add_node(4, "Bottom")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 1, to: 3, weight: 1)
-      |> Yog.add_edge(from: 2, to: 4, weight: 1)
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 1)
+      |> Yog.add_edge(from: 2, to: 4, with: 1)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
 
     result = Yog.Traversal.walk(in: graph, from: 1, using: :depth_first)
 
@@ -163,9 +163,9 @@ defmodule YogTraversalTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
 
     result =
       Yog.Traversal.walk_until(
@@ -185,9 +185,9 @@ defmodule YogTraversalTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
 
     result =
       Yog.Traversal.walk_until(
@@ -206,8 +206,8 @@ defmodule YogTraversalTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
 
     result =
       Yog.Traversal.walk_until(
@@ -225,7 +225,7 @@ defmodule YogTraversalTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
 
     result =
       Yog.Traversal.walk_until(
@@ -246,10 +246,10 @@ defmodule YogTraversalTest do
       |> Yog.add_node(3, "Right")
       |> Yog.add_node(4, "LL")
       |> Yog.add_node(5, "LR")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 1, to: 3, weight: 1)
-      |> Yog.add_edge(from: 2, to: 4, weight: 1)
-      |> Yog.add_edge(from: 2, to: 5, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 1)
+      |> Yog.add_edge(from: 2, to: 4, with: 1)
+      |> Yog.add_edge(from: 2, to: 5, with: 1)
 
     result =
       Yog.Traversal.walk_until(
@@ -272,8 +272,8 @@ defmodule YogTraversalTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 1, weight: 1)
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
+      |> Yog.add_edge(from: 1, to: 1, with: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
 
     assert Yog.Traversal.walk(in: graph, from: 1, using: :breadth_first) == [1, 2]
   end
@@ -284,7 +284,7 @@ defmodule YogTraversalTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
 
     assert Yog.Traversal.walk(in: graph, from: 1, using: :breadth_first) == [1, 2]
   end

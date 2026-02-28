@@ -14,9 +14,9 @@ defmodule RenderDot do
       |> Yog.add_node(1, "Start")
       |> Yog.add_node(2, "Middle")
       |> Yog.add_node(3, "End")
-      |> Yog.add_edge(from: 1, to: 2, weight: 5)
-      |> Yog.add_edge(from: 2, to: 3, weight: 3)
-      |> Yog.add_edge(from: 1, to: 3, weight: 10)
+      |> Yog.add_edge(from: 1, to: 2, with: 5)
+      |> Yog.add_edge(from: 2, to: 3, with: 3)
+      |> Yog.add_edge(from: 1, to: 3, with: 10)
 
     # 1. Basic DOT output
     IO.puts("--- Basic DOT Output ---")

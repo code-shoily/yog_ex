@@ -17,23 +17,23 @@ defmodule NetworkBandwidth do
     network =
       Yog.directed()
       # From source
-      |> Yog.add_edge(from: 0, to: 1, weight: 20)
+      |> Yog.add_edge(from: 0, to: 1, with: 20)
       # Source -> Router A (20 Mbps)
-      |> Yog.add_edge(from: 0, to: 2, weight: 30)
+      |> Yog.add_edge(from: 0, to: 2, with: 30)
       # Source -> Router B (30 Mbps)
       # Intermediate connections
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
       # Router A -> Router B (10 Mbps)
-      |> Yog.add_edge(from: 1, to: 3, weight: 15)
+      |> Yog.add_edge(from: 1, to: 3, with: 15)
       # Router A -> Router C (15 Mbps)
-      |> Yog.add_edge(from: 2, to: 3, weight: 25)
+      |> Yog.add_edge(from: 2, to: 3, with: 25)
       # Router B -> Router C (25 Mbps)
-      |> Yog.add_edge(from: 2, to: 4, weight: 20)
+      |> Yog.add_edge(from: 2, to: 4, with: 20)
       # Router B -> Router D (20 Mbps)
       # To destination
-      |> Yog.add_edge(from: 3, to: 5, weight: 30)
+      |> Yog.add_edge(from: 3, to: 5, with: 30)
       # Router C -> Destination (30 Mbps)
-      |> Yog.add_edge(from: 4, to: 5, weight: 15)
+      |> Yog.add_edge(from: 4, to: 5, with: 15)
       # Router D -> Destination (15 Mbps)
 
     IO.puts("Network topology:")

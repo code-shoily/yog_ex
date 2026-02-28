@@ -30,7 +30,7 @@ defmodule TaskOrdering do
               g
               |> Yog.add_node(from_id, from)
               |> Yog.add_node(to_id, to)
-              |> Yog.add_edge(from: from_id, to: to_id, weight: nil)
+              |> Yog.add_edge(from: from_id, to: to_id, with: nil)
             end)
 
     # Add any tasks that weren't in dependencies

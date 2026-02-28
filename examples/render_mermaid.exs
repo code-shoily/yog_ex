@@ -14,9 +14,9 @@ defmodule RenderMermaid do
       |> Yog.add_node(1, "Home")
       |> Yog.add_node(2, "Gym")
       |> Yog.add_node(3, "Office")
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
-      |> Yog.add_edge(from: 2, to: 3, weight: 5)
-      |> Yog.add_edge(from: 1, to: 3, weight: 20)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
+      |> Yog.add_edge(from: 2, to: 3, with: 5)
+      |> Yog.add_edge(from: 1, to: 3, with: 20)
 
     # 1. Basic Mermaid output
     IO.puts("--- Basic Mermaid Output ---")

@@ -16,7 +16,7 @@ defmodule YogTransformTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
 
     transposed = Yog.Transform.transpose(graph)
 
@@ -31,9 +31,9 @@ defmodule YogTransformTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
-      |> Yog.add_edge(from: 2, to: 3, weight: 20)
-      |> Yog.add_edge(from: 1, to: 3, weight: 30)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
+      |> Yog.add_edge(from: 2, to: 3, with: 20)
+      |> Yog.add_edge(from: 1, to: 3, with: 30)
 
     transposed = Yog.Transform.transpose(graph)
 
@@ -51,9 +51,9 @@ defmodule YogTransformTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 2)
-      |> Yog.add_edge(from: 3, to: 1, weight: 3)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 2)
+      |> Yog.add_edge(from: 3, to: 1, with: 3)
 
     transposed = Yog.Transform.transpose(graph)
 
@@ -67,7 +67,7 @@ defmodule YogTransformTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
 
     double_transposed =
       graph
@@ -83,7 +83,7 @@ defmodule YogTransformTest do
       Yog.directed()
       |> Yog.add_node(1, "Node A")
       |> Yog.add_node(2, "Node B")
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
 
     transposed = Yog.Transform.transpose(graph)
 
@@ -119,7 +119,7 @@ defmodule YogTransformTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
 
     mapped = Yog.Transform.map_nodes(graph, fn s -> s <> "!" end)
 
@@ -175,9 +175,9 @@ defmodule YogTransformTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
-      |> Yog.add_edge(from: 2, to: 3, weight: 20)
-      |> Yog.add_edge(from: 1, to: 3, weight: 30)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
+      |> Yog.add_edge(from: 2, to: 3, with: 20)
+      |> Yog.add_edge(from: 1, to: 3, with: 30)
 
     mapped = Yog.Transform.map_edges(graph, fn w -> w * 2 end)
 
@@ -191,7 +191,7 @@ defmodule YogTransformTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
 
     mapped = Yog.Transform.map_edges(graph, fn w -> w + 5 end)
 
@@ -205,7 +205,7 @@ defmodule YogTransformTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
 
     mapped = Yog.Transform.map_edges(graph, fn w -> w * 1.0 end)
 
@@ -217,7 +217,7 @@ defmodule YogTransformTest do
       Yog.undirected()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: 5)
+      |> Yog.add_edge(from: 1, to: 2, with: 5)
 
     mapped = Yog.Transform.map_edges(graph, fn w -> w * 3 end)
 
@@ -230,7 +230,7 @@ defmodule YogTransformTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
 
     composed =
       graph
@@ -258,7 +258,7 @@ defmodule YogTransformTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
 
     filtered = Yog.Transform.filter_nodes(graph, fn _ -> true end)
 
@@ -271,7 +271,7 @@ defmodule YogTransformTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
 
     filtered = Yog.Transform.filter_nodes(graph, fn _ -> false end)
 
@@ -302,9 +302,9 @@ defmodule YogTransformTest do
       |> Yog.add_node(1, "keep")
       |> Yog.add_node(2, "remove")
       |> Yog.add_node(3, "keep")
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
-      |> Yog.add_edge(from: 2, to: 3, weight: 20)
-      |> Yog.add_edge(from: 1, to: 3, weight: 30)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
+      |> Yog.add_edge(from: 2, to: 3, with: 20)
+      |> Yog.add_edge(from: 1, to: 3, with: 30)
 
     filtered = Yog.Transform.filter_nodes(graph, fn s -> s == "keep" end)
 
@@ -320,10 +320,10 @@ defmodule YogTransformTest do
       |> Yog.add_node(2, 2)
       |> Yog.add_node(3, 3)
       |> Yog.add_node(4, 4)
-      |> Yog.add_edge(from: 1, to: 2, weight: "a")
-      |> Yog.add_edge(from: 2, to: 3, weight: "b")
-      |> Yog.add_edge(from: 3, to: 4, weight: "c")
-      |> Yog.add_edge(from: 1, to: 4, weight: "d")
+      |> Yog.add_edge(from: 1, to: 2, with: "a")
+      |> Yog.add_edge(from: 2, to: 3, with: "b")
+      |> Yog.add_edge(from: 3, to: 4, with: "c")
+      |> Yog.add_edge(from: 1, to: 4, with: "d")
 
     filtered = Yog.Transform.filter_nodes(graph, fn n -> rem(n, 2) == 0 end)
 
@@ -358,7 +358,7 @@ defmodule YogTransformTest do
     g1 =
       Yog.directed()
       |> Yog.add_node(1, "A")
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
 
     g2 = Yog.directed()
 
@@ -372,13 +372,13 @@ defmodule YogTransformTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
 
     g2 =
       Yog.directed()
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge(from: 3, to: 4, weight: 20)
+      |> Yog.add_edge(from: 3, to: 4, with: 20)
 
     merged = Yog.Transform.merge(g1, g2)
 
@@ -409,13 +409,13 @@ defmodule YogTransformTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
 
     g2 =
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: 20)
+      |> Yog.add_edge(from: 1, to: 2, with: 20)
 
     merged = Yog.Transform.merge(g1, g2)
 
@@ -428,13 +428,13 @@ defmodule YogTransformTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
 
     g2 =
       Yog.directed()
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 2, to: 3, weight: 20)
+      |> Yog.add_edge(from: 2, to: 3, with: 20)
 
     merged = Yog.Transform.merge(g1, g2)
 
@@ -457,16 +457,16 @@ defmodule YogTransformTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
-      |> Yog.add_edge(from: 1, to: 3, weight: 15)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
+      |> Yog.add_edge(from: 1, to: 3, with: 15)
 
     g2 =
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(4, "D")
       |> Yog.add_node(5, "E")
-      |> Yog.add_edge(from: 1, to: 4, weight: 20)
-      |> Yog.add_edge(from: 1, to: 5, weight: 25)
+      |> Yog.add_edge(from: 1, to: 4, with: 20)
+      |> Yog.add_edge(from: 1, to: 5, with: 25)
 
     merged = Yog.Transform.merge(g1, g2)
     edges = Yog.successors(merged, 1)
@@ -486,8 +486,8 @@ defmodule YogTransformTest do
       |> Yog.add_node(1, 5)
       |> Yog.add_node(2, 10)
       |> Yog.add_node(3, 15)
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 2)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 2)
 
     result =
       graph
@@ -504,7 +504,7 @@ defmodule YogTransformTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: 42)
+      |> Yog.add_edge(from: 1, to: 2, with: 42)
 
     transposed = Yog.Transform.transpose(graph)
 
@@ -516,13 +516,13 @@ defmodule YogTransformTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
 
     g2 =
       Yog.directed()
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 2, to: 3, weight: 20)
+      |> Yog.add_edge(from: 2, to: 3, with: 20)
 
     result =
       Yog.Transform.merge(g1, g2)
@@ -539,7 +539,7 @@ defmodule YogTransformTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
 
     sub = Yog.Transform.subgraph(graph, [])
 
@@ -553,8 +553,8 @@ defmodule YogTransformTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
-      |> Yog.add_edge(from: 2, to: 3, weight: 20)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
+      |> Yog.add_edge(from: 2, to: 3, with: 20)
 
     sub = Yog.Transform.subgraph(graph, [2])
 
@@ -569,8 +569,8 @@ defmodule YogTransformTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
-      |> Yog.add_edge(from: 2, to: 3, weight: 20)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
+      |> Yog.add_edge(from: 2, to: 3, with: 20)
 
     sub = Yog.Transform.subgraph(graph, [2, 3])
 
@@ -585,8 +585,8 @@ defmodule YogTransformTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
-      |> Yog.add_edge(from: 2, to: 3, weight: 20)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
+      |> Yog.add_edge(from: 2, to: 3, with: 20)
 
     sub = Yog.Transform.subgraph(graph, [1, 2, 3])
 
@@ -602,9 +602,9 @@ defmodule YogTransformTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
-      |> Yog.add_edge(from: 2, to: 3, weight: 20)
-      |> Yog.add_edge(from: 3, to: 4, weight: 30)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
+      |> Yog.add_edge(from: 2, to: 3, with: 20)
+      |> Yog.add_edge(from: 3, to: 4, with: 30)
 
     sub = Yog.Transform.subgraph(graph, [2, 3])
 

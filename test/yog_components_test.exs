@@ -9,7 +9,7 @@ defmodule YogComponentsTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -31,8 +31,8 @@ defmodule YogComponentsTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -47,9 +47,9 @@ defmodule YogComponentsTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 1, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -68,7 +68,7 @@ defmodule YogComponentsTest do
     graph =
       Yog.directed()
       |> Yog.add_node(1, "A")
-      |> Yog.add_edge(from: 1, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 1, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -82,8 +82,8 @@ defmodule YogComponentsTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 1, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -104,11 +104,11 @@ defmodule YogComponentsTest do
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
       # Cycle 1: 1->2->1
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 1, with: 1)
       # Cycle 2: 3->4->3
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
-      |> Yog.add_edge(from: 4, to: 3, weight: 1)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
+      |> Yog.add_edge(from: 4, to: 3, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -128,11 +128,11 @@ defmodule YogComponentsTest do
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
       # Cycle: 1->2->3->1
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 1, with: 1)
       # Non-cycle node: 4
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -155,12 +155,12 @@ defmodule YogComponentsTest do
       |> Yog.add_node(3, "3")
       |> Yog.add_node(4, "4")
       |> Yog.add_node(5, "5")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 1, weight: 1)
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
-      |> Yog.add_edge(from: 4, to: 5, weight: 1)
-      |> Yog.add_edge(from: 5, to: 4, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 1, with: 1)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
+      |> Yog.add_edge(from: 4, to: 5, with: 1)
+      |> Yog.add_edge(from: 5, to: 4, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -179,11 +179,11 @@ defmodule YogComponentsTest do
       |> Yog.add_node(2, "Left")
       |> Yog.add_node(3, "Right")
       |> Yog.add_node(4, "Bottom")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 1, to: 3, weight: 1)
-      |> Yog.add_edge(from: 2, to: 4, weight: 1)
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
-      |> Yog.add_edge(from: 4, to: 2, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 1)
+      |> Yog.add_edge(from: 2, to: 4, with: 1)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
+      |> Yog.add_edge(from: 4, to: 2, with: 1)
 
     # Cycle: 2->4->2
 
@@ -204,12 +204,12 @@ defmodule YogComponentsTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       # All edges in both directions
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 1, weight: 1)
-      |> Yog.add_edge(from: 1, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 1, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 2, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 1, with: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 1, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 2, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -233,18 +233,18 @@ defmodule YogComponentsTest do
       |> Yog.add_node(5, "5")
       |> Yog.add_node(6, "6")
       # Cycle 1: 1<->2
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 1, with: 1)
       # Connection: 2->3
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
       # Cycle 2: 3<->4
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
-      |> Yog.add_edge(from: 4, to: 3, weight: 1)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
+      |> Yog.add_edge(from: 4, to: 3, with: 1)
       # Connection: 4->5
-      |> Yog.add_edge(from: 4, to: 5, weight: 1)
+      |> Yog.add_edge(from: 4, to: 5, with: 1)
       # Cycle 3: 5<->6
-      |> Yog.add_edge(from: 5, to: 6, weight: 1)
-      |> Yog.add_edge(from: 6, to: 5, weight: 1)
+      |> Yog.add_edge(from: 5, to: 6, with: 1)
+      |> Yog.add_edge(from: 6, to: 5, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -267,15 +267,15 @@ defmodule YogComponentsTest do
       |> Yog.add_node(6, "6")
       |> Yog.add_node(7, "7")
       # Large cycle: 1->2->3->4->1
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
-      |> Yog.add_edge(from: 4, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
+      |> Yog.add_edge(from: 4, to: 1, with: 1)
       # Small cycle: 5<->6
-      |> Yog.add_edge(from: 5, to: 6, weight: 1)
-      |> Yog.add_edge(from: 6, to: 5, weight: 1)
+      |> Yog.add_edge(from: 5, to: 6, with: 1)
+      |> Yog.add_edge(from: 6, to: 5, with: 1)
       # Single node
-      |> Yog.add_edge(from: 7, to: 1, weight: 1)
+      |> Yog.add_edge(from: 7, to: 1, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -295,10 +295,10 @@ defmodule YogComponentsTest do
       |> Yog.add_node(3, "R")
       |> Yog.add_node(4, "LL")
       |> Yog.add_node(5, "LR")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 1, to: 3, weight: 1)
-      |> Yog.add_edge(from: 2, to: 4, weight: 1)
-      |> Yog.add_edge(from: 2, to: 5, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 1)
+      |> Yog.add_edge(from: 2, to: 4, with: 1)
+      |> Yog.add_edge(from: 2, to: 5, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -318,9 +318,9 @@ defmodule YogComponentsTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 1, weight: 1)
-      |> Yog.add_edge(from: 2, to: 2, weight: 1)
-      |> Yog.add_edge(from: 3, to: 3, weight: 1)
+      |> Yog.add_edge(from: 1, to: 1, with: 1)
+      |> Yog.add_edge(from: 2, to: 2, with: 1)
+      |> Yog.add_edge(from: 3, to: 3, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -343,14 +343,14 @@ defmodule YogComponentsTest do
       |> Yog.add_node(7, "7")
       |> Yog.add_node(8, "8")
       # Cycle: 1->2->3->4->5->6->7->8->1
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
-      |> Yog.add_edge(from: 4, to: 5, weight: 1)
-      |> Yog.add_edge(from: 5, to: 6, weight: 1)
-      |> Yog.add_edge(from: 6, to: 7, weight: 1)
-      |> Yog.add_edge(from: 7, to: 8, weight: 1)
-      |> Yog.add_edge(from: 8, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
+      |> Yog.add_edge(from: 4, to: 5, with: 1)
+      |> Yog.add_edge(from: 5, to: 6, with: 1)
+      |> Yog.add_edge(from: 6, to: 7, with: 1)
+      |> Yog.add_edge(from: 7, to: 8, with: 1)
+      |> Yog.add_edge(from: 8, to: 1, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -371,14 +371,14 @@ defmodule YogComponentsTest do
       |> Yog.add_node(4, "4")
       |> Yog.add_node(5, "5")
       # Outer cycle: 1->2->3->4->5->1
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
-      |> Yog.add_edge(from: 4, to: 5, weight: 1)
-      |> Yog.add_edge(from: 5, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
+      |> Yog.add_edge(from: 4, to: 5, with: 1)
+      |> Yog.add_edge(from: 5, to: 1, with: 1)
       # Inner shortcuts
-      |> Yog.add_edge(from: 2, to: 4, weight: 1)
-      |> Yog.add_edge(from: 3, to: 5, weight: 1)
+      |> Yog.add_edge(from: 2, to: 4, with: 1)
+      |> Yog.add_edge(from: 3, to: 5, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -401,13 +401,13 @@ defmodule YogComponentsTest do
       |> Yog.add_node(4, "B2")
       |> Yog.add_node(5, "C1")
       # Subgraph A: 1<->2
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 1, with: 1)
       # Subgraph B: 3<->4
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
-      |> Yog.add_edge(from: 4, to: 3, weight: 1)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
+      |> Yog.add_edge(from: 4, to: 3, with: 1)
       # Subgraph C: 5 (isolated with self-loop)
-      |> Yog.add_edge(from: 5, to: 5, weight: 1)
+      |> Yog.add_edge(from: 5, to: 5, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -430,14 +430,14 @@ defmodule YogComponentsTest do
       |> Yog.add_node(4, "funcC")
       |> Yog.add_node(5, "helper")
       # main calls funcA
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
       # Mutual recursion: funcA <-> funcB
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 2, weight: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 2, with: 1)
       # funcB calls funcC
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
       # funcC calls helper
-      |> Yog.add_edge(from: 4, to: 5, weight: 1)
+      |> Yog.add_edge(from: 4, to: 5, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -458,18 +458,18 @@ defmodule YogComponentsTest do
       |> Yog.add_node(4, "blog")
       |> Yog.add_node(5, "archive")
       # index links to everything
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 1, to: 3, weight: 1)
-      |> Yog.add_edge(from: 1, to: 4, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 1)
+      |> Yog.add_edge(from: 1, to: 4, with: 1)
       # about and contact link to each other
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 2, weight: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 2, with: 1)
       # blog and archive link to each other
-      |> Yog.add_edge(from: 4, to: 5, weight: 1)
-      |> Yog.add_edge(from: 5, to: 4, weight: 1)
+      |> Yog.add_edge(from: 4, to: 5, with: 1)
+      |> Yog.add_edge(from: 5, to: 4, with: 1)
       # Everything links back to index
-      |> Yog.add_edge(from: 2, to: 1, weight: 1)
-      |> Yog.add_edge(from: 4, to: 1, weight: 1)
+      |> Yog.add_edge(from: 2, to: 1, with: 1)
+      |> Yog.add_edge(from: 4, to: 1, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -492,11 +492,11 @@ defmodule YogComponentsTest do
       |> Yog.add_node(3, "libB")
       |> Yog.add_node(4, "core")
       # app depends on libA and libB
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 1, to: 3, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 1)
       # Both libs depend on core
-      |> Yog.add_edge(from: 2, to: 4, weight: 1)
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
+      |> Yog.add_edge(from: 2, to: 4, with: 1)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
 
     result = Yog.Components.scc(graph)
 

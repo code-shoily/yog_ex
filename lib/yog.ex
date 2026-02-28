@@ -12,7 +12,7 @@ defmodule Yog do
       graph = Yog.directed()
         |> Yog.add_node(1, "Node A")
         |> Yog.add_node(2, "Node B")
-        |> Yog.add_edge(from: 1, to: 2, weight: 10)
+        |> Yog.add_edge(from: 1, to: 2, with: 10)
 
       # Query the graph
       Yog.successors(graph, 1)
@@ -126,18 +126,18 @@ defmodule Yog do
 
   - `:from` - Source node ID
   - `:to` - Destination node ID
-  - `:weight` - Edge weight/data
+  - `:with` - Edge weight/data
 
   ## Examples
 
       iex> graph = Yog.directed()
-      ...> |> Yog.add_edge(from: 1, to: 2, weight: 10)
+      ...> |> Yog.add_edge(from: 1, to: 2, with: 10)
   """
   @spec add_edge(graph(), keyword()) :: graph()
   def add_edge(graph, opts) do
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
-    weight = Keyword.fetch!(opts, :weight)
+    weight = Keyword.fetch!(opts, :with)
     :yog.add_edge(graph, from, to, weight)
   end
 
@@ -180,7 +180,7 @@ defmodule Yog do
   ## Examples
 
       iex> graph = Yog.directed()
-      ...> |> Yog.add_edge(from: 1, to: 2, weight: 10)
+      ...> |> Yog.add_edge(from: 1, to: 2, with: 10)
       iex> Yog.successors(graph, 1)
       [{2, 10}]
   """

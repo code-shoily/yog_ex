@@ -13,7 +13,7 @@ defmodule RenderJson do
       Yog.directed()
       |> Yog.add_node(1, "Node A")
       |> Yog.add_node(2, "Node B")
-      |> Yog.add_edge(from: 1, to: 2, weight: "connects")
+      |> Yog.add_edge(from: 1, to: 2, with: "connects")
 
     # Basic JSON rendering
     IO.puts("--- Basic JSON Rendering ---")

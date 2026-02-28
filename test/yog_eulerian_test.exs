@@ -12,9 +12,9 @@ defmodule YogEulerianTest do
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 1, with: 1)
 
     assert Eulerian.has_eulerian_circuit?(graph) == true
   end
@@ -27,10 +27,10 @@ defmodule YogEulerianTest do
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
       |> Yog.add_node(4, nil)
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
-      |> Yog.add_edge(from: 4, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
+      |> Yog.add_edge(from: 4, to: 1, with: 1)
 
     assert Eulerian.has_eulerian_circuit?(graph) == true
   end
@@ -42,8 +42,8 @@ defmodule YogEulerianTest do
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
 
     assert Eulerian.has_eulerian_circuit?(graph) == false
   end
@@ -56,9 +56,9 @@ defmodule YogEulerianTest do
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
       |> Yog.add_node(4, nil)
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 1, to: 3, weight: 1)
-      |> Yog.add_edge(from: 1, to: 4, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 1)
+      |> Yog.add_edge(from: 1, to: 4, with: 1)
 
     assert Eulerian.has_eulerian_circuit?(graph) == false
   end
@@ -73,12 +73,12 @@ defmodule YogEulerianTest do
       |> Yog.add_node(4, nil)
       |> Yog.add_node(5, nil)
       |> Yog.add_node(6, nil)
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 1, weight: 1)
-      |> Yog.add_edge(from: 4, to: 5, weight: 1)
-      |> Yog.add_edge(from: 5, to: 6, weight: 1)
-      |> Yog.add_edge(from: 6, to: 4, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 1, with: 1)
+      |> Yog.add_edge(from: 4, to: 5, with: 1)
+      |> Yog.add_edge(from: 5, to: 6, with: 1)
+      |> Yog.add_edge(from: 6, to: 4, with: 1)
 
     assert Eulerian.has_eulerian_circuit?(graph) == false
   end
@@ -97,8 +97,8 @@ defmodule YogEulerianTest do
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
 
     assert Eulerian.has_eulerian_path?(graph) == true
   end
@@ -110,9 +110,9 @@ defmodule YogEulerianTest do
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 1, with: 1)
 
     assert Eulerian.has_eulerian_path?(graph) == true
   end
@@ -125,9 +125,9 @@ defmodule YogEulerianTest do
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
       |> Yog.add_node(4, nil)
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 1, to: 3, weight: 1)
-      |> Yog.add_edge(from: 1, to: 4, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 1)
+      |> Yog.add_edge(from: 1, to: 4, with: 1)
 
     assert Eulerian.has_eulerian_path?(graph) == false
   end
@@ -141,11 +141,11 @@ defmodule YogEulerianTest do
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
       |> Yog.add_node(4, nil)
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
-      |> Yog.add_edge(from: 4, to: 1, weight: 1)
-      |> Yog.add_edge(from: 2, to: 4, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
+      |> Yog.add_edge(from: 4, to: 1, with: 1)
+      |> Yog.add_edge(from: 2, to: 4, with: 1)
 
     assert Eulerian.has_eulerian_path?(graph) == true
   end
@@ -158,9 +158,9 @@ defmodule YogEulerianTest do
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 1, with: 1)
 
     assert {:ok, path} = Eulerian.find_eulerian_circuit(graph)
     # Path should start and end at same vertex
@@ -176,10 +176,10 @@ defmodule YogEulerianTest do
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
       |> Yog.add_node(4, nil)
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
-      |> Yog.add_edge(from: 4, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
+      |> Yog.add_edge(from: 4, to: 1, with: 1)
 
     assert {:ok, path} = Eulerian.find_eulerian_circuit(graph)
     assert List.first(path) == List.last(path)
@@ -192,8 +192,8 @@ defmodule YogEulerianTest do
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
 
     assert Eulerian.find_eulerian_circuit(graph) == {:error, :no_eulerian_circuit}
   end
@@ -206,8 +206,8 @@ defmodule YogEulerianTest do
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
 
     assert {:ok, path} = Eulerian.find_eulerian_path(graph)
     # Path should have 3 vertices (2 edges)
@@ -224,9 +224,9 @@ defmodule YogEulerianTest do
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 1, with: 1)
 
     assert {:ok, path} = Eulerian.find_eulerian_path(graph)
     assert length(path) == 4
@@ -239,9 +239,9 @@ defmodule YogEulerianTest do
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
       |> Yog.add_node(4, nil)
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 1, to: 3, weight: 1)
-      |> Yog.add_edge(from: 1, to: 4, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 1)
+      |> Yog.add_edge(from: 1, to: 4, with: 1)
 
     assert Eulerian.find_eulerian_path(graph) == {:error, :no_eulerian_path}
   end
@@ -255,9 +255,9 @@ defmodule YogEulerianTest do
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 1, with: 1)
 
     assert Eulerian.has_eulerian_circuit?(graph) == true
   end
@@ -269,8 +269,8 @@ defmodule YogEulerianTest do
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
 
     assert Eulerian.has_eulerian_circuit?(graph) == false
   end
@@ -285,8 +285,8 @@ defmodule YogEulerianTest do
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
 
     assert Eulerian.has_eulerian_path?(graph) == true
   end
@@ -297,9 +297,9 @@ defmodule YogEulerianTest do
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 1, with: 1)
 
     assert {:ok, path} = Eulerian.find_eulerian_circuit(graph)
     assert List.first(path) == List.last(path)
@@ -312,8 +312,8 @@ defmodule YogEulerianTest do
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
 
     assert {:ok, path} = Eulerian.find_eulerian_path(graph)
     assert length(path) == 3
@@ -332,11 +332,11 @@ defmodule YogEulerianTest do
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
       |> Yog.add_node(4, nil)
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 1, to: 3, weight: 1)
-      |> Yog.add_edge(from: 1, to: 4, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 2, to: 4, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 1)
+      |> Yog.add_edge(from: 1, to: 4, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 2, to: 4, with: 1)
 
     # Missing: 3-4
 

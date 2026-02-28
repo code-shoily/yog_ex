@@ -80,7 +80,7 @@ Then try:
 graph = Yog.directed()
   |> Yog.add_node(1, "A")
   |> Yog.add_node(2, "B")
-  |> Yog.add_edge(from: 1, to: 2, weight: 10)
+  |> Yog.add_edge(from: 1, to: 2, with: 10)
 
 # Query it
 Yog.successors(graph, 1)

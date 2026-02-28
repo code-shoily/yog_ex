@@ -16,11 +16,11 @@ defmodule JobAssignment do
       |> Yog.add_node(4, "Programming")
       |> Yog.add_node(5, "Design")
       |> Yog.add_node(6, "Testing")
-      |> Yog.add_edge(from: 1, to: 4, weight: nil)
-      |> Yog.add_edge(from: 1, to: 5, weight: nil)
-      |> Yog.add_edge(from: 2, to: 4, weight: nil)
-      |> Yog.add_edge(from: 3, to: 5, weight: nil)
-      |> Yog.add_edge(from: 3, to: 6, weight: nil)
+      |> Yog.add_edge(from: 1, to: 4, with: nil)
+      |> Yog.add_edge(from: 1, to: 5, with: nil)
+      |> Yog.add_edge(from: 2, to: 4, with: nil)
+      |> Yog.add_edge(from: 3, to: 5, with: nil)
+      |> Yog.add_edge(from: 3, to: 6, with: nil)
 
     IO.puts("--- Bipartite Job Assignment ---")
 

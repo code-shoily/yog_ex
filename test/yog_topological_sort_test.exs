@@ -10,8 +10,8 @@ defmodule YogTopologicalSortTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
 
     result = Yog.TopologicalSort.sort(graph)
 
@@ -24,7 +24,7 @@ defmodule YogTopologicalSortTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
 
     result = Yog.TopologicalSort.sort(graph)
 
@@ -47,8 +47,8 @@ defmodule YogTopologicalSortTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 3, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
 
     result = Yog.TopologicalSort.sort(graph)
 
@@ -68,8 +68,8 @@ defmodule YogTopologicalSortTest do
       |> Yog.add_node(1, "Root")
       |> Yog.add_node(2, "Left")
       |> Yog.add_node(3, "Right")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 1, to: 3, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 1)
 
     result = Yog.TopologicalSort.sort(graph)
 
@@ -91,8 +91,8 @@ defmodule YogTopologicalSortTest do
       |> Yog.add_node(1, "Left")
       |> Yog.add_node(2, "Right")
       |> Yog.add_node(3, "Bottom")
-      |> Yog.add_edge(from: 1, to: 3, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
 
     result = Yog.TopologicalSort.sort(graph)
 
@@ -120,10 +120,10 @@ defmodule YogTopologicalSortTest do
       |> Yog.add_node(2, "Left")
       |> Yog.add_node(3, "Right")
       |> Yog.add_node(4, "Bottom")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 1, to: 3, weight: 1)
-      |> Yog.add_edge(from: 2, to: 4, weight: 1)
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 1)
+      |> Yog.add_edge(from: 2, to: 4, with: 1)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
 
     result = Yog.TopologicalSort.sort(graph)
 
@@ -153,9 +153,9 @@ defmodule YogTopologicalSortTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 1, with: 1)
 
     result = Yog.TopologicalSort.sort(graph)
 
@@ -167,7 +167,7 @@ defmodule YogTopologicalSortTest do
     graph =
       Yog.directed()
       |> Yog.add_node(1, "A")
-      |> Yog.add_edge(from: 1, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 1, with: 1)
 
     result = Yog.TopologicalSort.sort(graph)
 
@@ -182,11 +182,11 @@ defmodule YogTopologicalSortTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 2, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 2, with: 1)
       # 2-3 cycle
-      |> Yog.add_edge(from: 1, to: 4, weight: 1)
+      |> Yog.add_edge(from: 1, to: 4, with: 1)
 
     result = Yog.TopologicalSort.sort(graph)
 
@@ -199,8 +199,8 @@ defmodule YogTopologicalSortTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 1, with: 1)
 
     result = Yog.TopologicalSort.sort(graph)
 
@@ -218,9 +218,9 @@ defmodule YogTopologicalSortTest do
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
       # Component 1: 1->2
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
       # Component 2: 3->4
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
 
     result = Yog.TopologicalSort.sort(graph)
 
@@ -247,11 +247,11 @@ defmodule YogTopologicalSortTest do
       |> Yog.add_node(4, "4")
       |> Yog.add_node(5, "5")
       |> Yog.add_node(6, "6")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
-      |> Yog.add_edge(from: 4, to: 5, weight: 1)
-      |> Yog.add_edge(from: 5, to: 6, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
+      |> Yog.add_edge(from: 4, to: 5, with: 1)
+      |> Yog.add_edge(from: 5, to: 6, with: 1)
 
     result = Yog.TopologicalSort.sort(graph)
 
@@ -269,12 +269,12 @@ defmodule YogTopologicalSortTest do
       |> Yog.add_node(5, "LR")
       |> Yog.add_node(6, "RL")
       |> Yog.add_node(7, "RR")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 1, to: 3, weight: 1)
-      |> Yog.add_edge(from: 2, to: 4, weight: 1)
-      |> Yog.add_edge(from: 2, to: 5, weight: 1)
-      |> Yog.add_edge(from: 3, to: 6, weight: 1)
-      |> Yog.add_edge(from: 3, to: 7, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 1)
+      |> Yog.add_edge(from: 2, to: 4, with: 1)
+      |> Yog.add_edge(from: 2, to: 5, with: 1)
+      |> Yog.add_edge(from: 3, to: 6, with: 1)
+      |> Yog.add_edge(from: 3, to: 7, with: 1)
 
     result = Yog.TopologicalSort.sort(graph)
 
@@ -310,8 +310,8 @@ defmodule YogTopologicalSortTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 1, to: 3, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 1)
 
     # In Elixir we can just use &<=/2
     result =
@@ -330,8 +330,8 @@ defmodule YogTopologicalSortTest do
       |> Yog.add_node(1, "Root")
       |> Yog.add_node(2, "A")
       |> Yog.add_node(3, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 1, to: 3, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 1)
 
     result =
       Yog.TopologicalSort.lexicographical_sort(graph, fn a, b ->
@@ -350,8 +350,8 @@ defmodule YogTopologicalSortTest do
       |> Yog.add_node(2, "A")
       |> Yog.add_node(3, "B")
       |> Yog.add_node(1, "C")
-      |> Yog.add_edge(from: 2, to: 1, weight: 1)
-      |> Yog.add_edge(from: 3, to: 1, weight: 1)
+      |> Yog.add_edge(from: 2, to: 1, with: 1)
+      |> Yog.add_edge(from: 3, to: 1, with: 1)
 
     result =
       Yog.TopologicalSort.lexicographical_sort(graph, fn a, b ->
@@ -370,10 +370,10 @@ defmodule YogTopologicalSortTest do
       |> Yog.add_node(3, "Right")
       |> Yog.add_node(2, "Left")
       |> Yog.add_node(4, "Bottom")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 1, to: 3, weight: 1)
-      |> Yog.add_edge(from: 2, to: 4, weight: 1)
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 1)
+      |> Yog.add_edge(from: 2, to: 4, with: 1)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
 
     result =
       Yog.TopologicalSort.lexicographical_sort(graph, fn a, b ->
@@ -392,8 +392,8 @@ defmodule YogTopologicalSortTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 1, with: 1)
 
     result =
       Yog.TopologicalSort.lexicographical_sort(graph, fn a, b ->
@@ -413,10 +413,10 @@ defmodule YogTopologicalSortTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(4, "D")
       # Add edges to connect them
-      |> Yog.add_edge(from: 1, to: 5, weight: 1)
-      |> Yog.add_edge(from: 2, to: 5, weight: 1)
-      |> Yog.add_edge(from: 3, to: 5, weight: 1)
-      |> Yog.add_edge(from: 4, to: 5, weight: 1)
+      |> Yog.add_edge(from: 1, to: 5, with: 1)
+      |> Yog.add_edge(from: 2, to: 5, with: 1)
+      |> Yog.add_edge(from: 3, to: 5, with: 1)
+      |> Yog.add_edge(from: 4, to: 5, with: 1)
 
     # All point to 5, so 5 must be last
     result =
@@ -439,15 +439,15 @@ defmodule YogTopologicalSortTest do
       |> Yog.add_node(3, "Dress")
       |> Yog.add_node(4, "Eat breakfast")
       |> Yog.add_node(5, "Leave house")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
       # Wake before shower
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
       # Shower before dress
-      |> Yog.add_edge(from: 3, to: 5, weight: 1)
+      |> Yog.add_edge(from: 3, to: 5, with: 1)
       # Dress before leave
-      |> Yog.add_edge(from: 4, to: 5, weight: 1)
+      |> Yog.add_edge(from: 4, to: 5, with: 1)
       # Eat before leave
-      |> Yog.add_edge(from: 1, to: 4, weight: 1)
+      |> Yog.add_edge(from: 1, to: 4, with: 1)
 
     # Wake before eat
 
@@ -481,13 +481,13 @@ defmodule YogTopologicalSortTest do
       |> Yog.add_node(3, "utils.o")
       |> Yog.add_node(4, "utils.c")
       |> Yog.add_node(5, "app")
-      |> Yog.add_edge(from: 2, to: 1, weight: 1)
+      |> Yog.add_edge(from: 2, to: 1, with: 1)
       # main.c -> main.o
-      |> Yog.add_edge(from: 4, to: 3, weight: 1)
+      |> Yog.add_edge(from: 4, to: 3, with: 1)
       # utils.c -> utils.o
-      |> Yog.add_edge(from: 1, to: 5, weight: 1)
+      |> Yog.add_edge(from: 1, to: 5, with: 1)
       # main.o -> app
-      |> Yog.add_edge(from: 3, to: 5, weight: 1)
+      |> Yog.add_edge(from: 3, to: 5, with: 1)
 
     # utils.o -> app
 

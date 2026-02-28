@@ -15,13 +15,13 @@ defmodule BridgesOfKonigsberg do
       |> Yog.add_node(3, "Bank C")
       |> Yog.add_node(4, "Island D")
       # Bridges
-      |> Yog.add_edge(from: 1, to: 2, weight: "b1")
-      |> Yog.add_edge(from: 1, to: 2, weight: "b2")
-      |> Yog.add_edge(from: 1, to: 3, weight: "b3")
-      |> Yog.add_edge(from: 1, to: 3, weight: "b4")
-      |> Yog.add_edge(from: 1, to: 4, weight: "b5")
-      |> Yog.add_edge(from: 2, to: 4, weight: "b6")
-      |> Yog.add_edge(from: 3, to: 4, weight: "b7")
+      |> Yog.add_edge(from: 1, to: 2, with: "b1")
+      |> Yog.add_edge(from: 1, to: 2, with: "b2")
+      |> Yog.add_edge(from: 1, to: 3, with: "b3")
+      |> Yog.add_edge(from: 1, to: 3, with: "b4")
+      |> Yog.add_edge(from: 1, to: 4, with: "b5")
+      |> Yog.add_edge(from: 2, to: 4, with: "b6")
+      |> Yog.add_edge(from: 3, to: 4, with: "b7")
 
     IO.puts("--- Seven Bridges of Königsberg ---")
 
@@ -50,9 +50,9 @@ defmodule BridgesOfKonigsberg do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: nil)
-      |> Yog.add_edge(from: 2, to: 3, weight: nil)
-      |> Yog.add_edge(from: 3, to: 1, weight: nil)
+      |> Yog.add_edge(from: 1, to: 2, with: nil)
+      |> Yog.add_edge(from: 2, to: 3, with: nil)
+      |> Yog.add_edge(from: 3, to: 1, with: nil)
 
     IO.puts("\n--- Simple Triangle ---")
 

@@ -48,7 +48,7 @@ defmodule YogRenderTest do
       Yog.directed()
       |> Yog.add_node(1, "Node A")
       |> Yog.add_node(2, "Node B")
-      |> Yog.add_edge(from: 1, to: 2, weight: "10")
+      |> Yog.add_edge(from: 1, to: 2, with: "10")
 
     output = Render.to_mermaid(graph)
 
@@ -61,7 +61,7 @@ defmodule YogRenderTest do
       Yog.undirected()
       |> Yog.add_node(1, "Node A")
       |> Yog.add_node(2, "Node B")
-      |> Yog.add_edge(from: 1, to: 2, weight: "10")
+      |> Yog.add_edge(from: 1, to: 2, with: "10")
 
     output = Render.to_mermaid(graph)
 
@@ -78,9 +78,9 @@ defmodule YogRenderTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: "5")
-      |> Yog.add_edge(from: 2, to: 3, weight: "3")
-      |> Yog.add_edge(from: 1, to: 3, weight: "1")
+      |> Yog.add_edge(from: 1, to: 2, with: "5")
+      |> Yog.add_edge(from: 2, to: 3, with: "3")
+      |> Yog.add_edge(from: 1, to: 3, with: "1")
 
     output = Render.to_mermaid(graph)
 
@@ -111,9 +111,9 @@ defmodule YogRenderTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: "5")
-      |> Yog.add_edge(from: 2, to: 3, weight: "10")
-      |> Yog.add_edge(from: 1, to: 3, weight: "15")
+      |> Yog.add_edge(from: 1, to: 2, with: "5")
+      |> Yog.add_edge(from: 2, to: 3, with: "10")
+      |> Yog.add_edge(from: 1, to: 3, with: "15")
 
     output = Render.to_mermaid(graph)
 
@@ -144,7 +144,7 @@ defmodule YogRenderTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: "100")
+      |> Yog.add_edge(from: 1, to: 2, with: "100")
 
     output =
       Render.to_mermaid(graph,
@@ -201,8 +201,8 @@ defmodule YogRenderTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: "5")
-      |> Yog.add_edge(from: 2, to: 3, weight: "10")
+      |> Yog.add_edge(from: 1, to: 2, with: "5")
+      |> Yog.add_edge(from: 2, to: 3, with: "10")
 
     output =
       Render.to_mermaid(graph,
@@ -220,8 +220,8 @@ defmodule YogRenderTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: "5")
-      |> Yog.add_edge(from: 2, to: 3, weight: "10")
+      |> Yog.add_edge(from: 1, to: 2, with: "5")
+      |> Yog.add_edge(from: 2, to: 3, with: "10")
 
     output =
       Render.to_mermaid(graph,
@@ -273,7 +273,7 @@ defmodule YogRenderTest do
       Yog.directed()
       |> Yog.add_node(1, "Node A")
       |> Yog.add_node(2, "Node B")
-      |> Yog.add_edge(from: 1, to: 2, weight: "10")
+      |> Yog.add_edge(from: 1, to: 2, with: "10")
 
     output = Render.to_dot(graph)
 
@@ -286,7 +286,7 @@ defmodule YogRenderTest do
       Yog.undirected()
       |> Yog.add_node(1, "Node A")
       |> Yog.add_node(2, "Node B")
-      |> Yog.add_edge(from: 1, to: 2, weight: "10")
+      |> Yog.add_edge(from: 1, to: 2, with: "10")
 
     output = Render.to_dot(graph)
 
@@ -317,7 +317,7 @@ defmodule YogRenderTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: "100")
+      |> Yog.add_edge(from: 1, to: 2, with: "100")
 
     output =
       Render.to_dot(graph,
@@ -354,8 +354,8 @@ defmodule YogRenderTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: "5")
-      |> Yog.add_edge(from: 2, to: 3, weight: "10")
+      |> Yog.add_edge(from: 1, to: 2, with: "5")
+      |> Yog.add_edge(from: 2, to: 3, with: "10")
 
     output =
       Render.to_dot(graph,
@@ -411,7 +411,7 @@ defmodule YogRenderTest do
       Yog.directed()
       |> Yog.add_node(1, "Node A")
       |> Yog.add_node(2, "Node B")
-      |> Yog.add_edge(from: 1, to: 2, weight: "10")
+      |> Yog.add_edge(from: 1, to: 2, with: "10")
 
     output = Render.to_json(graph)
 
@@ -425,7 +425,7 @@ defmodule YogRenderTest do
       Yog.undirected()
       |> Yog.add_node(1, "Node A")
       |> Yog.add_node(2, "Node B")
-      |> Yog.add_edge(from: 1, to: 2, weight: "10")
+      |> Yog.add_edge(from: 1, to: 2, with: "10")
 
     output = Render.to_json(graph)
 
@@ -449,9 +449,9 @@ defmodule YogRenderTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: "5")
-      |> Yog.add_edge(from: 2, to: 3, weight: "10")
-      |> Yog.add_edge(from: 1, to: 3, weight: "15")
+      |> Yog.add_edge(from: 1, to: 2, with: "5")
+      |> Yog.add_edge(from: 2, to: 3, with: "10")
+      |> Yog.add_edge(from: 1, to: 3, with: "15")
 
     output = Render.to_json(graph)
 
@@ -497,7 +497,7 @@ defmodule YogRenderTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: "follows")
+      |> Yog.add_edge(from: 1, to: 2, with: "follows")
 
     output =
       Render.to_json(graph,
@@ -522,11 +522,11 @@ defmodule YogRenderTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge(from: 1, to: 2, weight: "1")
-      |> Yog.add_edge(from: 1, to: 3, weight: "4")
-      |> Yog.add_edge(from: 2, to: 3, weight: "2")
-      |> Yog.add_edge(from: 2, to: 4, weight: "5")
-      |> Yog.add_edge(from: 3, to: 4, weight: "1")
+      |> Yog.add_edge(from: 1, to: 2, with: "1")
+      |> Yog.add_edge(from: 1, to: 3, with: "4")
+      |> Yog.add_edge(from: 2, to: 3, with: "2")
+      |> Yog.add_edge(from: 2, to: 4, with: "5")
+      |> Yog.add_edge(from: 3, to: 4, with: "1")
 
     output = Render.to_json(graph)
 

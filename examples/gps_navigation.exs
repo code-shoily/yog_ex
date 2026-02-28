@@ -15,9 +15,9 @@ defmodule GpsNavigation do
       |> Yog.add_node(2, "Office")
       |> Yog.add_node(3, "Mall")
       # 15 minutes
-      |> Yog.add_edge(from: 1, to: 2, weight: 15)
-      |> Yog.add_edge(from: 2, to: 3, weight: 10)
-      |> Yog.add_edge(from: 1, to: 3, weight: 30)
+      |> Yog.add_edge(from: 1, to: 2, with: 15)
+      |> Yog.add_edge(from: 2, to: 3, with: 10)
+      |> Yog.add_edge(from: 1, to: 3, with: 30)
 
     # Use A* with straight-line distance heuristic
     straight_line_distance = fn from, to ->

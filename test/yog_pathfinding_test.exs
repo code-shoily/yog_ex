@@ -12,8 +12,8 @@ defmodule YogPathfindingTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 5)
-      |> Yog.add_edge(from: 2, to: 3, weight: 10)
+      |> Yog.add_edge(from: 1, to: 2, with: 5)
+      |> Yog.add_edge(from: 2, to: 3, with: 10)
 
     result =
       Pathfinding.shortest_path(
@@ -34,7 +34,7 @@ defmodule YogPathfindingTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
 
     result =
       Pathfinding.shortest_path(
@@ -75,7 +75,7 @@ defmodule YogPathfindingTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 5)
+      |> Yog.add_edge(from: 1, to: 2, with: 5)
 
     # No edge to node 3
 
@@ -144,9 +144,9 @@ defmodule YogPathfindingTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 5)
-      |> Yog.add_edge(from: 2, to: 3, weight: 10)
-      |> Yog.add_edge(from: 1, to: 3, weight: 20)
+      |> Yog.add_edge(from: 1, to: 2, with: 5)
+      |> Yog.add_edge(from: 2, to: 3, with: 10)
+      |> Yog.add_edge(from: 1, to: 3, with: 20)
 
     result =
       Pathfinding.shortest_path(
@@ -171,9 +171,9 @@ defmodule YogPathfindingTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 3, weight: 5)
-      |> Yog.add_edge(from: 1, to: 2, weight: 2)
-      |> Yog.add_edge(from: 2, to: 3, weight: 10)
+      |> Yog.add_edge(from: 1, to: 3, with: 5)
+      |> Yog.add_edge(from: 1, to: 2, with: 2)
+      |> Yog.add_edge(from: 2, to: 3, with: 10)
 
     result =
       Pathfinding.shortest_path(
@@ -206,10 +206,10 @@ defmodule YogPathfindingTest do
       |> Yog.add_node(2, "Left")
       |> Yog.add_node(3, "Right")
       |> Yog.add_node(4, "Bottom")
-      |> Yog.add_edge(from: 1, to: 2, weight: 2)
-      |> Yog.add_edge(from: 1, to: 3, weight: 3)
-      |> Yog.add_edge(from: 2, to: 4, weight: 4)
-      |> Yog.add_edge(from: 3, to: 4, weight: 5)
+      |> Yog.add_edge(from: 1, to: 2, with: 2)
+      |> Yog.add_edge(from: 1, to: 3, with: 3)
+      |> Yog.add_edge(from: 2, to: 4, with: 4)
+      |> Yog.add_edge(from: 3, to: 4, with: 5)
 
     result =
       Pathfinding.shortest_path(
@@ -238,15 +238,15 @@ defmodule YogPathfindingTest do
       |> Yog.add_node(5, "E")
       |> Yog.add_node(6, "F")
       # Row 1
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
       # Row 2
-      |> Yog.add_edge(from: 4, to: 5, weight: 1)
-      |> Yog.add_edge(from: 5, to: 6, weight: 1)
+      |> Yog.add_edge(from: 4, to: 5, with: 1)
+      |> Yog.add_edge(from: 5, to: 6, with: 1)
       # Columns
-      |> Yog.add_edge(from: 1, to: 4, weight: 10)
-      |> Yog.add_edge(from: 2, to: 5, weight: 1)
-      |> Yog.add_edge(from: 3, to: 6, weight: 10)
+      |> Yog.add_edge(from: 1, to: 4, with: 10)
+      |> Yog.add_edge(from: 2, to: 5, with: 1)
+      |> Yog.add_edge(from: 3, to: 6, with: 10)
 
     result =
       Pathfinding.shortest_path(
@@ -269,9 +269,9 @@ defmodule YogPathfindingTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 1, with: 1)
 
     # Cycle: 1->2->3->1
 
@@ -297,8 +297,8 @@ defmodule YogPathfindingTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 5)
-      |> Yog.add_edge(from: 2, to: 3, weight: 10)
+      |> Yog.add_edge(from: 1, to: 2, with: 5)
+      |> Yog.add_edge(from: 2, to: 3, with: 10)
 
     result =
       Pathfinding.astar(
@@ -325,13 +325,13 @@ defmodule YogPathfindingTest do
       |> Yog.add_node(5, "1,1")
       |> Yog.add_node(6, "2,1")
       # Grid connections (each edge cost 1)
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 1, to: 4, weight: 1)
-      |> Yog.add_edge(from: 2, to: 5, weight: 1)
-      |> Yog.add_edge(from: 3, to: 6, weight: 1)
-      |> Yog.add_edge(from: 4, to: 5, weight: 1)
-      |> Yog.add_edge(from: 5, to: 6, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 1, to: 4, with: 1)
+      |> Yog.add_edge(from: 2, to: 5, with: 1)
+      |> Yog.add_edge(from: 3, to: 6, with: 1)
+      |> Yog.add_edge(from: 4, to: 5, with: 1)
+      |> Yog.add_edge(from: 5, to: 6, with: 1)
 
     # Manhattan distance heuristic
     # Node positions: 1=(0,0), 2=(1,0), 3=(2,0), 4=(0,1), 5=(1,1), 6=(2,1)
@@ -373,10 +373,10 @@ defmodule YogPathfindingTest do
       |> Yog.add_node(2, "A")
       |> Yog.add_node(3, "B")
       |> Yog.add_node(4, "Goal")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 1, to: 3, weight: 2)
-      |> Yog.add_edge(from: 2, to: 4, weight: 100)
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 2)
+      |> Yog.add_edge(from: 2, to: 4, with: 100)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
 
     # Heuristic that prefers node 2 initially
     h = fn from, to ->
@@ -430,7 +430,7 @@ defmodule YogPathfindingTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 5)
+      |> Yog.add_edge(from: 1, to: 2, with: 5)
 
     result =
       Pathfinding.astar(
@@ -456,11 +456,11 @@ defmodule YogPathfindingTest do
       |> Yog.add_node(4, "D")
       |> Yog.add_node(5, "E")
       # Multiple paths from 1 to 5
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 5, weight: 10)
-      |> Yog.add_edge(from: 1, to: 3, weight: 3)
-      |> Yog.add_edge(from: 3, to: 4, weight: 2)
-      |> Yog.add_edge(from: 4, to: 5, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 5, with: 10)
+      |> Yog.add_edge(from: 1, to: 3, with: 3)
+      |> Yog.add_edge(from: 3, to: 4, with: 2)
+      |> Yog.add_edge(from: 4, to: 5, with: 1)
 
     # Admissible heuristic (never overestimates)
     h = fn from, to ->
@@ -495,10 +495,10 @@ defmodule YogPathfindingTest do
       |> Yog.add_node(2, "Left")
       |> Yog.add_node(3, "Right")
       |> Yog.add_node(4, "Bottom")
-      |> Yog.add_edge(from: 1, to: 2, weight: 2)
-      |> Yog.add_edge(from: 1, to: 3, weight: 3)
-      |> Yog.add_edge(from: 2, to: 4, weight: 4)
-      |> Yog.add_edge(from: 3, to: 4, weight: 5)
+      |> Yog.add_edge(from: 1, to: 2, with: 2)
+      |> Yog.add_edge(from: 1, to: 3, with: 3)
+      |> Yog.add_edge(from: 2, to: 4, with: 4)
+      |> Yog.add_edge(from: 3, to: 4, with: 5)
 
     h = fn from, to ->
       case {from, to} do
@@ -550,12 +550,12 @@ defmodule YogPathfindingTest do
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
       |> Yog.add_node(5, "E")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 1, to: 3, weight: 4)
-      |> Yog.add_edge(from: 2, to: 3, weight: 2)
-      |> Yog.add_edge(from: 2, to: 4, weight: 5)
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
-      |> Yog.add_edge(from: 4, to: 5, weight: 2)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 4)
+      |> Yog.add_edge(from: 2, to: 3, with: 2)
+      |> Yog.add_edge(from: 2, to: 4, with: 5)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
+      |> Yog.add_edge(from: 4, to: 5, with: 2)
 
     astar_result =
       Pathfinding.astar(
@@ -590,8 +590,8 @@ defmodule YogPathfindingTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 5)
-      |> Yog.add_edge(from: 2, to: 3, weight: 10)
+      |> Yog.add_edge(from: 1, to: 2, with: 5)
+      |> Yog.add_edge(from: 2, to: 3, with: 10)
 
     result =
       Pathfinding.bellman_ford(
@@ -613,8 +613,8 @@ defmodule YogPathfindingTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 10)
-      |> Yog.add_edge(from: 2, to: 3, weight: -5)
+      |> Yog.add_edge(from: 1, to: 2, with: 10)
+      |> Yog.add_edge(from: 2, to: 3, with: -5)
 
     result =
       Pathfinding.bellman_ford(
@@ -637,10 +637,10 @@ defmodule YogPathfindingTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge(from: 1, to: 4, weight: 5)
-      |> Yog.add_edge(from: 1, to: 2, weight: 2)
-      |> Yog.add_edge(from: 2, to: 3, weight: 2)
-      |> Yog.add_edge(from: 3, to: 4, weight: -10)
+      |> Yog.add_edge(from: 1, to: 4, with: 5)
+      |> Yog.add_edge(from: 1, to: 2, with: 2)
+      |> Yog.add_edge(from: 2, to: 3, with: 2)
+      |> Yog.add_edge(from: 3, to: 4, with: -10)
 
     result =
       Pathfinding.bellman_ford(
@@ -663,9 +663,9 @@ defmodule YogPathfindingTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 2)
-      |> Yog.add_edge(from: 3, to: 1, weight: -5)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 2)
+      |> Yog.add_edge(from: 3, to: 1, with: -5)
 
     result =
       Pathfinding.bellman_ford(
@@ -690,11 +690,11 @@ defmodule YogPathfindingTest do
       |> Yog.add_node(4, "D")
       |> Yog.add_node(5, "E")
       # Negative cycle: 2->3->4->2 (unreachable from 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
-      |> Yog.add_edge(from: 4, to: 2, weight: -5)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
+      |> Yog.add_edge(from: 4, to: 2, with: -5)
       # Path from 1 to 5 (doesn't touch the cycle)
-      |> Yog.add_edge(from: 1, to: 5, weight: 10)
+      |> Yog.add_edge(from: 1, to: 5, with: 10)
 
     result =
       Pathfinding.bellman_ford(
@@ -717,7 +717,7 @@ defmodule YogPathfindingTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 5)
+      |> Yog.add_edge(from: 1, to: 2, with: 5)
 
     result =
       Pathfinding.bellman_ford(

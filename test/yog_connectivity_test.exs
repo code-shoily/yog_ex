@@ -28,7 +28,7 @@ defmodule YogConnectivityTest do
       Yog.undirected()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
 
     result = Yog.Connectivity.analyze(in: graph)
 
@@ -49,9 +49,9 @@ defmodule YogConnectivityTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
 
     result = Yog.Connectivity.analyze(in: graph)
 
@@ -73,9 +73,9 @@ defmodule YogConnectivityTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 1, with: 1)
 
     result = Yog.Connectivity.analyze(in: graph)
 
@@ -100,15 +100,15 @@ defmodule YogConnectivityTest do
       |> Yog.add_node(5, "E")
       |> Yog.add_node(6, "F")
       # First triangle
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 1, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 1, with: 1)
       # Second triangle
-      |> Yog.add_edge(from: 4, to: 5, weight: 1)
-      |> Yog.add_edge(from: 5, to: 6, weight: 1)
-      |> Yog.add_edge(from: 6, to: 4, weight: 1)
+      |> Yog.add_edge(from: 4, to: 5, with: 1)
+      |> Yog.add_edge(from: 5, to: 6, with: 1)
+      |> Yog.add_edge(from: 6, to: 4, with: 1)
       # Bridge connecting the triangles
-      |> Yog.add_edge(from: 3, to: 6, weight: 1)
+      |> Yog.add_edge(from: 3, to: 6, with: 1)
 
     result = Yog.Connectivity.analyze(in: graph)
 
@@ -138,10 +138,10 @@ defmodule YogConnectivityTest do
       |> Yog.add_node(3, "B")
       |> Yog.add_node(4, "C")
       |> Yog.add_node(5, "D")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 1, to: 3, weight: 1)
-      |> Yog.add_edge(from: 1, to: 4, weight: 1)
-      |> Yog.add_edge(from: 1, to: 5, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 1)
+      |> Yog.add_edge(from: 1, to: 4, with: 1)
+      |> Yog.add_edge(from: 1, to: 5, with: 1)
 
     result = Yog.Connectivity.analyze(in: graph)
 
@@ -166,10 +166,10 @@ defmodule YogConnectivityTest do
       |> Yog.add_node(2, "Left")
       |> Yog.add_node(3, "Right")
       |> Yog.add_node(4, "Bottom")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 1, to: 3, weight: 1)
-      |> Yog.add_edge(from: 2, to: 4, weight: 1)
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 1)
+      |> Yog.add_edge(from: 2, to: 4, with: 1)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
 
     result = Yog.Connectivity.analyze(in: graph)
 
@@ -200,14 +200,14 @@ defmodule YogConnectivityTest do
       |> Yog.add_node(6, "F")
       |> Yog.add_node(7, "G")
       |> Yog.add_node(8, "H")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 2, to: 4, weight: 1)
-      |> Yog.add_edge(from: 3, to: 5, weight: 1)
-      |> Yog.add_edge(from: 4, to: 5, weight: 1)
-      |> Yog.add_edge(from: 5, to: 6, weight: 1)
-      |> Yog.add_edge(from: 5, to: 7, weight: 1)
-      |> Yog.add_edge(from: 7, to: 8, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 2, to: 4, with: 1)
+      |> Yog.add_edge(from: 3, to: 5, with: 1)
+      |> Yog.add_edge(from: 4, to: 5, with: 1)
+      |> Yog.add_edge(from: 5, to: 6, with: 1)
+      |> Yog.add_edge(from: 5, to: 7, with: 1)
+      |> Yog.add_edge(from: 7, to: 8, with: 1)
 
     result = Yog.Connectivity.analyze(in: graph)
 
@@ -238,9 +238,9 @@ defmodule YogConnectivityTest do
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
       |> Yog.add_node(5, "E")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
-      |> Yog.add_edge(from: 4, to: 5, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
+      |> Yog.add_edge(from: 4, to: 5, with: 1)
 
     result = Yog.Connectivity.analyze(in: graph)
 
@@ -258,7 +258,7 @@ defmodule YogConnectivityTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
 
     result = Yog.Connectivity.analyze(in: graph)
 
@@ -276,8 +276,8 @@ defmodule YogConnectivityTest do
       Yog.undirected()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 1, weight: 1)
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
+      |> Yog.add_edge(from: 1, to: 1, with: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
 
     result = Yog.Connectivity.analyze(in: graph)
 
@@ -297,10 +297,10 @@ defmodule YogConnectivityTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 1, to: 2, weight: 2)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 2)
       # Duplicate edge with different weight
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
 
     result = Yog.Connectivity.analyze(in: graph)
 
@@ -323,12 +323,12 @@ defmodule YogConnectivityTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 1, to: 3, weight: 1)
-      |> Yog.add_edge(from: 1, to: 4, weight: 1)
-      |> Yog.add_edge(from: 2, to: 3, weight: 1)
-      |> Yog.add_edge(from: 2, to: 4, weight: 1)
-      |> Yog.add_edge(from: 3, to: 4, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 1, to: 3, with: 1)
+      |> Yog.add_edge(from: 1, to: 4, with: 1)
+      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge(from: 2, to: 4, with: 1)
+      |> Yog.add_edge(from: 3, to: 4, with: 1)
 
     result = Yog.Connectivity.analyze(in: graph)
 
@@ -350,11 +350,11 @@ defmodule YogConnectivityTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge(from: 1, to: 2, weight: 1)
-      |> Yog.add_edge(from: 2, to: 4, weight: 1)
-      |> Yog.add_edge(from: 4, to: 3, weight: 1)
-      |> Yog.add_edge(from: 3, to: 1, weight: 1)
-      |> Yog.add_edge(from: 1, to: 4, weight: 1)
+      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge(from: 2, to: 4, with: 1)
+      |> Yog.add_edge(from: 4, to: 3, with: 1)
+      |> Yog.add_edge(from: 3, to: 1, with: 1)
+      |> Yog.add_edge(from: 1, to: 4, with: 1)
 
     # Diagonal
 
@@ -374,7 +374,7 @@ defmodule YogConnectivityTest do
       Yog.undirected()
       |> Yog.add_node(5, "A")
       |> Yog.add_node(3, "B")
-      |> Yog.add_edge(from: 5, to: 3, weight: 1)
+      |> Yog.add_edge(from: 5, to: 3, with: 1)
 
     result = Yog.Connectivity.analyze(in: graph)
 

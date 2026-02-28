@@ -31,8 +31,8 @@ defmodule Yog.Transform do
 
       # Original: A -> B -> C
       graph = Yog.directed()
-        |> Yog.add_edge(from: "A", to: "B", weight: 1)
-        |> Yog.add_edge(from: "B", to: "C", weight: 2)
+        |> Yog.add_edge(from: "A", to: "B", with: 1)
+        |> Yog.add_edge(from: "B", to: "C", with: 2)
 
       # Transposed: C -> B -> A
       transposed = Yog.Transform.transpose(graph)
@@ -122,11 +122,11 @@ defmodule Yog.Transform do
 
       graph1 = Yog.directed()
         |> Yog.add_node(1, "A")
-        |> Yog.add_edge(from: 1, to: 2, weight: 10)
+        |> Yog.add_edge(from: 1, to: 2, with: 10)
 
       graph2 = Yog.directed()
         |> Yog.add_node(2, "B")
-        |> Yog.add_edge(from: 2, to: 3, weight: 5)
+        |> Yog.add_edge(from: 2, to: 3, with: 5)
 
       merged = Yog.Transform.merge(graph1, graph2)
       # Contains nodes 1, 2, 3 and both edges
@@ -146,8 +146,8 @@ defmodule Yog.Transform do
         |> Yog.add_node(1, "A")
         |> Yog.add_node(2, "B")
         |> Yog.add_node(3, "C")
-        |> Yog.add_edge(from: 1, to: 2, weight: 10)
-        |> Yog.add_edge(from: 2, to: 3, weight: 20)
+        |> Yog.add_edge(from: 1, to: 2, with: 10)
+        |> Yog.add_edge(from: 2, to: 3, with: 20)
 
       # Keep only nodes 2 and 3
       sub = Yog.Transform.subgraph(graph, [2, 3])
