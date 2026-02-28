@@ -16,10 +16,4 @@ defmodule Yog.MinCut do
     {:min_cut, weight, a_size, b_size} = :yog@min_cut.global_min_cut(graph)
     %{weight: weight, group_a_size: a_size, group_b_size: b_size}
   end
-
-  @doc """
-  Alias for global_min_cut since it doesn't fail based on node count anymore.
-  """
-  @spec global_min_cut!(Yog.graph()) :: min_cut_result()
-  def global_min_cut!(graph), do: global_min_cut(graph)
 end

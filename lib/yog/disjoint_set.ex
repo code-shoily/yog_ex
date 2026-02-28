@@ -4,8 +4,8 @@ defmodule Yog.DisjointSet do
 
   Provides O(α(n)) operations for dynamic connectivity queries.
   """
-  
-  @opaque t :: term()
+
+  @type t :: term()
 
   @doc """
   Creates a new, empty Disjoint Set.

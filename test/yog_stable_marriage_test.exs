@@ -83,14 +83,16 @@ defmodule YogStableMarriageTest do
   test "medical_residency_test" do
     # 4 residents, 4 hospitals
     residents = %{
-      1 => [101, 102, 103, 104],  # Resident 1 ranks hospitals
+      # Resident 1 ranks hospitals
+      1 => [101, 102, 103, 104],
       2 => [102, 104, 101, 103],
       3 => [103, 101, 104, 102],
       4 => [104, 103, 102, 101]
     }
 
     hospitals = %{
-      101 => [2, 1, 3, 4],  # Hospital 101 ranks residents
+      # Hospital 101 ranks residents
+      101 => [2, 1, 3, 4],
       102 => [1, 3, 2, 4],
       103 => [3, 4, 1, 2],
       104 => [4, 2, 3, 1]
@@ -208,10 +210,8 @@ defmodule YogStableMarriageTest do
     # Get all men's partners
     partners =
       [1, 2, 3]
-      |> Enum.filter_map(
-        fn man -> Map.has_key?(matching, man) end,
-        fn man -> Map.get(matching, man) end
-      )
+      |> Enum.filter(fn man -> Map.has_key?(matching, man) end)
+      |> Enum.map(fn man -> Map.get(matching, man) end)
 
     # Should have no duplicates
     unique_partners = MapSet.size(MapSet.new(partners))

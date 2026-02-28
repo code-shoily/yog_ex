@@ -71,18 +71,6 @@ defmodule Yog.Pathfinding do
   end
 
   @doc """
-  Finds the shortest path or raises an exception if none is found.
-  See `shortest_path/1` for options.
-  """
-  @spec shortest_path!(keyword()) :: term()
-  def shortest_path!(opts) do
-    case shortest_path(opts) do
-      {:some, path} -> path
-      :none -> raise "No shortest path found from #{opts[:from]} to #{opts[:to]}"
-    end
-  end
-
-  @doc """
   Finds the shortest path using A* search with a heuristic.
 
   Best for when you have a good heuristic estimate of remaining distance.
@@ -131,18 +119,6 @@ defmodule Yog.Pathfinding do
   end
 
   @doc """
-  Finds the shortest path using A* search or raises an exception if none is found.
-  See `astar/1` for options.
-  """
-  @spec astar!(keyword()) :: term()
-  def astar!(opts) do
-    case astar(opts) do
-      {:some, path} -> path
-      :none -> raise "No A* path found from #{opts[:from]} to #{opts[:to]}"
-    end
-  end
-
-  @doc """
   Finds the shortest path using Bellman-Ford algorithm.
 
   Supports negative edge weights and detects negative cycles.
@@ -158,9 +134,9 @@ defmodule Yog.Pathfinding do
 
   ## Returns
 
-  - `{:ok, {:some, path}}` - Path found
-  - `{:ok, :none}` - No path exists
-  - `{:error, :negative_cycle}` - Graph contains a negative cycle
+  - `{:shortest_path, {:path, nodes, weight}}` - Path found
+  - `:no_path` - No path exists
+  - `:negative_cycle` - Graph contains a negative cycle
 
   ## Examples
 
@@ -172,12 +148,13 @@ defmodule Yog.Pathfinding do
         add: &Kernel.+/2,
         compare: &Integer.compare/2
       ) do
-        {:ok, {:some, path}} -> path.total_weight
-        {:ok, :none} -> :no_path
-        {:error, :negative_cycle} -> :cycle_detected
+        {:shortest_path, {:path, _nodes, weight}} -> weight
+        :no_path -> :no_path
+        :negative_cycle -> :cycle_detected
       end
   """
-  @spec bellman_ford(keyword()) :: {:ok, {:some, term()} | :none} | {:error, :negative_cycle}
+  @spec bellman_ford(keyword()) ::
+          :negative_cycle | :no_path | {:shortest_path, {:path, [Yog.node_id()], term()}}
   def bellman_ford(opts) do
     graph = Keyword.fetch!(opts, :in)
     from = Keyword.fetch!(opts, :from)
@@ -187,20 +164,6 @@ defmodule Yog.Pathfinding do
     compare = Keyword.fetch!(opts, :compare)
 
     :yog@pathfinding.bellman_ford(graph, from, to, zero, add, compare)
-  end
-
-  @doc """
-  Finds the shortest path using Bellman-Ford algorithms or raises an exception.
-  Raises on negative cycles or if no path is found.
-  See `bellman_ford/1` for options.
-  """
-  @spec bellman_ford!(keyword()) :: term()
-  def bellman_ford!(opts) do
-    case bellman_ford(opts) do
-      {:ok, {:some, path}} -> path
-      {:ok, :none} -> raise "No Bellman-Ford path found from #{opts[:from]} to #{opts[:to]}"
-      {:error, :negative_cycle} -> raise "Negative cycle detected in graph!"
-    end
   end
 
   @doc """
@@ -217,7 +180,8 @@ defmodule Yog.Pathfinding do
 
   A nested map `%{start_node_id => %{end_node_id => distance}}`.
   """
-  @spec floyd_warshall(keyword()) :: {:ok, %{Yog.node_id() => %{Yog.node_id() => term()}}} | {:error, term()}
+  @spec floyd_warshall(keyword()) ::
+          {:ok, %{Yog.node_id() => %{Yog.node_id() => term()}}} | {:error, term()}
   def floyd_warshall(opts) do
     graph = Keyword.fetch!(opts, :in)
     zero = Keyword.fetch!(opts, :zero)
@@ -230,10 +194,10 @@ defmodule Yog.Pathfinding do
       {:error, reason} -> {:error, reason}
     end
   end
-  
+
   @doc """
   Computes single-source distances to all reachable nodes without tracking paths.
-  
+
   ## Options
 
   - `:in` - The graph to search
@@ -260,7 +224,7 @@ defmodule Yog.Pathfinding do
     |> :gleam@dict.to_list()
     |> Map.new()
   end
-  
+
   defp unwrap_gleam_dict_of_dicts(dict_of_dicts) do
     dict_of_dicts
     |> :gleam@dict.to_list()

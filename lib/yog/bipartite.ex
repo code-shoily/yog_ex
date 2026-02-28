@@ -13,7 +13,7 @@ defmodule Yog.Bipartite do
   """
 
   @type partition :: %{left: MapSet.t(Yog.node_id()), right: MapSet.t(Yog.node_id())}
-  
+
   @doc """
   Checks if a graph is bipartite (2-colorable).
   """
@@ -34,6 +34,7 @@ defmodule Yog.Bipartite do
         left = left_set |> :gleam@set.to_list() |> MapSet.new()
         right = right_set |> :gleam@set.to_list() |> MapSet.new()
         {:ok, %{left: left, right: right}}
+
       :none ->
         {:error, :not_bipartite}
     end
@@ -47,7 +48,10 @@ defmodule Yog.Bipartite do
   """
   @spec maximum_matching(Yog.graph(), partition()) :: [{Yog.node_id(), Yog.node_id()}]
   def maximum_matching(graph, partition) do
-    gleam_part = {:partition, partition.left |> MapSet.to_list() |> :gleam@set.from_list(), partition.right |> MapSet.to_list() |> :gleam@set.from_list()}
+    gleam_part =
+      {:partition, partition.left |> MapSet.to_list() |> :gleam@set.from_list(),
+       partition.right |> MapSet.to_list() |> :gleam@set.from_list()}
+
     :yog@bipartite.maximum_matching(graph, gleam_part)
   end
 

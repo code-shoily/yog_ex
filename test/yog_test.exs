@@ -8,9 +8,12 @@ defmodule YogTest do
 
       assert graph |> elem(0) == :graph
       assert graph |> elem(1) == :directed
-      assert graph |> elem(2) |> map_size() == 0 # nodes
-      assert graph |> elem(3) |> map_size() == 0 # out_edges
-      assert graph |> elem(4) |> map_size() == 0 # in_edges
+      # nodes
+      assert graph |> elem(2) |> map_size() == 0
+      # out_edges
+      assert graph |> elem(3) |> map_size() == 0
+      # in_edges
+      assert graph |> elem(4) |> map_size() == 0
     end
 
     # Test creating a new undirected graph
@@ -68,7 +71,7 @@ defmodule YogTest do
 
       assert Map.get(out_edges, 1) == %{2 => 10}
       assert Map.get(in_edges, 2) == %{1 => 10}
-      
+
       assert Map.get(out_edges, 2) == nil
       assert Map.get(in_edges, 1) == nil
     end

@@ -29,7 +29,7 @@ defmodule Mix.Tasks.Yog.Sync do
       |> Enum.each(fn {func, arity} ->
         Mix.shell().info("  - #{func}/#{arity}")
       end)
-      
+
       System.halt(1)
     end
   end
@@ -37,7 +37,7 @@ defmodule Mix.Tasks.Yog.Sync do
   defp get_exports(module) do
     # Load the module if it isn't already
     Code.ensure_loaded(module)
-    
+
     module.module_info(:exports)
     |> Enum.reject(fn {func, _arity} ->
       # Ignore standard Erlang/Elixir internal functions

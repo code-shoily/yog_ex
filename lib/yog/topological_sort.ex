@@ -18,17 +18,6 @@ defmodule Yog.TopologicalSort do
   end
 
   @doc """
-  Performs a topological sort or raises an exception if a cycle is detected.
-  """
-  @spec sort!(Yog.graph()) :: [Yog.node_id()]
-  def sort!(graph) do
-    case sort(graph) do
-      {:ok, order} -> order
-      {:error, :contains_cycle} -> raise "Graph contains a cycle; cannot be topologically sorted."
-    end
-  end
-
-  @doc """
   Performs a lexicographical topological sort.
 
   When multiple nodes are available to be placed next in the sorted order, this

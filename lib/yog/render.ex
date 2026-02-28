@@ -64,7 +64,7 @@ defmodule Yog.Render do
   def to_mermaid(graph, opts \\ []) do
     node_label_fn = Keyword.get(opts, :node_label, fn id, _data -> to_string(id) end)
     edge_label_fn = Keyword.get(opts, :edge_label, fn weight -> to_string(weight) end)
-    
+
     opts_map = Keyword.get(opts, :options, %{})
     high_nodes = wrap_option(Map.get(opts_map, :highlighted_nodes))
     high_edges = wrap_option(Map.get(opts_map, :highlighted_edges))
@@ -76,20 +76,15 @@ defmodule Yog.Render do
   @doc """
   Converts a shortest path to Mermaid options for highlighting.
   """
-  @spec path_to_mermaid_options(Yog.Pathfinding.path(), keyword()) :: map()
+  @spec path_to_mermaid_options(map(), keyword()) :: map()
   def path_to_mermaid_options(path, base_options \\ []) do
     case path do
       %{} = map ->
         {:path, nodes, _} = map.gleam_path
-        node_label_fn = Keyword.get(base_options, :node_label, fn id, _data -> to_string(id) end)
-        edge_label_fn = Keyword.get(base_options, :edge_label, fn w -> to_string(w) end)
-        
-        # Gleam 1.3.0 path_to_options returns a MermaidOptions tuple, which we could return directly
-        # or repackage. Let's return the gleam tuple, to_mermaid will need to handle it or we just
-        # let users pass it. 
-        # Actually, it's better to just build the option map.
         %{highlighted_nodes: nodes, highlighted_edges: path_to_edges(nodes)}
-      _ -> base_options
+
+      _ ->
+        base_options
     end
   end
 
@@ -108,28 +103,33 @@ defmodule Yog.Render do
   def to_dot(graph, opts \\ []) do
     node_label_fn = Keyword.get(opts, :node_label, fn id, _data -> to_string(id) end)
     edge_label_fn = Keyword.get(opts, :edge_label, fn weight -> to_string(weight) end)
-    
+
     opts_map = Keyword.get(opts, :options, %{})
     high_nodes = wrap_option(Map.get(opts_map, :highlighted_nodes))
     high_edges = wrap_option(Map.get(opts_map, :highlighted_edges))
-    
+
     node_shape = Keyword.get(opts, :node_shape, "ellipse")
     highlight_color = Keyword.get(opts, :highlight_color, "red")
 
-    gleam_opts = {:dot_options, node_label_fn, edge_label_fn, high_nodes, high_edges, node_shape, highlight_color}
+    gleam_opts =
+      {:dot_options, node_label_fn, edge_label_fn, high_nodes, high_edges, node_shape,
+       highlight_color}
+
     :yog@render.to_dot(graph, gleam_opts)
   end
 
   @doc """
   Converts a shortest path to DOT options for highlighting.
   """
-  @spec path_to_dot_options(Yog.Pathfinding.path(), keyword()) :: map()
+  @spec path_to_dot_options(map(), keyword()) :: map()
   def path_to_dot_options(path, base_options \\ []) do
     case path do
       %{} = map ->
         {:path, nodes, _} = map.gleam_path
         %{highlighted_nodes: nodes, highlighted_edges: path_to_edges(nodes)}
-      _ -> base_options
+
+      _ ->
+        base_options
     end
   end
 
@@ -138,12 +138,22 @@ defmodule Yog.Render do
   """
   @spec to_json(Yog.graph(), keyword()) :: String.t()
   def to_json(graph, opts \\ []) do
-    node_mapper = Keyword.get(opts, :node_mapper, fn id, label -> 
-      :gleam@json.object([{"id", :gleam@json.int(id)}, {"label", :gleam@json.string(to_string(label))}]) 
-    end)
-    edge_mapper = Keyword.get(opts, :edge_mapper, fn from, to, weight -> 
-      :gleam@json.object([{"source", :gleam@json.int(from)}, {"target", :gleam@json.int(to)}, {"weight", :gleam@json.string(to_string(weight))}]) 
-    end)
+    node_mapper =
+      Keyword.get(opts, :node_mapper, fn id, label ->
+        :gleam@json.object([
+          {"id", :gleam@json.int(id)},
+          {"label", :gleam@json.string(to_string(label))}
+        ])
+      end)
+
+    edge_mapper =
+      Keyword.get(opts, :edge_mapper, fn from, to, weight ->
+        :gleam@json.object([
+          {"source", :gleam@json.int(from)},
+          {"target", :gleam@json.int(to)},
+          {"weight", :gleam@json.string(to_string(weight))}
+        ])
+      end)
 
     gleam_opts = {:json_options, node_mapper, edge_mapper}
     :yog@render.to_json(graph, gleam_opts)

@@ -38,7 +38,7 @@ defmodule YogTransformTest do
     transposed = Yog.Transform.transpose(graph)
 
     assert Yog.successors(transposed, 2) == [{1, 10}]
-    
+
     succ_3 = Yog.successors(transposed, 3)
     assert length(succ_3) == 2
     assert {2, 20} in succ_3

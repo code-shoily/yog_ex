@@ -88,46 +88,46 @@ defmodule Yog.Transform do
   @doc """
   Removes nodes matching a predicate and prunes their edges.
 
-  The predicate receives the node ID and node data, and returns `true`
+  The predicate receives the node data, and returns `true`
   to keep the node or `false` to remove it.
 
   ## Examples
 
-      # Keep only nodes with even IDs
-      even_graph = Yog.Transform.filter_nodes(graph, fn id, _data ->
-        rem(id, 2) == 0
+      # Keep only nodes with string "active"
+      even_graph = Yog.Transform.filter_nodes(graph, fn data ->
+        data == "active"
       end)
 
       # Remove nodes with nil data
-      clean_graph = Yog.Transform.filter_nodes(graph, fn _id, data ->
+      clean_graph = Yog.Transform.filter_nodes(graph, fn data ->
         data != nil
       end)
 
       # Keep nodes matching a pattern
-      filtered = Yog.Transform.filter_nodes(graph, fn _id, data ->
-        String.starts_with?(data, "active_")
+      filtered = Yog.Transform.filter_nodes(graph, fn data ->
+        String.starts_with?(to_string(data), "active_")
       end)
   """
-  @spec filter_nodes(Yog.graph(), (integer(), term() -> boolean())) :: Yog.graph()
+  @spec filter_nodes(Yog.graph(), (term() -> boolean())) :: Yog.graph()
   defdelegate filter_nodes(graph, predicate), to: :yog@transform
 
   @doc """
   Merges two graphs.
-  
+
   When nodes or edges exist in both graphs, the second graph's data
   takes precedence. The merged graph preserves the base graph's type
   (directed/undirected).
-  
+
   ## Examples
-  
+
       graph1 = Yog.directed()
         |> Yog.add_node(1, "A")
         |> Yog.add_edge(from: 1, to: 2, weight: 10)
-  
+
       graph2 = Yog.directed()
         |> Yog.add_node(2, "B")
         |> Yog.add_edge(from: 2, to: 3, weight: 5)
-  
+
       merged = Yog.Transform.merge(graph1, graph2)
       # Contains nodes 1, 2, 3 and both edges
   """
@@ -136,22 +136,22 @@ defmodule Yog.Transform do
 
   @doc """
   Creates a subgraph containing only the specified nodes and edges between them.
-  
+
   Nodes not in the `keeping` list are removed, implicitly removing all edges
   connected to them.
-  
+
   ## Examples
-  
+
       graph = Yog.directed()
         |> Yog.add_node(1, "A")
         |> Yog.add_node(2, "B")
         |> Yog.add_node(3, "C")
         |> Yog.add_edge(from: 1, to: 2, weight: 10)
         |> Yog.add_edge(from: 2, to: 3, weight: 20)
-  
+
       # Keep only nodes 2 and 3
       sub = Yog.Transform.subgraph(graph, [2, 3])
-      
+
       # Edge 2->3 remains, Edge 1->2 is removed
   """
   @spec subgraph(Yog.graph(), [Yog.node_id()]) :: Yog.graph()
