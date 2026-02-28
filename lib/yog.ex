@@ -21,7 +21,8 @@ defmodule Yog do
   ## Modules
 
   - `Yog` - Core graph operations
-  - `Yog.Labeled` - Build graphs with string/atom labels
+  - `Yog.Model` - Native graph data structure and operations
+  - `Yog.Builder.Labeled` - Build graphs with string/atom labels
   - `Yog.Pathfinding` - Shortest path algorithms
   - `Yog.Traversal` - BFS/DFS traversal
   - `Yog.Transform` - Graph transformations

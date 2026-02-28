@@ -11,8 +11,8 @@ defmodule YogModelTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> :yog@model.add_edge(1, 2, 10)
-      |> :yog@model.add_edge_with_combine(1, 2, 5, &Kernel.+/2)
+      |> Yog.Model.add_edge(1, 2, 10)
+      |> Yog.Model.add_edge_with_combine(1, 2, 5, &Kernel.+/2)
 
     # Edge weight should be 10 + 5 = 15
     assert Yog.successors(graph, 1) == [{2, 15}]
@@ -23,8 +23,8 @@ defmodule YogModelTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> :yog@model.add_edge(1, 2, 10)
-      |> :yog@model.add_edge_with_combine(1, 2, 25, &max/2)
+      |> Yog.Model.add_edge(1, 2, 10)
+      |> Yog.Model.add_edge_with_combine(1, 2, 25, &max/2)
 
     # Edge weight should be max(10, 25) = 25
     assert Yog.successors(graph, 1) == [{2, 25}]
@@ -35,8 +35,8 @@ defmodule YogModelTest do
       Yog.undirected()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> :yog@model.add_edge(1, 2, 10)
-      |> :yog@model.add_edge_with_combine(1, 2, 5, &Kernel.+/2)
+      |> Yog.Model.add_edge(1, 2, 10)
+      |> Yog.Model.add_edge_with_combine(1, 2, 5, &Kernel.+/2)
 
     # Both directions should have combined weight
     assert Yog.successors(graph, 1) == [{2, 15}]
@@ -51,7 +51,7 @@ defmodule YogModelTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> :yog@model.remove_node(2)
+      |> Yog.Model.remove_node(2)
 
     nodes = Yog.all_nodes(graph)
     assert length(nodes) == 2
@@ -68,7 +68,7 @@ defmodule YogModelTest do
       |> Yog.add_node(3, "C")
       |> Yog.add_edge(from: 1, to: 2, weight: 10)
       |> Yog.add_edge(from: 2, to: 3, weight: 20)
-      |> :yog@model.remove_node(2)
+      |> Yog.Model.remove_node(2)
 
     # Node 2 removed
     nodes = Yog.all_nodes(graph)
@@ -88,7 +88,7 @@ defmodule YogModelTest do
       |> Yog.add_node(3, "C")
       |> Yog.add_edge(from: 1, to: 2, weight: 10)
       |> Yog.add_edge(from: 2, to: 3, weight: 20)
-      |> :yog@model.remove_node(2)
+      |> Yog.Model.remove_node(2)
 
     # Both directions should be cleaned up
     assert Yog.successors(graph, 1) == []
@@ -99,7 +99,7 @@ defmodule YogModelTest do
 
   test "order_empty_graph_test" do
     graph = Yog.directed()
-    assert :yog@model.order(graph) == 0
+    assert Yog.Model.order(graph) == 0
   end
 
   test "order_after_adding_nodes_test" do
@@ -109,7 +109,7 @@ defmodule YogModelTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
 
-    assert :yog@model.order(graph) == 3
+    assert Yog.Model.order(graph) == 3
   end
 
   test "order_unchanged_by_edges_test" do
@@ -118,10 +118,10 @@ defmodule YogModelTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
 
-    assert :yog@model.order(graph) == 2
+    assert Yog.Model.order(graph) == 2
 
     graph = Yog.add_edge(graph, from: 1, to: 2, weight: 10)
-    assert :yog@model.order(graph) == 2
+    assert Yog.Model.order(graph) == 2
   end
 
   test "order_after_remove_node_test" do
@@ -131,10 +131,10 @@ defmodule YogModelTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
 
-    assert :yog@model.order(graph) == 3
+    assert Yog.Model.order(graph) == 3
 
-    graph = :yog@model.remove_node(graph, 2)
-    assert :yog@model.order(graph) == 2
+    graph = Yog.Model.remove_node(graph, 2)
+    assert Yog.Model.order(graph) == 2
   end
 
   # ============= Complex Graph Tests =============

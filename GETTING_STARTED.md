@@ -87,10 +87,10 @@ Yog.successors(graph, 1)
 #=> [{2, 10}]
 
 # Use labeled graphs
-builder = Yog.Labeled.directed()
-  |> Yog.Labeled.add_edge("home", "work", 10)
+builder = Yog.Builder.Labeled.directed()
+  |> Yog.Builder.Labeled.add_edge("home", "work", 10)
 
-graph = Yog.Labeled.to_graph(builder)
+graph = Yog.Builder.Labeled.to_graph(builder)
 ```
 
 ## Development Workflow

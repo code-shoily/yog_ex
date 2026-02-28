@@ -52,13 +52,13 @@ defmodule GraphCreation do
          |> Yog.add_simple_edge(from: 1, to: 2)
     IO.puts("   Created graph with #{count_nodes(g5)} nodes")
 
-    # 6. Labeled variants - Note: Labeled API is separate in Yog.Labeled module
-    IO.puts("\n6. Labeled Builder Pattern (using Yog.Labeled)")
-    # Labeled graphs use the Yog.Labeled module with string/atom identifiers
-    IO.puts("   Available via Yog.Labeled module for string-based node IDs")
+    # 6. Labeled variants - Note: Labeled API is separate in Yog.Builder.Labeled module
+    IO.puts("\n6. Labeled Builder Pattern (using Yog.Builder.Labeled)")
+    # Labeled graphs use the Yog.Builder.Labeled module with string/atom identifiers
+    IO.puts("   Available via Yog.Builder.Labeled module for string-based node IDs")
 
     IO.puts("\n7-9. Additional Graph Creation Methods")
-    IO.puts("   Yog provides flexible APIs in the Yog.Labeled module")
+    IO.puts("   Yog provides flexible APIs in the Yog.Builder.Labeled module")
 
     # 10. Undirected graph support
     IO.puts("\n10. Undirected Graph")

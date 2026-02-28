@@ -10,7 +10,7 @@ defmodule Yog.Builder.Grid do
   Edges are created between adjacent cells (up, down, left, right) if the
   `is_passable` function returns true for the cell's weight.
   """
-  @spec from_2d_list([[term()]], Yog.graph_type(), fun()) :: Yog.Labeled.builder()
+  @spec from_2d_list([[term()]], Yog.graph_type(), fun()) :: Yog.Builder.Labeled.builder()
   def from_2d_list(grid_data, graph_type, is_passable_fn) do
     # Gleam's Directed/Undirected compile to :directed/:undirected atoms
     :yog@builder@grid.from_2d_list(grid_data, graph_type, is_passable_fn)
@@ -19,7 +19,7 @@ defmodule Yog.Builder.Grid do
   @doc """
   Converts a labelled grid builder strictly into a usable Graph.
   """
-  @spec to_graph(Yog.Labeled.builder()) :: Yog.graph()
+  @spec to_graph(Yog.Builder.Labeled.builder()) :: Yog.graph()
   defdelegate to_graph(builder), to: :yog@builder@grid
 
   @doc """

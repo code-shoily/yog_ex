@@ -1,4 +1,4 @@
-defmodule Yog.Labeled do
+defmodule Yog.Builder.Labeled do
   @moduledoc """
   Build graphs using arbitrary labels instead of integer IDs.
 
@@ -8,15 +8,15 @@ defmodule Yog.Labeled do
   ## Examples
 
       # Build a graph with string labels
-      builder = Yog.Labeled.directed()
-        |> Yog.Labeled.add_edge("home", "work", 10)
-        |> Yog.Labeled.add_edge("work", "gym", 5)
+      builder = Yog.Builder.Labeled.directed()
+        |> Yog.Builder.Labeled.add_edge("home", "work", 10)
+        |> Yog.Builder.Labeled.add_edge("work", "gym", 5)
 
       # Convert to a Graph to use with algorithms
-      graph = Yog.Labeled.to_graph(builder)
+      graph = Yog.Builder.Labeled.to_graph(builder)
 
       # Get the node ID for a label
-      {:ok, home_id} = Yog.Labeled.get_id(builder, "home")
+      {:ok, home_id} = Yog.Builder.Labeled.get_id(builder, "home")
 
       # Use with pathfinding
       case Yog.Pathfinding.shortest_path(
@@ -40,7 +40,7 @@ defmodule Yog.Labeled do
 
   ## Examples
 
-      iex> builder = Yog.Labeled.directed()
+      iex> builder = Yog.Builder.Labeled.directed()
       iex> is_tuple(builder)
       true
   """
@@ -52,7 +52,7 @@ defmodule Yog.Labeled do
 
   ## Examples
 
-      iex> builder = Yog.Labeled.undirected()
+      iex> builder = Yog.Builder.Labeled.undirected()
       iex> is_tuple(builder)
       true
   """
@@ -64,7 +64,7 @@ defmodule Yog.Labeled do
 
   ## Examples
 
-      iex> builder = Yog.Labeled.new(:directed)
+      iex> builder = Yog.Builder.Labeled.new(:directed)
       iex> is_tuple(builder)
       true
   """
@@ -76,9 +76,9 @@ defmodule Yog.Labeled do
 
   ## Examples
 
-      iex> builder = Yog.Labeled.directed()
-      ...> |> Yog.Labeled.add_node("Node A")
-      iex> Yog.Labeled.all_labels(builder)
+      iex> builder = Yog.Builder.Labeled.directed()
+      ...> |> Yog.Builder.Labeled.add_node("Node A")
+      iex> Yog.Builder.Labeled.all_labels(builder)
       ["Node A"]
   """
   @spec add_node(builder(), label()) :: builder()
@@ -91,9 +91,9 @@ defmodule Yog.Labeled do
 
   ## Examples
 
-      iex> builder = Yog.Labeled.directed()
-      ...> |> Yog.Labeled.add_edge("A", "B", 10)
-      iex> {:ok, successors} = Yog.Labeled.successors(builder, "A")
+      iex> builder = Yog.Builder.Labeled.directed()
+      ...> |> Yog.Builder.Labeled.add_edge("A", "B", 10)
+      iex> {:ok, successors} = Yog.Builder.Labeled.successors(builder, "A")
       iex> successors
       [{"B", 10}]
   """
@@ -109,9 +109,9 @@ defmodule Yog.Labeled do
 
   ## Examples
 
-      iex> builder = Yog.Labeled.directed()
-      ...> |> Yog.Labeled.add_edge("A", "B", 5)
-      iex> graph = Yog.Labeled.to_graph(builder)
+      iex> builder = Yog.Builder.Labeled.directed()
+      ...> |> Yog.Builder.Labeled.add_edge("A", "B", 5)
+      iex> graph = Yog.Builder.Labeled.to_graph(builder)
       iex> Yog.graph?(graph)
       true
   """
@@ -125,13 +125,13 @@ defmodule Yog.Labeled do
 
   ## Examples
 
-      iex> builder = Yog.Labeled.directed()
-      ...> |> Yog.Labeled.add_node("A")
-      iex> Yog.Labeled.get_id(builder, "A")
+      iex> builder = Yog.Builder.Labeled.directed()
+      ...> |> Yog.Builder.Labeled.add_node("A")
+      iex> Yog.Builder.Labeled.get_id(builder, "A")
       {:ok, 0}
 
-      iex> builder = Yog.Labeled.directed()
-      iex> Yog.Labeled.get_id(builder, "NonExistent")
+      iex> builder = Yog.Builder.Labeled.directed()
+      iex> Yog.Builder.Labeled.get_id(builder, "NonExistent")
       {:error, nil}
   """
   @spec get_id(builder(), label()) :: {:ok, integer()} | {:error, nil}
@@ -147,10 +147,10 @@ defmodule Yog.Labeled do
 
   ## Examples
 
-      iex> builder = Yog.Labeled.directed()
-      ...> |> Yog.Labeled.add_node("A")
-      ...> |> Yog.Labeled.add_node("B")
-      iex> Yog.Labeled.all_labels(builder)
+      iex> builder = Yog.Builder.Labeled.directed()
+      ...> |> Yog.Builder.Labeled.add_node("A")
+      ...> |> Yog.Builder.Labeled.add_node("B")
+      iex> Yog.Builder.Labeled.all_labels(builder)
       ["A", "B"]
   """
   @spec all_labels(builder()) :: [label()]
@@ -164,9 +164,9 @@ defmodule Yog.Labeled do
 
   ## Examples
 
-      iex> builder = Yog.Labeled.directed()
-      ...> |> Yog.Labeled.add_edge("A", "B", 10)
-      iex> Yog.Labeled.successors(builder, "A")
+      iex> builder = Yog.Builder.Labeled.directed()
+      ...> |> Yog.Builder.Labeled.add_edge("A", "B", 10)
+      iex> Yog.Builder.Labeled.successors(builder, "A")
       {:ok, [{"B", 10}]}
   """
   @spec successors(builder(), label()) :: {:ok, [{label(), term()}]} | {:error, nil}
@@ -185,9 +185,9 @@ defmodule Yog.Labeled do
 
   ## Examples
 
-      iex> builder = Yog.Labeled.directed()
-      ...> |> Yog.Labeled.add_edge("A", "B", 5)
-      iex> Yog.Labeled.predecessors(builder, "B")
+      iex> builder = Yog.Builder.Labeled.directed()
+      ...> |> Yog.Builder.Labeled.add_edge("A", "B", 5)
+      iex> Yog.Builder.Labeled.predecessors(builder, "B")
       {:ok, [{"A", 5}]}
   """
   @spec predecessors(builder(), label()) :: {:ok, [{label(), term()}]} | {:error, nil}
@@ -206,8 +206,8 @@ defmodule Yog.Labeled do
 
   ## Examples
 
-      iex> builder = Yog.Labeled.directed()
-      iex> {builder, id} = Yog.Labeled.ensure_node(builder, "A")
+      iex> builder = Yog.Builder.Labeled.directed()
+      iex> {_builder, id} = Yog.Builder.Labeled.ensure_node(builder, "A")
       iex> is_integer(id)
       true
   """
