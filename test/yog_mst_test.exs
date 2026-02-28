@@ -83,7 +83,7 @@ defmodule YogMSTTest do
 
     result = MST.kruskal(in: graph, compare: &compare/2)
 
-    assert length(result) == 0
+    assert result == []
   end
 
   # Empty graph
@@ -92,7 +92,7 @@ defmodule YogMSTTest do
 
     result = MST.kruskal(in: graph, compare: &compare/2)
 
-    assert length(result) == 0
+    assert result == []
   end
 
   # ============= Classic MST Test Cases =============

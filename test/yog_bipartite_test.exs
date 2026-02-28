@@ -7,7 +7,7 @@ defmodule YogBipartiteTest do
 
   test "is_bipartite_empty_test" do
     graph = Yog.undirected()
-    assert Bipartite.is_bipartite?(graph) == true
+    assert Bipartite.bipartite?(graph) == true
   end
 
   test "is_bipartite_single_node_test" do
@@ -15,7 +15,7 @@ defmodule YogBipartiteTest do
       Yog.undirected()
       |> Yog.add_node(1, nil)
 
-    assert Bipartite.is_bipartite?(graph) == true
+    assert Bipartite.bipartite?(graph) == true
   end
 
   test "is_bipartite_path_test" do
@@ -30,7 +30,7 @@ defmodule YogBipartiteTest do
       |> Yog.add_edge(from: 2, to: 3, weight: 1)
       |> Yog.add_edge(from: 3, to: 4, weight: 1)
 
-    assert Bipartite.is_bipartite?(graph) == true
+    assert Bipartite.bipartite?(graph) == true
   end
 
   test "is_bipartite_even_cycle_test" do
@@ -46,7 +46,7 @@ defmodule YogBipartiteTest do
       |> Yog.add_edge(from: 3, to: 4, weight: 1)
       |> Yog.add_edge(from: 4, to: 1, weight: 1)
 
-    assert Bipartite.is_bipartite?(graph) == true
+    assert Bipartite.bipartite?(graph) == true
   end
 
   test "is_bipartite_odd_cycle_test" do
@@ -60,7 +60,7 @@ defmodule YogBipartiteTest do
       |> Yog.add_edge(from: 2, to: 3, weight: 1)
       |> Yog.add_edge(from: 3, to: 1, weight: 1)
 
-    assert Bipartite.is_bipartite?(graph) == false
+    assert Bipartite.bipartite?(graph) == false
   end
 
   test "is_bipartite_complete_bipartite_test" do
@@ -79,7 +79,7 @@ defmodule YogBipartiteTest do
       |> Yog.add_edge(from: 2, to: 4, weight: 1)
       |> Yog.add_edge(from: 2, to: 5, weight: 1)
 
-    assert Bipartite.is_bipartite?(graph) == true
+    assert Bipartite.bipartite?(graph) == true
   end
 
   test "is_bipartite_tree_test" do
@@ -96,7 +96,7 @@ defmodule YogBipartiteTest do
       |> Yog.add_edge(from: 2, to: 4, weight: 1)
       |> Yog.add_edge(from: 2, to: 5, weight: 1)
 
-    assert Bipartite.is_bipartite?(graph) == true
+    assert Bipartite.bipartite?(graph) == true
   end
 
   test "is_bipartite_disconnected_components_test" do
@@ -118,7 +118,7 @@ defmodule YogBipartiteTest do
       |> Yog.add_edge(from: 7, to: 8, weight: 1)
       |> Yog.add_edge(from: 8, to: 5, weight: 1)
 
-    assert Bipartite.is_bipartite?(graph) == true
+    assert Bipartite.bipartite?(graph) == true
   end
 
   test "is_bipartite_disconnected_with_odd_cycle_test" do
@@ -140,7 +140,7 @@ defmodule YogBipartiteTest do
       |> Yog.add_edge(from: 6, to: 7, weight: 1)
       |> Yog.add_edge(from: 7, to: 5, weight: 1)
 
-    assert Bipartite.is_bipartite?(graph) == false
+    assert Bipartite.bipartite?(graph) == false
   end
 
   # ============= Partition Tests =============
@@ -294,7 +294,7 @@ defmodule YogBipartiteTest do
 
       {:ok, p} ->
         matching = Bipartite.maximum_matching(graph, p)
-        assert length(matching) == 0
+        assert matching == []
     end
   end
 
@@ -313,7 +313,7 @@ defmodule YogBipartiteTest do
 
       {:ok, p} ->
         matching = Bipartite.maximum_matching(graph, p)
-        assert length(matching) == 0
+        assert matching == []
     end
   end
 

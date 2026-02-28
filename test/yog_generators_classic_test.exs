@@ -41,7 +41,7 @@ defmodule YogGeneratorsClassicTest do
     assert length(Yog.all_nodes(k1)) == 1
 
     # No edges
-    assert length(Yog.successors(k1, 0)) == 0
+    assert Yog.successors(k1, 0) == []
   end
 
   # Cycle graph tests
@@ -77,7 +77,7 @@ defmodule YogGeneratorsClassicTest do
   test "cycle_graph_small_test" do
     # Cycle requires at least 3 nodes
     c2 = Generators.cycle(2)
-    assert length(Yog.all_nodes(c2)) == 0
+    assert Yog.all_nodes(c2) == []
   end
 
   # Path graph tests

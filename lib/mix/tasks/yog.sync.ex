@@ -1,5 +1,17 @@
 defmodule Mix.Tasks.Yog.Sync do
-  @moduledoc "Checks if YogEx is missing any exported functions from the Gleam Yog library"
+  @moduledoc """
+  Checks if YogEx is missing any exported functions from the underlying Gleam Yog library.
+
+  Evaluates all public exports from the `yog` Erlang module and compares them against the
+  `Yog` Elixir module exports.
+
+  ## Special Mappings
+
+  To adhere to Elixir naming conventions, Gleam functions starting with `is_` (e.g.,
+  `is_bipartite`) are automatically expected to be mapped to `?` suffixed functions
+  without the prefix (e.g., `bipartite?`). The sync script will silently rewrite these
+  during comparison.
+  """
   use Mix.Task
 
   @shortdoc "Checks for missing Gleam wrappers"
@@ -10,7 +22,22 @@ defmodule Mix.Tasks.Yog.Sync do
     Application.ensure_all_started(:yog)
 
     # 1. Get all public functions from the primary :yog Erlang module
-    gleam_exports = get_exports(:yog) |> MapSet.new()
+    gleam_exports =
+      get_exports(:yog)
+      |> Enum.map(fn {func, arity} ->
+        func_str = to_string(func)
+
+        # Gleam predicates like "is_directed" map to Elixir "directed?"
+        expected_name =
+          if String.starts_with?(func_str, "is_") do
+            String.to_atom(String.replace_prefix(func_str, "is_", "") <> "?")
+          else
+            func
+          end
+
+        {expected_name, arity}
+      end)
+      |> MapSet.new()
 
     # 2. Get all public functions from our Elixir wrapper
     elixir_exports = get_exports(Yog) |> MapSet.new()

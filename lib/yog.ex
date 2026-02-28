@@ -44,7 +44,7 @@ defmodule Yog do
   ## Examples
 
       iex> graph = Yog.directed()
-      iex> Yog.is_graph(graph)
+      iex> Yog.graph?(graph)
       true
   """
   @spec directed() :: graph()
@@ -56,7 +56,7 @@ defmodule Yog do
   ## Examples
 
       iex> graph = Yog.undirected()
-      iex> Yog.is_graph(graph)
+      iex> Yog.graph?(graph)
       true
   """
   @spec undirected() :: graph()
@@ -73,7 +73,7 @@ defmodule Yog do
   ## Examples
 
       iex> graph = Yog.new(:directed)
-      iex> Yog.is_graph(graph)
+      iex> Yog.graph?(graph)
       true
   """
   @spec new(graph_type()) :: graph()
@@ -220,12 +220,12 @@ defmodule Yog do
   ## Examples
 
       iex> graph = Yog.directed()
-      iex> Yog.is_graph(graph)
+      iex> Yog.graph?(graph)
       true
 
-      iex> Yog.is_graph("not a graph")
+      iex> Yog.graph?("not a graph")
       false
   """
-  def is_graph(term) when is_tuple(term), do: elem(term, 0) == :graph
-  def is_graph(_), do: false
+  def graph?(term) when is_tuple(term), do: elem(term, 0) == :graph
+  def graph?(_), do: false
 end

@@ -30,7 +30,8 @@ defmodule YogEx.MixProject do
   defp deps do
     [
       {:yog, ">= 1.3.0", manager: :rebar3},
-      {:ex_doc, "~> 0.31", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.31", only: :dev, runtime: false},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end
 

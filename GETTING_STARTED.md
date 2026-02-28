@@ -122,6 +122,10 @@ This task:
 - Exits with an error if wrappers are missing
 - Shows a success message if everything is in sync
 
+**Predicate Auto-Mapping**
+
+The sync task automatically accounts for idiom differences between Gleam and Elixir concerning predicate functions. Any Gleam function beginning with `is_` (e.g. `is_directed`) is expected to be wrapped as an Elixir function ending in `?` without the prefix (e.g. `directed?`) to satisfy Elixir conventions and tools like Credo.
+
 **Use this task when:**
 - Upgrading the Yog dependency version
 - Adding new wrapper functions

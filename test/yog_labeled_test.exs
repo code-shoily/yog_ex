@@ -19,7 +19,7 @@ defmodule Yog.LabeledTest do
         |> Yog.Labeled.add_edge("A", "B", 5)
 
       graph = Yog.Labeled.to_graph(builder)
-      assert Yog.is_graph(graph)
+      assert Yog.graph?(graph)
     end
 
     test "queries by label" do

@@ -17,8 +17,8 @@ defmodule Yog.Bipartite do
   @doc """
   Checks if a graph is bipartite (2-colorable).
   """
-  @spec is_bipartite?(Yog.graph()) :: boolean()
-  def is_bipartite?(graph) do
+  @spec bipartite?(Yog.graph()) :: boolean()
+  def bipartite?(graph) do
     :yog@bipartite.is_bipartite(graph)
   end
 

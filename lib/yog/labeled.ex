@@ -112,7 +112,7 @@ defmodule Yog.Labeled do
       iex> builder = Yog.Labeled.directed()
       ...> |> Yog.Labeled.add_edge("A", "B", 5)
       iex> graph = Yog.Labeled.to_graph(builder)
-      iex> Yog.is_graph(graph)
+      iex> Yog.graph?(graph)
       true
   """
   @spec to_graph(builder()) :: Yog.graph()
