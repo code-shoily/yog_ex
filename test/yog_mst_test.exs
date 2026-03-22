@@ -1,5 +1,8 @@
 defmodule YogMSTTest do
   use ExUnit.Case
+
+  doctest Yog.MST
+
   alias Yog.MST
 
   # Helper functions for algorithms

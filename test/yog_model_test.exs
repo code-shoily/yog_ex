@@ -1,6 +1,8 @@
 defmodule YogModelTest do
   use ExUnit.Case
 
+  doctest Yog.Model
+
   # Note: Many model tests are already covered in yog_test.exs
   # This file focuses on additional model-specific behaviors
 
@@ -303,7 +305,7 @@ defmodule YogModelTest do
     graph = Yog.Model.add_node(graph, 1, "A")
     graph = Yog.Model.add_node(graph, 2, "B")
     graph = Yog.Model.add_edge!(graph, 1, 2, 10)
-    graph = Yog.Model.add_edge_ensured(graph, 2, 3, 5, "C")
+    graph = Yog.Model.add_edge_ensure(graph, 2, 3, 5, "C")
 
     assert Yog.Model.order(graph) == 3
     assert length(Yog.Model.all_nodes(graph)) == 3
