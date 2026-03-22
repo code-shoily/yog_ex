@@ -55,6 +55,8 @@ A graph algorithm library for Elixir, providing implementations of classic graph
 
 ## Installation
 
+### Basic Installation
+
 Add YogEx to your list of dependencies in `mix.exs`:
 
 ```elixir
@@ -64,6 +66,39 @@ def deps do
   ]
 end
 ```
+
+Then run:
+
+```bash
+mix deps.get
+```
+
+### Adding I/O Support (Optional)
+
+YogEx includes graph I/O modules (`Yog.IO.*`) for formats like GraphML, GDF, JSON, LEDA, Pajek, and TGF. However, due to dependency conflicts with Gleam packages, `yog_io` is **not** included as a default dependency.
+
+**If you need graph I/O functionality**, add `yog_io` to your dependencies:
+
+```elixir
+def deps do
+  [
+    {:yog_ex, "~> 0.51.0"},
+    {:yog_io, "~> 1.0", manager: :rebar3, app: false, override: true}
+  ]
+end
+```
+
+**Why `override: true`?** The `yog` package (a Gleam library) requires `app: false` to work with Elixir, but `yog_io` depends on `yog` without this flag. The `override: true` tells Mix to use your configuration instead.
+
+**What features require yog_io?**
+- `Yog.IO.GraphML` - GraphML format serialization/parsing
+- `Yog.IO.GDF` - GUESS GDF format I/O
+- `Yog.IO.JSON` - JSON export (write-only)
+- `Yog.IO.LEDA` - LEDA format I/O
+- `Yog.IO.Pajek` - Pajek NET format I/O
+- `Yog.IO.TGF` - Trivial Graph Format I/O
+
+All other YogEx features (pathfinding, generators, centrality, community detection, etc.) work without `yog_io`.
 
 ## Quick Start
 
@@ -369,6 +404,22 @@ mix test test/yog/pathfinding/dijkstra_test.exs
 - `lib/yog/` — Core graph library modules (Elixir wrappers around Gleam)
 - `test/` — Unit tests and doctests
 - `examples/` — Real-world usage examples
+
+### Publishing to Hex
+
+Due to Gleam package requirements, publishing to Hex requires a special environment configuration:
+
+```sh
+# Publish the package
+MIX_ENV=publish mix hex.publish package
+```
+
+**Why `MIX_ENV=publish`?**
+- The publish environment uses a simplified dependency configuration without `manager: :rebar3`
+- Hex.pm doesn't allow these flags in published packages
+- Local development still uses the full configuration with `manager: :rebar3, app: false`
+
+**Documentation:** HexDocs automatically builds and publishes documentation from your package source code. No separate docs publishing step is needed - your docs will be available at `https://hexdocs.pm/yog_ex` shortly after publishing the package.
 
 ## AI Assistance
 
