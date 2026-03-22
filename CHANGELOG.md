@@ -11,25 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.51.0] - Unreleased
 
 ### Added
-
-- **`Yog.Connectivity`**: Full parity with Gleam `connectivity.gleam`.
-  - Added `connected_components/1` and `weakly_connected_components/1`.
-  - Comprehensive documentation and doctests for all connectivity algorithms.
-- **I/O Modules**: Integrated `yog_io` support for multiple graph formats:
-  - `Yog.IO.GDF`
-  - `Yog.IO.GraphML`
-  - `Yog.IO.JSON`
-  - `Yog.IO.LEDA`
-  - `Yog.IO.Pajek`
-  - `Yog.IO.TGF`
-- **Dependencies**: Synced with **Yog 5.1.0** and **Yog_IO 1.0.0**.
+- **`Yog.Pathfinding`**: New facade module providing a unified keyword-based API for `Dijkstra`, `AStar`, `BellmanFord`, and `FloydWarshall`.
+- **`Yog.Connectivity`**: Support for `connected_components/1` and `weakly_connected_components/1` via `defdelegate`.
+- **I/O Integration**: Support for multiple graph formats via `yog_io`: `GDF`, `GraphML`, `JSON`, `LEDA`, `Pajek`, and `TGF`.
+- **Documentation**: Comprehensive `@moduledoc`, `@doc`, and doctests for `Yog.Connectivity` and `Yog.Pathfinding`.
 
 ### Changed
-
-- **`Yog.DAG`**: Renamed internal modules for consistency with Elixir naming conventions:
-  - `Yog.DAG.Models` -> `Yog.DAG.Model`
-  - `Yog.DAG.Algorithms` -> `Yog.DAG.Algorithm`
-- **`README.md`**: Updated to reflect new features and parity status.
+- **DAG Modules**: Renamed for Elixir consistency: `Yog.DAG.Models` -> `Yog.DAG.Model` and `Yog.DAG.Algorithms` -> `Yog.DAG.Algorithm`.
+- **Examples**: Updated all example files to use `add_edge!` (and variants) when chaining to handle the `Result` type correctly.
+- **Module Names**: Corrected outdated module references in examples (`Yog.Components` -> `Yog.Connectivity`, `Yog.TopologicalSort` -> `Yog.Traversal`).
+- **Dependencies**: Updated `yog` to `~> 5.1` and `yog_io` to `>= 1.0.0` with `override: true`.
 
 ## [2.0.0] - 2026-03-04
 

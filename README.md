@@ -60,7 +60,7 @@ Add YogEx to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:yog_ex, "~> 5.1.0"}
+    {:yog_ex, "~> 0.51.0"}
   ]
 end
 ```

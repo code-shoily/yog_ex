@@ -15,13 +15,13 @@ defmodule CityDistanceMatrix do
       |> Yog.add_node(2, "City B")
       |> Yog.add_node(3, "City C")
       |> Yog.add_node(4, "City D")
-      |> Yog.add_edge(from: 1, to: 2, with: 3)
-      |> Yog.add_edge(from: 2, to: 1, with: 8)
-      |> Yog.add_edge(from: 1, to: 4, with: 7)
-      |> Yog.add_edge(from: 4, to: 1, with: 2)
-      |> Yog.add_edge(from: 2, to: 3, with: 2)
-      |> Yog.add_edge(from: 3, to: 1, with: 5)
-      |> Yog.add_edge(from: 3, to: 4, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 3)
+      |> Yog.add_edge!(from: 2, to: 1, with: 8)
+      |> Yog.add_edge!(from: 1, to: 4, with: 7)
+      |> Yog.add_edge!(from: 4, to: 1, with: 2)
+      |> Yog.add_edge!(from: 2, to: 3, with: 2)
+      |> Yog.add_edge!(from: 3, to: 1, with: 5)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
 
     IO.puts("--- All-Pairs Shortest Paths (Floyd-Warshall) ---")
 
@@ -32,11 +32,9 @@ defmodule CityDistanceMatrix do
       compare: fn a, b -> if a < b, do: :lt, else: if(a > b, do: :gt, else: :eq) end
     ) do
       {:ok, matrix} ->
-        # Matrix is Map(NodeId => Map(NodeId => Weight))
-        Enum.each(matrix, fn {from, rows} ->
-          Enum.each(rows, fn {to, weight} ->
-            IO.puts("From #{from} to #{to}: #{weight}")
-          end)
+        # Matrix is Map({from_id, to_id} => Weight)
+        Enum.each(matrix, fn {{from, to}, weight} ->
+          IO.puts("From #{from} to #{to}: #{weight}")
         end)
 
       {:error, _} ->

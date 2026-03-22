@@ -16,7 +16,7 @@ defmodule LeetCode do
     # Step 3: Run Strongly Connected Components (SCC)
     # Since it's an undirected graph connecting only lands,
     # SCC will extract everything as components (including isolated water tiles).
-    components = Yog.Components.scc(graph)
+    components = Yog.Connectivity.scc(graph)
 
     # Step 4: The number of islands is the number of components
     # that are actually made of land. We can just check the first

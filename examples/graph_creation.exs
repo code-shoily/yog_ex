@@ -15,7 +15,7 @@ defmodule GraphCreation do
     g1 = Yog.directed()
          |> Yog.add_node(1, "A")
          |> Yog.add_node(2, "B")
-         |> Yog.add_edge(from: 1, to: 2, with: 5)
+         |> Yog.add_edge!(from: 1, to: 2, with: 5)
     IO.puts("   Created graph with #{count_nodes(g1)} nodes")
 
     # 2. from_edges function for quick creation
@@ -49,7 +49,7 @@ defmodule GraphCreation do
     g5 = Yog.directed()
          |> Yog.add_node(1, "A")
          |> Yog.add_node(2, "B")
-         |> Yog.add_simple_edge(from: 1, to: 2)
+         |> Yog.add_simple_edge!(from: 1, to: 2)
     IO.puts("   Created graph with #{count_nodes(g5)} nodes")
 
     # 6. Labeled variants - Note: Labeled API is separate in Yog.Builder.Labeled module
@@ -65,7 +65,7 @@ defmodule GraphCreation do
     g10 = Yog.undirected()
           |> Yog.add_node(1, "A")
           |> Yog.add_node(2, "B")
-          |> Yog.add_edge(from: 1, to: 2, with: 5)
+          |> Yog.add_edge!(from: 1, to: 2, with: 5)
     IO.puts("   Created undirected graph (edges work both ways)")
 
     IO.puts("\n=== Summary ===")

@@ -16,18 +16,18 @@ defmodule TaskScheduling do
       |> Yog.add_node(3, "Test")
       |> Yog.add_node(4, "Deploy")
       # Design before Implement
-      |> Yog.add_edge(from: 1, to: 2, with: nil)
+      |> Yog.add_edge!(from: 1, to: 2, with: nil)
       # Implement before Test
-      |> Yog.add_edge(from: 2, to: 3, with: nil)
+      |> Yog.add_edge!(from: 2, to: 3, with: nil)
       # Test before Deploy
-      |> Yog.add_edge(from: 3, to: 4, with: nil)
+      |> Yog.add_edge!(from: 3, to: 4, with: nil)
 
-    case Yog.TopologicalSort.sort(tasks) do
+    case Yog.Traversal.topological_sort(tasks) do
       {:ok, order} ->
         # order = [1, 2, 3, 4] - valid execution order
         IO.puts("Execute tasks in order: #{inspect(order)}")
 
-      {:error, :not_a_dag} ->
+      {:error, :contains_cycle} ->
         IO.puts("Circular dependency detected!")
     end
   end

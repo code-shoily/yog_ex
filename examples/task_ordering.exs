@@ -30,7 +30,7 @@ defmodule TaskOrdering do
               g
               |> Yog.add_node(from_id, from)
               |> Yog.add_node(to_id, to)
-              |> Yog.add_edge(from: from_id, to: to_id, with: nil)
+              |> Yog.add_edge!(from: from_id, to: to_id, with: nil)
             end)
 
     # Add any tasks that weren't in dependencies
@@ -40,7 +40,7 @@ defmodule TaskOrdering do
               Yog.add_node(g, task_id, task)
             end)
 
-    case Yog.TopologicalSort.lexicographical_sort(
+    case Yog.Traversal.lexicographical_topological_sort(
       graph,
       fn a, b ->
         task_a = id_to_task[a]
