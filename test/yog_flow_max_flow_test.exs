@@ -5,6 +5,7 @@ defmodule YogFlowMaxFlowTest do
 
   use ExUnit.Case, async: true
   alias Yog.Flow.MaxFlow
+  doctest MaxFlow
 
   describe "edmonds_karp_int/3" do
     test "simple flow network" do

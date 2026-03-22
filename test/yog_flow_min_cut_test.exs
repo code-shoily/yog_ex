@@ -5,6 +5,7 @@ defmodule YogFlowMinCutTest do
 
   use ExUnit.Case, async: true
   alias Yog.Flow.MinCut
+  doctest MinCut
 
   describe "global_min_cut/1" do
     test "simple triangle graph" do

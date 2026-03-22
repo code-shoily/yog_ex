@@ -83,17 +83,36 @@ defmodule Yog.Flow.MinCut do
 
   **Time Complexity:** O(V³)
 
-  ## Example
+  ## Examples
 
-      graph =
-        Yog.undirected()
-        |> Yog.add_node(1, "A")
-        |> Yog.add_node(2, "B")
-        |> Yog.add_node(3, "C")
-        |> Yog.add_edges([{1, 2, 5}, {2, 3, 3}, {1, 3, 2}])
+  Simple triangle graph:
 
-      result = Yog.Flow.MinCut.global_min_cut(graph)
-      # => %{weight: 3, group_a_size: 1, group_b_size: 2}
+      iex> {:ok, graph} = Yog.undirected()
+      ...>   |> Yog.add_node(1, "A")
+      ...>   |> Yog.add_node(2, "B")
+      ...>   |> Yog.add_node(3, "C")
+      ...>   |> Yog.add_edges([{1, 2, 5}, {2, 3, 3}, {1, 3, 2}])
+      iex> result = Yog.Flow.MinCut.global_min_cut(graph)
+      iex> result.group_a_size + result.group_b_size
+      3
+
+  A larger example:
+
+      iex> {:ok, graph} = Yog.undirected()
+      ...>   |> Yog.add_node(1, "A")
+      ...>   |> Yog.add_node(2, "B")
+      ...>   |> Yog.add_node(3, "C")
+      ...>   |> Yog.add_node(4, "D")
+      ...>   |> Yog.add_edges([
+      ...>     {1, 2, 3},
+      ...>     {1, 3, 4},
+      ...>     {2, 3, 2},
+      ...>     {2, 4, 5},
+      ...>     {3, 4, 1}
+      ...>   ])
+      iex> result = Yog.Flow.MinCut.global_min_cut(graph)
+      iex> result.weight > 0
+      true
 
   ## Notes
 

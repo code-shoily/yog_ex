@@ -99,18 +99,18 @@ defmodule Yog.Flow.MaxFlow do
   - `compare` - Comparison function for capacities
   - `min` - Minimum function for capacities
 
-  ## Example
+  ## Examples
 
-      result = Yog.Flow.MaxFlow.edmonds_karp(
-        graph,
-        1,
-        4,
-        0,
-        &(&1 + &2),
-        &(&1 - &2),
-        fn a, b -> a <= b end,
-        &min/2
-      )
+  Simple example with bottleneck:
+
+      iex> {:ok, graph} = Yog.directed()
+      ...>   |> Yog.add_node(1, "s")
+      ...>   |> Yog.add_node(2, "a")
+      ...>   |> Yog.add_node(3, "t")
+      ...>   |> Yog.add_edges([{1, 2, 10}, {2, 3, 5}])
+      iex> result = Yog.Flow.MaxFlow.edmonds_karp_int(graph, 1, 3)
+      iex> result.max_flow
+      5
   """
   @spec edmonds_karp(
           Yog.graph(),
@@ -143,17 +143,34 @@ defmodule Yog.Flow.MaxFlow do
 
   This is a simplified version that uses integer arithmetic.
 
-  ## Example
+  ## Examples
 
-      graph =
-        Yog.directed()
-        |> Yog.add_node(1, "s")
-        |> Yog.add_node(2, "a")
-        |> Yog.add_node(3, "t")
-        |> Yog.add_edges([{1, 2, 10}, {2, 3, 5}])
+      iex> {:ok, graph} = Yog.directed()
+      ...>   |> Yog.add_node(1, "s")
+      ...>   |> Yog.add_node(2, "a")
+      ...>   |> Yog.add_node(3, "t")
+      ...>   |> Yog.add_edges([{1, 2, 10}, {2, 3, 5}])
+      iex> result = Yog.Flow.MaxFlow.edmonds_karp_int(graph, 1, 3)
+      iex> result.max_flow
+      5
 
-      result = Yog.Flow.MaxFlow.edmonds_karp_int(graph, 1, 3)
-      # => %{max_flow: 5, ...}
+  A more complex example with multiple paths:
+
+      iex> {:ok, graph} = Yog.directed()
+      ...>   |> Yog.add_node(1, "source")
+      ...>   |> Yog.add_node(2, "A")
+      ...>   |> Yog.add_node(3, "B")
+      ...>   |> Yog.add_node(4, "sink")
+      ...>   |> Yog.add_edges([
+      ...>     {1, 2, 10},
+      ...>     {1, 3, 5},
+      ...>     {2, 3, 15},
+      ...>     {2, 4, 10},
+      ...>     {3, 4, 10}
+      ...>   ])
+      iex> result = Yog.Flow.MaxFlow.edmonds_karp_int(graph, 1, 4)
+      iex> result.max_flow
+      15
   """
   @spec edmonds_karp_int(Yog.graph(), Yog.node_id(), Yog.node_id()) ::
           max_flow_result(integer())
@@ -171,17 +188,68 @@ defmodule Yog.Flow.MaxFlow do
   Returns a map with `source_side` (nodes reachable from source) and
   `sink_side` (all other nodes).
 
-  ## Example
+  ## Examples
 
-      max_flow_result = Yog.Flow.MaxFlow.edmonds_karp_int(graph, 1, 4)
-      min_cut = Yog.Flow.MaxFlow.extract_min_cut(max_flow_result)
-      # => %{source_side: MapSet.new([1, 2]), sink_side: MapSet.new([3, 4])}
+      iex> {:ok, graph} = Yog.directed()
+      ...>   |> Yog.add_node(1, "s")
+      ...>   |> Yog.add_node(2, "a")
+      ...>   |> Yog.add_node(3, "t")
+      ...>   |> Yog.add_edges([{1, 2, 10}, {2, 3, 5}])
+      iex> result = Yog.Flow.MaxFlow.edmonds_karp_int(graph, 1, 3)
+      iex> cut = Yog.Flow.MaxFlow.extract_min_cut(result)
+      iex> MapSet.member?(cut.source_side, 1)
+      true
+      iex> MapSet.member?(cut.sink_side, 3)
+      true
   """
   @spec extract_min_cut(max_flow_result(any())) :: min_cut()
-  def extract_min_cut(%{max_flow: max_flow, residual_graph: residual, source: source, sink: sink}) do
-    # Reconstruct the Gleam result tuple for the min_cut function
+  def extract_min_cut(result) do
+    min_cut(result, 0, fn a, b -> a <= b end)
+  end
+
+  @doc """
+  Extracts the minimum cut from a max flow result with custom numeric type.
+
+  This version allows you to specify the zero element and comparison function
+  for custom numeric types.
+
+  ## Parameters
+
+  - `result` - The max flow result from `edmonds_karp/8`
+  - `zero` - Zero value for the capacity type
+  - `compare` - Comparison function for capacities (returns true if a <= b)
+
+  ## Examples
+
+      iex> {:ok, graph} = Yog.directed()
+      ...>   |> Yog.add_node(1, "s")
+      ...>   |> Yog.add_node(2, "a")
+      ...>   |> Yog.add_node(3, "t")
+      ...>   |> Yog.add_edges([{1, 2, 10}, {2, 3, 5}])
+      iex> result = Yog.Flow.MaxFlow.edmonds_karp(
+      ...>   graph, 1, 3, 0, &(&1 + &2), &(&1 - &2), fn a, b -> a <= b end, &min/2
+      ...> )
+      iex> cut = Yog.Flow.MaxFlow.min_cut(result, 0, fn a, b -> a <= b end)
+      iex> MapSet.member?(cut.source_side, 1)
+      true
+  """
+  @spec min_cut(max_flow_result(any()), any(), (any(), any() -> boolean())) :: min_cut()
+  def min_cut(
+        %{max_flow: max_flow, residual_graph: residual, source: source, sink: sink},
+        zero,
+        compare
+      ) do
     gleam_result = {:max_flow_result, max_flow, residual, source, sink}
-    result = :yog@flow@max_flow.min_cut(gleam_result, 0, fn a, b -> a <= b end)
+    # Convert Elixir compare function to Gleam-style compare (returns :gt/:eq/:lt)
+    gleam_compare = fn a, b ->
+      cond do
+        compare.(a, b) and compare.(b, a) -> :eq
+        compare.(a, b) -> :lt
+        true -> :gt
+      end
+    end
+
+    result = :yog@flow@max_flow.min_cut(gleam_result, zero, gleam_compare)
     wrap_min_cut(result)
   end
 
