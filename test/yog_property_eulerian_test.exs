@@ -1,7 +1,9 @@
 defmodule YogEulerianTest do
   use ExUnit.Case
 
-  alias Yog.Eulerian
+  alias Yog.Property.Eulerian
+
+  doctest Yog.Property.Eulerian
 
   # ============= Eulerian Circuit Tests (Undirected) =============
 

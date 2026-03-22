@@ -1,16 +1,20 @@
 defmodule YogCyclicityTest do
   use ExUnit.Case
 
+  alias Yog.Property.Cyclicity
+
+  doctest Yog.Property.Cyclicity
+
   # ============= Acyclic Tests =============
 
   test "acyclic_empty_graph_test" do
     graph = Yog.directed()
-    assert Yog.Property.Cyclicity.acyclic?(graph) == true
+    assert Cyclicity.acyclic?(graph) == true
   end
 
   test "acyclic_single_node_test" do
     graph = Yog.directed() |> Yog.add_node(1, "A")
-    assert Yog.Property.Cyclicity.acyclic?(graph) == true
+    assert Cyclicity.acyclic?(graph) == true
   end
 
   test "acyclic_simple_dag_test" do
@@ -23,7 +27,7 @@ defmodule YogCyclicityTest do
       |> Yog.add_edge!(from: 1, to: 2, with: 1)
       |> Yog.add_edge!(from: 2, to: 3, with: 1)
 
-    assert Yog.Property.Cyclicity.acyclic?(graph) == true
+    assert Cyclicity.acyclic?(graph) == true
   end
 
   test "acyclic_undirected_tree_test" do
@@ -38,7 +42,7 @@ defmodule YogCyclicityTest do
       |> Yog.add_edge!(from: 1, to: 3, with: 1)
       |> Yog.add_edge!(from: 1, to: 4, with: 1)
 
-    assert Yog.Property.Cyclicity.acyclic?(graph) == true
+    assert Cyclicity.acyclic?(graph) == true
   end
 
   # ============= Cyclic Tests =============
@@ -50,8 +54,8 @@ defmodule YogCyclicityTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_edge!(from: 1, to: 1, with: 1)
 
-    assert Yog.Property.Cyclicity.cyclic?(graph) == true
-    assert Yog.Property.Cyclicity.acyclic?(graph) == false
+    assert Cyclicity.cyclic?(graph) == true
+    assert Cyclicity.acyclic?(graph) == false
   end
 
   test "cyclic_simple_directed_cycle_test" do
@@ -65,8 +69,8 @@ defmodule YogCyclicityTest do
       |> Yog.add_edge!(from: 2, to: 3, with: 1)
       |> Yog.add_edge!(from: 3, to: 1, with: 1)
 
-    assert Yog.Property.Cyclicity.cyclic?(graph) == true
-    assert Yog.Property.Cyclicity.acyclic?(graph) == false
+    assert Cyclicity.cyclic?(graph) == true
+    assert Cyclicity.acyclic?(graph) == false
   end
 
   test "cyclic_undirected_triangle_test" do
@@ -80,8 +84,8 @@ defmodule YogCyclicityTest do
       |> Yog.add_edge!(from: 2, to: 3, with: 1)
       |> Yog.add_edge!(from: 3, to: 1, with: 1)
 
-    assert Yog.Property.Cyclicity.cyclic?(graph) == true
-    assert Yog.Property.Cyclicity.acyclic?(graph) == false
+    assert Cyclicity.cyclic?(graph) == true
+    assert Cyclicity.acyclic?(graph) == false
   end
 
   test "cyclic_complex_dag_with_cycle_test" do
@@ -99,8 +103,8 @@ defmodule YogCyclicityTest do
       # Back edge creates cycle
       |> Yog.add_edge!(from: 4, to: 1, with: 1)
 
-    assert Yog.Property.Cyclicity.cyclic?(graph) == true
-    assert Yog.Property.Cyclicity.acyclic?(graph) == false
+    assert Cyclicity.cyclic?(graph) == true
+    assert Cyclicity.acyclic?(graph) == false
   end
 
   # ============= Edge Cases =============
@@ -118,15 +122,15 @@ defmodule YogCyclicityTest do
       |> Yog.add_edge!(from: 2, to: 4, with: 1)
       |> Yog.add_edge!(from: 3, to: 4, with: 1)
 
-    assert Yog.Property.Cyclicity.acyclic?(graph) == true
-    assert Yog.Property.Cyclicity.cyclic?(graph) == false
+    assert Cyclicity.acyclic?(graph) == true
+    assert Cyclicity.cyclic?(graph) == false
   end
 
   test "cyclic_empty_graph_is_acyclic_test" do
     graph = Yog.directed()
 
-    assert Yog.Property.Cyclicity.acyclic?(graph) == true
-    assert Yog.Property.Cyclicity.cyclic?(graph) == false
+    assert Cyclicity.acyclic?(graph) == true
+    assert Cyclicity.cyclic?(graph) == false
   end
 
   test "acyclic_disconnected_components_test" do
@@ -140,7 +144,7 @@ defmodule YogCyclicityTest do
       |> Yog.add_edge!(from: 1, to: 2, with: 1)
       |> Yog.add_edge!(from: 3, to: 4, with: 1)
 
-    assert Yog.Property.Cyclicity.acyclic?(graph) == true
-    assert Yog.Property.Cyclicity.cyclic?(graph) == false
+    assert Cyclicity.acyclic?(graph) == true
+    assert Cyclicity.cyclic?(graph) == false
   end
 end

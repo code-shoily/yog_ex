@@ -146,11 +146,10 @@ defmodule Yog.Property.Clique do
       ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
       iex> Yog.Property.Clique.all_maximal_cliques(path) |> length()
       2
-
-      # Empty graph has no cliques
+      iex> # Empty graph has no cliques
       iex> empty = Yog.undirected()
       iex> Yog.Property.Clique.all_maximal_cliques(empty)
-      []
+      [MapSet.new([])]
 
   ## Time Complexity
 
@@ -183,12 +182,10 @@ defmodule Yog.Property.Clique do
       ...> |> Yog.add_edge!(from: 3, to: 4, with: 1)
       iex> Yog.Property.Clique.k_cliques(graph, 3) |> length()
       4
-
-      # Find edges (cliques of size 2)
+      iex> # Find edges (cliques of size 2)
       iex> Yog.Property.Clique.k_cliques(graph, 2) |> length()
       6
-
-      # k <= 0 returns empty list
+      iex> # k <= 0 returns empty list
       iex> Yog.Property.Clique.k_cliques(graph, 0)
       []
 

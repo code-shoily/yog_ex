@@ -58,6 +58,15 @@ defmodule Yog.Property.Bipartite do
       true
 
       # Get the partition
+      iex> graph =
+      ...>   Yog.undirected()
+      ...>   |> Yog.add_node(1, nil)
+      ...>   |> Yog.add_node(2, nil)
+      ...>   |> Yog.add_node(3, nil)
+      ...>   |> Yog.add_node(4, nil)
+      ...>   |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      ...>   |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...>   |> Yog.add_edge!(from: 3, to: 4, with: 1)
       iex> {:ok, %{left: left, right: right}} = Yog.Property.Bipartite.partition(graph)
       iex> MapSet.size(left) + MapSet.size(right)
       4

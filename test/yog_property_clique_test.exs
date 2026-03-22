@@ -1,6 +1,10 @@
 defmodule YogCliqueTest do
   use ExUnit.Case
 
+  alias Yog.Property.Clique
+
+  doctest Yog.Property.Clique
+
   # ============= Max Clique Tests =============
 
   test "max_clique finds complete subgraph in triangle" do
@@ -13,7 +17,7 @@ defmodule YogCliqueTest do
       |> Yog.add_edge!(from: 2, to: 3, with: 1)
       |> Yog.add_edge!(from: 1, to: 3, with: 1)
 
-    clique = Yog.Clique.max_clique(graph)
+    clique = Clique.max_clique(graph)
     assert MapSet.size(clique) == 3
     assert MapSet.equal?(clique, MapSet.new([1, 2, 3]))
   end
@@ -36,7 +40,7 @@ defmodule YogCliqueTest do
       # 5 is isolated
       |> Yog.add_edge!(from: 5, to: 1, with: 1)
 
-    clique = Yog.Clique.max_clique(graph)
+    clique = Clique.max_clique(graph)
     assert MapSet.size(clique) == 3
   end
 
@@ -46,7 +50,7 @@ defmodule YogCliqueTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
 
-    clique = Yog.Clique.max_clique(graph)
+    clique = Clique.max_clique(graph)
     # Single node is the max clique
     assert MapSet.size(clique) == 1
   end
@@ -67,7 +71,7 @@ defmodule YogCliqueTest do
       # Edge {3, 4}
       |> Yog.add_edge!(from: 3, to: 4, with: 1)
 
-    cliques = Yog.Clique.all_maximal_cliques(graph)
+    cliques = Clique.all_maximal_cliques(graph)
     assert length(cliques) >= 2
   end
 
@@ -88,7 +92,7 @@ defmodule YogCliqueTest do
       |> Yog.add_edge!(from: 4, to: 2, with: 1)
       |> Yog.add_edge!(from: 4, to: 3, with: 1)
 
-    triangles = Yog.Clique.k_cliques(graph, 3)
+    triangles = Clique.k_cliques(graph, 3)
     assert length(triangles) == 2
 
     triangle_sets = Enum.map(triangles, &MapSet.new/1)
@@ -105,7 +109,7 @@ defmodule YogCliqueTest do
       |> Yog.add_edge!(from: 1, to: 2, with: 1)
       |> Yog.add_edge!(from: 2, to: 3, with: 1)
 
-    pairs = Yog.Clique.k_cliques(graph, 2)
+    pairs = Clique.k_cliques(graph, 2)
     assert length(pairs) == 2
   end
 end

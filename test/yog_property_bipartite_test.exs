@@ -1,7 +1,9 @@
 defmodule YogBipartiteTest do
   use ExUnit.Case
 
-  alias Yog.Bipartite
+  alias Yog.Property.Bipartite
+
+  doctest Yog.Property.Bipartite
 
   # ============= Bipartite Detection Tests =============
 
