@@ -1,6 +1,8 @@
 defmodule YogTransformTest do
   use ExUnit.Case
 
+  doctest Yog.Transform
+
   # ============= Transpose Tests =============
 
   test "transpose_empty_graph_test" do
