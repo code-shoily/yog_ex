@@ -45,30 +45,29 @@ defmodule Yog.Multi.Traversal do
   end
 
   defp do_bfs(graph, [current | rest], visited_nodes, visited_edges, result) do
+    # Add current node to result (we're processing it now)
+    new_result = [current | result]
+
     successors = Model.successors(graph, current)
 
-    {new_queue, new_visited_nodes, new_visited_edges, new_result} =
-      Enum.reduce(successors, {rest, visited_nodes, visited_edges, result}, fn {neighbor, edge_id,
-                                                                                _data},
-                                                                               {q, vn, ve, r} =
-                                                                                 acc ->
+    {new_queue, new_visited_nodes, new_visited_edges} =
+      Enum.reduce(successors, {rest, visited_nodes, visited_edges}, fn {neighbor, edge_id, _data},
+                                                                       {q, vn, ve} ->
         if MapSet.member?(ve, edge_id) do
-          acc
+          {q, vn, ve}
         else
           new_ve = MapSet.put(ve, edge_id)
 
           if MapSet.member?(vn, neighbor) do
-            {q, vn, new_ve, r}
+            {q, vn, new_ve}
           else
             new_vn = MapSet.put(vn, neighbor)
-            {q ++ [neighbor], new_vn, new_ve, [neighbor | r]}
+            {q ++ [neighbor], new_vn, new_ve}
           end
         end
       end)
 
-    do_bfs(graph, new_queue, new_visited_nodes, new_visited_edges, [
-      current | new_result
-    ])
+    do_bfs(graph, new_queue, new_visited_nodes, new_visited_edges, new_result)
   end
 
   @doc """
@@ -91,23 +90,40 @@ defmodule Yog.Multi.Traversal do
   end
 
   defp do_dfs(graph, current, visited_nodes, visited_edges, result) do
+    {_, ve, r} = do_dfs_with_nodes(graph, current, visited_nodes, visited_edges, result)
+    {ve, r}
+  end
+
+  defp do_dfs_successors([], _graph, visited_nodes, visited_edges, result) do
+    {visited_nodes, visited_edges, result}
+  end
+
+  defp do_dfs_successors(
+         [{neighbor, edge_id, _} | rest],
+         graph,
+         visited_nodes,
+         visited_edges,
+         result
+       ) do
+    if MapSet.member?(visited_edges, edge_id) do
+      do_dfs_successors(rest, graph, visited_nodes, visited_edges, result)
+    else
+      new_ve = MapSet.put(visited_edges, edge_id)
+      {vn2, ve2, r2} = do_dfs_with_nodes(graph, neighbor, visited_nodes, new_ve, result)
+      do_dfs_successors(rest, graph, vn2, ve2, r2)
+    end
+  end
+
+  # Helper that returns {visited_nodes, visited_edges, result}
+  defp do_dfs_with_nodes(graph, current, visited_nodes, visited_edges, result) do
     if MapSet.member?(visited_nodes, current) do
-      {visited_edges, result}
+      {visited_nodes, visited_edges, result}
     else
       new_vn = MapSet.put(visited_nodes, current)
       new_result = [current | result]
 
       successors = Model.successors(graph, current)
-
-      Enum.reduce(successors, {visited_edges, new_result}, fn {neighbor, edge_id, _data},
-                                                              {ve, r} = acc ->
-        if MapSet.member?(ve, edge_id) do
-          acc
-        else
-          new_ve = MapSet.put(ve, edge_id)
-          do_dfs(graph, neighbor, new_vn, new_ve, r)
-        end
-      end)
+      do_dfs_successors(successors, graph, new_vn, visited_edges, new_result)
     end
   end
 

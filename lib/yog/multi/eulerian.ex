@@ -2,10 +2,40 @@ defmodule Yog.Multi.Eulerian do
   @moduledoc """
   Eulerian path and circuit detection for multigraphs.
 
-  An Eulerian path is a walk that traverses every edge exactly once.
-  An Eulerian circuit is an Eulerian path that starts and ends at the same node.
+  An **Eulerian path** is a walk that traverses every edge exactly once.
+  An **Eulerian circuit** is an Eulerian path that starts and ends at the same node.
 
-  This module provides Hierholzer's algorithm adapted for multigraphs.
+  This module provides Hierholzer's algorithm adapted for multigraphs. In
+  multigraphs, parallel edges between nodes are handled by using edge IDs rather
+  than node pairs, ensuring unambiguous traversal.
+
+  ## Conditions for Eulerian Paths/Circuits
+
+  ### Undirected Graphs
+
+  - **Circuit**: All nodes have even degree and the graph is connected
+  - **Path**: Exactly 0 or 2 nodes have odd degree and the graph is connected
+
+  ### Directed Graphs
+
+  - **Circuit**: Every node has equal in-degree and out-degree, and the graph
+    is (weakly) connected
+  - **Path**: At most one node with (out − in = 1), at most one with
+    (in − out = 1), all others balanced; graph must be connected
+
+  ## Time Complexity
+
+  - Detection functions (`has_eulerian_circuit?/1`, `has_eulerian_path?/1`): O(V + E)
+  - Finding functions (`find_eulerian_circuit/1`, `find_eulerian_path/1`): O(E)
+
+  ## Examples
+
+      # Check if a graph has an Eulerian circuit
+      if Yog.Multi.Eulerian.has_eulerian_circuit?(graph) do
+        {:some, edge_ids} = Yog.Multi.Eulerian.find_eulerian_circuit(graph)
+        # Traverse the circuit using edge_ids...
+      end
+
   """
 
   alias Yog.Multi.Model
@@ -13,9 +43,10 @@ defmodule Yog.Multi.Eulerian do
   @doc """
   Returns `true` if the multigraph has an Eulerian circuit.
 
-  A closed walk that traverses every edge exactly once.
+  An Eulerian circuit is a closed walk that traverses every edge exactly once.
 
-  Conditions:
+  ## Conditions
+
   - **Undirected:** all nodes have even degree and the graph is connected
   - **Directed:** every node has equal in-degree and out-degree and the
     graph is (weakly) connected
@@ -26,9 +57,28 @@ defmodule Yog.Multi.Eulerian do
 
   ## Examples
 
-      if Yog.Multi.Eulerian.has_eulerian_circuit?(multi) do
-        circuit = Yog.Multi.Eulerian.find_eulerian_circuit(multi)
-      end
+      # A directed cycle has an Eulerian circuit
+      iex> graph = Yog.Multi.Model.directed()
+      ...>   |> Yog.Multi.Model.add_node(:a, "A")
+      ...>   |> Yog.Multi.Model.add_node(:b, "B")
+      ...>   |> Yog.Multi.Model.add_node(:c, "C")
+      ...> graph = elem(Yog.Multi.Model.add_edge(graph, :a, :b, 1), 0)
+      ...> graph = elem(Yog.Multi.Model.add_edge(graph, :b, :c, 2), 0)
+      ...> graph = elem(Yog.Multi.Model.add_edge(graph, :c, :a, 3), 0)
+      ...> Yog.Multi.Eulerian.has_eulerian_circuit?(graph)
+      true
+
+      # A path does not have an Eulerian circuit
+      iex> graph = Yog.Multi.Model.directed()
+      ...>   |> Yog.Multi.Model.add_node(:a, "A")
+      ...>   |> Yog.Multi.Model.add_node(:b, "B")
+      ...> graph = elem(Yog.Multi.Model.add_edge(graph, :a, :b, 1), 0)
+      ...> Yog.Multi.Eulerian.has_eulerian_circuit?(graph)
+      false
+
+      # Empty graph has no circuit
+      iex> Yog.Multi.Eulerian.has_eulerian_circuit?(Yog.Multi.Model.directed())
+      false
   """
   @spec has_eulerian_circuit?(Model.t()) :: boolean()
   def has_eulerian_circuit?(graph) do
@@ -47,9 +97,11 @@ defmodule Yog.Multi.Eulerian do
   @doc """
   Returns `true` if the multigraph has an Eulerian path.
 
-  An open walk that traverses every edge exactly once.
+  An Eulerian path is an open walk that traverses every edge exactly once.
+  Note that any graph with an Eulerian circuit also has an Eulerian path.
 
-  Conditions:
+  ## Conditions
+
   - **Undirected:** exactly 0 or 2 nodes have odd degree and the graph is connected
   - **Directed:** at most one node with (out − in = 1), at most one with
     (in − out = 1), all others balanced; graph must be connected
@@ -57,6 +109,31 @@ defmodule Yog.Multi.Eulerian do
   ## Time Complexity
 
   O(V + E)
+
+  ## Examples
+
+      # A simple path has an Eulerian path
+      iex> graph = Yog.Multi.Model.directed()
+      ...>   |> Yog.Multi.Model.add_node(:a, "A")
+      ...>   |> Yog.Multi.Model.add_node(:b, "B")
+      ...> graph = elem(Yog.Multi.Model.add_edge(graph, :a, :b, 1), 0)
+      ...> Yog.Multi.Eulerian.has_eulerian_path?(graph)
+      true
+
+      # A cycle also has an Eulerian path
+      iex> graph = Yog.Multi.Model.directed()
+      ...>   |> Yog.Multi.Model.add_node(:a, "A")
+      ...>   |> Yog.Multi.Model.add_node(:b, "B")
+      ...>   |> Yog.Multi.Model.add_node(:c, "C")
+      ...> graph = elem(Yog.Multi.Model.add_edge(graph, :a, :b, 1), 0)
+      ...> graph = elem(Yog.Multi.Model.add_edge(graph, :b, :c, 2), 0)
+      ...> graph = elem(Yog.Multi.Model.add_edge(graph, :c, :a, 3), 0)
+      ...> Yog.Multi.Eulerian.has_eulerian_path?(graph)
+      true
+
+      # Empty graph has no path
+      iex> Yog.Multi.Eulerian.has_eulerian_path?(Yog.Multi.Model.directed())
+      false
   """
   @spec has_eulerian_path?(Model.t()) :: boolean()
   def has_eulerian_path?(graph) do
@@ -99,16 +176,38 @@ defmodule Yog.Multi.Eulerian do
 
   Returns the circuit as a list of `EdgeId`s, or `:none` if no circuit exists.
 
+  ## Important Note on Multigraphs
+
+  In multigraphs, parallel edges between the same pair of nodes cannot be
+  distinguished by node IDs alone. This function returns a list of edge IDs,
+  which unambiguously identify which specific edge to traverse at each step.
+
   ## Time Complexity
 
   O(E)
 
   ## Examples
 
-      case Yog.Multi.Eulerian.find_eulerian_circuit(multi) do
-        {:some, edge_ids} -> traverse_circuit(edge_ids)
-        :none -> :no_circuit
-      end
+      iex> graph = Yog.Multi.Model.directed()
+      ...>   |> Yog.Multi.Model.add_node(:a, "A")
+      ...>   |> Yog.Multi.Model.add_node(:b, "B")
+      ...>   |> Yog.Multi.Model.add_node(:c, "C")
+      ...> graph = elem(Yog.Multi.Model.add_edge(graph, :a, :b, 1), 0)
+      ...> graph = elem(Yog.Multi.Model.add_edge(graph, :b, :c, 2), 0)
+      ...> graph = elem(Yog.Multi.Model.add_edge(graph, :c, :a, 3), 0)
+      ...> case Yog.Multi.Eulerian.find_eulerian_circuit(graph) do
+      ...>   {:some, edge_ids} -> length(edge_ids)
+      ...>   :none -> 0
+      ...> end
+      3
+
+      # No circuit exists
+      iex> graph = Yog.Multi.Model.directed()
+      ...>   |> Yog.Multi.Model.add_node(:a, "A")
+      ...>   |> Yog.Multi.Model.add_node(:b, "B")
+      ...> graph = elem(Yog.Multi.Model.add_edge(graph, :a, :b, 1), 0)
+      ...> Yog.Multi.Eulerian.find_eulerian_circuit(graph)
+      :none
   """
   @spec find_eulerian_circuit(Model.t()) :: {:some, [Model.edge_id()]} | :none
   def find_eulerian_circuit(graph) do
@@ -127,16 +226,53 @@ defmodule Yog.Multi.Eulerian do
 
   Returns the path as a list of `EdgeId`s, or `:none` if no path exists.
 
+  ## Important Note on Multigraphs
+
+  In multigraphs, parallel edges between the same pair of nodes cannot be
+  distinguished by node IDs alone. This function returns a list of edge IDs,
+  which unambiguously identify which specific edge to traverse at each step.
+
   ## Time Complexity
 
   O(E)
 
   ## Examples
 
-      case Yog.Multi.Eulerian.find_eulerian_path(multi) do
-        {:some, edge_ids} -> traverse_path(edge_ids)
-        :none -> :no_path
-      end
+      iex> graph = Yog.Multi.Model.directed()
+      ...>   |> Yog.Multi.Model.add_node(:a, "A")
+      ...>   |> Yog.Multi.Model.add_node(:b, "B")
+      ...>   |> Yog.Multi.Model.add_node(:c, "C")
+      ...> graph = elem(Yog.Multi.Model.add_edge(graph, :a, :b, 1), 0)
+      ...> graph = elem(Yog.Multi.Model.add_edge(graph, :b, :c, 2), 0)
+      ...> case Yog.Multi.Eulerian.find_eulerian_path(graph) do
+      ...>   {:some, edge_ids} -> length(edge_ids)
+      ...>   :none -> 0
+      ...> end
+      2
+
+      # A circuit is also a valid path
+      iex> graph = Yog.Multi.Model.directed()
+      ...>   |> Yog.Multi.Model.add_node(:a, "A")
+      ...>   |> Yog.Multi.Model.add_node(:b, "B")
+      ...>   |> Yog.Multi.Model.add_node(:c, "C")
+      ...> graph = elem(Yog.Multi.Model.add_edge(graph, :a, :b, 1), 0)
+      ...> graph = elem(Yog.Multi.Model.add_edge(graph, :b, :c, 2), 0)
+      ...> graph = elem(Yog.Multi.Model.add_edge(graph, :c, :a, 3), 0)
+      ...> case Yog.Multi.Eulerian.find_eulerian_path(graph) do
+      ...>   {:some, edge_ids} -> length(edge_ids)
+      ...>   :none -> 0
+      ...> end
+      3
+
+      # No path exists
+      iex> graph = Yog.Multi.Model.directed()
+      ...>   |> Yog.Multi.Model.add_node(:a, "A")
+      ...>   |> Yog.Multi.Model.add_node(:b, "B")
+      ...>   |> Yog.Multi.Model.add_node(:c, "C")
+      ...> graph = elem(Yog.Multi.Model.add_edge(graph, :a, :b, 1), 0)
+      ...> graph = elem(Yog.Multi.Model.add_edge(graph, :a, :c, 2), 0)
+      ...> Yog.Multi.Eulerian.find_eulerian_path(graph)
+      :none
   """
   @spec find_eulerian_path(Model.t()) :: {:some, [Model.edge_id()]} | :none
   def find_eulerian_path(graph) do
@@ -189,9 +325,18 @@ defmodule Yog.Multi.Eulerian do
   defp do_bfs_visited(_graph, [], visited), do: MapSet.to_list(visited)
 
   defp do_bfs_visited(graph, [current | rest], visited) do
-    neighbors =
+    # For weak connectivity, consider both successors and predecessors
+    successors =
       Model.successors(graph, current)
       |> Enum.map(fn {n, _, _} -> n end)
+
+    predecessors =
+      Model.predecessors(graph, current)
+      |> Enum.map(fn {n, _, _} -> n end)
+
+    neighbors =
+      (successors ++ predecessors)
+      |> Enum.uniq()
       |> Enum.filter(fn n -> not MapSet.member?(visited, n) end)
 
     new_visited =

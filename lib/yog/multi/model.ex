@@ -86,16 +86,15 @@ defmodule Yog.Multi.Model do
     in_ids = Map.get(graph.in_edge_ids, id, [])
     ids_to_remove = Enum.uniq(out_ids ++ in_ids)
 
-    graph
-    |> Enum.reduce(ids_to_remove, &do_remove_edge/2)
-    |> (fn g ->
-          %{
-            g
-            | nodes: Map.delete(g.nodes, id),
-              out_edge_ids: Map.delete(g.out_edge_ids, id),
-              in_edge_ids: Map.delete(g.in_edge_ids, id)
-          }
-        end).()
+    # Use proper accumulator ordering for reduce
+    graph = Enum.reduce(ids_to_remove, graph, fn eid, g -> do_remove_edge(g, eid) end)
+
+    %{
+      graph
+      | nodes: Map.delete(graph.nodes, id),
+        out_edge_ids: Map.delete(graph.out_edge_ids, id),
+        in_edge_ids: Map.delete(graph.in_edge_ids, id)
+    }
   end
 
   @doc """
@@ -270,27 +269,44 @@ defmodule Yog.Multi.Model do
   @spec to_simple_graph(t(), (any(), any() -> any())) :: Yog.graph()
   def to_simple_graph(graph, combine_fn) do
     base =
-      Enum.reduce(graph.nodes, Yog.new(graph.kind), fn {id, data}, g ->
-        Yog.add_node(g, id, data)
+      Enum.reduce(graph.nodes, %{}, fn {id, data}, g ->
+        Map.put(g, id, data)
       end)
 
-    Enum.reduce(graph.edges, base, fn {_eid, {src, dst, data}}, g ->
-      # Check if edge already exists using neighbors
-      existing =
-        case Enum.find(Yog.neighbors(g, src), fn {n, _} -> n == dst end) do
-          {_, val} -> val
-          nil -> nil
-        end
+    # Build edges map, combining parallel edges
+    edges =
+      Enum.reduce(graph.edges, %{}, fn {_eid, {src, dst, data}}, acc ->
+        key = {src, dst}
 
-      new_data =
-        if existing != nil do
-          combine_fn.(existing, data)
-        else
-          data
-        end
+        existing = Map.get(acc, key)
 
-      Yog.add_edge(g, src, dst, new_data)
-    end)
+        new_data =
+          if existing != nil do
+            combine_fn.(existing, data)
+          else
+            data
+          end
+
+        Map.put(acc, key, new_data)
+      end)
+
+    # Convert to simple graph format
+    forward_edges =
+      Enum.reduce(edges, %{}, fn {{src, dst}, data}, acc ->
+        Map.update(acc, src, %{dst => data}, fn existing ->
+          Map.put(existing, dst, data)
+        end)
+      end)
+
+    reverse_edges =
+      Enum.reduce(edges, %{}, fn {{src, dst}, data}, acc ->
+        Map.update(acc, dst, %{src => data}, fn existing ->
+          Map.put(existing, src, data)
+        end)
+      end)
+
+    # Return in Erlang-compatible tuple format
+    {:graph, graph.kind, base, forward_edges, reverse_edges}
   end
 
   @doc """
