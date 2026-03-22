@@ -3,6 +3,8 @@ defmodule Yog.Pathfinding.AStarTest do
   alias Yog.Pathfinding.AStar
   alias Yog.Pathfinding.Utils
 
+  doctest AStar
+
   # Helper functions for algorithms
   defp compare(a, b), do: if(a < b, do: :lt, else: if(a > b, do: :gt, else: :eq))
   defp add(a, b), do: a + b

@@ -3,6 +3,8 @@ defmodule Yog.Pathfinding.DijkstraTest do
   alias Yog.Pathfinding.Dijkstra
   alias Yog.Pathfinding.Utils
 
+  doctest Dijkstra
+
   # Helper functions for algorithms
   defp compare(a, b), do: if(a < b, do: :lt, else: if(a > b, do: :gt, else: :eq))
   defp add(a, b), do: a + b

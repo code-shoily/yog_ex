@@ -28,13 +28,14 @@ defmodule Yog.Pathfinding.BellmanFord do
   ## Examples
 
       # Graph with negative weights but no negative cycles
-      graph = Graph.new()
-      |> Graph.add_edge(:a, :b, 4)
-      |> Graph.add_edge(:b, :c, -3)
-      |> Graph.add_edge(:a, :c, 2)
+      graph = Yog.new()
+      |> Yog.add_edge(:a, :b, 4)
+      |> Yog.add_edge(:b, :c, -3)
+      |> Yog.add_edge(:a, :c, 2)
 
-      BellmanFord.bellman_ford(graph, :a, :c, 0, &(&1+&2), &Integer.compare/2)
-      #=> {:shortest_path, %Path{nodes: [:a, :b, :c], weight: 1}}
+      compare = fn a, b when a < b -> :lt; a, b when a > b -> :gt; _, _ -> :eq end
+      BellmanFord.bellman_ford(graph, :a, :c, 0, &(&1+&2), compare)
+      #=> {:shortest_path, {:path, [:a, :b, :c], 1}}
   """
 
   alias Yog.Pathfinding.Utils
@@ -71,7 +72,7 @@ defmodule Yog.Pathfinding.BellmanFord do
         to: :c,
         zero: 0,
         add: &(&1 + &2),
-        compare: &Integer.compare/2
+        compare: fn a, b when a < b -> :lt; a, b when a > b -> :gt; _, _ -> :eq end
       )
   """
   @spec bellman_ford(keyword()) :: result(any())
@@ -106,7 +107,7 @@ defmodule Yog.Pathfinding.BellmanFord do
         is_goal: fn n -> n == 10 end,
         zero: 0,
         add: &(&1 + &2),
-        compare: &Integer.compare/2
+        compare: fn a, b when a < b -> :lt; a, b when a > b -> :gt; _, _ -> :eq end
       )
   """
   @spec implicit_bellman_ford(keyword()) :: implicit_result(any())
@@ -171,21 +172,28 @@ defmodule Yog.Pathfinding.BellmanFord do
 
   ## Examples
 
-      iex> graph = Graph.new()
-      ...> |> Graph.add_edge(:a, :b, 4)
-      ...> |> Graph.add_edge(:b, :c, -3)
-      iex> BellmanFord.bellman_ford(graph, :a, :c, 0, &(&1 + &2), &Integer.compare/2)
-      {:shortest_path, %Path{nodes: [:a, :b, :c], weight: 1}}
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(:a, nil)
+      ...> |> Yog.add_node(:b, nil)
+      ...> |> Yog.add_node(:c, nil)
+      ...> |> Yog.add_edge!(:a, :b, 4)
+      ...> |> Yog.add_edge!(:b, :c, -3)
+      iex> compare = fn a, b when a < b -> :lt; a, b when a > b -> :gt; _, _ -> :eq end
+      iex> BellmanFord.bellman_ford(graph, :a, :c, 0, &(&1 + &2), compare)
+      {:shortest_path, {:path, [:a, :b, :c], 1}}
 
       iex> # Graph with negative cycle
-      iex> bad_graph = Graph.new()
-      ...> |> Graph.add_edge(:a, :b, 1)
-      ...> |> Graph.add_edge(:b, :a, -3)
-      iex> BellmanFord.bellman_ford(bad_graph, :a, :b, 0, &(&1 + &2), &Integer.compare/2)
+      iex> bad_graph = Yog.directed()
+      ...> |> Yog.add_node(:a, nil)
+      ...> |> Yog.add_node(:b, nil)
+      ...> |> Yog.add_edge!(:a, :b, 1)
+      ...> |> Yog.add_edge!(:b, :a, -3)
+      iex> compare = fn a, b when a < b -> :lt; a, b when a > b -> :gt; _, _ -> :eq end
+      iex> BellmanFord.bellman_ford(bad_graph, :a, :b, 0, &(&1 + &2), compare)
       :negative_cycle
   """
   @spec bellman_ford(
-          Graph.t(),
+          Yog.t(),
           Yog.node_id(),
           Yog.node_id(),
           weight,
@@ -219,13 +227,16 @@ defmodule Yog.Pathfinding.BellmanFord do
 
   ## Examples
 
-      iex> graph = Graph.new()
-      ...> |> Graph.add_edge(1, 2, 4)
-      ...> |> Graph.add_edge(2, 3, -3)
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edge!(1, 2, 4)
+      ...> |> Yog.add_edge!(2, 3, -3)
       iex> BellmanFord.bellman_ford_int(graph, 1, 3)
-      {:shortest_path, %Path{nodes: [1, 2, 3], weight: 1}}
+      {:shortest_path, {:path, [1, 2, 3], 1}}
   """
-  @spec bellman_ford_int(Graph.t(), Yog.node_id(), Yog.node_id()) :: result(integer())
+  @spec bellman_ford_int(Yog.t(), Yog.node_id(), Yog.node_id()) :: result(integer())
   def bellman_ford_int(graph, from, to) do
     :yog@pathfinding@bellman_ford.bellman_ford_int(graph, from, to)
     |> wrap_result()
@@ -236,7 +247,7 @@ defmodule Yog.Pathfinding.BellmanFord do
 
   Convenience function for float weights.
   """
-  @spec bellman_ford_float(Graph.t(), Yog.node_id(), Yog.node_id()) :: result(float())
+  @spec bellman_ford_float(Yog.t(), Yog.node_id(), Yog.node_id()) :: result(float())
   def bellman_ford_float(graph, from, to) do
     :yog@pathfinding@bellman_ford.bellman_ford_float(graph, from, to)
     |> wrap_result()
@@ -356,7 +367,7 @@ defmodule Yog.Pathfinding.BellmanFord do
       ...> end
       iex> BellmanFord.implicit_bellman_ford(
       ...>   1, successors, fn x -> x == 4 end,
-      ...>   0, &(&1 + &2), &Integer.compare/2
+      ...>   0, &(&1 + &2), fn a, b when a < b -> :lt; a, b when a > b -> :gt; _, _ -> :eq end
       ...> )
       {:found_goal, -6}
   """

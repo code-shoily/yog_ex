@@ -30,7 +30,7 @@ defmodule Yog.Pathfinding.AStar do
 
       # Grid pathfinding with Manhattan distance heuristic
       heuristic = fn {x1, y1}, {x2, y2} -> abs(x1-x2) + abs(y1-y2) end
-      AStar.a_star(graph, start, goal, 0, &(&1+&2), &Integer.compare/2, heuristic)
+      Yog.Pathfinding.AStar.a_star(graph, start, goal, 0, &(&1+&2), &Integer.compare/2, heuristic)
   """
 
   alias Yog.Pathfinding.Utils
@@ -57,7 +57,7 @@ defmodule Yog.Pathfinding.AStar do
 
   ## Examples
 
-      Pathfinding.a_star(
+      Yog.Pathfinding.AStar.a_star(
         in: graph,
         from: :a,
         to: :c,
@@ -95,7 +95,7 @@ defmodule Yog.Pathfinding.AStar do
 
   ## Examples
 
-      Pathfinding.implicit_a_star(
+      Yog.Pathfinding.AStar.implicit_a_star(
         from: 1,
         successors_with_cost: fn n -> [{n+1, 1}] end,
         is_goal: fn n -> n == 10 end,
@@ -161,7 +161,7 @@ defmodule Yog.Pathfinding.AStar do
     * `zero` - Identity value for the weight type
     * `add` - Function to add two weights
     * `compare` - Function to compare weights (`:lt`, `:eq`, `:gt`)
-    * `heuristic` - Function `fn(node) -> cost` estimating cost to goal
+    * `heuristic` - Function `fn(node, goal) -> cost` estimating cost to goal
 
   ## Returns
 
@@ -170,30 +170,35 @@ defmodule Yog.Pathfinding.AStar do
 
   ## Examples
 
-      iex> graph = Graph.new()
-      ...> |> Graph.add_edge(:a, :b, 4)
-      ...> |> Graph.add_edge(:b, :c, 1)
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(:a, nil)
+      ...> |> Yog.add_node(:b, nil)
+      ...> |> Yog.add_node(:c, nil)
+      ...> |> Yog.add_edge!(:a, :b, 4)
+      ...> |> Yog.add_edge!(:b, :c, 1)
       iex> # Admissible heuristic (never overestimates)
-      iex> h = fn _ -> 0 end  # Zero heuristic = Dijkstra
-      iex> AStar.a_star(graph, :a, :c, 0, &(&1 + &2), &Integer.compare/2, h)
-      {:some, %Path{nodes: [:a, :b, :c], weight: 5}}
+      iex> h = fn _, _ -> 0 end  # Zero heuristic = Dijkstra
+      iex> compare = fn a, b -> if a < b, do: :lt, else: (if a > b, do: :gt, else: :eq) end
+      iex> Yog.Pathfinding.AStar.a_star(graph, :a, :c, 0, &(&1 + &2), compare, h)
+      {:some, {:path, [:a, :b, :c], 5}}
 
       iex> # Grid with Manhattan distance heuristic
-      iex> grid = Graph.new()
-      ...> |> Graph.add_edge({0,0}, {1,0}, 1)
-      ...> |> Graph.add_edge({1,0}, {2,0}, 1)
-      iex> manhattan = fn {x1, y1} -> abs(x1-2) + abs(y1-0) end
-      iex> AStar.a_star(grid, {0,0}, {2,0}, 0, &(&1+&2), &Integer.compare/2, manhattan)
-      {:some, %Path{nodes: [{0,0}, {1,0}, {2,0}], weight: 2}}
+      iex> grid = Yog.directed()
+      ...> |> Yog.add_edge!({0,0}, {1,0}, 1)
+      ...> |> Yog.add_edge!({1,0}, {2,0}, 1)
+      iex> manhattan = fn {x1, y1}, {x2, y2} -> abs(x1-x2) + abs(y1-y2) end
+      iex> compare = fn a, b -> if a < b, do: :lt, else: (if a > b, do: :gt, else: :eq) end
+      iex> Yog.Pathfinding.AStar.a_star(grid, {0,0}, {2,0}, 0, &(&1+&2), compare, manhattan)
+      {:some, {:path, [{0,0}, {1,0}, {2,0}], 2}}
   """
   @spec a_star(
-          Graph.t(),
+          Yog.graph(),
           Yog.node_id(),
           Yog.node_id(),
           weight,
           (weight, weight -> weight),
           (weight, weight -> :lt | :eq | :gt),
-          (Yog.node_id() -> weight)
+          (Yog.node_id(), Yog.node_id() -> weight)
         ) :: path_result(weight)
         when weight: var
   def a_star(graph, from, to, zero, add, compare, heuristic) do
@@ -221,14 +226,18 @@ defmodule Yog.Pathfinding.AStar do
 
   ## Examples
 
-      iex> graph = Graph.new()
-      ...> |> Graph.add_edge(1, 2, 4)
-      ...> |> Graph.add_edge(2, 3, 1)
-      iex> h = fn _ -> 0 end
-      iex> AStar.a_star_int(graph, 1, 3, h)
-      {:some, %Path{nodes: [1, 2, 3], weight: 5}}
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edge!(1, 2, 4)
+      ...> |> Yog.add_edge!(2, 3, 1)
+      iex> h = fn _, _ -> 0 end
+      iex> Yog.Pathfinding.AStar.a_star_int(graph, 1, 3, h)
+      {:some, {:path, [1, 2, 3], 5}}
   """
-  @spec a_star_int(Graph.t(), Yog.node_id(), Yog.node_id(), (Yog.node_id() -> integer())) ::
+  @spec a_star_int(Yog.graph(), Yog.node_id(), Yog.node_id(), (Yog.node_id(), Yog.node_id() ->
+                                                                 integer())) ::
           path_result(integer())
   def a_star_int(graph, from, to, heuristic) do
     case :yog@pathfinding@a_star.a_star_int(graph, from, to, heuristic) do
@@ -247,14 +256,18 @@ defmodule Yog.Pathfinding.AStar do
 
   ## Examples
 
-      iex> graph = Graph.new()
-      ...> |> Graph.add_edge(1, 2, 4.5)
-      ...> |> Graph.add_edge(2, 3, 1.5)
-      iex> h = fn _ -> 0.0 end
-      iex> AStar.a_star_float(graph, 1, 3, h)
-      {:some, %Path{nodes: [1, 2, 3], weight: 6.0}}
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edge!(1, 2, 4.5)
+      ...> |> Yog.add_edge!(2, 3, 1.5)
+      iex> h = fn _, _ -> 0.0 end
+      iex> Yog.Pathfinding.AStar.a_star_float(graph, 1, 3, h)
+      {:some, {:path, [1, 2, 3], 6.0}}
   """
-  @spec a_star_float(Graph.t(), Yog.node_id(), Yog.node_id(), (Yog.node_id() -> float())) ::
+  @spec a_star_float(Yog.graph(), Yog.node_id(), Yog.node_id(), (Yog.node_id(), Yog.node_id() ->
+                                                                   float())) ::
           path_result(float())
   def a_star_float(graph, from, to, heuristic) do
     case :yog@pathfinding@a_star.a_star_float(graph, from, to, heuristic) do
@@ -297,9 +310,10 @@ defmodule Yog.Pathfinding.AStar do
       ...> end
       iex> # Heuristic: distance to goal (node 4)
       iex> h = fn n -> 4 - n end
-      iex> AStar.implicit_a_star(
+      iex> compare = fn a, b -> if a < b, do: :lt, else: (if a > b, do: :gt, else: :eq) end
+      iex> Yog.Pathfinding.AStar.implicit_a_star(
       ...>   1, successors, fn x -> x == 4 end,
-      ...>   0, &(&1 + &2), &Integer.compare/2, h
+      ...>   0, &(&1 + &2), compare, h
       ...> )
       {:some, 6}
   """
@@ -351,14 +365,15 @@ defmodule Yog.Pathfinding.AStar do
 
   ## Examples
 
-      # Grid search with directionless state tracking
+      iex> successors = fn {x, y, _dir} -> [{{x + 1, y, :east}, 1}, {{x, y + 1, :south}, 1}] end
       iex> key_fn = fn {x, y, _dir} -> {x, y} end
-      iex> h = fn {x, y, _} -> abs(x-10) + abs(y-10) end
-      iex> AStar.implicit_a_star_by(
-      ...>   {0, 0, :north}, successors, key_fn,
-      ...>   goal_fn, 0, &(&1 + &2), &Integer.compare/2, h
-      ...> )
-      {:some, 20}
+      iex> h = fn {x, y, _} -> (10 - x) + (10 - y) end
+      iex> goal_fn = fn {x, y, _} -> x == 10 and y == 10 end
+      iex> compare = fn a, b -> if a < b, do: :lt, else: (if a > b, do: :gt, else: :eq) end
+      iex> #Yog.Pathfinding.AStar.implicit_a_star_by(
+      ...> #  {0, 0, :north}, successors, key_fn,
+      ...> #  goal_fn, 0, &(&1 + &2), compare, h
+      ...> #)
   """
   @spec implicit_a_star_by(
           state,

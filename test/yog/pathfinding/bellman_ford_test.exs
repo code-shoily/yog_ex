@@ -3,6 +3,8 @@ defmodule Yog.Pathfinding.BellmanFordTest do
   alias Yog.Pathfinding.BellmanFord
   alias Yog.Pathfinding.Utils
 
+  doctest Yog.Pathfinding.BellmanFord
+
   # Helper functions for algorithms
   defp compare(a, b), do: if(a < b, do: :lt, else: if(a > b, do: :gt, else: :eq))
   defp add(a, b), do: a + b

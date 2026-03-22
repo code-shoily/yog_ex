@@ -22,15 +22,19 @@ defmodule Yog.Pathfinding.Dijkstra do
   ## Examples
 
       # Find shortest path between two nodes
-      graph = Graph.new()
-      |> Graph.add_edge(:a, :b, 4)
-      |> Graph.add_edge(:b, :c, 1)
+      graph = Yog.directed()
+      |> Yog.add_node(:a, nil)
+      |> Yog.add_node(:b, nil)
+      |> Yog.add_node(:c, nil)
+      |> Yog.add_edge!(:a, :b, 4)
+      |> Yog.add_edge!(:b, :c, 1)
 
-      Dijkstra.shortest_path(graph, :a, :c)
-      #=> {:some, %Path{nodes: [:a, :b, :c], weight: 5}}
+      compare = fn a, b when a < b -> :lt; a, b when a > b -> :gt; _, _ -> :eq end
+      Dijkstra.shortest_path(graph, :a, :c, 0, &(&1 + &2), compare)
+      #=> {:some, {:path, [:a, :b, :c], 5}}
 
       # Find all distances from a source
-      Dijkstra.single_source_distances(graph, :a)
+      Dijkstra.single_source_distances(graph, :a, 0, &(&1 + &2), compare)
       #=> %{:a => 0, :b => 4, :c => 5}
   """
 
@@ -63,7 +67,7 @@ defmodule Yog.Pathfinding.Dijkstra do
         to: :c,
         zero: 0,
         add: &(&1 + &2),
-        compare: &Integer.compare/2
+        compare: fn a, b when a < b -> :lt; a, b when a > b -> :gt; _, _ -> :eq end
       )
   """
   @spec shortest_path(keyword()) :: path_result(any())
@@ -112,7 +116,7 @@ defmodule Yog.Pathfinding.Dijkstra do
         from: :a,
         zero: 0,
         add: &(&1 + &2),
-        compare: &Integer.compare/2
+        compare: fn a, b when a < b -> :lt; a, b when a > b -> :gt; _, _ -> :eq end
       )
   """
   @spec single_source_distances(keyword()) :: %{Yog.node_id() => any()}
@@ -146,7 +150,7 @@ defmodule Yog.Pathfinding.Dijkstra do
         is_goal: fn n -> n == 10 end,
         zero: 0,
         add: &(&1 + &2),
-        compare: &Integer.compare/2
+        compare: fn a, b when a < b -> :lt; a, b when a > b -> :gt; _, _ -> :eq end
       )
   """
   @spec implicit_dijkstra(keyword()) :: {:some, any()} | :none
@@ -210,17 +214,28 @@ defmodule Yog.Pathfinding.Dijkstra do
 
   ## Examples
 
-      iex> graph = Graph.new()
-      ...> |> Graph.add_edge(:a, :b, 4)
-      ...> |> Graph.add_edge(:b, :c, 1)
-      iex> Dijkstra.shortest_path(graph, :a, :c, 0, &(&1 + &2), &Integer.compare/2)
-      {:some, %Path{nodes: [:a, :b, :c], weight: 5}}
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(:a, nil)
+      ...> |> Yog.add_node(:b, nil)
+      ...> |> Yog.add_node(:c, nil)
+      ...> |> Yog.add_edge!(:a, :b, 4)
+      ...> |> Yog.add_edge!(:b, :c, 1)
+      iex> compare = fn a, b when a < b -> :lt; a, b when a > b -> :gt; _, _ -> :eq end
+      iex> Dijkstra.shortest_path(graph, :a, :c, 0, &(&1 + &2), compare)
+      {:some, {:path, [:a, :b, :c], 5}}
 
-      iex> Dijkstra.shortest_path(graph, :a, :nonexistent, 0, &(&1 + &2), &Integer.compare/2)
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(:a, nil)
+      ...> |> Yog.add_node(:b, nil)
+      ...> |> Yog.add_node(:c, nil)
+      ...> |> Yog.add_edge!(:a, :b, 4)
+      ...> |> Yog.add_edge!(:b, :c, 1)
+      iex> compare = fn a, b when a < b -> :lt; a, b when a > b -> :gt; _, _ -> :eq end
+      iex> Dijkstra.shortest_path(graph, :a, :nonexistent, 0, &(&1 + &2), compare)
       :none
   """
   @spec shortest_path(
-          Graph.t(),
+          Yog.t(),
           Yog.node_id(),
           Yog.node_id(),
           weight,
@@ -254,13 +269,16 @@ defmodule Yog.Pathfinding.Dijkstra do
 
   ## Examples
 
-      iex> graph = Graph.new()
-      ...> |> Graph.add_edge(1, 2, 4)
-      ...> |> Graph.add_edge(2, 3, 1)
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edge!(1, 2, 4)
+      ...> |> Yog.add_edge!(2, 3, 1)
       iex> Dijkstra.shortest_path_int(graph, 1, 3)
-      {:some, %Path{nodes: [1, 2, 3], weight: 5}}
+      {:some, {:path, [1, 2, 3], 5}}
   """
-  @spec shortest_path_int(Graph.t(), Yog.node_id(), Yog.node_id()) :: path_result(integer())
+  @spec shortest_path_int(Yog.t(), Yog.node_id(), Yog.node_id()) :: path_result(integer())
   def shortest_path_int(graph, from, to) do
     case :yog@pathfinding@dijkstra.shortest_path_int(graph, from, to) do
       :none ->
@@ -278,13 +296,16 @@ defmodule Yog.Pathfinding.Dijkstra do
 
   ## Examples
 
-      iex> graph = Graph.new()
-      ...> |> Graph.add_edge(1, 2, 4.5)
-      ...> |> Graph.add_edge(2, 3, 1.5)
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edge!(1, 2, 4.5)
+      ...> |> Yog.add_edge!(2, 3, 1.5)
       iex> Dijkstra.shortest_path_float(graph, 1, 3)
-      {:some, %Path{nodes: [1, 2, 3], weight: 6.0}}
+      {:some, {:path, [1, 2, 3], 6.0}}
   """
-  @spec shortest_path_float(Graph.t(), Yog.node_id(), Yog.node_id()) :: path_result(float())
+  @spec shortest_path_float(Yog.t(), Yog.node_id(), Yog.node_id()) :: path_result(float())
   def shortest_path_float(graph, from, to) do
     case :yog@pathfinding@dijkstra.shortest_path_float(graph, from, to) do
       :none ->
@@ -310,15 +331,19 @@ defmodule Yog.Pathfinding.Dijkstra do
 
   ## Examples
 
-      iex> graph = Graph.new()
-      ...> |> Graph.add_edge(:a, :b, 4)
-      ...> |> Graph.add_edge(:a, :c, 2)
-      ...> |> Graph.add_edge(:b, :c, 1)
-      iex> Dijkstra.single_source_distances(graph, :a, 0, &(&1 + &2), &Integer.compare/2)
-      %{:a => 0, :b => 4, :c => 2}
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(:a, nil)
+      ...> |> Yog.add_node(:b, nil)
+      ...> |> Yog.add_node(:c, nil)
+      ...> |> Yog.add_edge!(:a, :b, 4)
+      ...> |> Yog.add_edge!(:a, :c, 2)
+      ...> |> Yog.add_edge!(:b, :c, 1)
+      iex> compare = fn a, b when a < b -> :lt; a, b when a > b -> :gt; _, _ -> :eq end
+      iex> Dijkstra.single_source_distances(graph, :a, 0, &(&1 + &2), compare)
+      %{a: 0, b: 4, c: 2}
   """
   @spec single_source_distances(
-          Graph.t(),
+          Yog.t(),
           Yog.node_id(),
           weight,
           (weight, weight -> weight),
@@ -371,9 +396,10 @@ defmodule Yog.Pathfinding.Dijkstra do
       ...>   3 -> [{4, 3}]
       ...>   4 -> []
       ...> end
+      iex> compare = fn a, b when a < b -> :lt; a, b when a > b -> :gt; _, _ -> :eq end
       iex> Dijkstra.implicit_dijkstra(
       ...>   1, successors, fn x -> x == 4 end,
-      ...>   0, &(&1 + &2), &Integer.compare/2
+      ...>   0, &(&1 + &2), compare
       ...> )
       {:some, 6}
   """
@@ -425,13 +451,18 @@ defmodule Yog.Pathfinding.Dijkstra do
 
   ## Examples
 
-      # Search with position equivalence (ignoring direction)
-      iex> key_fn = fn {x, y, _dir} -> {x, y} end
+      iex> successors = fn
+      ...>   {pos, _dir} when pos < 3 -> [{{pos + 1, :fwd}, 1}]
+      ...>   _ -> []
+      ...> end
+      iex> key_fn = fn {pos, _dir} -> pos end
+      iex> goal_fn = fn {pos, _dir} -> pos == 3 end
+      iex> compare = fn a, b when a < b -> :lt; a, b when a > b -> :gt; _, _ -> :eq end
       iex> Dijkstra.implicit_dijkstra_by(
-      ...>   {0, 0, :north}, successors, key_fn,
-      ...>   goal_fn, 0, &(&1 + &2), &Integer.compare/2
+      ...>   {0, :start}, successors, key_fn,
+      ...>   goal_fn, 0, &(&1 + &2), compare
       ...> )
-      {:some, 10}
+      {:some, 3}
   """
   @spec implicit_dijkstra_by(
           state,

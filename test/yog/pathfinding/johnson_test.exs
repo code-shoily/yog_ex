@@ -1,6 +1,7 @@
 defmodule Yog.Pathfinding.JohnsonTest do
   use ExUnit.Case
   alias Yog.Pathfinding.Johnson
+  doctest Johnson
 
   # Helper functions for algorithms
   defp compare(a, b), do: if(a < b, do: :lt, else: if(a > b, do: :gt, else: :eq))

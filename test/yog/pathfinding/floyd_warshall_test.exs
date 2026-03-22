@@ -1,6 +1,7 @@
 defmodule Yog.Pathfinding.FloydWarshallTest do
   use ExUnit.Case
   alias Yog.Pathfinding.FloydWarshall
+  doctest FloydWarshall
 
   # Helper functions for algorithms
   defp compare(a, b), do: if(a < b, do: :lt, else: if(a > b, do: :gt, else: :eq))
