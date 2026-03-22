@@ -263,7 +263,8 @@ defmodule Yog.Multi.Model do
 
   ## Example
 
-      # Keep minimum weight among parallel edges
+  Keep minimum weight among parallel edges:
+
       multi.to_simple_graph(mg, fn a, b -> min(a, b) end)
   """
   @spec to_simple_graph(t(), (any(), any() -> any())) :: Yog.graph()

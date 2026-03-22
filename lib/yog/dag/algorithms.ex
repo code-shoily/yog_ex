@@ -30,10 +30,22 @@ defmodule Yog.DAG.Algorithms do
 
   ## Examples
 
-      # Given edges: 1->2, 1->3, 2->4, 3->4
-      # Valid topological sorts include: [1, 2, 3, 4] or [1, 3, 2, 4]
-      sorted = Yog.DAG.Algorithms.topological_sort(dag)
-      #=> [1, 2, 3, 4]  # or another valid ordering
+      iex> {:ok, dag} = Yog.DAG.Models.from_graph(
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(1, nil)
+      ...>   |> Yog.add_node(2, nil)
+      ...>   |> Yog.add_node(3, nil)
+      ...>   |> Yog.add_node(4, nil)
+      ...>   |> Yog.add_edge!(1, 2, 1)
+      ...>   |> Yog.add_edge!(1, 3, 1)
+      ...>   |> Yog.add_edge!(2, 4, 1)
+      ...>   |> Yog.add_edge!(3, 4, 1)
+      ...> )
+      iex> sorted = Yog.DAG.Algorithms.topological_sort(dag)
+      iex> hd(sorted)
+      1
+      iex> List.last(sorted)
+      4
   """
   @spec topological_sort(Yog.DAG.t()) :: [Yog.node_id()]
   def topological_sort(dag) do
@@ -67,9 +79,17 @@ defmodule Yog.DAG.Algorithms do
 
   ## Examples
 
-      # Find the critical path in a project schedule
-      critical_path = Yog.DAG.Algorithms.longest_path(project_dag)
-      #=> [:start, :task_a, :task_b, :end]
+      iex> {:ok, dag} = Yog.DAG.Models.from_graph(
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(:a, nil)
+      ...>   |> Yog.add_node(:b, nil)
+      ...>   |> Yog.add_node(:c, nil)
+      ...>   |> Yog.add_edge!(:a, :b, 5)
+      ...>   |> Yog.add_edge!(:b, :c, 3)
+      ...> )
+      iex> path = Yog.DAG.Algorithms.longest_path(dag)
+      iex> length(path)
+      3
   """
   @spec longest_path(Yog.DAG.t()) :: [Yog.node_id()]
   def longest_path(dag) do
@@ -132,7 +152,17 @@ defmodule Yog.DAG.Algorithms do
 
   ## Examples
 
-      closure = Yog.DAG.Algorithms.transitive_closure(dag)
+      iex> {:ok, dag} = Yog.DAG.Models.from_graph(
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(:a, nil)
+      ...>   |> Yog.add_node(:b, nil)
+      ...>   |> Yog.add_node(:c, nil)
+      ...>   |> Yog.add_edge!(:a, :b, 1)
+      ...>   |> Yog.add_edge!(:b, :c, 1)
+      ...> )
+      iex> closure = Yog.DAG.Algorithms.transitive_closure(dag)
+      iex> is_tuple(closure)
+      true
   """
   @spec transitive_closure(Yog.DAG.t()) :: Yog.DAG.t()
   def transitive_closure(dag) do
@@ -190,7 +220,17 @@ defmodule Yog.DAG.Algorithms do
 
   ## Examples
 
-      reduction = Yog.DAG.Algorithms.transitive_reduction(dag)
+      iex> {:ok, dag} = Yog.DAG.Models.from_graph(
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(:a, nil)
+      ...>   |> Yog.add_node(:b, nil)
+      ...>   |> Yog.add_node(:c, nil)
+      ...>   |> Yog.add_edge!(:a, :b, 1)
+      ...>   |> Yog.add_edge!(:b, :c, 1)
+      ...> )
+      iex> reduction = Yog.DAG.Algorithms.transitive_reduction(dag)
+      iex> is_tuple(reduction)
+      true
   """
   @spec transitive_reduction(Yog.DAG.t()) :: Yog.DAG.t()
   def transitive_reduction(dag) do
@@ -226,10 +266,16 @@ defmodule Yog.DAG.Algorithms do
 
   ## Examples
 
-      case Yog.DAG.Algorithms.shortest_path(dag, :a, :d) do
-        {:some, path} -> path.nodes
-        :none -> :no_path
-      end
+      iex> {:ok, dag} = Yog.DAG.Models.from_graph(
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(:a, nil)
+      ...>   |> Yog.add_node(:b, nil)
+      ...>   |> Yog.add_node(:c, nil)
+      ...>   |> Yog.add_edge!(:a, :b, 3)
+      ...>   |> Yog.add_edge!(:b, :c, 2)
+      ...> )
+      iex> {:some, path} = Yog.DAG.Algorithms.shortest_path(dag, :a, :c)
+      iex> {:path, [:a, :b, :c], 5} = path
   """
   @spec shortest_path(Yog.DAG.t(), Yog.node_id(), Yog.node_id()) ::
           {:some, PathUtils.path(any())} | :none
@@ -304,10 +350,22 @@ defmodule Yog.DAG.Algorithms do
 
   ## Examples
 
-      # Given: A->B, A->C, B->D, C->D (diamond pattern)
-      # D has 3 ancestors (A, B, C)
-      # A has 3 descendants (B, C, D) - D counted once despite 2 paths
-      descendant_counts = Yog.DAG.Algorithms.count_reachability(dag, :descendants)
+      iex> {:ok, dag} = Yog.DAG.Models.from_graph(
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(:a, nil)
+      ...>   |> Yog.add_node(:b, nil)
+      ...>   |> Yog.add_node(:c, nil)
+      ...>   |> Yog.add_node(:d, nil)
+      ...>   |> Yog.add_edge!(:a, :b, 1)
+      ...>   |> Yog.add_edge!(:a, :c, 1)
+      ...>   |> Yog.add_edge!(:b, :d, 1)
+      ...>   |> Yog.add_edge!(:c, :d, 1)
+      ...> )
+      iex> counts = Yog.DAG.Algorithms.count_reachability(dag, :descendants)
+      iex> counts[:a]
+      3
+      iex> counts[:d]
+      0
   """
   @spec count_reachability(Yog.DAG.t(), direction()) :: %{Yog.node_id() => integer()}
   def count_reachability(dag, direction) do
@@ -376,10 +434,17 @@ defmodule Yog.DAG.Algorithms do
 
   ## Examples
 
-      # Given: X->A, X->B, Y->A, Z->B
-      # LCAs of A and B are [X] - the most specific shared ancestor
-      lcas = Yog.DAG.Algorithms.lowest_common_ancestors(dag, :a, :b)
-      #=> [:x]
+      iex> {:ok, dag} = Yog.DAG.Models.from_graph(
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(:x, nil)
+      ...>   |> Yog.add_node(:a, nil)
+      ...>   |> Yog.add_node(:b, nil)
+      ...>   |> Yog.add_edge!(:x, :a, 1)
+      ...>   |> Yog.add_edge!(:x, :b, 1)
+      ...> )
+      iex> lcas = Yog.DAG.Algorithms.lowest_common_ancestors(dag, :a, :b)
+      iex> :x in lcas
+      true
   """
   @spec lowest_common_ancestors(Yog.DAG.t(), Yog.node_id(), Yog.node_id()) ::
           [Yog.node_id()]
