@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+> [!NOTE]
+> **Versioning Scheme**: Starting from `0.51.0`, YogEx versions map to upstream Yog versions as follows: `Yog A.B._` maps to `YogEx 0.AB.0`. Internal YogEx fixes increment the patch version (e.g., `0.51.1`). This will continue until YogEx reaches parity/confidence with upstream versioning.
+
+## [0.51.0] - Unreleased
+
+### Added
+
+- **`Yog.Connectivity`**: Full parity with Gleam `connectivity.gleam`.
+  - Added `connected_components/1` and `weakly_connected_components/1`.
+  - Comprehensive documentation and doctests for all connectivity algorithms.
+- **I/O Modules**: Integrated `yog_io` support for multiple graph formats:
+  - `Yog.IO.GDF`
+  - `Yog.IO.GraphML`
+  - `Yog.IO.JSON`
+  - `Yog.IO.LEDA`
+  - `Yog.IO.Pajek`
+  - `Yog.IO.TGF`
+- **Dependencies**: Synced with **Yog 5.1.0** and **Yog_IO 1.0.0**.
+
+### Changed
+
+- **`Yog.DAG`**: Renamed internal modules for consistency with Elixir naming conventions:
+  - `Yog.DAG.Models` -> `Yog.DAG.Model`
+  - `Yog.DAG.Algorithms` -> `Yog.DAG.Algorithm`
+- **`README.md`**: Updated to reflect new features and parity status.
+
 ## [2.0.0] - 2026-03-04
 
 ### Breaking
