@@ -40,18 +40,27 @@ defmodule Yog.Pathfinding.Matrix do
   - **Facility location**: Distances between candidate sites
   - **Network analysis**: Selected node pairwise distances
 
-  ## Example
+  ## Examples
 
       # Compute distances only between important waypoints
-      pois = [start, waypoint_a, waypoint_b, goal]
-      distances = Yog.Pathfinding.Matrix.distance_matrix(
-        graph,
-        pois,
-        0,
-        &(&1 + &2),
-        &Integer.compare/2
-      )
-      # Result contains only 4×4 = 16 distances, not full V×V matrix
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_node(4, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 4)
+      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge!(from: 3, to: 4, with: 2)
+      iex> pois = [1, 2, 4]  # Only care about these 3 nodes
+      iex> {:ok, distances} = Yog.Pathfinding.Matrix.distance_matrix(
+      ...>   graph, pois, 0, &(&1 + &2), &Integer.compare/2
+      ...> )
+      iex> # Distance from 1 to 4 should be 1->2->3->4 = 7
+      ...> distances[{1, 4}]
+      7
+      iex> # Matrix only contains 3×3 = 9 entries
+      ...> map_size(distances)
+      9
 
   ## References
 
@@ -89,23 +98,30 @@ defmodule Yog.Pathfinding.Matrix do
   ## Examples
 
       # Non-negative weights only (uses Dijkstra or Floyd-Warshall)
-      Yog.Pathfinding.Matrix.distance_matrix(
-        graph,
-        pois,
-        0,
-        &(&1 + &2),
-        &Integer.compare/2
-      )
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 4)
+      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      iex> {:ok, distances} = Yog.Pathfinding.Matrix.distance_matrix(
+      ...>   graph, [1, 3], 0, &(&1 + &2), &Integer.compare/2
+      ...> )
+      iex> distances[{1, 3}]
+      5
 
       # Support negative weights (uses Johnson's or Floyd-Warshall)
-      Yog.Pathfinding.Matrix.distance_matrix(
-        graph,
-        pois,
-        0,
-        &(&1 + &2),
-        &Integer.compare/2,
-        &(&1 - &2)
-      )
+      iex> neg_graph = Yog.directed()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 4)
+      ...> |> Yog.add_edge!(from: 2, to: 3, with: -2)
+      iex> {:ok, distances} = Yog.Pathfinding.Matrix.distance_matrix(
+      ...>   neg_graph, [1, 3], 0, &(&1 + &2), &Integer.compare/2, &(&1 - &2)
+      ...> )
+      iex> distances[{1, 3}]
+      2
   """
   @spec distance_matrix(
           Yog.graph(),

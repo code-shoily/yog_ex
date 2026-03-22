@@ -20,15 +20,37 @@ defmodule Yog.Generator.Classic do
   | `petersen/0` | Petersen | O(1) | 15 |
   | `empty/1` | Isolated | O(n) | 0 |
 
-  ## Example
+  ## Examples
 
-      # Classic structures
-      cycle = Yog.Generator.Classic.cycle(5)                    # C5 cycle graph
-      complete = Yog.Generator.Classic.complete(4)              # K4 complete graph
-      grid = Yog.Generator.Classic.grid_2d(3, 4)                # 3x4 lattice mesh
-      tree = Yog.Generator.Classic.binary_tree(3)               # Depth-3 binary tree
-      bipartite = Yog.Generator.Classic.complete_bipartite(3, 4) # K_{3,4}
-      petersen = Yog.Generator.Classic.petersen()               # Famous Petersen graph
+      # Generate a cycle graph C5
+      iex> cycle = Yog.Generator.Classic.cycle(5)
+      iex> Yog.Model.order(cycle)
+      5
+
+      # Generate a complete graph K4
+      iex> complete = Yog.Generator.Classic.complete(4)
+      iex> Yog.Model.order(complete)
+      4
+
+      # Generate a 3x4 grid
+      iex> grid = Yog.Generator.Classic.grid_2d(3, 4)
+      iex> Yog.Model.order(grid)
+      12
+
+      # Generate a depth-3 binary tree (15 nodes total)
+      iex> tree = Yog.Generator.Classic.binary_tree(3)
+      iex> Yog.Model.order(tree)
+      15
+
+      # Generate a complete bipartite graph K_{3,4}
+      iex> bipartite = Yog.Generator.Classic.complete_bipartite(3, 4)
+      iex> Yog.Model.order(bipartite)
+      7
+
+      # Generate the Petersen graph
+      iex> petersen = Yog.Generator.Classic.petersen()
+      iex> Yog.Model.order(petersen)
+      10
 
   ## Use Cases
 
@@ -55,10 +77,14 @@ defmodule Yog.Generator.Classic do
 
   **Time Complexity:** O(n²)
 
-  ## Example
+  ## Examples
 
-      k5 = Yog.Generator.Classic.complete(5)
-      # K5 has 5 nodes and 10 edges
+      iex> k5 = Yog.Generator.Classic.complete(5)
+      iex> Yog.Model.order(k5)
+      5
+      iex> # K5 is undirected, each node has 4 neighbors
+      ...> length(Yog.neighbors(k5, 0))
+      4
 
   ## Use Cases
 
@@ -72,9 +98,13 @@ defmodule Yog.Generator.Classic do
   @doc """
   Generates a complete graph with specified graph type.
 
-  ## Example
+  ## Examples
 
-      directed_k4 = Yog.Generator.Classic.complete_with_type(4, :directed)
+      iex> directed_k4 = Yog.Generator.Classic.complete_with_type(4, :directed)
+      iex> Yog.Model.type(directed_k4)
+      :directed
+      iex> Yog.Model.order(directed_k4)
+      4
   """
   @spec complete_with_type(integer(), Yog.graph_type()) :: Yog.graph()
   defdelegate complete_with_type(n, graph_type), to: :yog@generator@classic
@@ -91,10 +121,14 @@ defmodule Yog.Generator.Classic do
 
   **Time Complexity:** O(n)
 
-  ## Example
+  ## Examples
 
-      c6 = Yog.Generator.Classic.cycle(6)
-      # C6: 0-1-2-3-4-5-0 (a hexagon)
+      iex> c6 = Yog.Generator.Classic.cycle(6)
+      iex> Yog.Model.order(c6)
+      6
+      iex> # Each node in a cycle has degree 2
+      ...> length(Yog.neighbors(c6, 0))
+      2
 
   ## Use Cases
 
@@ -121,10 +155,17 @@ defmodule Yog.Generator.Classic do
 
   **Time Complexity:** O(n)
 
-  ## Example
+  ## Examples
 
-      p5 = Yog.Generator.Classic.path(5)
-      # P5: 0-1-2-3-4
+      iex> p5 = Yog.Generator.Classic.path(5)
+      iex> Yog.Model.order(p5)
+      5
+      iex> # End nodes have degree 1
+      ...> length(Yog.neighbors(p5, 0))
+      1
+      iex> # Middle nodes have degree 2
+      ...> length(Yog.neighbors(p5, 2))
+      2
 
   ## Use Cases
 
@@ -151,10 +192,17 @@ defmodule Yog.Generator.Classic do
 
   **Time Complexity:** O(n)
 
-  ## Example
+  ## Examples
 
-      s5 = Yog.Generator.Classic.star(5)
-      # S5: center 0 connected to nodes 1, 2, 3, 4
+      iex> s5 = Yog.Generator.Classic.star(5)
+      iex> Yog.Model.order(s5)
+      5
+      iex> # Center (node 0) has degree 4
+      ...> length(Yog.neighbors(s5, 0))
+      4
+      iex> # Leaf nodes have degree 1
+      ...> length(Yog.neighbors(s5, 1))
+      1
 
   ## Use Cases
 
@@ -181,10 +229,17 @@ defmodule Yog.Generator.Classic do
 
   **Time Complexity:** O(n)
 
-  ## Example
+  ## Examples
 
-      w6 = Yog.Generator.Classic.wheel(6)
-      # W6: center 0 connected to rim nodes 1-5, which form a cycle
+      iex> w6 = Yog.Generator.Classic.wheel(6)
+      iex> Yog.Model.order(w6)
+      6
+      iex> # Center has degree 5 (connected to all rim nodes)
+      ...> length(Yog.neighbors(w6, 0))
+      5
+      iex> # Rim nodes have degree 3 (center + 2 neighbors in cycle)
+      ...> length(Yog.neighbors(w6, 1))
+      3
 
   ## Use Cases
 
@@ -211,10 +266,17 @@ defmodule Yog.Generator.Classic do
 
   **Time Complexity:** O(mn)
 
-  ## Example
+  ## Examples
 
-      k34 = Yog.Generator.Classic.complete_bipartite(3, 4)
-      # K_{3,4}: 3 nodes in left partition, 4 in right, all cross-edges
+      iex> k34 = Yog.Generator.Classic.complete_bipartite(3, 4)
+      iex> Yog.Model.order(k34)
+      7
+      iex> # First partition nodes (0-2) have degree 4
+      ...> length(Yog.neighbors(k34, 0))
+      4
+      iex> # Second partition nodes (3-6) have degree 3
+      ...> length(Yog.neighbors(k34, 3))
+      3
 
   ## Use Cases
 
@@ -241,10 +303,12 @@ defmodule Yog.Generator.Classic do
 
   **Time Complexity:** O(2^depth)
 
-  ## Example
+  ## Examples
 
-      tree = Yog.Generator.Classic.binary_tree(3)
-      # Depth-3 binary tree with 15 nodes (1 + 2 + 4 + 8)
+      iex> tree = Yog.Generator.Classic.binary_tree(3)
+      iex> # Depth-3 binary tree: 1 + 2 + 4 + 8 = 15 nodes
+      ...> Yog.Model.order(tree)
+      15
 
   ## Use Cases
 
@@ -270,10 +334,18 @@ defmodule Yog.Generator.Classic do
 
   **Time Complexity:** O(rows × cols)
 
-  ## Example
+  ## Examples
 
-      grid = Yog.Generator.Classic.grid_2d(3, 4)
-      # 3x4 grid with 12 nodes
+      iex> grid = Yog.Generator.Classic.grid_2d(3, 4)
+      iex> # 3x4 grid has 12 nodes
+      ...> Yog.Model.order(grid)
+      12
+      iex> # Corner nodes have degree 2
+      ...> length(Yog.neighbors(grid, 0))
+      2
+      iex> # Interior nodes have degree 4
+      ...> length(Yog.neighbors(grid, 4))
+      4
 
   ## Use Cases
 
@@ -300,10 +372,15 @@ defmodule Yog.Generator.Classic do
 
   **Time Complexity:** O(1)
 
-  ## Example
+  ## Examples
 
-      p = Yog.Generator.Classic.petersen()
-      # The famous Petersen graph
+      iex> p = Yog.Generator.Classic.petersen()
+      iex> # Petersen graph has 10 nodes
+      ...> Yog.Model.order(p)
+      10
+      iex> # All nodes have degree 3
+      ...> length(Yog.neighbors(p, 0))
+      3
 
   ## Properties
 
@@ -328,10 +405,14 @@ defmodule Yog.Generator.Classic do
 
   **Time Complexity:** O(n)
 
-  ## Example
+  ## Examples
 
-      empty5 = Yog.Generator.Classic.empty(5)
-      # 5 nodes with no edges
+      iex> empty5 = Yog.Generator.Classic.empty(5)
+      iex> Yog.Model.order(empty5)
+      5
+      iex> # No edges - isolated nodes have degree 0
+      ...> length(Yog.neighbors(empty5, 0))
+      0
   """
   @spec empty(integer()) :: Yog.graph()
   defdelegate empty(n), to: :yog@generator@classic

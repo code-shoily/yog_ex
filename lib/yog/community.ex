@@ -26,21 +26,36 @@ defmodule Yog.Community do
   - `Dendrogram` - Hierarchical community structure with multiple levels
   - `CommunityId` - Integer identifier for a community
 
-  ## Example
+  ## Examples
 
-      # Detect communities using Louvain
-      communities = Yog.Community.Louvain.detect(graph)
-      communities.num_communities  # => 4
+      # Create a graph with clear community structure (two cliques connected by a bridge)
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_node(4, nil)
+      ...> |> Yog.add_node(5, nil)
+      ...> |> Yog.add_node(6, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge!(from: 1, to: 3, with: 1)  # Triangle: 1-2-3
+      ...> |> Yog.add_edge!(from: 4, to: 5, with: 1)
+      ...> |> Yog.add_edge!(from: 5, to: 6, with: 1)
+      ...> |> Yog.add_edge!(from: 4, to: 6, with: 1)  # Triangle: 4-5-6
+      ...> |> Yog.add_edge!(from: 3, to: 4, with: 1)  # Bridge between communities
+      iex> communities = Yog.Community.Louvain.detect(graph)
+      iex> communities.num_communities
+      2
 
-      # Get nodes in each community
-      communities_dict = Yog.Community.to_dict(communities)
-      # => %{0 => MapSet.new([1, 2, 3]), 1 => MapSet.new([4, 5])}
+      # Get nodes in each community as a dictionary
+      iex> communities_dict = Yog.Community.to_dict(communities)
+      iex> map_size(communities_dict)
+      2
 
-      # Find largest community
-      case Yog.Community.largest(communities) do
-        {:some, community_id} -> community_id
-        :none -> nil
-      end
+      # Find the largest community
+      iex> {:some, _community_id} = Yog.Community.largest(communities)
+      iex> true
+      true
 
   ## Choosing an Algorithm
 
@@ -88,15 +103,14 @@ defmodule Yog.Community do
   This is useful when you need to iterate over all nodes in each community
   rather than looking up the community for each node.
 
-  ## Example
+  ## Examples
 
-      communities = %{
-        assignments: %{1 => 0, 2 => 0, 3 => 1},
-        num_communities: 2
-      }
-
-      Yog.Community.to_dict(communities)
-      # => %{0 => MapSet.new([1, 2]), 1 => MapSet.new([3])}
+      iex> communities = %{
+      ...>   assignments: %{1 => 0, 2 => 0, 3 => 1},
+      ...>   num_communities: 2
+      ...> }
+      iex> Yog.Community.to_dict(communities)
+      %{0 => MapSet.new([1, 2]), 1 => MapSet.new([3])}
   """
   @spec to_dict(communities()) :: %{community_id() => MapSet.t(Yog.node_id())}
   def to_dict(communities) do
@@ -111,15 +125,14 @@ defmodule Yog.Community do
 
   Returns `:none` if there are no communities (empty graph or no assignments).
 
-  ## Example
+  ## Examples
 
-      communities = %{
-        assignments: %{1 => 0, 2 => 0, 3 => 0, 4 => 1},
-        num_communities: 2
-      }
-
-      Yog.Community.largest(communities)
-      # => {:some, 0}  # Community 0 has 3 nodes vs 1 for community 1
+      iex> communities = %{
+      ...>   assignments: %{1 => 0, 2 => 0, 3 => 0, 4 => 1},
+      ...>   num_communities: 2
+      ...> }
+      iex> Yog.Community.largest(communities)
+      {:some, 0}
   """
   @spec largest(communities()) :: {:some, community_id()} | :none
   def largest(communities) do
@@ -137,15 +150,14 @@ defmodule Yog.Community do
   @doc """
   Returns a dictionary mapping community IDs to their sizes (number of nodes).
 
-  ## Example
+  ## Examples
 
-      communities = %{
-        assignments: %{1 => 0, 2 => 0, 3 => 1, 4 => 1, 5 => 1},
-        num_communities: 2
-      }
-
-      Yog.Community.sizes(communities)
-      # => %{0 => 2, 1 => 3}
+      iex> communities = %{
+      ...>   assignments: %{1 => 0, 2 => 0, 3 => 1, 4 => 1, 5 => 1},
+      ...>   num_communities: 2
+      ...> }
+      iex> Yog.Community.sizes(communities)
+      %{0 => 2, 1 => 3}
   """
   @spec sizes(communities()) :: %{community_id() => integer()}
   def sizes(communities) do
@@ -167,17 +179,17 @@ defmodule Yog.Community do
     * `source` - The community ID to merge from (will be removed)
     * `target` - The community ID to merge into (will be kept)
 
-  ## Example
+  ## Examples
 
-      communities = %{
-        assignments: %{1 => 0, 2 => 0, 3 => 1, 4 => 1},
-        num_communities: 2
-      }
-
-      # Merge community 1 into community 0
-      merged = Yog.Community.merge(communities, source: 1, target: 0)
-      # merged.assignments => %{1 => 0, 2 => 0, 3 => 0, 4 => 0}
-      # merged.num_communities => 1
+      iex> communities = %{
+      ...>   assignments: %{1 => 0, 2 => 0, 3 => 1, 4 => 1},
+      ...>   num_communities: 2
+      ...> }
+      iex> merged = Yog.Community.merge(communities, source: 1, target: 0)
+      iex> merged.assignments
+      %{1 => 0, 2 => 0, 3 => 0, 4 => 0}
+      iex> merged.num_communities
+      1
   """
   @spec merge(communities(), source: community_id(), target: community_id()) ::
           communities()
@@ -207,10 +219,14 @@ defmodule Yog.Community do
   @doc """
   Returns all nodes belonging to a specific community.
 
-  ## Example
+  ## Examples
 
-      nodes = Yog.Community.nodes_in(communities, 0)
-      # => MapSet.new([1, 2, 3])
+      iex> communities = %{
+      ...>   assignments: %{1 => 0, 2 => 0, 3 => 0, 4 => 1},
+      ...>   num_communities: 2
+      ...> }
+      iex> Yog.Community.nodes_in(communities, 0)
+      MapSet.new([1, 2, 3])
   """
   @spec nodes_in(communities(), community_id()) :: MapSet.t(Yog.node_id())
   def nodes_in(communities, community_id) do
@@ -225,10 +241,16 @@ defmodule Yog.Community do
 
   Returns `:none` if the node is not assigned to any community.
 
-  ## Example
+  ## Examples
 
-      Yog.Community.for_node(communities, 1)
-      # => {:some, 0}
+      iex> communities = %{
+      ...>   assignments: %{1 => 0, 2 => 0, 3 => 1},
+      ...>   num_communities: 2
+      ...> }
+      iex> Yog.Community.for_node(communities, 1)
+      {:some, 0}
+      iex> Yog.Community.for_node(communities, 999)
+      :none
   """
   @spec for_node(communities(), Yog.node_id()) :: {:some, community_id()} | :none
   def for_node(communities, node) do
@@ -251,10 +273,18 @@ defmodule Yog.Community do
 
   Range: [-0.5, 1.0]. Values > 0.3 indicate significant community structure.
 
-  ## Example
+  ## Examples
 
-      q = Yog.Community.modularity(graph, communities)
-      # => 0.42
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      iex> communities = %{assignments: %{1 => 0, 2 => 0, 3 => 0}, num_communities: 1}
+      iex> q = Yog.Community.modularity(graph, communities)
+      iex> is_float(q)
+      true
   """
   @spec modularity(Yog.graph(), communities()) :: float()
   def modularity(graph, communities) do
@@ -266,10 +296,17 @@ defmodule Yog.Community do
 
   A triangle is a set of three nodes where each pair is connected.
 
-  ## Example
+  ## Examples
 
-      triangles = Yog.Community.count_triangles(graph)
-      # => 15
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      iex> Yog.Community.count_triangles(graph)
+      1
   """
   @spec count_triangles(Yog.graph()) :: integer()
   def count_triangles(graph) do
@@ -279,10 +316,17 @@ defmodule Yog.Community do
   @doc """
   Returns the number of triangles each node participates in.
 
-  ## Example
+  ## Examples
 
-      per_node = Yog.Community.triangles_per_node(graph)
-      # => %{1 => 2, 2 => 3, 3 => 1}
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      iex> Yog.Community.triangles_per_node(graph)
+      %{1 => 1, 2 => 1, 3 => 1}
   """
   @spec triangles_per_node(Yog.graph()) :: %{Yog.node_id() => integer()}
   def triangles_per_node(graph) do
@@ -296,10 +340,17 @@ defmodule Yog.Community do
 
   Range: [0.0, 1.0]. 1.0 means all neighbors are connected to each other.
 
-  ## Example
+  ## Examples
 
-      cc = Yog.Community.clustering_coefficient(graph, :a)
-      # => 0.67
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      iex> Yog.Community.clustering_coefficient(graph, 1)
+      1.0
   """
   @spec clustering_coefficient(Yog.graph(), Yog.node_id()) :: float()
   def clustering_coefficient(graph, node) do
@@ -309,10 +360,17 @@ defmodule Yog.Community do
   @doc """
   Calculates the average clustering coefficient for the entire graph.
 
-  ## Example
+  ## Examples
 
-      avg_cc = Yog.Community.average_clustering_coefficient(graph)
-      # => 0.45
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      iex> Yog.Community.average_clustering_coefficient(graph)
+      1.0
   """
   @spec average_clustering_coefficient(Yog.graph()) :: float()
   def average_clustering_coefficient(graph) do
@@ -324,10 +382,16 @@ defmodule Yog.Community do
 
   The ratio of actual edges to possible edges.
 
-  ## Example
+  ## Examples
 
-      d = Yog.Community.density(graph)
-      # => 0.3
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      iex> d = Yog.Community.density(graph)
+      iex> is_float(d)
+      true
   """
   @spec density(Yog.graph()) :: float()
   def density(graph) do
@@ -337,10 +401,17 @@ defmodule Yog.Community do
   @doc """
   Calculates the density of edges within a specific community.
 
-  ## Example
+  ## Examples
 
-      cd = Yog.Community.community_density(graph, communities, 0)
-      # => 0.5
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      iex> communities = %{assignments: %{1 => 0, 2 => 0, 3 => 0}, num_communities: 1}
+      iex> cd = Yog.Community.community_density(graph, communities, 0)
+      iex> is_float(cd)
+      true
   """
   @spec community_density(Yog.graph(), communities(), community_id()) :: float()
   def community_density(graph, communities, community_id) do
@@ -351,10 +422,17 @@ defmodule Yog.Community do
   @doc """
   Calculates the average density across all communities.
 
-  ## Example
+  ## Examples
 
-      avg_cd = Yog.Community.average_community_density(graph, communities)
-      # => 0.42
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      iex> communities = %{assignments: %{1 => 0, 2 => 0, 3 => 0}, num_communities: 1}
+      iex> avg_cd = Yog.Community.average_community_density(graph, communities)
+      iex> is_float(avg_cd)
+      true
   """
   @spec average_community_density(Yog.graph(), communities()) :: float()
   def average_community_density(graph, communities) do

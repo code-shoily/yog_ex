@@ -15,14 +15,14 @@ defmodule Yog.Generator.Random do
   | `watts_strogatz/3` | Small-world | O(nk) | High clustering + short paths |
   | `random_tree/1` | Uniform tree | O(n²) | Uniformly random spanning tree |
 
-  ## Quick Start
+  ## Quick Start (Not Doctests - Random Output)
 
-      # Random network models
-      sparse = Yog.Generator.Random.erdos_renyi_gnp(100, 0.05)      # Sparse random (p=5%)
-      exact = Yog.Generator.Random.erdos_renyi_gnm(50, 100)         # Exactly 100 edges
-      scale_free = Yog.Generator.Random.barabasi_albert(1000, 3)    # Scale-free network
-      small_world = Yog.Generator.Random.watts_strogatz(100, 6, 0.1) # Small-world (10% rewire)
-      tree = Yog.Generator.Random.random_tree(50)                   # Random spanning tree
+      # Random network models (output varies due to randomness)
+      # sparse = Yog.Generator.Random.erdos_renyi_gnp(100, 0.05)      # Sparse random (p=5%)
+      # exact = Yog.Generator.Random.erdos_renyi_gnm(50, 100)         # Exactly 100 edges
+      # scale_free = Yog.Generator.Random.barabasi_albert(1000, 3)    # Scale-free network
+      # small_world = Yog.Generator.Random.watts_strogatz(100, 6, 0.1) # Small-world (10% rewire)
+      # tree = Yog.Generator.Random.random_tree(50)                   # Random spanning tree
 
   ## Network Models Explained
 
@@ -73,13 +73,16 @@ defmodule Yog.Generator.Random do
 
   **Time Complexity:** O(n²)
 
-  ## Example
+  ## Examples
 
-      # Sparse random graph
-      sparse = Yog.Generator.Random.erdos_renyi_gnp(100, 0.05)
-
-      # Dense random graph
-      dense = Yog.Generator.Random.erdos_renyi_gnp(50, 0.8)
+      iex> # Generate a sparse random graph (output varies)
+      ...> sparse = Yog.Generator.Random.erdos_renyi_gnp(10, 0.3)
+      iex> Yog.Model.order(sparse)
+      10
+      iex> # Generate a denser random graph
+      ...> dense = Yog.Generator.Random.erdos_renyi_gnp(5, 0.8)
+      iex> Yog.Model.order(dense)
+      5
 
   ## Properties
 
@@ -110,10 +113,11 @@ defmodule Yog.Generator.Random do
 
   **Time Complexity:** O(m)
 
-  ## Example
+  ## Examples
 
-      # Exactly 100 edges among 50 nodes
-      graph = Yog.Generator.Random.erdos_renyi_gnm(50, 100)
+      iex> graph = Yog.Generator.Random.erdos_renyi_gnm(10, 15)
+      iex> Yog.Model.order(graph)
+      10
 
   ## Properties
 
@@ -145,10 +149,11 @@ defmodule Yog.Generator.Random do
 
   **Time Complexity:** O(nm)
 
-  ## Example
+  ## Examples
 
-      # Scale-free network with 1000 nodes, each new node connects to 3 existing
-      ba = Yog.Generator.Random.barabasi_albert(1000, 3)
+      iex> ba = Yog.Generator.Random.barabasi_albert(20, 2)
+      iex> Yog.Model.order(ba)
+      20
 
   ## Properties
 
@@ -182,10 +187,11 @@ defmodule Yog.Generator.Random do
 
   **Time Complexity:** O(nk)
 
-  ## Example
+  ## Examples
 
-      # Small-world network: 100 nodes, 6 neighbors, 10% rewire probability
-      ws = Yog.Generator.Random.watts_strogatz(100, 6, 0.1)
+      iex> ws = Yog.Generator.Random.watts_strogatz(20, 4, 0.1)
+      iex> Yog.Model.order(ws)
+      20
 
   ## Properties
 
@@ -218,10 +224,14 @@ defmodule Yog.Generator.Random do
 
   **Time Complexity:** O(n²)
 
-  ## Example
+  ## Examples
 
-      # Random spanning tree on 50 nodes
-      tree = Yog.Generator.Random.random_tree(50)
+      iex> tree = Yog.Generator.Random.random_tree(10)
+      iex> Yog.Model.order(tree)
+      10
+      iex> # A tree has exactly n-1 edges (undirected, so 2*(n-1) neighbors total)
+      ...> Yog.Model.size(tree)
+      9
 
   ## Properties
 

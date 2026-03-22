@@ -21,20 +21,25 @@ defmodule Yog.Community.Louvain do
   - `:max_iterations` - Max iterations per phase (default: 100)
   - `:seed` - Random seed for tie-breaking (default: 42)
 
-  ## Example
+  ## Examples
 
-      # Simple detection
-      communities = Yog.Community.Louvain.detect(graph)
-
-      # With custom options
-      communities = Yog.Community.Louvain.detect_with_options(graph,
-        min_modularity_gain: 0.0001,
-        max_iterations: 50,
-        seed: 123
-      )
-
-      # Hierarchical detection
-      dendrogram = Yog.Community.Louvain.detect_hierarchical(graph)
+      # Simple detection (creates communities for a triangle + square connected by an edge)
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_node(4, nil)
+      ...> |> Yog.add_node(5, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      ...> |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      ...> |> Yog.add_edge!(from: 4, to: 5, with: 1)
+      iex> communities = Yog.Community.Louvain.detect(graph)
+      iex> is_map(communities.assignments)
+      true
+      iex> communities.num_communities >= 1
+      true
   """
 
   alias Yog.Community
@@ -42,9 +47,15 @@ defmodule Yog.Community.Louvain do
   @doc """
   Detects communities using the Louvain algorithm with default options.
 
-  ## Example
+  ## Examples
 
-      communities = Yog.Community.Louvain.detect(graph)
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      iex> communities = Yog.Community.Louvain.detect(graph)
+      iex> is_map(communities.assignments)
+      true
   """
   @spec detect(Yog.graph()) :: Community.communities()
   def detect(graph) do
@@ -65,13 +76,19 @@ defmodule Yog.Community.Louvain do
     * `:max_iterations` - Maximum iterations per phase (default: 100)
     * `:seed` - Random seed for tie-breaking (default: 42)
 
-  ## Example
+  ## Examples
 
-      communities = Yog.Community.Louvain.detect_with_options(graph,
-        min_modularity_gain: 0.0001,
-        max_iterations: 50,
-        seed: 123
-      )
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      iex> communities = Yog.Community.Louvain.detect_with_options(graph,
+      ...>   min_modularity_gain: 0.0001,
+      ...>   max_iterations: 50,
+      ...>   seed: 123
+      ...> )
+      iex> is_map(communities.assignments)
+      true
   """
   @spec detect_with_options(Yog.graph(), keyword()) :: Community.communities()
   def detect_with_options(graph, opts) do
@@ -95,10 +112,17 @@ defmodule Yog.Community.Louvain do
 
   Returns the communities along with modularity scores for each level.
 
-  ## Example
+  ## Examples
 
-      {communities, stats} = Yog.Community.Louvain.detect_with_stats(graph)
-      # stats => %{modularity: 0.42, levels: 3, iterations: [5, 3, 1]}
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      iex> {communities, stats} = Yog.Community.Louvain.detect_with_stats(graph)
+      iex> is_map(communities.assignments)
+      true
+      iex> is_map(stats)
+      true
   """
   @spec detect_with_stats(Yog.graph(), keyword()) :: {Community.communities(), map()}
   def detect_with_stats(graph, opts \\ []) do
@@ -136,10 +160,15 @@ defmodule Yog.Community.Louvain do
   Returns a dendrogram showing community structure at multiple levels
   of granularity.
 
-  ## Example
+  ## Examples
 
-      dendrogram = Yog.Community.Louvain.detect_hierarchical(graph)
-      # Access levels: dendrogram.levels
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      iex> dendrogram = Yog.Community.Louvain.detect_hierarchical(graph)
+      iex> is_list(dendrogram.levels)
+      true
   """
   @spec detect_hierarchical(Yog.graph()) :: Community.dendrogram()
   def detect_hierarchical(graph) do
@@ -154,12 +183,18 @@ defmodule Yog.Community.Louvain do
   @doc """
   Detects hierarchical community structure with custom options.
 
-  ## Example
+  ## Examples
 
-      dendrogram = Yog.Community.Louvain.detect_hierarchical_with_options(graph,
-        min_modularity_gain: 0.0001,
-        max_iterations: 50
-      )
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      iex> dendrogram = Yog.Community.Louvain.detect_hierarchical_with_options(graph,
+      ...>   min_modularity_gain: 0.0001,
+      ...>   max_iterations: 50
+      ...> )
+      iex> is_list(dendrogram.levels)
+      true
   """
   @spec detect_hierarchical_with_options(Yog.graph(), keyword()) :: Community.dendrogram()
   def detect_hierarchical_with_options(graph, opts) do

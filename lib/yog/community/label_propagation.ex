@@ -17,14 +17,17 @@ defmodule Yog.Community.LabelPropagation do
   - `:max_iterations` - Maximum iterations (default: 100)
   - `:seed` - Random seed for initialization (default: 0)
 
-  ## Example
+  ## Examples
 
-      communities = Yog.Community.LabelPropagation.detect(graph)
-
-      communities = Yog.Community.LabelPropagation.detect_with_options(graph,
-        max_iterations: 200,
-        seed: 42
-      )
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      iex> communities = Yog.Community.LabelPropagation.detect(graph)
+      iex> is_map(communities.assignments)
+      true
   """
 
   alias Yog.Community
@@ -39,6 +42,16 @@ defmodule Yog.Community.LabelPropagation do
 
   @doc """
   Detects communities using Label Propagation with default options.
+
+  ## Examples
+
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      iex> communities = Yog.Community.LabelPropagation.detect(graph)
+      iex> is_map(communities.assignments)
+      true
   """
   @spec detect(Yog.graph()) :: Community.communities()
   def detect(graph) do
@@ -57,6 +70,19 @@ defmodule Yog.Community.LabelPropagation do
 
     * `:max_iterations` - Maximum iterations (default: 100)
     * `:seed` - Random seed (default: 0)
+
+  ## Examples
+
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      iex> communities = Yog.Community.LabelPropagation.detect_with_options(graph,
+      ...>   max_iterations: 200,
+      ...>   seed: 42
+      ...> )
+      iex> is_map(communities.assignments)
+      true
   """
   @spec detect_with_options(Yog.graph(), keyword()) :: Community.communities()
   def detect_with_options(graph, opts) do

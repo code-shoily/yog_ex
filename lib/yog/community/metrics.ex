@@ -19,10 +19,16 @@ defmodule Yog.Community.Metrics do
 
   Range: [-0.5, 1.0]. Values > 0.3 indicate significant community structure.
 
-  ## Example
+  ## Examples
 
-      q = Yog.Community.Metrics.modularity(graph, communities)
-      # => 0.42
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      iex> communities = %{assignments: %{1 => 0, 2 => 0}, num_communities: 1}
+      iex> q = Yog.Community.Metrics.modularity(graph, communities)
+      iex> is_float(q)
+      true
   """
   @spec modularity(Yog.graph(), Community.communities()) :: float()
   def modularity(graph, communities) do
@@ -34,10 +40,17 @@ defmodule Yog.Community.Metrics do
 
   A triangle is a set of three nodes where each pair is connected.
 
-  ## Example
+  ## Examples
 
-      triangles = Yog.Community.Metrics.count_triangles(graph)
-      # => 15
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      iex> Yog.Community.Metrics.count_triangles(graph)
+      1
   """
   @spec count_triangles(Yog.graph()) :: integer()
   def count_triangles(graph) do
@@ -47,10 +60,17 @@ defmodule Yog.Community.Metrics do
   @doc """
   Returns the number of triangles each node participates in.
 
-  ## Example
+  ## Examples
 
-      per_node = Yog.Community.Metrics.triangles_per_node(graph)
-      # => %{1 => 2, 2 => 3, 3 => 1}
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      iex> Yog.Community.Metrics.triangles_per_node(graph)
+      %{1 => 1, 2 => 1, 3 => 1}
   """
   @spec triangles_per_node(Yog.graph()) :: %{Yog.node_id() => integer()}
   def triangles_per_node(graph) do
@@ -66,10 +86,17 @@ defmodule Yog.Community.Metrics do
 
   Range: [0.0, 1.0]. 1.0 means all neighbors are connected to each other.
 
-  ## Example
+  ## Examples
 
-      cc = Yog.Community.Metrics.clustering_coefficient(graph, :a)
-      # => 0.67
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      iex> Yog.Community.Metrics.clustering_coefficient(graph, 1)
+      1.0
   """
   @spec clustering_coefficient(Yog.graph(), Yog.node_id()) :: float()
   def clustering_coefficient(graph, node) do
@@ -79,10 +106,17 @@ defmodule Yog.Community.Metrics do
   @doc """
   Calculates the average clustering coefficient for the entire graph.
 
-  ## Example
+  ## Examples
 
-      avg_cc = Yog.Community.Metrics.average_clustering_coefficient(graph)
-      # => 0.45
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      iex> Yog.Community.Metrics.average_clustering_coefficient(graph)
+      1.0
   """
   @spec average_clustering_coefficient(Yog.graph()) :: float()
   def average_clustering_coefficient(graph) do
@@ -94,10 +128,16 @@ defmodule Yog.Community.Metrics do
 
   The ratio of actual edges to possible edges.
 
-  ## Example
+  ## Examples
 
-      d = Yog.Community.Metrics.density(graph)
-      # => 0.3
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      iex> d = Yog.Community.Metrics.density(graph)
+      iex> is_float(d)
+      true
   """
   @spec density(Yog.graph()) :: float()
   def density(graph) do
@@ -107,24 +147,37 @@ defmodule Yog.Community.Metrics do
   @doc """
   Calculates the density of edges within a specific set of nodes.
 
-  ## Example
+  ## Examples
 
-      cd = Yog.Community.Metrics.community_density(graph, MapSet.new([1, 2, 3]))
-      # => 0.5
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      iex> cd = Yog.Community.Metrics.community_density(graph, MapSet.new([1, 2]))
+      iex> is_float(cd)
+      true
   """
   @spec community_density(Yog.graph(), MapSet.t(Yog.node_id())) :: float()
   def community_density(graph, nodes) do
     node_list = MapSet.to_list(nodes)
-    :yog@community@metrics.community_density(graph, node_list)
+    # Convert to Gleam set (internal representation is a sorted list)
+    gleam_set = :gleam@set.from_list(node_list)
+    :yog@community@metrics.community_density(graph, gleam_set)
   end
 
   @doc """
   Calculates the average density across all communities.
 
-  ## Example
+  ## Examples
 
-      avg_cd = Yog.Community.Metrics.average_community_density(graph, communities)
-      # => 0.42
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      iex> communities = %{assignments: %{1 => 0, 2 => 0}, num_communities: 1}
+      iex> avg_cd = Yog.Community.Metrics.average_community_density(graph, communities)
+      iex> is_float(avg_cd)
+      true
   """
   @spec average_community_density(Yog.graph(), Community.communities()) :: float()
   def average_community_density(graph, communities) do

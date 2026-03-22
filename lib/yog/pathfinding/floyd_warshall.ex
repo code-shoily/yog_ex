@@ -86,17 +86,29 @@ defmodule Yog.Pathfinding.FloydWarshall do
   - `add` - Function to add two weights
   - `compare` - Function to compare two weights
 
-  ## Example
+  ## Examples
 
-      case Yog.Pathfinding.FloydWarshall.floyd_warshall(graph, 0, &(&1 + &2), &Integer.compare/2) do
-        {:ok, distances} ->
-          # distances[{{1, 2}}] gives shortest distance from node 1 to node 2
-          distances[{{1, 2}}]
+      # Triangle graph with all-pairs distances
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 4)
+      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge!(from: 1, to: 3, with: 10)
+      iex> {:ok, distances} = Yog.Pathfinding.FloydWarshall.floyd_warshall(graph, 0, &(&1 + &2), &Integer.compare/2)
+      iex> # Shortest path from 1 to 3 should be 1->2->3 = 5, not direct 10
+      ...> distances[{1, 3}]
+      5
 
-        {:error, :negative_cycle} ->
-          # Graph contains a negative cycle
-          :error
-      end
+      # Negative cycle detection
+      iex> bad_graph = Yog.directed()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge!(from: 2, to: 1, with: -3)
+      iex> Yog.Pathfinding.FloydWarshall.floyd_warshall(bad_graph, 0, &(&1 + &2), &Integer.compare/2)
+      {:error, :negative_cycle}
   """
   @spec floyd_warshall(
           Yog.graph(),

@@ -97,17 +97,29 @@ defmodule Yog.Pathfinding.Johnson do
   - `subtract` - Function to subtract two weights
   - `compare` - Function to compare two weights
 
-  ## Example
+  ## Examples
 
-      case Yog.Pathfinding.Johnson.johnson(graph, 0, &(&1 + &2), &(&1 - &2), &Integer.compare/2) do
-        {:ok, distances} ->
-          # Get distance from node 1 to node 5
-          distance = distances[{{1, 5}}]
+      # Graph with negative weights (but no negative cycles)
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 4)
+      ...> |> Yog.add_edge!(from: 2, to: 3, with: -3)
+      ...> |> Yog.add_edge!(from: 1, to: 3, with: 10)
+      iex> {:ok, distances} = Yog.Pathfinding.Johnson.johnson(graph, 0, &(&1 + &2), &(&1 - &2), &Integer.compare/2)
+      iex> # Shortest path from 1 to 3 should be 1->2->3 = 1, not direct 10
+      ...> distances[{1, 3}]
+      1
 
-        {:error, :negative_cycle} ->
-          # Graph contains a negative cycle
-          :error
-      end
+      # Negative cycle detection
+      iex> bad_graph = Yog.directed()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge!(from: 2, to: 1, with: -3)
+      iex> Yog.Pathfinding.Johnson.johnson(bad_graph, 0, &(&1 + &2), &(&1 - &2), &Integer.compare/2)
+      {:error, :negative_cycle}
   """
   @spec johnson(
           Yog.graph(),
