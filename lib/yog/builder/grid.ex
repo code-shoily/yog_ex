@@ -7,7 +7,8 @@ defmodule Yog.Builder.Grid do
 
   ## Example
 
-      # Create a maze grid
+  Create a maze grid:
+
       maze = [
         [".", ".", "#", "."],
         [".", "#", "#", "."],
@@ -59,15 +60,12 @@ defmodule Yog.Builder.Grid do
   - `graph_type` - `:directed` or `:undirected`
   - `can_move_fn` - Function `(from_cell, to_cell) -> boolean` determining if movement is allowed
 
-  ## Example
+  ## Examples
 
-      maze = [
-        [".", ".", "#"],
-        [".", "#", "."],
-        [".", ".", "."]
-      ]
-
-      grid = Yog.Builder.Grid.from_2d_list(maze, :undirected, Yog.Builder.Grid.walkable("."))
+      iex> maze = [[".", ".", "#"], [".", "#", "."], [".", ".", "."]]
+      iex> grid = Yog.Builder.Grid.from_2d_list(maze, :undirected, Yog.Builder.Grid.walkable("."))
+      iex> is_tuple(grid)
+      true
   """
   @spec from_2d_list([[term()]], Yog.graph_type(), (term(), term() -> boolean())) :: grid()
   defdelegate from_2d_list(grid_data, graph_type, can_move_fn), to: :yog@builder@grid
@@ -79,15 +77,17 @@ defmodule Yog.Builder.Grid do
   which neighbors each cell can reach. Use presets like `rook/0`, `bishop/0`,
   `queen/0`, or `knight/0`.
 
-  ## Example
+  ## Examples
 
-      # Allow diagonal movement
-      grid = Yog.Builder.Grid.from_2d_list_with_topology(
-        grid_data,
-        :directed,
-        Yog.Builder.Grid.queen(),
-        Yog.Builder.Grid.always()
-      )
+      iex> grid_data = [[1, 2], [3, 4]]
+      iex> grid = Yog.Builder.Grid.from_2d_list_with_topology(
+      ...>   grid_data,
+      ...>   :directed,
+      ...>   Yog.Builder.Grid.queen(),
+      ...>   Yog.Builder.Grid.always()
+      ...> )
+      iex> is_tuple(grid)
+      true
   """
   @spec from_2d_list_with_topology([[term()]], Yog.graph_type(), topology(), (term(), term() ->
                                                                                 boolean())) ::
@@ -116,10 +116,12 @@ defmodule Yog.Builder.Grid do
 
   Returns `{:ok, node_id}` or `{:error, nil}`.
 
-  ## Example
+  ## Examples
 
-      # Find the node containing the start position
-      {:ok, start_id} = Yog.Builder.Grid.find_node(grid, fn cell -> cell == "S" end)
+      iex> grid = Yog.Builder.Grid.from_2d_list([["S", "."]], :undirected, Yog.Builder.Grid.always())
+      iex> {:ok, start_id} = Yog.Builder.Grid.find_node(grid, fn cell -> cell == "S" end)
+      iex> is_integer(start_id)
+      true
   """
   @spec find_node(grid(), (term() -> boolean())) :: {:ok, Yog.node_id()} | {:error, nil}
   defdelegate find_node(grid, predicate), to: :yog@builder@grid
@@ -129,9 +131,10 @@ defmodule Yog.Builder.Grid do
   @doc """
   Converts grid coordinates `{row, col}` to a node ID.
 
-  ## Example
+  ## Examples
 
-      node_id = Yog.Builder.Grid.coord_to_id(2, 3, 10)  # row 2, col 3, 10 columns
+      iex> Yog.Builder.Grid.coord_to_id(2, 3, 10)
+      23
   """
   @spec coord_to_id(integer(), integer(), integer()) :: Yog.node_id()
   defdelegate coord_to_id(row, col, cols), to: :yog@builder@grid
@@ -139,9 +142,10 @@ defmodule Yog.Builder.Grid do
   @doc """
   Converts a node ID back to grid coordinates `{row, col}`.
 
-  ## Example
+  ## Examples
 
-      {row, col} = Yog.Builder.Grid.id_to_coord(node_id, 10)
+      iex> Yog.Builder.Grid.id_to_coord(23, 10)
+      {2, 3}
   """
   @spec id_to_coord(Yog.node_id(), integer()) :: {integer(), integer()}
   defdelegate id_to_coord(id, cols), to: :yog@builder@grid
@@ -226,10 +230,13 @@ defmodule Yog.Builder.Grid do
   @doc """
   Creates a predicate that only allows movement into cells matching `valid_value`.
 
-  ## Example
+  ## Examples
 
-      # Only allow walking on floor tiles
-      can_move = Yog.Builder.Grid.walkable(".")
+      iex> can_move = Yog.Builder.Grid.walkable(".")
+      iex> can_move.(".", ".")
+      true
+      iex> can_move.(".", "#")
+      false
   """
   @spec walkable(term()) :: (term(), term() -> boolean())
   defdelegate walkable(valid_value), to: :yog@builder@grid
@@ -237,10 +244,13 @@ defmodule Yog.Builder.Grid do
   @doc """
   Creates a predicate that allows movement into any cell except `wall_value`.
 
-  ## Example
+  ## Examples
 
-      # Walk anywhere except walls
-      can_move = Yog.Builder.Grid.avoiding("#")
+      iex> can_move = Yog.Builder.Grid.avoiding("#")
+      iex> can_move.(".", ".")
+      true
+      iex> can_move.(".", "#")
+      false
   """
   @spec avoiding(term()) :: (term(), term() -> boolean())
   defdelegate avoiding(wall_value), to: :yog@builder@grid
@@ -248,10 +258,13 @@ defmodule Yog.Builder.Grid do
   @doc """
   Creates a predicate that allows movement into any of the specified values.
 
-  ## Example
+  ## Examples
 
-      # Walk on floors, start, or goal
-      can_move = Yog.Builder.Grid.including([".", "S", "G"])
+      iex> can_move = Yog.Builder.Grid.including([".", "S", "G"])
+      iex> can_move.(".", "S")
+      true
+      iex> can_move.(".", "#")
+      false
   """
   @spec including([term()]) :: (term(), term() -> boolean())
   defdelegate including(valid_values), to: :yog@builder@grid
@@ -259,10 +272,11 @@ defmodule Yog.Builder.Grid do
   @doc """
   Always allows movement between adjacent cells.
 
-  ## Example
+  ## Examples
 
-      # No restrictions
-      grid = Yog.Builder.Grid.from_2d_list(data, :undirected, Yog.Builder.Grid.always())
+      iex> can_move = Yog.Builder.Grid.always()
+      iex> can_move.("anything", "works")
+      true
   """
   @spec always() :: (term(), term() -> boolean())
   defdelegate always(), to: :yog@builder@grid

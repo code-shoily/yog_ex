@@ -5,7 +5,7 @@ defmodule Yog.Builder.Labeled do
   This module provides a convenient way to build graphs when your nodes are
   naturally identified by strings, atoms, or other types, rather than integers.
 
-  ## Examples
+  ## Example Usage (Not a doctest - delegates to Erlang)
 
       # Build a graph with string labels
       builder = Yog.Builder.Labeled.directed()
@@ -35,9 +35,9 @@ defmodule Yog.Builder.Labeled do
 
   For building from existing data, use the `from_list` functions:
 
-      edges = [{"A", "B", 5}, {"B", "C", 3}, {"A", "C", 10}]
-      builder = Yog.Builder.Labeled.from_list(:directed, edges)
-      graph = Yog.Builder.Labeled.to_graph(builder)
+      # edges = [{"A", "B", 5}, {"B", "C", 3}, {"A", "C", 10}]
+      # builder = Yog.Builder.Labeled.from_list(:directed, edges)
+      # graph = Yog.Builder.Labeled.to_graph(builder)
   """
 
   @typedoc "Opaque builder type"
@@ -108,7 +108,7 @@ defmodule Yog.Builder.Labeled do
   ## Examples
 
       iex> builder = Yog.Builder.Labeled.directed()
-      iex> {builder, id} = Yog.Builder.Labeled.ensure_node(builder, "A")
+      iex> {_builder, id} = Yog.Builder.Labeled.ensure_node(builder, "A")
       iex> is_integer(id)
       true
   """
@@ -152,8 +152,10 @@ defmodule Yog.Builder.Labeled do
 
   ## Examples
 
-      iex> builder = Yog.Builder.Labeled.directed()
+      iex> Yog.Builder.Labeled.directed()
       ...> |> Yog.Builder.Labeled.add_simple_edge("A", "B")
+      ...> |> is_tuple()
+      true
   """
   @spec add_simple_edge(builder(), label(), label()) :: builder()
   defdelegate add_simple_edge(builder, from, to), to: :yog@builder@labeled

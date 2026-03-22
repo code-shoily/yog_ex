@@ -30,19 +30,19 @@ defmodule Yog.Builder.Live do
 
       # For high-frequency streaming (e.g., Kafka consumer)
       # Sync every N messages or every T seconds
-      {builder, graph} =
-        if Yog.Builder.Live.pending_count(builder) > 1000 do
-          Yog.Builder.Live.sync(builder, graph)
-        else
-          {builder, graph}
-        end
+      # {builder, graph} =
+      #   if Yog.Builder.Live.pending_count(builder) > 1000 do
+      #     Yog.Builder.Live.sync(builder, graph)
+      #   else
+      #     {builder, graph}
+      #   end
 
       # For batch processing
       # Build up a batch, then sync once
-      builder = Enum.reduce(batch, builder, fn {from, to, weight}, b ->
-        Yog.Builder.Live.add_edge(b, from, to, weight)
-      end)
-      {builder, graph} = Yog.Builder.Live.sync(builder, graph)
+      # builder = Enum.reduce(batch, builder, fn {from, to, weight}, b ->
+      #   Yog.Builder.Live.add_edge(b, from, to, weight)
+      # end)
+      # {builder, graph} = Yog.Builder.Live.sync(builder, graph)
 
   ## Recovery
 
@@ -56,20 +56,20 @@ defmodule Yog.Builder.Live do
   - **No Persistence:** The pending queue is lost if the process crashes
   - **Single-threaded:** Not designed for concurrent updates from multiple actors
 
-  ## Example
+  ## Example Usage (Not a doctest - delegates to Erlang)
 
       # Initial setup - build base graph
-      builder = Yog.Builder.Live.new() |> Yog.Builder.Live.add_edge("A", "B", 10)
-      {builder, graph} = Yog.Builder.Live.sync(builder, Yog.directed())
+      # builder = Yog.Builder.Live.new() |> Yog.Builder.Live.add_edge("A", "B", 10)
+      # {builder, graph} = Yog.Builder.Live.sync(builder, Yog.directed())
 
       # Incremental update - add new edge efficiently
-      builder = Yog.Builder.Live.add_edge(builder, "B", "C", 5)
-      {builder, graph} = Yog.Builder.Live.sync(builder, graph)  # O(1) for just this edge!
+      # builder = Yog.Builder.Live.add_edge(builder, "B", "C", 5)
+      # {builder, graph} = Yog.Builder.Live.sync(builder, graph)  # O(1) for just this edge!
 
       # Use with algorithms - get IDs from registry
-      {:ok, a_id} = Yog.Builder.Live.get_id(builder, "A")
-      {:ok, c_id} = Yog.Builder.Live.get_id(builder, "C")
-      path = Yog.Pathfinding.shortest_path(graph, a_id, c_id, ...)
+      # {:ok, a_id} = Yog.Builder.Live.get_id(builder, "A")
+      # {:ok, c_id} = Yog.Builder.Live.get_id(builder, "C")
+      # path = Yog.Pathfinding.shortest_path(graph, a_id, c_id, ...)
   """
 
   @typedoc "Opaque live builder type"
@@ -125,7 +125,9 @@ defmodule Yog.Builder.Live do
 
       iex> labeled = Yog.Builder.Labeled.directed()
       ...> |> Yog.Builder.Labeled.add_edge("A", "B", 5)
-      iex> live = Yog.Builder.Live.from_labeled(labeled)
+      iex> Yog.Builder.Live.from_labeled(labeled)
+      ...> |> is_tuple()
+      true
   """
   @spec from_labeled(Yog.Builder.Labeled.builder()) :: builder()
   defdelegate from_labeled(labeled_builder), to: :yog@builder@live
@@ -152,8 +154,10 @@ defmodule Yog.Builder.Live do
 
   ## Examples
 
-      iex> builder = Yog.Builder.Live.new()
+      iex> Yog.Builder.Live.new()
       ...> |> Yog.Builder.Live.add_unweighted_edge("A", "B")
+      ...> |> is_tuple()
+      true
   """
   @spec add_unweighted_edge(builder(), label(), label()) :: builder()
   defdelegate add_unweighted_edge(builder, from, to), to: :yog@builder@live
@@ -163,8 +167,10 @@ defmodule Yog.Builder.Live do
 
   ## Examples
 
-      iex> builder = Yog.Builder.Live.new()
+      iex> Yog.Builder.Live.new()
       ...> |> Yog.Builder.Live.add_simple_edge("A", "B")
+      ...> |> is_tuple()
+      true
   """
   @spec add_simple_edge(builder(), label(), label()) :: builder()
   defdelegate add_simple_edge(builder, from, to), to: :yog@builder@live
@@ -176,9 +182,11 @@ defmodule Yog.Builder.Live do
 
   ## Examples
 
-      iex> builder = Yog.Builder.Live.new()
+      iex> Yog.Builder.Live.new()
       ...> |> Yog.Builder.Live.add_edge("A", "B", 10)
       ...> |> Yog.Builder.Live.remove_edge("A", "B")
+      ...> |> is_tuple()
+      true
   """
   @spec remove_edge(builder(), label(), label()) :: builder()
   defdelegate remove_edge(builder, from, to), to: :yog@builder@live
@@ -191,9 +199,11 @@ defmodule Yog.Builder.Live do
 
   ## Examples
 
-      iex> builder = Yog.Builder.Live.new()
+      iex> Yog.Builder.Live.new()
       ...> |> Yog.Builder.Live.add_edge("A", "B", 10)
       ...> |> Yog.Builder.Live.remove_node("A")
+      ...> |> is_tuple()
+      true
   """
   @spec remove_node(builder(), label()) :: builder()
   defdelegate remove_node(builder, label), to: :yog@builder@live

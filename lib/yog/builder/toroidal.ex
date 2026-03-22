@@ -20,26 +20,26 @@ defmodule Yog.Builder.Toroidal do
   - **Queen (8-way)** → `toroidal_chebyshev_distance/5`
   - **Weighted diagonals** → `toroidal_octile_distance/5`
 
-  ## Example
+  ## Example Usage (Not a doctest - delegates to Erlang)
 
-      grid_data = [
-        [1, 2, 3],
-        [4, 5, 6],
-        [7, 8, 9]
-      ]
+      # grid_data = [
+      #   [1, 2, 3],
+      #   [4, 5, 6],
+      #   [7, 8, 9]
+      # ]
 
       # Create toroidal grid where all moves wrap
-      grid = Yog.Builder.Toroidal.from_2d_list(
-        grid_data,
-        :directed,
-        Yog.Builder.Toroidal.always()
-      )
+      # grid = Yog.Builder.Toroidal.from_2d_list(
+      #   grid_data,
+      #   :directed,
+      #   Yog.Builder.Toroidal.always()
+      # )
 
       # Distance from (0,0) to (2,2) goes "around" the grid
       # On 3x3: direct is 4, but wrapping is 2 (up 1 + left 1)
-      start = Yog.Builder.Toroidal.coord_to_id(0, 0, 3)
-      goal = Yog.Builder.Toroidal.coord_to_id(2, 2, 3)
-      dist = Yog.Builder.Toroidal.toroidal_manhattan_distance(start, goal, 3, 3)
+      # start = Yog.Builder.Toroidal.coord_to_id(0, 0, 3)
+      # goal = Yog.Builder.Toroidal.coord_to_id(2, 2, 3)
+      # dist = Yog.Builder.Toroidal.toroidal_manhattan_distance(start, goal, 3, 3)
       # dist = 2
   """
 
@@ -57,17 +57,15 @@ defmodule Yog.Builder.Toroidal do
   Movement wraps at boundaries: moving right from the rightmost column
   brings you to the leftmost column, and similarly for vertical movement.
 
-  ## Example
+  ## Examples
 
-      data = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
-
-      grid = Yog.Builder.Toroidal.from_2d_list(
-        data,
-        :directed,
-        Yog.Builder.Toroidal.always()
-      )
-
-      # Cell at (0, 2) connects to cell at (0, 0) via wrapping
+      # Create grid from 2D list (delegates to Erlang)
+      # data = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+      # grid = Yog.Builder.Toroidal.from_2d_list(
+      #   data,
+      #   :directed,
+      #   Yog.Builder.Toroidal.always()
+      # )
 
   ## Time Complexity
 
@@ -80,15 +78,15 @@ defmodule Yog.Builder.Toroidal do
   @doc """
   Creates a toroidal graph from a 2D list using a custom movement topology.
 
-  ## Example
+  ## Examples
 
-      # 8-way movement on a toroidal grid
-      grid = Yog.Builder.Toroidal.from_2d_list_with_topology(
-        data,
-        :directed,
-        Yog.Builder.Toroidal.queen(),
-        Yog.Builder.Toroidal.always()
-      )
+      # 8-way movement on a toroidal grid (delegates to Erlang)
+      # grid = Yog.Builder.Toroidal.from_2d_list_with_topology(
+      #   data,
+      #   :directed,
+      #   Yog.Builder.Toroidal.queen(),
+      #   Yog.Builder.Toroidal.always()
+      # )
   """
   @spec from_2d_list_with_topology(
           [[term()]],
