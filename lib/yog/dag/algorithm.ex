@@ -1,4 +1,4 @@
-defmodule Yog.DAG.Algorithms do
+defmodule Yog.DAG.Algorithm do
   @moduledoc """
   Algorithms for Directed Acyclic Graphs (DAGs).
 
@@ -7,7 +7,7 @@ defmodule Yog.DAG.Algorithms do
   longest path, transitive closure, and more.
   """
 
-  alias Yog.DAG.Models
+  alias Yog.DAG.Model
   alias Yog.Pathfinding.Utils, as: PathUtils
 
   @typedoc "Direction for reachability counting"
@@ -30,7 +30,7 @@ defmodule Yog.DAG.Algorithms do
 
   ## Examples
 
-      iex> {:ok, dag} = Yog.DAG.Models.from_graph(
+      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
       ...>   Yog.directed()
       ...>   |> Yog.add_node(1, nil)
       ...>   |> Yog.add_node(2, nil)
@@ -41,7 +41,7 @@ defmodule Yog.DAG.Algorithms do
       ...>   |> Yog.add_edge!(2, 4, 1)
       ...>   |> Yog.add_edge!(3, 4, 1)
       ...> )
-      iex> sorted = Yog.DAG.Algorithms.topological_sort(dag)
+      iex> sorted = Yog.DAG.Algorithm.topological_sort(dag)
       iex> hd(sorted)
       1
       iex> List.last(sorted)
@@ -49,7 +49,7 @@ defmodule Yog.DAG.Algorithms do
   """
   @spec topological_sort(Yog.DAG.t()) :: [Yog.node_id()]
   def topological_sort(dag) do
-    graph = Models.to_graph(dag)
+    graph = Model.to_graph(dag)
 
     # We can safely unwrap because the graph is proven to be acyclic
     case Yog.Traversal.topological_sort(graph) do
@@ -79,7 +79,7 @@ defmodule Yog.DAG.Algorithms do
 
   ## Examples
 
-      iex> {:ok, dag} = Yog.DAG.Models.from_graph(
+      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
       ...>   Yog.directed()
       ...>   |> Yog.add_node(:a, nil)
       ...>   |> Yog.add_node(:b, nil)
@@ -87,13 +87,13 @@ defmodule Yog.DAG.Algorithms do
       ...>   |> Yog.add_edge!(:a, :b, 5)
       ...>   |> Yog.add_edge!(:b, :c, 3)
       ...> )
-      iex> path = Yog.DAG.Algorithms.longest_path(dag)
+      iex> path = Yog.DAG.Algorithm.longest_path(dag)
       iex> length(path)
       3
   """
   @spec longest_path(Yog.DAG.t()) :: [Yog.node_id()]
   def longest_path(dag) do
-    graph = Models.to_graph(dag)
+    graph = Model.to_graph(dag)
     sorted_nodes = topological_sort(dag)
 
     # Initialize DP tables
@@ -152,7 +152,7 @@ defmodule Yog.DAG.Algorithms do
 
   ## Examples
 
-      iex> {:ok, dag} = Yog.DAG.Models.from_graph(
+      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
       ...>   Yog.directed()
       ...>   |> Yog.add_node(:a, nil)
       ...>   |> Yog.add_node(:b, nil)
@@ -160,13 +160,13 @@ defmodule Yog.DAG.Algorithms do
       ...>   |> Yog.add_edge!(:a, :b, 1)
       ...>   |> Yog.add_edge!(:b, :c, 1)
       ...> )
-      iex> closure = Yog.DAG.Algorithms.transitive_closure(dag)
+      iex> closure = Yog.DAG.Algorithm.transitive_closure(dag)
       iex> is_tuple(closure)
       true
   """
   @spec transitive_closure(Yog.DAG.t()) :: Yog.DAG.t()
   def transitive_closure(dag) do
-    graph = Models.to_graph(dag)
+    graph = Model.to_graph(dag)
     # Process in reverse topological order (leaves first)
     sorted_nodes = topological_sort(dag) |> Enum.reverse()
 
@@ -204,7 +204,7 @@ defmodule Yog.DAG.Algorithms do
       end)
 
     # Unwrap and re-wrap as DAG (closure preserves acyclicity)
-    {:ok, result} = Models.from_graph(new_graph)
+    {:ok, result} = Model.from_graph(new_graph)
     result
   end
 
@@ -220,7 +220,7 @@ defmodule Yog.DAG.Algorithms do
 
   ## Examples
 
-      iex> {:ok, dag} = Yog.DAG.Models.from_graph(
+      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
       ...>   Yog.directed()
       ...>   |> Yog.add_node(:a, nil)
       ...>   |> Yog.add_node(:b, nil)
@@ -228,13 +228,13 @@ defmodule Yog.DAG.Algorithms do
       ...>   |> Yog.add_edge!(:a, :b, 1)
       ...>   |> Yog.add_edge!(:b, :c, 1)
       ...> )
-      iex> reduction = Yog.DAG.Algorithms.transitive_reduction(dag)
+      iex> reduction = Yog.DAG.Algorithm.transitive_reduction(dag)
       iex> is_tuple(reduction)
       true
   """
   @spec transitive_reduction(Yog.DAG.t()) :: Yog.DAG.t()
   def transitive_reduction(dag) do
-    graph = Models.to_graph(dag)
+    graph = Model.to_graph(dag)
     nodes = Yog.all_nodes(graph)
 
     # For each edge, check if it's implied by transitivity
@@ -251,7 +251,7 @@ defmodule Yog.DAG.Algorithms do
       end)
 
     # Unwrap and re-wrap as DAG
-    {:ok, result} = Models.from_graph(new_graph)
+    {:ok, result} = Model.from_graph(new_graph)
     result
   end
 
@@ -266,7 +266,7 @@ defmodule Yog.DAG.Algorithms do
 
   ## Examples
 
-      iex> {:ok, dag} = Yog.DAG.Models.from_graph(
+      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
       ...>   Yog.directed()
       ...>   |> Yog.add_node(:a, nil)
       ...>   |> Yog.add_node(:b, nil)
@@ -274,13 +274,13 @@ defmodule Yog.DAG.Algorithms do
       ...>   |> Yog.add_edge!(:a, :b, 3)
       ...>   |> Yog.add_edge!(:b, :c, 2)
       ...> )
-      iex> {:some, path} = Yog.DAG.Algorithms.shortest_path(dag, :a, :c)
+      iex> {:some, path} = Yog.DAG.Algorithm.shortest_path(dag, :a, :c)
       iex> {:path, [:a, :b, :c], 5} = path
   """
   @spec shortest_path(Yog.DAG.t(), Yog.node_id(), Yog.node_id()) ::
           {:some, PathUtils.path(any())} | :none
   def shortest_path(dag, from, to) do
-    graph = Models.to_graph(dag)
+    graph = Model.to_graph(dag)
     sorted_nodes = topological_sort(dag)
 
     # Only consider nodes from 'from' onwards in topological order
@@ -350,7 +350,7 @@ defmodule Yog.DAG.Algorithms do
 
   ## Examples
 
-      iex> {:ok, dag} = Yog.DAG.Models.from_graph(
+      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
       ...>   Yog.directed()
       ...>   |> Yog.add_node(:a, nil)
       ...>   |> Yog.add_node(:b, nil)
@@ -361,7 +361,7 @@ defmodule Yog.DAG.Algorithms do
       ...>   |> Yog.add_edge!(:b, :d, 1)
       ...>   |> Yog.add_edge!(:c, :d, 1)
       ...> )
-      iex> counts = Yog.DAG.Algorithms.count_reachability(dag, :descendants)
+      iex> counts = Yog.DAG.Algorithm.count_reachability(dag, :descendants)
       iex> counts[:a]
       3
       iex> counts[:d]
@@ -369,7 +369,7 @@ defmodule Yog.DAG.Algorithms do
   """
   @spec count_reachability(Yog.DAG.t(), direction()) :: %{Yog.node_id() => integer()}
   def count_reachability(dag, direction) do
-    graph = Models.to_graph(dag)
+    graph = Model.to_graph(dag)
 
     # Determine processing order
     nodes_to_process =
@@ -434,7 +434,7 @@ defmodule Yog.DAG.Algorithms do
 
   ## Examples
 
-      iex> {:ok, dag} = Yog.DAG.Models.from_graph(
+      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
       ...>   Yog.directed()
       ...>   |> Yog.add_node(:x, nil)
       ...>   |> Yog.add_node(:a, nil)
@@ -442,7 +442,7 @@ defmodule Yog.DAG.Algorithms do
       ...>   |> Yog.add_edge!(:x, :a, 1)
       ...>   |> Yog.add_edge!(:x, :b, 1)
       ...> )
-      iex> lcas = Yog.DAG.Algorithms.lowest_common_ancestors(dag, :a, :b)
+      iex> lcas = Yog.DAG.Algorithm.lowest_common_ancestors(dag, :a, :b)
       iex> :x in lcas
       true
   """
@@ -520,7 +520,7 @@ defmodule Yog.DAG.Algorithms do
   end
 
   defp get_ancestors_set(dag, node) do
-    graph = Models.to_graph(dag)
+    graph = Model.to_graph(dag)
     all_nodes = Yog.all_nodes(graph)
 
     # Ancestors of X are all nodes Y where X is reachable from Y
@@ -528,7 +528,7 @@ defmodule Yog.DAG.Algorithms do
   end
 
   defp has_path?(dag, start, target) do
-    graph = Models.to_graph(dag)
+    graph = Model.to_graph(dag)
     do_has_path?(graph, [start], target, MapSet.new([start]), nil)
   end
 end

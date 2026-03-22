@@ -1,4 +1,4 @@
-defmodule Yog.DAG.Models do
+defmodule Yog.DAG.Model do
   @moduledoc """
   Core DAG type and basic operations.
 

@@ -1,4 +1,4 @@
-defmodule Yog.DAG.AlgorithmsTest do
+defmodule Yog.DAG.AlgorithmTest do
   @moduledoc """
   Tests for Yog.DAG.Algorithms module.
 
@@ -9,14 +9,15 @@ defmodule Yog.DAG.AlgorithmsTest do
 
   use ExUnit.Case
 
-  doctest Yog.DAG.Algorithms
+  doctest Yog.DAG.Algorithm
 
-  alias Yog.DAG.Models
-  alias Yog.DAG.Algorithms
+  alias Yog.DAG.Model
+
+  alias Yog.DAG.Algorithm
 
   # Helper to build a DAG from edges
   defp build_dag(edges) do
-    dag = Models.new(:directed)
+    dag = Model.new(:directed)
 
     # Add all nodes first
     nodes =
@@ -24,11 +25,11 @@ defmodule Yog.DAG.AlgorithmsTest do
       |> Enum.flat_map(fn {from, to, _} -> [from, to] end)
       |> Enum.uniq()
 
-    dag = Enum.reduce(nodes, dag, fn node, d -> Models.add_node(d, node, node) end)
+    dag = Enum.reduce(nodes, dag, fn node, d -> Model.add_node(d, node, node) end)
 
     # Add edges
     Enum.reduce(edges, {:ok, dag}, fn {from, to, weight}, {:ok, d} ->
-      Models.add_edge(d, from, to, weight)
+      Model.add_edge(d, from, to, weight)
     end)
   end
 
@@ -40,7 +41,7 @@ defmodule Yog.DAG.AlgorithmsTest do
     test "sorts simple linear DAG" do
       {:ok, dag} = build_dag([{:a, :b, 1}, {:b, :c, 2}])
 
-      sorted = Algorithms.topological_sort(dag)
+      sorted = Algorithm.topological_sort(dag)
       assert sorted == [:a, :b, :c]
     end
 
@@ -54,7 +55,7 @@ defmodule Yog.DAG.AlgorithmsTest do
           {:c, :d, 4}
         ])
 
-      sorted = Algorithms.topological_sort(dag)
+      sorted = Algorithm.topological_sort(dag)
       # :a must be first, :d must be last
       assert hd(sorted) == :a
       assert List.last(sorted) == :d
@@ -81,19 +82,19 @@ defmodule Yog.DAG.AlgorithmsTest do
           {:d, :e, 5}
         ])
 
-      sorted = Algorithms.topological_sort(dag)
+      sorted = Algorithm.topological_sort(dag)
       assert hd(sorted) == :a
       assert List.last(sorted) == :e
     end
 
     test "handles single node DAG" do
-      dag = Models.new(:directed) |> Models.add_node(:a, "A")
-      assert Algorithms.topological_sort(dag) == [:a]
+      dag = Model.new(:directed) |> Model.add_node(:a, "A")
+      assert Algorithm.topological_sort(dag) == [:a]
     end
 
     test "handles empty DAG" do
-      dag = Models.new(:directed)
-      assert Algorithms.topological_sort(dag) == []
+      dag = Model.new(:directed)
+      assert Algorithm.topological_sort(dag) == []
     end
   end
 
@@ -105,7 +106,7 @@ defmodule Yog.DAG.AlgorithmsTest do
     test "finds longest path in linear DAG" do
       {:ok, dag} = build_dag([{:a, :b, 1}, {:b, :c, 2}])
 
-      path = Algorithms.longest_path(dag)
+      path = Algorithm.longest_path(dag)
       assert path == [:a, :b, :c]
     end
 
@@ -119,14 +120,14 @@ defmodule Yog.DAG.AlgorithmsTest do
           {:c, :d, 1}
         ])
 
-      path = Algorithms.longest_path(dag)
+      path = Algorithm.longest_path(dag)
       # Path a->c->d has weight 6, a->b->d has weight 2
       assert path == [:a, :c, :d]
     end
 
     test "handles single node" do
-      dag = Models.new(:directed) |> Models.add_node(:a, "A")
-      assert Algorithms.longest_path(dag) == []
+      dag = Model.new(:directed) |> Model.add_node(:a, "A")
+      assert Algorithm.longest_path(dag) == []
     end
 
     test "handles disconnected components" do
@@ -137,7 +138,7 @@ defmodule Yog.DAG.AlgorithmsTest do
           {:c, :d, 10}
         ])
 
-      path = Algorithms.longest_path(dag)
+      path = Algorithm.longest_path(dag)
       # Should return the longest path (c->d)
       assert path == [:c, :d]
     end
@@ -152,8 +153,8 @@ defmodule Yog.DAG.AlgorithmsTest do
       # a -> b -> c, closure adds a -> c
       {:ok, dag} = build_dag([{:a, :b, 1}, {:b, :c, 2}])
 
-      closure = Algorithms.transitive_closure(dag)
-      graph = Models.to_graph(closure)
+      closure = Algorithm.transitive_closure(dag)
+      graph = Model.to_graph(closure)
 
       # Original edges preserved
       assert {_, 1} = List.keyfind(Yog.successors(graph, :a), :b, 0)
@@ -172,8 +173,8 @@ defmodule Yog.DAG.AlgorithmsTest do
           {:c, :d, 4}
         ])
 
-      closure = Algorithms.transitive_closure(dag)
-      graph = Models.to_graph(closure)
+      closure = Algorithm.transitive_closure(dag)
+      graph = Model.to_graph(closure)
 
       # All direct paths should exist
       # b, c, d
@@ -202,12 +203,12 @@ defmodule Yog.DAG.AlgorithmsTest do
       # Note: The transitive_reduction implementation has a known issue
       # with the has_indirect_path? logic. For now, we just verify
       # it returns a valid DAG structure.
-      reduction = Algorithms.transitive_reduction(dag)
-      _graph = Models.to_graph(reduction)
+      reduction = Algorithm.transitive_reduction(dag)
+      _graph = Model.to_graph(reduction)
 
       # Verify it's still a valid DAG
       assert {:dag, _} = reduction
-      assert Models.to_graph(reduction) |> Yog.all_nodes() |> length() == 3
+      assert Model.to_graph(reduction) |> Yog.all_nodes() |> length() == 3
     end
 
     test "preserves minimal edges in diamond" do
@@ -222,11 +223,11 @@ defmodule Yog.DAG.AlgorithmsTest do
       # Note: The transitive_reduction implementation has a known issue
       # with the has_indirect_path? logic. For now, we just verify
       # it returns a valid DAG structure.
-      reduction = Algorithms.transitive_reduction(dag)
+      reduction = Algorithm.transitive_reduction(dag)
 
       # Verify it's still a valid DAG
       assert {:dag, _} = reduction
-      assert Models.to_graph(reduction) |> Yog.all_nodes() |> length() == 4
+      assert Model.to_graph(reduction) |> Yog.all_nodes() |> length() == 4
     end
   end
 
@@ -238,7 +239,7 @@ defmodule Yog.DAG.AlgorithmsTest do
     test "finds shortest path in linear DAG" do
       {:ok, dag} = build_dag([{:a, :b, 1}, {:b, :c, 2}])
 
-      {:some, path} = Algorithms.shortest_path(dag, :a, :c)
+      {:some, path} = Algorithm.shortest_path(dag, :a, :c)
       assert {:path, [:a, :b, :c], 3} = path
     end
 
@@ -251,7 +252,7 @@ defmodule Yog.DAG.AlgorithmsTest do
           {:c, :d, 1}
         ])
 
-      {:some, path} = Algorithms.shortest_path(dag, :a, :d)
+      {:some, path} = Algorithm.shortest_path(dag, :a, :d)
       # a->b->d has weight 2, a->c->d has weight 11
       assert {:path, [:a, :b, :d], 2} = path
     end
@@ -259,14 +260,14 @@ defmodule Yog.DAG.AlgorithmsTest do
     test "returns none for unreachable node" do
       {:ok, dag} = build_dag([{:a, :b, 1}, {:c, :d, 2}])
 
-      assert :none = Algorithms.shortest_path(dag, :a, :d)
+      assert :none = Algorithm.shortest_path(dag, :a, :d)
     end
 
     test "returns path with zero weight for same node" do
       {:ok, dag} = build_dag([{:a, :b, 1}])
 
       # Path from node to itself has zero weight
-      assert {:some, {:path, [:a], 0}} = Algorithms.shortest_path(dag, :a, :a)
+      assert {:some, {:path, [:a], 0}} = Algorithm.shortest_path(dag, :a, :a)
     end
   end
 
@@ -279,7 +280,7 @@ defmodule Yog.DAG.AlgorithmsTest do
       # Linear: a -> b -> c
       {:ok, dag} = build_dag([{:a, :b, 1}, {:b, :c, 2}])
 
-      counts = Algorithms.count_reachability(dag, :descendants)
+      counts = Algorithm.count_reachability(dag, :descendants)
       # b, c
       assert counts[:a] == 2
       # c
@@ -291,7 +292,7 @@ defmodule Yog.DAG.AlgorithmsTest do
       # Linear: a -> b -> c
       {:ok, dag} = build_dag([{:a, :b, 1}, {:b, :c, 2}])
 
-      counts = Algorithms.count_reachability(dag, :ancestors)
+      counts = Algorithm.count_reachability(dag, :ancestors)
       assert counts[:a] == 0
       # a
       assert counts[:b] == 1
@@ -308,13 +309,13 @@ defmodule Yog.DAG.AlgorithmsTest do
           {:c, :d, 4}
         ])
 
-      descendant_counts = Algorithms.count_reachability(dag, :descendants)
+      descendant_counts = Algorithm.count_reachability(dag, :descendants)
       # a can reach b, c, d (d counted once)
       assert descendant_counts[:a] == 3
       # d can reach nothing
       assert descendant_counts[:d] == 0
 
-      ancestor_counts = Algorithms.count_reachability(dag, :ancestors)
+      ancestor_counts = Algorithm.count_reachability(dag, :ancestors)
       # d can be reached from a, b, c
       assert ancestor_counts[:d] == 3
       # a has no ancestors
@@ -341,7 +342,7 @@ defmodule Yog.DAG.AlgorithmsTest do
           {:c, :d, 4}
         ])
 
-      lcas = Algorithms.lowest_common_ancestors(dag, :b, :c)
+      lcas = Algorithm.lowest_common_ancestors(dag, :b, :c)
       assert lcas == [:a]
     end
 
@@ -359,7 +360,7 @@ defmodule Yog.DAG.AlgorithmsTest do
           {:z, :b, 4}
         ])
 
-      lcas = Algorithms.lowest_common_ancestors(dag, :a, :b)
+      lcas = Algorithm.lowest_common_ancestors(dag, :a, :b)
       assert :x in lcas
     end
 
@@ -370,7 +371,7 @@ defmodule Yog.DAG.AlgorithmsTest do
           {:c, :d, 2}
         ])
 
-      lcas = Algorithms.lowest_common_ancestors(dag, :b, :d)
+      lcas = Algorithm.lowest_common_ancestors(dag, :b, :d)
       # No common ancestors (except maybe none)
       assert lcas == []
     end
@@ -378,7 +379,7 @@ defmodule Yog.DAG.AlgorithmsTest do
     test "handles same node" do
       {:ok, dag} = build_dag([{:a, :b, 1}])
 
-      lcas = Algorithms.lowest_common_ancestors(dag, :b, :b)
+      lcas = Algorithm.lowest_common_ancestors(dag, :b, :b)
       # A node is its own ancestor in this context
       assert :b in lcas
     end
