@@ -10,6 +10,8 @@ defmodule YogFlowNetworkSimplexTest do
   use ExUnit.Case, async: true
   alias Yog.Flow.NetworkSimplex
 
+  doctest NetworkSimplex
+
   describe "min_cost_flow/4" do
     test "returns error for unbalanced demands" do
       graph =

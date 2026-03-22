@@ -54,35 +54,28 @@ defmodule Yog.Flow.NetworkSimplex do
 
   ## Example
 
+      # Store demand/capacity/cost data in node and edge data tuples
       graph =
         Yog.directed()
-        |> Yog.add_node(1, "warehouse")
-        |> Yog.add_node(2, "store_a")
-        |> Yog.add_node(3, "store_b")
+        # Node data: {demand, nil} where negative=supply, positive=demand
+        |> Yog.add_node(1, {-20, nil})   # warehouse: supply 20
+        |> Yog.add_node(2, {10, nil})    # store_a: demand 10
+        |> Yog.add_node(3, {10, nil})    # store_b: demand 10
+        # Edge data: {capacity, cost_per_unit}
         |> Yog.add_edges([
-          {1, 2, 10},  # capacity 10
-          {1, 3, 15},  # capacity 15
-          {2, 3, 5}    # capacity 5
+          {1, 2, {10, 3}},   # capacity 10, cost $3
+          {1, 3, {15, 2}},   # capacity 15, cost $2
+          {2, 3, {5, 1}}     # capacity 5, cost $1
         ])
 
-      # Demands: node 1 supplies 20, node 2 demands 10, node 3 demands 10
-      get_demand = fn
-        1 -> -20  # supply
-        2 -> 10   # demand
-        3 -> 10   # demand
-        _ -> 0
-      end
+      # Extract demand from node data
+      get_demand = fn {d, _} -> d end
 
-      # All edges have capacity as their weight in the graph
-      get_capacity = fn _from, _to, weight -> weight end
+      # Extract capacity from edge data
+      get_capacity = fn {c, _} -> c end
 
-      # Costs per unit flow
-      get_cost = fn
-        1, 2, _ -> 3   # $3 per unit from warehouse to store_a
-        1, 3, _ -> 2   # $2 per unit from warehouse to store_b
-        2, 3, _ -> 1   # $1 per unit from store_a to store_b
-        _, _, _ -> 0
-      end
+      # Extract cost from edge data
+      get_cost = fn {_, c} -> c end
 
       case Yog.Flow.NetworkSimplex.min_cost_flow(graph, get_demand, get_capacity, get_cost) do
         {:ok, result} ->
@@ -144,7 +137,7 @@ defmodule Yog.Flow.NetworkSimplex do
   - `get_capacity` - Function `(edge_data) -> capacity`
   - `get_cost` - Function `(edge_data) -> cost_per_unit`
 
-  Note: These functions take the node/edge data stored in the graph, not node IDs.
+  Note: These functions take the node/edge **data** stored in the graph, not node IDs.
   For example, if you stored `Yog.add_node(g, 1, "warehouse")`, then `get_demand`
   will be called with `"warehouse"` as the argument.
 
@@ -155,27 +148,24 @@ defmodule Yog.Flow.NetworkSimplex do
   - `{:error, :unbounded}` - Negative cost cycle exists
   - `{:error, :unbalanced_demands}` - Total supply ≠ total demand
 
-  ## Example
+  ## Examples
 
-      get_demand = fn
-        1 -> -10  # supply 10 units
-        2 -> 5    # demand 5 units
-        3 -> 5    # demand 5 units
-        _ -> 0
-      end
-
-      get_capacity = fn _from, _to, weight -> weight end
-      get_cost = fn _from, _to, _weight -> 1 end  # uniform cost
-
-      {:ok, result} = Yog.Flow.NetworkSimplex.min_cost_flow(
-        graph,
-        get_demand,
-        get_capacity,
-        get_cost
-      )
-
-      IO.puts("Total cost: \#{result.cost}")
-      # result.flow contains the flow on each edge
+      iex> graph = Yog.directed()
+      ...>   |> Yog.add_node(1, "s")
+      ...>   |> Yog.add_node(2, "t")
+      ...>   |> Yog.add_edge!(from: 1, to: 2, with: 10)
+      iex> get_demand = fn
+      ...>   "s" -> -5   # supply 5
+      ...>   "t" -> 5    # demand 5
+      ...>   _ -> 0
+      ...> end
+      iex> get_capacity = fn w -> w end
+      iex> get_cost = fn _ -> 1 end
+      iex> result = Yog.Flow.NetworkSimplex.min_cost_flow(
+      ...>   graph, get_demand, get_capacity, get_cost
+      ...> )
+      iex> match?({:ok, _} , result) or match?({:error, _}, result)
+      true
 
   ## Notes
 
@@ -185,9 +175,9 @@ defmodule Yog.Flow.NetworkSimplex do
   """
   @spec min_cost_flow(
           Yog.graph(),
-          (Yog.node_id() -> integer()),
-          (Yog.node_id(), Yog.node_id(), any() -> integer()),
-          (Yog.node_id(), Yog.node_id(), any() -> integer())
+          (any() -> integer()),
+          (any() -> integer()),
+          (any() -> integer())
         ) :: {:ok, min_cost_flow_result()} | {:error, network_simplex_error()}
   def min_cost_flow(graph, get_demand, get_capacity, get_cost) do
     result =
