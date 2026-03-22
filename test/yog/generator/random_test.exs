@@ -18,16 +18,6 @@ defmodule Yog.Generator.RandomTest do
     |> div(2)
   end
 
-  # Helper for directed graphs
-  defp edge_count_directed(graph) do
-    {:graph, _type, _nodes, out_edges, _in_edges} = graph
-
-    out_edges
-    |> Map.values()
-    |> Enum.map(&map_size/1)
-    |> Enum.sum()
-  end
-
   # ============= Erdős-Rényi G(n, p) Tests =============
 
   test "erdos_renyi_gnp_basic_test" do

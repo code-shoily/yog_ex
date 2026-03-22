@@ -220,7 +220,7 @@ defmodule Yog.Builder.Live do
 
       iex> builder = Yog.Builder.Live.new()
       ...> |> Yog.Builder.Live.add_edge("A", "B", 10)
-      iex> {builder, graph} = Yog.Builder.Live.sync(builder, Yog.directed())
+      iex> {_builder, graph} = Yog.Builder.Live.sync(builder, Yog.directed())
       iex> length(Yog.all_nodes(graph))
       2
   """

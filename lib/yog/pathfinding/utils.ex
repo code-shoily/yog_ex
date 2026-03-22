@@ -44,4 +44,34 @@ defmodule Yog.Pathfinding.Utils do
   """
   @spec total_weight(path(any())) :: any()
   def total_weight({:path, _, weight}), do: weight
+
+  @doc """
+  A standard Gleam-compatible comparison function for numbers in Elixir.
+
+  Many pathfinding algorithms (like Dijkstra and A*) require an explicit
+  comparison function that returns `:lt`, `:eq`, or `:gt` to order nodes
+  in priority queues. Writing this manually can be repetitive.
+
+  This function evaluates to:
+  - `:lt` when `a < b`
+  - `:eq` when `a == b`
+  - `:gt` when `a > b`
+
+  It works for both integers and floats.
+
+  ## Examples
+
+      iex> Yog.Pathfinding.Utils.compare(10, 20)
+      :lt
+      iex> Yog.Pathfinding.Utils.compare(20, 20)
+      :eq
+      iex> Yog.Pathfinding.Utils.compare(30, 20)
+      :gt
+      iex> Yog.Pathfinding.Utils.compare(1.5, 3.2)
+      :lt
+  """
+  @spec compare(number(), number()) :: :lt | :eq | :gt
+  def compare(a, b) when a < b, do: :lt
+  def compare(a, b) when a > b, do: :gt
+  def compare(_, _), do: :eq
 end

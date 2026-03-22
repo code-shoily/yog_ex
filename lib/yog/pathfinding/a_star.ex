@@ -365,14 +365,14 @@ defmodule Yog.Pathfinding.AStar do
 
   ## Examples
 
-      iex> successors = fn {x, y, _dir} -> [{{x + 1, y, :east}, 1}, {{x, y + 1, :south}, 1}] end
-      iex> key_fn = fn {x, y, _dir} -> {x, y} end
-      iex> h = fn {x, y, _} -> (10 - x) + (10 - y) end
-      iex> goal_fn = fn {x, y, _} -> x == 10 and y == 10 end
-      iex> compare = fn a, b -> if a < b, do: :lt, else: (if a > b, do: :gt, else: :eq) end
+      iex> _successors = fn {x, y, _dir} -> [{{x + 1, y, :east}, 1}, {{x, y + 1, :south}, 1}] end
+      iex> _key_fn = fn {x, y, _dir} -> {x, y} end
+      iex> _h = fn {x, y, _} -> (10 - x) + (10 - y) end
+      iex> _goal_fn = fn {x, y, _} -> x == 10 and y == 10 end
+      iex> _compare = fn a, b -> if a < b, do: :lt, else: (if a > b, do: :gt, else: :eq) end
       iex> #Yog.Pathfinding.AStar.implicit_a_star_by(
-      ...> #  {0, 0, :north}, successors, key_fn,
-      ...> #  goal_fn, 0, &(&1 + &2), compare, h
+      ...> #  {0, 0, :north}, _successors, _key_fn,
+      ...> #  _goal_fn, 0, &(&1 + &2), _compare, _h
       ...> #)
       ...> # {:some, 20}
   """

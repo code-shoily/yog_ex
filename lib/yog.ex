@@ -1078,7 +1078,7 @@ defmodule Yog do
       ...>   |> Yog.add_node(3, "C")
       ...>   |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}])
       iex> # Count nodes during traversal
-      iex> Yog.fold_walk(graph, 1, :breadth_first, 0, fn acc, node, _meta ->
+      iex> Yog.fold_walk(graph, 1, :breadth_first, 0, fn acc, _node, _meta ->
       ...>   {Yog.continue(), acc + 1}
       ...> end)
       3
