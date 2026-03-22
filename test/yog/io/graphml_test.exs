@@ -313,7 +313,7 @@ defmodule Yog.IO.GraphMLTest do
 
     assert length(Yog.successors(graph, 1)) == 2
     assert length(Yog.successors(graph, 2)) == 1
-    assert length(Yog.successors(graph, 3)) == 0
+    assert Yog.successors(graph, 3) == []
   end
 
   # =============================================================================

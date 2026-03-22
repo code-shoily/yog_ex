@@ -51,23 +51,27 @@ defmodule Yog.Multi.Traversal do
     successors = Model.successors(graph, current)
 
     {new_queue, new_visited_nodes, new_visited_edges} =
-      Enum.reduce(successors, {rest, visited_nodes, visited_edges}, fn {neighbor, edge_id, _data},
-                                                                       {q, vn, ve} ->
-        if MapSet.member?(ve, edge_id) do
-          {q, vn, ve}
-        else
-          new_ve = MapSet.put(ve, edge_id)
-
-          if MapSet.member?(vn, neighbor) do
-            {q, vn, new_ve}
-          else
-            new_vn = MapSet.put(vn, neighbor)
-            {q ++ [neighbor], new_vn, new_ve}
-          end
-        end
-      end)
+      Enum.reduce(successors, {rest, visited_nodes, visited_edges}, &bfs_fold/2)
 
     do_bfs(graph, new_queue, new_visited_nodes, new_visited_edges, new_result)
+  end
+
+  defp bfs_fold({neighbor, edge_id, _data}, {q, vn, ve}) do
+    if MapSet.member?(ve, edge_id) do
+      {q, vn, ve}
+    else
+      new_ve = MapSet.put(ve, edge_id)
+      handle_neighbor_visit(neighbor, q, vn, new_ve)
+    end
+  end
+
+  defp handle_neighbor_visit(neighbor, q, vn, ve) do
+    if MapSet.member?(vn, neighbor) do
+      {q, vn, ve}
+    else
+      new_vn = MapSet.put(vn, neighbor)
+      {q ++ [neighbor], new_vn, ve}
+    end
   end
 
   @doc """
@@ -216,19 +220,21 @@ defmodule Yog.Multi.Traversal do
         successors = Model.successors(graph, current)
 
         {new_queue, new_depths, new_visited} =
-          Enum.reduce(successors, {rest, depths, visited_edges}, fn {neighbor, succ_edge_id,
-                                                                     _data},
-                                                                    {q, d, ve} = acc2 ->
-            if MapSet.member?(ve, succ_edge_id) do
-              acc2
-            else
-              new_ve = MapSet.put(ve, succ_edge_id)
-              new_d = Map.put_new(d, neighbor, depth + 1)
-              {q ++ [{neighbor, current, succ_edge_id}], new_d, new_ve}
-            end
+          Enum.reduce(successors, {rest, depths, visited_edges}, fn succ, acc2 ->
+            fold_walk_reducer(succ, current, depth, acc2)
           end)
 
         do_fold_walk(graph, new_queue, new_depths, new_visited, new_acc, folder)
+    end
+  end
+
+  defp fold_walk_reducer({neighbor, succ_edge_id, _data}, current, depth, acc2 = {q, d, ve}) do
+    if MapSet.member?(ve, succ_edge_id) do
+      acc2
+    else
+      new_ve = MapSet.put(ve, succ_edge_id)
+      new_d = Map.put_new(d, neighbor, depth + 1)
+      {q ++ [{neighbor, current, succ_edge_id}], new_d, new_ve}
     end
   end
 end

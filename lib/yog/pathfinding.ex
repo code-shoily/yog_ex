@@ -5,9 +5,9 @@ defmodule Yog.Pathfinding do
   Provides a unified keyword-based API for various pathfinding algorithms.
   """
 
-  alias Yog.Pathfinding.Dijkstra
   alias Yog.Pathfinding.AStar
   alias Yog.Pathfinding.BellmanFord
+  alias Yog.Pathfinding.Dijkstra
   alias Yog.Pathfinding.FloydWarshall
 
   @doc """

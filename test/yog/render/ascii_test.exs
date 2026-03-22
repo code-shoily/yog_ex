@@ -1,6 +1,7 @@
 defmodule Yog.Render.ASCIITest do
   use ExUnit.Case
 
+  alias Yog.Builder.Grid
   alias Yog.Render.ASCII
 
   doctest ASCII
@@ -8,10 +9,10 @@ defmodule Yog.Render.ASCIITest do
   describe "grid_to_string/1" do
     test "returns empty string for empty grid" do
       grid =
-        Yog.Builder.Grid.from_2d_list(
+        Grid.from_2d_list(
           [],
           :undirected,
-          Yog.Builder.Grid.always()
+          Grid.always()
         )
 
       result = ASCII.grid_to_string(grid)
@@ -20,10 +21,10 @@ defmodule Yog.Render.ASCIITest do
 
     test "renders simple 2x2 grid" do
       grid =
-        Yog.Builder.Grid.from_2d_list(
+        Grid.from_2d_list(
           [[".", "."], [".", "."]],
           :undirected,
-          Yog.Builder.Grid.always()
+          Grid.always()
         )
 
       result = ASCII.grid_to_string(grid)
@@ -36,10 +37,10 @@ defmodule Yog.Render.ASCIITest do
 
     test "renders 3x3 grid" do
       grid =
-        Yog.Builder.Grid.from_2d_list(
+        Grid.from_2d_list(
           [[".", ".", "."], [".", ".", "."], [".", ".", "."]],
           :undirected,
-          Yog.Builder.Grid.always()
+          Grid.always()
         )
 
       result = ASCII.grid_to_string(grid)
@@ -59,10 +60,10 @@ defmodule Yog.Render.ASCIITest do
       ]
 
       grid =
-        Yog.Builder.Grid.from_2d_list(
+        Grid.from_2d_list(
           maze,
           :undirected,
-          Yog.Builder.Grid.walkable(".")
+          Grid.walkable(".")
         )
 
       result = ASCII.grid_to_string(grid)

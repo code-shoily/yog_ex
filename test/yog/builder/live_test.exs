@@ -1,5 +1,7 @@
 defmodule Yog.Builder.LiveTest do
   use ExUnit.Case
+
+  alias Yog.Builder.Labeled
   alias Yog.Builder.Live
 
   doctest Live
@@ -29,8 +31,8 @@ defmodule Yog.Builder.LiveTest do
 
   test "live_builder_from_labeled_test" do
     labeled =
-      Yog.Builder.Labeled.directed()
-      |> Yog.Builder.Labeled.add_edge("X", "Y", 7)
+      Labeled.directed()
+      |> Labeled.add_edge("X", "Y", 7)
 
     builder = Live.from_labeled(labeled)
     assert is_tuple(builder)

@@ -184,7 +184,7 @@ defmodule Yog.IO.GDFTest do
     """
 
     {:ok, graph} = GDF.deserialize(gdf_str)
-    assert length(Yog.all_nodes(graph)) == 0
+    assert Yog.all_nodes(graph) == []
   end
 
   test "deserialize single node" do
@@ -267,7 +267,7 @@ defmodule Yog.IO.GDFTest do
     assert Yog.Model.type(graph) == :directed
 
     assert length(Yog.successors(graph, 1)) == 1
-    assert length(Yog.successors(graph, 2)) == 0
+    assert Yog.successors(graph, 2) == []
   end
 
   test "deserialize multiple edges" do
@@ -286,7 +286,7 @@ defmodule Yog.IO.GDFTest do
 
     assert length(Yog.successors(graph, 1)) == 2
     assert length(Yog.successors(graph, 2)) == 1
-    assert length(Yog.successors(graph, 3)) == 0
+    assert Yog.successors(graph, 3) == []
   end
 
   test "deserialize without types" do
@@ -360,7 +360,7 @@ defmodule Yog.IO.GDFTest do
     {:ok, graph} = GDF.deserialize(gdf_str)
 
     assert length(Yog.all_nodes(graph)) == 2
-    assert length(Yog.successors(graph, 1)) == 0
+    assert Yog.successors(graph, 1) == []
   end
 
   test "deserialize edge without nodes creates nodes" do
@@ -511,7 +511,7 @@ defmodule Yog.IO.GDFTest do
     {:ok, graph} = GDF.deserialize(gdf_str)
 
     # Invalid node IDs should be skipped
-    assert length(Yog.all_nodes(graph)) == 0
+    assert Yog.all_nodes(graph) == []
   end
 
   # =============================================================================

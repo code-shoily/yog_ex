@@ -6,6 +6,8 @@ defmodule Yog.DAG.Model do
   and guarantees acyclicity at the type level.
   """
 
+  alias Yog.Property.Cyclicity
+
   @typedoc """
   An opaque wrapper around a `Graph` that guarantees acyclicity at the type level.
 
@@ -37,7 +39,7 @@ defmodule Yog.DAG.Model do
   """
   @spec from_graph(Yog.graph()) :: {:ok, t()} | {:error, :cycle_detected}
   def from_graph(graph) do
-    if Yog.Property.Cyclicity.acyclic?(graph) do
+    if Cyclicity.acyclic?(graph) do
       {:ok, {:dag, graph}}
     else
       {:error, :cycle_detected}
@@ -111,7 +113,7 @@ defmodule Yog.DAG.Model do
     # add_edge! returns the graph directly (or raises on error like missing node)
     new_graph = Yog.add_edge!(graph, from, to, weight)
 
-    if Yog.Property.Cyclicity.acyclic?(new_graph) do
+    if Cyclicity.acyclic?(new_graph) do
       {:ok, {:dag, new_graph}}
     else
       {:error, :cycle_detected}

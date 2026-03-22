@@ -37,7 +37,7 @@ defmodule Yog.Generator.ClassicTest do
     graph = Classic.complete(1)
 
     assert Yog.Model.order(graph) == 1
-    assert length(Yog.neighbors(graph, 0)) == 0
+    assert Yog.neighbors(graph, 0) == []
   end
 
   # ============= Cycle Graph Tests =============
@@ -96,14 +96,14 @@ defmodule Yog.Generator.ClassicTest do
     assert length(Yog.successors(graph, 0)) == 1
     assert length(Yog.successors(graph, 1)) == 1
     # Last node
-    assert length(Yog.successors(graph, 2)) == 0
+    assert Yog.successors(graph, 2) == []
   end
 
   test "path_single_node_test" do
     graph = Classic.path(1)
 
     assert Yog.Model.order(graph) == 1
-    assert length(Yog.neighbors(graph, 0)) == 0
+    assert Yog.neighbors(graph, 0) == []
   end
 
   # ============= Star Graph Tests =============
@@ -218,8 +218,8 @@ defmodule Yog.Generator.ClassicTest do
     assert length(Yog.successors(graph, 2)) == 2
 
     # Leaf nodes have no children
-    assert length(Yog.successors(graph, 3)) == 0
-    assert length(Yog.successors(graph, 4)) == 0
+    assert Yog.successors(graph, 3) == []
+    assert Yog.successors(graph, 4) == []
   end
 
   test "binary_tree_depth_zero_test" do
@@ -227,7 +227,7 @@ defmodule Yog.Generator.ClassicTest do
     graph = Classic.binary_tree(0)
 
     assert Yog.Model.order(graph) == 1
-    assert length(Yog.successors(graph, 0)) == 0
+    assert Yog.successors(graph, 0) == []
   end
 
   # ============= Grid 2D Tests =============
@@ -295,7 +295,7 @@ defmodule Yog.Generator.ClassicTest do
     assert Yog.Model.order(graph) == 5
 
     for i <- 0..4 do
-      assert length(Yog.neighbors(graph, i)) == 0
+      assert Yog.neighbors(graph, i) == []
     end
   end
 

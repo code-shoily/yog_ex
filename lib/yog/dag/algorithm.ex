@@ -96,34 +96,12 @@ defmodule Yog.DAG.Algorithm do
     graph = Model.to_graph(dag)
     sorted_nodes = topological_sort(dag)
 
-    # Initialize DP tables
-    # distances: tracks the longest distance to a node
-    # predecessors: tracks the node that came before it on the longest path
     {distances, predecessors} =
       Enum.reduce(sorted_nodes, {%{}, %{}}, fn node, {dist_acc, pred_acc} ->
         node_dist = Map.get(dist_acc, node, 0)
-
-        # Relax outgoing edges
         out_edges = :yog@model.successors(graph, node) |> Map.new()
 
-        Enum.reduce(out_edges, {dist_acc, pred_acc}, fn {target, weight},
-                                                        {d_acc, p_acc} =
-                                                          acc ->
-          current_target_dist = Map.get(d_acc, target)
-          new_dist = node_dist + weight
-
-          should_update =
-            case current_target_dist do
-              nil -> true
-              d -> new_dist > d
-            end
-
-          if should_update do
-            {Map.put(d_acc, target, new_dist), Map.put(p_acc, target, node)}
-          else
-            acc
-          end
-        end)
+        update_longest_distances(out_edges, node, node_dist, dist_acc, pred_acc)
       end)
 
     # Find the node with maximum distance
@@ -138,6 +116,22 @@ defmodule Yog.DAG.Algorithm do
       []
     end
   end
+
+  defp update_longest_distances(edges, node, node_dist, dist_acc, pred_acc) do
+    Enum.reduce(edges, {dist_acc, pred_acc}, fn {target, weight}, {d_acc, p_acc} = acc ->
+      current_target_dist = Map.get(d_acc, target)
+      new_dist = node_dist + weight
+
+      if should_update_longest?(current_target_dist, new_dist) do
+        {Map.put(d_acc, target, new_dist), Map.put(p_acc, target, node)}
+      else
+        acc
+      end
+    end)
+  end
+
+  defp should_update_longest?(nil, _), do: true
+  defp should_update_longest?(curr, next), do: next > curr
 
   @doc """
   Computes the transitive closure of the DAG.
@@ -171,41 +165,43 @@ defmodule Yog.DAG.Algorithm do
     sorted_nodes = topological_sort(dag) |> Enum.reverse()
 
     # For each node, compute all reachable nodes
-    reachable =
-      Enum.reduce(sorted_nodes, %{}, fn node, acc ->
-        # Direct successors are reachable
-        successors =
-          :yog@model.successors(graph, node)
-          |> Enum.map(fn {n, _} -> n end)
-
-        # Plus all nodes reachable from successors
-        all_reachable =
-          Enum.reduce(successors, MapSet.new(successors), fn child, set_acc ->
-            child_reachable = Map.get(acc, child, MapSet.new())
-            MapSet.union(set_acc, child_reachable)
-          end)
-
-        Map.put(acc, node, all_reachable)
-      end)
+    reachable = solve_transitive_reachability(graph, sorted_nodes)
 
     # Build new graph with closure edges
     new_graph =
       Enum.reduce(reachable, graph, fn {node, targets}, g ->
-        Enum.reduce(MapSet.to_list(targets), g, fn target, g_acc ->
-          # Add edge if it doesn't already exist
-          existing_targets = :yog@model.successors(g_acc, node) |> Enum.map(fn {n, _} -> n end)
-
-          if target in existing_targets do
-            g_acc
-          else
-            Yog.add_edge!(g_acc, node, target, 1)
-          end
-        end)
+        add_closure_edges(g, node, targets)
       end)
 
     # Unwrap and re-wrap as DAG (closure preserves acyclicity)
     {:ok, result} = Model.from_graph(new_graph)
     result
+  end
+
+  defp solve_transitive_reachability(graph, sorted_nodes) do
+    Enum.reduce(sorted_nodes, %{}, fn node, acc ->
+      successors = :yog@model.successors(graph, node) |> Enum.map(fn {n, _} -> n end)
+
+      all_reachable =
+        Enum.reduce(successors, MapSet.new(successors), fn child, set_acc ->
+          child_reachable = Map.get(acc, child, MapSet.new())
+          MapSet.union(set_acc, child_reachable)
+        end)
+
+      Map.put(acc, node, all_reachable)
+    end)
+  end
+
+  defp add_closure_edges(graph, node, targets) do
+    Enum.reduce(MapSet.to_list(targets), graph, fn target, g_acc ->
+      existing_targets = :yog@model.successors(g_acc, node) |> Enum.map(fn {n, _} -> n end)
+
+      if target in existing_targets do
+        g_acc
+      else
+        Yog.add_edge!(g_acc, node, target, 1)
+      end
+    end)
   end
 
   @doc """
@@ -284,43 +280,12 @@ defmodule Yog.DAG.Algorithm do
     sorted_nodes = topological_sort(dag)
 
     # Only consider nodes from 'from' onwards in topological order
-    relevant_nodes =
-      Enum.drop_while(sorted_nodes, fn node -> node != from end)
+    relevant_nodes = Enum.drop_while(sorted_nodes, fn node -> node != from end)
 
     if relevant_nodes == [] do
       :none
     else
-      {distances, predecessors} =
-        Enum.reduce(relevant_nodes, {%{from => 0}, %{}}, fn node,
-                                                            {dist_acc, pred_acc} =
-                                                              acc ->
-          node_dist = Map.get(dist_acc, node)
-
-          if node_dist == nil do
-            acc
-          else
-            out_edges = :yog@model.successors(graph, node) |> Map.new()
-
-            Enum.reduce(out_edges, {dist_acc, pred_acc}, fn {target, weight},
-                                                            {d_acc, p_acc} =
-                                                              inner_acc ->
-              current_target_dist = Map.get(d_acc, target)
-              new_dist = node_dist + weight
-
-              should_update =
-                case current_target_dist do
-                  nil -> true
-                  d -> new_dist < d
-                end
-
-              if should_update do
-                {Map.put(d_acc, target, new_dist), Map.put(p_acc, target, node)}
-              else
-                inner_acc
-              end
-            end)
-          end
-        end)
+      {distances, predecessors} = solve_shortest_path_dp(relevant_nodes, from, graph)
 
       case Map.fetch(distances, to) do
         {:ok, total_dist} ->
@@ -332,6 +297,35 @@ defmodule Yog.DAG.Algorithm do
       end
     end
   end
+
+  defp solve_shortest_path_dp(nodes, from, graph) do
+    Enum.reduce(nodes, {%{from => 0}, %{}}, fn node, {dist_acc, pred_acc} = acc ->
+      node_dist = Map.get(dist_acc, node)
+
+      if node_dist == nil do
+        acc
+      else
+        out_edges = :yog@model.successors(graph, node) |> Map.new()
+        relax_edges(out_edges, node, node_dist, dist_acc, pred_acc)
+      end
+    end)
+  end
+
+  defp relax_edges(edges, node, node_dist, dist_acc, pred_acc) do
+    Enum.reduce(edges, {dist_acc, pred_acc}, fn {target, weight}, {d_acc, p_acc} = inner_acc ->
+      current_target_dist = Map.get(d_acc, target)
+      new_dist = node_dist + weight
+
+      if should_update_shortest?(current_target_dist, new_dist) do
+        {Map.put(d_acc, target, new_dist), Map.put(p_acc, target, node)}
+      else
+        inner_acc
+      end
+    end)
+  end
+
+  defp should_update_shortest?(nil, _), do: true
+  defp should_update_shortest?(current, new), do: new < current
 
   @doc """
   Counts the number of ancestors or descendants for every node.
@@ -382,20 +376,7 @@ defmodule Yog.DAG.Algorithm do
       end
 
     # Helper to get related nodes based on direction
-    get_related =
-      case direction do
-        :descendants ->
-          fn node ->
-            :yog@model.successors(graph, node)
-            |> Enum.map(fn {n, _} -> n end)
-          end
-
-        :ancestors ->
-          fn node ->
-            :yog@model.predecessors(graph, node)
-            |> Enum.map(fn {n, _} -> n end)
-          end
-      end
+    get_related = build_related_fn(graph, direction)
 
     # DP: Map of node -> Set of all reachable nodes
     reachability_sets =
@@ -414,6 +395,20 @@ defmodule Yog.DAG.Algorithm do
 
     # Convert sets to counts
     Map.new(reachability_sets, fn {node, set} -> {node, MapSet.size(set)} end)
+  end
+
+  defp build_related_fn(graph, :descendants) do
+    fn node ->
+      :yog@model.successors(graph, node)
+      |> Enum.map(fn {n, _} -> n end)
+    end
+  end
+
+  defp build_related_fn(graph, :ancestors) do
+    fn node ->
+      :yog@model.predecessors(graph, node)
+      |> Enum.map(fn {n, _} -> n end)
+    end
   end
 
   @doc """
@@ -499,13 +494,7 @@ defmodule Yog.DAG.Algorithm do
     if current == target do
       true
     else
-      neighbors =
-        :yog@model.successors(graph, current)
-        |> Enum.map(fn {n, _} -> n end)
-        |> Enum.reject(fn n ->
-          # Skip the excluded edge
-          current == exclude and n == target
-        end)
+      neighbors = get_filtered_neighbors(graph, current, target, exclude)
 
       new_neighbors =
         Enum.reject(neighbors, fn n -> MapSet.member?(visited, n) end)
@@ -517,6 +506,15 @@ defmodule Yog.DAG.Algorithm do
 
       do_has_path?(graph, rest ++ new_neighbors, target, new_visited, exclude)
     end
+  end
+
+  defp get_filtered_neighbors(graph, current, target, exclude) do
+    :yog@model.successors(graph, current)
+    |> Enum.map(fn {n, _} -> n end)
+    |> Enum.reject(fn n ->
+      # Skip the excluded edge
+      current == exclude and n == target
+    end)
   end
 
   defp get_ancestors_set(dag, node) do

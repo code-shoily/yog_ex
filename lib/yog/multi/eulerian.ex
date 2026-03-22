@@ -82,16 +82,19 @@ defmodule Yog.Multi.Eulerian do
   """
   @spec has_eulerian_circuit?(Model.t()) :: boolean()
   def has_eulerian_circuit?(graph) do
-    cond do
-      map_size(graph.nodes) == 0 ->
-        false
-
-      graph.kind == :undirected ->
-        all_even_degree?(graph) and connected?(graph)
-
-      graph.kind == :directed ->
-        all_balanced_degree?(graph) and connected?(graph)
+    if map_size(graph.nodes) == 0 do
+      false
+    else
+      check_eulerian_circuit(graph)
     end
+  end
+
+  defp check_eulerian_circuit(graph = %{kind: :undirected}) do
+    all_even_degree?(graph) and connected?(graph)
+  end
+
+  defp check_eulerian_circuit(graph = %{kind: :directed}) do
+    all_balanced_degree?(graph) and connected?(graph)
   end
 
   @doc """
@@ -137,39 +140,45 @@ defmodule Yog.Multi.Eulerian do
   """
   @spec has_eulerian_path?(Model.t()) :: boolean()
   def has_eulerian_path?(graph) do
-    cond do
-      map_size(graph.nodes) == 0 ->
-        false
-
-      graph.kind == :undirected ->
-        odd_count =
-          graph.nodes
-          |> Map.keys()
-          |> Enum.filter(fn n -> rem(Model.out_degree(graph, n), 2) == 1 end)
-          |> length()
-
-        (odd_count == 0 or odd_count == 2) and connected?(graph)
-
-      graph.kind == :directed ->
-        {starts, ends, balanced} =
-          graph.nodes
-          |> Map.keys()
-          |> Enum.reduce({0, 0, true}, fn n, {s, e, ok} ->
-            diff = Model.out_degree(graph, n) - Model.in_degree(graph, n)
-
-            case diff do
-              1 -> {s + 1, e, ok}
-              -1 -> {s, e + 1, ok}
-              0 -> {s, e, ok}
-              _ -> {s, e, false}
-            end
-          end)
-
-        balanced and
-          ((starts == 0 and ends == 0) or (starts == 1 and ends == 1)) and
-          connected?(graph)
+    if map_size(graph.nodes) == 0 do
+      false
+    else
+      check_eulerian_path(graph)
     end
   end
+
+  defp check_eulerian_path(graph = %{kind: :undirected}) do
+    odd_count = count_odd_degree_nodes(graph)
+    (odd_count == 0 or odd_count == 2) and connected?(graph)
+  end
+
+  defp check_eulerian_path(graph = %{kind: :directed}) do
+    {starts, ends, balanced} = analyze_directed_degrees(graph)
+
+    balanced and
+      ((starts == 0 and ends == 0) or (starts == 1 and ends == 1)) and
+      connected?(graph)
+  end
+
+  defp count_odd_degree_nodes(graph) do
+    graph.nodes
+    |> Map.keys()
+    |> Enum.count(fn n -> rem(Model.out_degree(graph, n), 2) == 1 end)
+  end
+
+  defp analyze_directed_degrees(graph) do
+    graph.nodes
+    |> Map.keys()
+    |> Enum.reduce({0, 0, true}, fn n, {s, e, ok} ->
+      diff = Model.out_degree(graph, n) - Model.in_degree(graph, n)
+      update_directed_stats(diff, s, e, ok)
+    end)
+  end
+
+  defp update_directed_stats(1, s, e, ok), do: {s + 1, e, ok}
+  defp update_directed_stats(-1, s, e, ok), do: {s, e + 1, ok}
+  defp update_directed_stats(0, s, e, ok), do: {s, e, ok}
+  defp update_directed_stats(_, s, e, _ok), do: {s, e, false}
 
   @doc """
   Finds an Eulerian circuit using Hierholzer's algorithm adapted for multigraphs.
@@ -334,36 +343,42 @@ defmodule Yog.Multi.Eulerian do
       Model.predecessors(graph, current)
       |> Enum.map(fn {n, _, _} -> n end)
 
-    neighbors =
+    new_neighbors =
       (successors ++ predecessors)
       |> Enum.uniq()
-      |> Enum.filter(fn n -> not MapSet.member?(visited, n) end)
+      |> Enum.reject(fn n -> MapSet.member?(visited, n) end)
 
     new_visited =
-      Enum.reduce(neighbors, visited, fn n, acc -> MapSet.put(acc, n) end)
+      Enum.reduce(new_neighbors, visited, fn n, acc -> MapSet.put(acc, n) end)
 
-    do_bfs_visited(graph, rest ++ neighbors, new_visited)
+    do_bfs_visited(graph, rest ++ new_neighbors, new_visited)
   end
 
   defp find_path_start(graph) do
-    cond do
-      graph.kind == :undirected ->
-        # Start at any node with odd degree, or any node if all even
-        case Enum.find(Model.all_nodes(graph), fn n ->
-               rem(Model.out_degree(graph, n), 2) == 1
-             end) do
-          nil -> List.first(Model.all_nodes(graph))
-          node -> node
-        end
+    if graph.kind == :undirected do
+      find_undirected_path_start(graph)
+    else
+      find_directed_path_start(graph)
+    end
+  end
 
-      graph.kind == :directed ->
-        # Start at node with out_degree = in_degree + 1, or any balanced node
-        case Enum.find(Model.all_nodes(graph), fn n ->
-               Model.out_degree(graph, n) == Model.in_degree(graph, n) + 1
-             end) do
-          nil -> List.first(Model.all_nodes(graph))
-          node -> node
-        end
+  defp find_undirected_path_start(graph) do
+    # Start at any node with odd degree, or any node if all even
+    case Enum.find(Model.all_nodes(graph), fn n ->
+           rem(Model.out_degree(graph, n), 2) == 1
+         end) do
+      nil -> List.first(Model.all_nodes(graph))
+      node -> node
+    end
+  end
+
+  defp find_directed_path_start(graph) do
+    # Start at node with out_degree = in_degree + 1, or any balanced node
+    case Enum.find(Model.all_nodes(graph), fn n ->
+           Model.out_degree(graph, n) == Model.in_degree(graph, n) + 1
+         end) do
+      nil -> List.first(Model.all_nodes(graph))
+      node -> node
     end
   end
 

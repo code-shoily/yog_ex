@@ -148,50 +148,82 @@ defmodule Yog.Render.DOT do
   """
   @spec to_dot(Yog.graph(), options()) :: String.t()
   def to_dot(graph, options) do
-    nodes =
-      case graph do
-        %{nodes: n} when is_map(n) -> n
-        {:graph, _, n, _, _} when is_map(n) -> n
-        _ -> %{}
+    nodes = extract_nodes(graph)
+    edges = extract_edges(graph)
+    kind = extract_kind(graph)
+
+    {graph_type, arrow} =
+      if kind == :directed do
+        {"digraph", "->"}
+      else
+        {"graph", "--"}
       end
 
-    edges =
-      case graph do
-        %{out_edges: e} when is_map(e) -> e
-        {:graph, _, _, e, _} when is_map(e) -> e
-        _ -> %{}
-      end
+    header = "#{graph_type} #{options.graph_name} {"
+    graph_attrs = build_graph_attrs(options)
+    node_defaults = build_node_defaults(options)
+    edge_defaults = build_edge_defaults(options)
 
-    kind =
-      case graph do
-        %{kind: k} -> k
-        {:graph, k, _, _, _} -> k
-        _ -> :directed
-      end
+    lines =
+      [header]
+      |> add_if_not_empty(graph_attrs)
+      |> List.insert_at(-1, node_defaults)
+      |> List.insert_at(-1, edge_defaults)
+      |> List.insert_at(-1, "")
 
-    graph_type = if kind == :directed, do: "digraph", else: "graph"
-    arrow = if kind == :directed, do: "->", else: "--"
+    node_lines = build_node_lines(nodes, options)
+    edge_lines = build_edge_lines(edges, options, arrow)
 
-    # Build lines
-    lines = ["#{graph_type} #{options.graph_name} {"]
+    lines =
+      (lines ++ node_lines)
+      |> List.insert_at(-1, "")
+      |> Kernel.++(edge_lines)
+      |> List.insert_at(-1, "}")
 
-    # Graph attributes
-    graph_attrs =
+    Enum.join(lines, "\n")
+  end
+
+  defp extract_nodes(graph) do
+    case graph do
+      %{nodes: n} when is_map(n) -> n
+      {:graph, _, n, _, _} when is_map(n) -> n
+      _ -> %{}
+    end
+  end
+
+  defp extract_edges(graph) do
+    case graph do
+      %{out_edges: e} when is_map(e) -> e
+      {:graph, _, _, e, _} when is_map(e) -> e
+      _ -> %{}
+    end
+  end
+
+  defp extract_kind(graph) do
+    case graph do
+      %{kind: k} -> k
+      {:graph, k, _, _, _} -> k
+      _ -> :directed
+    end
+  end
+
+  defp build_graph_attrs(options) do
+    attrs =
       [
         options.rankdir && "rankdir=#{rankdir_to_string(options.rankdir)}",
         options.bgcolor && "bgcolor=\"#{options.bgcolor}\""
       ]
       |> Enum.reject(&is_nil/1)
 
-    lines =
-      if graph_attrs != [] do
-        lines ++ ["  graph [#{Enum.join(graph_attrs, ", ")}];"]
-      else
-        lines
-      end
+    if attrs != [] do
+      "  graph [#{Enum.join(attrs, ", ")}];"
+    else
+      ""
+    end
+  end
 
-    # Node defaults
-    node_attrs = [
+  defp build_node_defaults(options) do
+    attrs = [
       "shape=#{options.node_shape}",
       "style=#{options.node_style}",
       "fillcolor=\"#{options.node_color}\"",
@@ -199,84 +231,72 @@ defmodule Yog.Render.DOT do
       "fontsize=#{options.node_fontsize}"
     ]
 
-    lines = lines ++ ["  node [#{Enum.join(node_attrs, ", ")}];"]
+    "  node [#{Enum.join(attrs, ", ")}];"
+  end
 
-    # Edge defaults
-    edge_attrs = [
+  defp build_edge_defaults(options) do
+    attrs = [
       "color=\"#{options.edge_color}\"",
       "style=#{options.edge_style}"
     ]
 
-    lines = lines ++ ["  edge [#{Enum.join(edge_attrs, ", ")}];"]
-
-    # Add empty line before nodes
-    lines = lines ++ [""]
-
-    # Add nodes
-    node_lines =
-      Enum.map(nodes, fn {id, data} ->
-        label = options.node_label.(id, data)
-        attrs = [{"label", label}]
-
-        # Add highlighting
-        attrs =
-          if options.highlighted_nodes && id in options.highlighted_nodes do
-            attrs ++ [{"color", options.highlight_color}, {"penwidth", "2"}]
-          else
-            attrs
-          end
-
-        attr_str =
-          Enum.map(attrs, fn {k, v} -> "#{k}=\"#{v}\"" end) |> Enum.join(", ")
-
-        "  #{id} [#{attr_str}];"
-      end)
-
-    lines = lines ++ node_lines
-
-    # Add empty line before edges
-    lines = lines ++ [""]
-
-    # Add edges
-    edge_lines =
-      Enum.flat_map(edges, fn {from, targets} ->
-        case targets do
-          t when is_map(t) ->
-            Enum.map(t, fn {to, weight} ->
-              label = options.edge_label.(weight)
-
-              attrs = if label != "" and label != "nil", do: [{"label", label}], else: []
-
-              # Add highlighting
-              attrs =
-                if options.highlighted_edges && {from, to} in options.highlighted_edges do
-                  attrs ++ [{"color", options.highlight_color}, {"penwidth", "2"}]
-                else
-                  attrs
-                end
-
-              if attrs == [] do
-                "  #{from} #{arrow} #{to};"
-              else
-                attr_str =
-                  Enum.map(attrs, fn {k, v} -> "#{k}=\"#{v}\"" end) |> Enum.join(", ")
-
-                "  #{from} #{arrow} #{to} [#{attr_str}];"
-              end
-            end)
-
-          _ ->
-            []
-        end
-      end)
-
-    lines = lines ++ edge_lines
-
-    # Close graph
-    lines = lines ++ ["}"]
-
-    Enum.join(lines, "\n")
+    "  edge [#{Enum.join(attrs, ", ")}];"
   end
+
+  defp build_node_lines(nodes, options) do
+    Enum.map(nodes, fn {id, data} ->
+      label = options.node_label.(id, data)
+      attrs = [{"label", label}]
+
+      attrs =
+        if options.highlighted_nodes && id in options.highlighted_nodes do
+          attrs ++ [{"color", options.highlight_color}, {"penwidth", "2"}]
+        else
+          attrs
+        end
+
+      attr_str = Enum.map_join(attrs, ", ", fn {k, v} -> "#{k}=\"#{v}\"" end)
+      "  #{id} [#{attr_str}];"
+    end)
+  end
+
+  defp build_edge_lines(edges, options, arrow) do
+    Enum.flat_map(edges, fn {from, targets} ->
+      build_edge_lines_for_node(from, targets, options, arrow)
+    end)
+  end
+
+  defp build_edge_lines_for_node(from, targets, options, arrow) do
+    if is_map(targets) do
+      Enum.map(targets, fn {to, weight} ->
+        build_single_edge_line(from, to, weight, arrow, options)
+      end)
+    else
+      []
+    end
+  end
+
+  defp build_single_edge_line(from, to, weight, arrow, options) do
+    label = options.edge_label.(weight)
+    attrs = if label != "" and label != "nil", do: [{"label", label}], else: []
+
+    attrs =
+      if options.highlighted_edges && {from, to} in options.highlighted_edges do
+        attrs ++ [{"color", options.highlight_color}, {"penwidth", "2"}]
+      else
+        attrs
+      end
+
+    if attrs == [] do
+      "  #{from} #{arrow} #{to};"
+    else
+      attr_str = Enum.map_join(attrs, ", ", fn {k, v} -> "#{k}=\"#{v}\"" end)
+      "  #{from} #{arrow} #{to} [#{attr_str}];"
+    end
+  end
+
+  defp add_if_not_empty(lines, ""), do: lines
+  defp add_if_not_empty(lines, line), do: lines ++ [line]
 
   defp rankdir_to_string(:tb), do: "TB"
   defp rankdir_to_string(:lr), do: "LR"

@@ -316,10 +316,7 @@ defmodule Yog.Multi.Model do
   @spec to_simple_graph_min_edges(t()) :: Yog.graph()
   def to_simple_graph_min_edges(graph) do
     to_simple_graph(graph, fn a, b ->
-      cond do
-        is_number(a) and is_number(b) -> min(a, b)
-        true -> a
-      end
+      if is_number(a) and is_number(b), do: min(a, b), else: a
     end)
   end
 

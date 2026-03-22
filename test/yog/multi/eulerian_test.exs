@@ -10,8 +10,8 @@ defmodule Yog.Multi.EulerianTest do
 
   doctest Yog.Multi.Eulerian
 
-  alias Yog.Multi.Model
   alias Yog.Multi.Eulerian
+  alias Yog.Multi.Model
 
   # ============================================================
   # Empty Graph Tests

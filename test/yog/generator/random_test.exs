@@ -2,6 +2,7 @@ defmodule Yog.Generator.RandomTest do
   use ExUnit.Case
 
   alias Yog.Generator.Random
+  alias Yog.Property.Cyclicity
 
   doctest Random
 
@@ -175,7 +176,7 @@ defmodule Yog.Generator.RandomTest do
     graph = Random.random_tree(10)
 
     # Check that it's acyclic
-    assert Yog.Property.Cyclicity.acyclic?(graph)
+    assert Cyclicity.acyclic?(graph)
   end
 
   test "random_tree_single_node_test" do

@@ -2,6 +2,7 @@ defmodule Yog.IO.JSONTest do
   use ExUnit.Case
 
   alias Yog.IO.JSON
+  alias Yog.Multi.Model
 
   doctest Yog.IO.JSON
 
@@ -190,13 +191,13 @@ defmodule Yog.IO.JSONTest do
 
   test "to_json_multi generic format" do
     graph =
-      Yog.Multi.Model.directed()
-      |> Yog.Multi.Model.add_node(1, "Alice")
-      |> Yog.Multi.Model.add_node(2, "Bob")
+      Model.directed()
+      |> Model.add_node(1, "Alice")
+      |> Model.add_node(2, "Bob")
 
-    {graph, _} = Yog.Multi.Model.add_edge(graph, 1, 2, "follows")
-    {graph, _} = Yog.Multi.Model.add_edge(graph, 1, 2, "mentions")
-    {graph, _} = Yog.Multi.Model.add_edge(graph, 1, 2, "likes")
+    {graph, _} = Model.add_edge(graph, 1, 2, "follows")
+    {graph, _} = Model.add_edge(graph, 1, 2, "mentions")
+    {graph, _} = Model.add_edge(graph, 1, 2, "likes")
 
     json_str = JSON.to_json_multi(graph, JSON.default_export_options())
 

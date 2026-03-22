@@ -140,96 +140,113 @@ defmodule Yog.Render.Mermaid do
   """
   @spec to_mermaid(Yog.graph(), options()) :: String.t()
   def to_mermaid(graph, options) do
-    nodes =
-      case graph do
-        %{nodes: n} when is_map(n) -> n
-        {:graph, _, n, _, _} when is_map(n) -> n
-        _ -> %{}
-      end
-
-    edges =
-      case graph do
-        %{out_edges: e} when is_map(e) -> e
-        {:graph, _, _, e, _} when is_map(e) -> e
-        _ -> %{}
-      end
-
-    kind =
-      case graph do
-        %{kind: k} -> k
-        {:graph, k, _, _, _} -> k
-        _ -> :directed
-      end
+    nodes = extract_nodes(graph)
+    edges = extract_edges(graph)
+    kind = extract_kind(graph)
 
     # Graph type and direction
-    dir = direction_to_string(options.direction)
-    lines = ["graph #{dir}"]
-
-    # Style definitions for highlighting
-    styles =
-      if options.highlighted_nodes != nil or options.highlighted_edges != nil do
-        [
-          "  classDef highlight fill:#{options.highlight_fill},stroke:#{options.highlight_stroke},stroke-width:3px"
-        ]
-      else
-        []
-      end
-
-    lines = lines ++ styles
-
-    # Generate node declarations
-    node_lines =
-      Enum.map(nodes, fn {id, data} ->
-        label = options.node_label.(id, data)
-        brackets = node_shape_brackets(options.node_shape, label)
-
-        line = "  #{id}#{brackets}"
-
-        # Add highlight class if applicable
-        if options.highlighted_nodes != nil and id in options.highlighted_nodes do
-          line <> ":::highlight"
-        else
-          line
-        end
-      end)
-
-    lines = lines ++ node_lines
-
-    # Generate edge declarations
+    dir_str = direction_to_string(options.direction)
     arrow = if kind == :directed, do: "-->", else: "---"
 
-    edge_lines =
-      Enum.flat_map(edges, fn {from, targets} ->
-        case targets do
-          t when is_map(t) ->
-            Enum.map(t, fn {to, weight} ->
-              label = options.edge_label.(weight)
+    [
+      "graph #{dir_str}",
+      build_highlight_defs(options)
+      | build_node_lines(nodes, options) ++
+          build_edge_lines(edges, options, arrow)
+    ]
+    |> List.flatten()
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.join("\n")
+  end
 
-              edge_str =
-                if label != "" do
-                  "  #{from} #{arrow}|\"#{label}\"| #{to}"
-                else
-                  "  #{from} #{arrow} #{to}"
-                end
+  defp extract_nodes(graph) do
+    case graph do
+      %{nodes: n} when is_map(n) -> n
+      {:graph, _, n, _, _} when is_map(n) -> n
+      _ -> %{}
+    end
+  end
 
-              # Add highlight class if applicable
-              if options.highlighted_edges != nil and
-                   ({from, to} in options.highlighted_edges or
-                      {to, from} in options.highlighted_edges) do
-                edge_str <> ":::highlight"
-              else
-                edge_str
-              end
-            end)
+  defp extract_edges(graph) do
+    case graph do
+      %{out_edges: e} when is_map(e) -> e
+      {:graph, _, _, e, _} when is_map(e) -> e
+      _ -> %{}
+    end
+  end
 
-          _ ->
-            []
-        end
+  defp extract_kind(graph) do
+    case graph do
+      %{kind: k} -> k
+      {:graph, k, _, _, _} -> k
+      _ -> :directed
+    end
+  end
+
+  defp build_highlight_defs(options) do
+    if options.highlighted_nodes != nil or options.highlighted_edges != nil do
+      "  classDef highlight fill:#{options.highlight_fill},stroke:#{options.highlight_stroke},stroke-width:3px"
+    else
+      ""
+    end
+  end
+
+  defp build_node_lines(nodes, options) do
+    Enum.map(nodes, fn {id, data} ->
+      label = options.node_label.(id, data)
+      brackets = node_shape_brackets(options.node_shape, label)
+      line = "  #{id}#{brackets}"
+
+      if node_highlighted?(id, options) do
+        line <> ":::highlight"
+      else
+        line
+      end
+    end)
+  end
+
+  defp node_highlighted?(id, options) do
+    options.highlighted_nodes != nil and id in options.highlighted_nodes
+  end
+
+  defp build_edge_lines(edges, options, arrow) do
+    Enum.flat_map(edges, fn {from, targets} ->
+      build_edge_lines_for_node(from, targets, options, arrow)
+    end)
+  end
+
+  defp build_edge_lines_for_node(from, targets, options, arrow) do
+    if is_map(targets) do
+      Enum.map(targets, fn {to, weight} ->
+        build_single_edge_line(from, to, weight, arrow, options)
       end)
+    else
+      []
+    end
+  end
 
-    lines = lines ++ edge_lines
+  defp build_single_edge_line(from, to, weight, arrow, options) do
+    label = options.edge_label.(weight)
 
-    Enum.join(lines, "\n")
+    edge_str =
+      if label != "" do
+        "  #{from} #{arrow}|\"#{label}\"| #{to}"
+      else
+        "  #{from} #{arrow} #{to}"
+      end
+
+    if edge_highlighted?(from, to, options) do
+      edge_str <> ":::highlight"
+    else
+      edge_str
+    end
+  end
+
+  defp edge_highlighted?(from, to, options) do
+    edges = options.highlighted_edges
+
+    edges != nil and
+      ({from, to} in edges or {to, from} in edges)
   end
 
   defp direction_to_string(:td), do: "TD"
