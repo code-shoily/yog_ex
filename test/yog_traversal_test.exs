@@ -1,6 +1,8 @@
 defmodule YogTraversalTest do
   use ExUnit.Case
 
+  doctest Yog.Traversal
+
   # ============= BFS Tests =============
 
   test "bfs_linear_path_test" do
@@ -680,5 +682,102 @@ defmodule YogTraversalTest do
     assert costs[3] == 5
     # via 2 (10+5), not via 3 (5+20)
     assert costs[4] == 15
+  end
+
+  # ============= Topological Sort Tests =============
+
+  test "topological_sort_dag_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+
+    assert {:ok, order} = Yog.Traversal.topological_sort(graph)
+    # Valid topological order: 1 before 2 before 3
+    assert Enum.find_index(order, &(&1 == 1)) < Enum.find_index(order, &(&1 == 2))
+    assert Enum.find_index(order, &(&1 == 2)) < Enum.find_index(order, &(&1 == 3))
+  end
+
+  test "topological_sort_cyclic_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 1, with: 1)
+
+    assert {:error, :contains_cycle} = Yog.Traversal.topological_sort(graph)
+  end
+
+  test "topological_sort_empty_test" do
+    graph = Yog.directed()
+    assert {:ok, []} = Yog.Traversal.topological_sort(graph)
+  end
+
+  test "topological_sort_single_node_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+
+    assert {:ok, [1]} = Yog.Traversal.topological_sort(graph)
+  end
+
+  test "topological_sort_diamond_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "Start")
+      |> Yog.add_node(2, "Left")
+      |> Yog.add_node(3, "Right")
+      |> Yog.add_node(4, "End")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 3, with: 1)
+      |> Yog.add_edge!(from: 2, to: 4, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+
+    assert {:ok, order} = Yog.Traversal.topological_sort(graph)
+    # 1 must be first, 4 must be last
+    assert hd(order) == 1
+    assert List.last(order) == 4
+  end
+
+  test "lexicographical_topological_sort_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "charlie")
+      |> Yog.add_node(2, "alpha")
+      |> Yog.add_node(3, "bravo")
+      # Edges: 1 -> 3 -> 2 (charlie -> bravo -> alpha)
+      |> Yog.add_edge!(from: 1, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 2, with: 1)
+
+    # When there are multiple choices, pick smallest by string value
+    # Valid order respecting dependencies: 2 (alpha), 3 (bravo), 1 (charlie)
+    assert {:ok, order} =
+             Yog.Traversal.lexicographical_topological_sort(graph, fn a, b ->
+               a <= b
+             end)
+
+    # The lexicographical sort should produce a deterministic order
+    assert length(order) == 3
+    # Dependencies must be respected: 1 before 3 before 2
+    assert Enum.find_index(order, &(&1 == 1)) < Enum.find_index(order, &(&1 == 3))
+    assert Enum.find_index(order, &(&1 == 3)) < Enum.find_index(order, &(&1 == 2))
+  end
+
+  test "lexicographical_topological_sort_cyclic_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 1, with: 1)
+
+    assert {:error, :contains_cycle} =
+             Yog.Traversal.lexicographical_topological_sort(graph, &<=/2)
   end
 end
