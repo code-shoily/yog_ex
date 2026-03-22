@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-03-04
+
+### Breaking
+
+- **`Yog.Pathfinding.floyd_warshall/1`**: Return type changed from nested `%{src => %{dst => weight}}` to flat `%{{src, dst} => weight}` to match Yog 2.0.0 upstream change.
+
+### Added
+
+- **`Yog.Clique`** module: `max_clique/1`, `all_maximal_cliques/1`, `k_cliques/2` (Bron-Kerbosch)
+- **`Yog.Model.add_edge_ensured/5`**: Auto-creates missing endpoint nodes with default data
+- **`Yog.MST.prim/1`**: Prim's algorithm for MST
+- **`Yog.Components.kosaraju/1`**: Kosaraju's SCC algorithm
+- **`Yog.Traversal`**: `fold_walk/1`, `implicit_fold/1`, `implicit_fold_by/1`, `is_cyclic/1`, `is_acyclic/1`
+- **`Yog.Pathfinding`**: `distance_matrix/1`, `implicit_dijkstra/1`, `implicit_dijkstra_by/1`, `implicit_a_star/1`, `implicit_a_star_by/1`, `implicit_bellman_ford/1`, `implicit_bellman_ford_by/1`
+- **`Yog.Transform`**: `filter_edges/2`, `complement/2`, `to_directed/1`, `to_undirected/2`, `contract/4`
+- **`Yog.Builder.Grid`**: `from_2d_list_with_topology/4`, `rook/0`, `bishop/0`, `queen/0`, `knight/0`, `walkable/1`, `always/0`, `find_node/2`
+- **`Yog` facade**: `is_cyclic/1`, `is_acyclic/1`, `add_edge_ensured/4`
+
+### Changed
+
+- **`Yog.TopologicalSort.lexicographical_sort/2`**: Compare function now operates on node data (not node IDs), matching Yog 2.0.0
+- Synced with Yog 2.2.0 (upstream fixes to MST Prim, min-cut, DFS ordering)
+
 ## [0.1.0] - 2026-02-27
 
 ### Added

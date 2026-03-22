@@ -17,9 +17,9 @@ defmodule YogMSTTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 3, with: 2)
-      |> Yog.add_edge(from: 1, to: 3, with: 3)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 2)
+      |> Yog.add_edge!(from: 1, to: 3, with: 3)
 
     result = MST.kruskal(in: graph, compare: &compare/2)
 
@@ -43,8 +43,8 @@ defmodule YogMSTTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, with: 5)
-      |> Yog.add_edge(from: 2, to: 3, with: 10)
+      |> Yog.add_edge!(from: 1, to: 2, with: 5)
+      |> Yog.add_edge!(from: 2, to: 3, with: 10)
 
     result = MST.kruskal(in: graph, compare: &compare/2)
 
@@ -63,7 +63,7 @@ defmodule YogMSTTest do
       Yog.undirected()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, with: 10)
+      |> Yog.add_edge!(from: 1, to: 2, with: 10)
 
     result = MST.kruskal(in: graph, compare: &compare/2)
 
@@ -110,12 +110,12 @@ defmodule YogMSTTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 4, with: 1)
-      |> Yog.add_edge(from: 4, to: 3, with: 1)
-      |> Yog.add_edge(from: 3, to: 1, with: 1)
-      |> Yog.add_edge(from: 1, to: 4, with: 5)
-      |> Yog.add_edge(from: 2, to: 3, with: 5)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 4, with: 1)
+      |> Yog.add_edge!(from: 4, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      |> Yog.add_edge!(from: 1, to: 4, with: 5)
+      |> Yog.add_edge!(from: 2, to: 3, with: 5)
 
     result = MST.kruskal(in: graph, compare: &compare/2)
 
@@ -136,11 +136,11 @@ defmodule YogMSTTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 3, with: 2)
-      |> Yog.add_edge(from: 3, to: 4, with: 3)
-      |> Yog.add_edge(from: 1, to: 4, with: 4)
-      |> Yog.add_edge(from: 2, to: 4, with: 5)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 2)
+      |> Yog.add_edge!(from: 3, to: 4, with: 3)
+      |> Yog.add_edge!(from: 1, to: 4, with: 4)
+      |> Yog.add_edge!(from: 2, to: 4, with: 5)
 
     result = MST.kruskal(in: graph, compare: &compare/2)
 
@@ -162,11 +162,11 @@ defmodule YogMSTTest do
       |> Yog.add_node(4, "D")
       |> Yog.add_node(5, "E")
       # Pentagon edges
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 3, with: 2)
-      |> Yog.add_edge(from: 3, to: 4, with: 3)
-      |> Yog.add_edge(from: 4, to: 5, with: 4)
-      |> Yog.add_edge(from: 5, to: 1, with: 5)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 2)
+      |> Yog.add_edge!(from: 3, to: 4, with: 3)
+      |> Yog.add_edge!(from: 4, to: 5, with: 4)
+      |> Yog.add_edge!(from: 5, to: 1, with: 5)
 
     result = MST.kruskal(in: graph, compare: &compare/2)
 
@@ -189,9 +189,9 @@ defmodule YogMSTTest do
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
       # Component 1: 1-2
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
       # Component 2: 3-4
-      |> Yog.add_edge(from: 3, to: 4, with: 2)
+      |> Yog.add_edge!(from: 3, to: 4, with: 2)
 
     result = MST.kruskal(in: graph, compare: &compare/2)
 
@@ -214,11 +214,11 @@ defmodule YogMSTTest do
       |> Yog.add_node(5, "E")
       |> Yog.add_node(6, "F")
       # Component 1: 1-2
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
       # Component 2: 3-4
-      |> Yog.add_edge(from: 3, to: 4, with: 2)
+      |> Yog.add_edge!(from: 3, to: 4, with: 2)
       # Component 3: 5-6
-      |> Yog.add_edge(from: 5, to: 6, with: 3)
+      |> Yog.add_edge!(from: 5, to: 6, with: 3)
 
     result = MST.kruskal(in: graph, compare: &compare/2)
 
@@ -234,7 +234,7 @@ defmodule YogMSTTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
 
     # Nodes 3 and 4 are isolated
 
@@ -253,10 +253,10 @@ defmodule YogMSTTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge(from: 1, to: 2, with: 5)
-      |> Yog.add_edge(from: 2, to: 3, with: 5)
-      |> Yog.add_edge(from: 3, to: 4, with: 5)
-      |> Yog.add_edge(from: 1, to: 4, with: 5)
+      |> Yog.add_edge!(from: 1, to: 2, with: 5)
+      |> Yog.add_edge!(from: 2, to: 3, with: 5)
+      |> Yog.add_edge!(from: 3, to: 4, with: 5)
+      |> Yog.add_edge!(from: 1, to: 4, with: 5)
 
     result = MST.kruskal(in: graph, compare: &compare/2)
 
@@ -275,8 +275,8 @@ defmodule YogMSTTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, with: 0)
-      |> Yog.add_edge(from: 2, to: 3, with: 0)
+      |> Yog.add_edge!(from: 1, to: 2, with: 0)
+      |> Yog.add_edge!(from: 2, to: 3, with: 0)
 
     result = MST.kruskal(in: graph, compare: &compare/2)
 
@@ -297,12 +297,12 @@ defmodule YogMSTTest do
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
       # All possible edges with increasing weights
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 1, to: 3, with: 2)
-      |> Yog.add_edge(from: 1, to: 4, with: 3)
-      |> Yog.add_edge(from: 2, to: 3, with: 4)
-      |> Yog.add_edge(from: 2, to: 4, with: 5)
-      |> Yog.add_edge(from: 3, to: 4, with: 6)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 3, with: 2)
+      |> Yog.add_edge!(from: 1, to: 4, with: 3)
+      |> Yog.add_edge!(from: 2, to: 3, with: 4)
+      |> Yog.add_edge!(from: 2, to: 4, with: 5)
+      |> Yog.add_edge!(from: 3, to: 4, with: 6)
 
     result = MST.kruskal(in: graph, compare: &compare/2)
 
@@ -324,16 +324,16 @@ defmodule YogMSTTest do
       |> Yog.add_node(4, "D")
       |> Yog.add_node(5, "E")
       # K5 has 10 edges
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 1, to: 3, with: 2)
-      |> Yog.add_edge(from: 1, to: 4, with: 3)
-      |> Yog.add_edge(from: 1, to: 5, with: 4)
-      |> Yog.add_edge(from: 2, to: 3, with: 5)
-      |> Yog.add_edge(from: 2, to: 4, with: 6)
-      |> Yog.add_edge(from: 2, to: 5, with: 7)
-      |> Yog.add_edge(from: 3, to: 4, with: 8)
-      |> Yog.add_edge(from: 3, to: 5, with: 9)
-      |> Yog.add_edge(from: 4, to: 5, with: 10)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 3, with: 2)
+      |> Yog.add_edge!(from: 1, to: 4, with: 3)
+      |> Yog.add_edge!(from: 1, to: 5, with: 4)
+      |> Yog.add_edge!(from: 2, to: 3, with: 5)
+      |> Yog.add_edge!(from: 2, to: 4, with: 6)
+      |> Yog.add_edge!(from: 2, to: 5, with: 7)
+      |> Yog.add_edge!(from: 3, to: 4, with: 8)
+      |> Yog.add_edge!(from: 3, to: 5, with: 9)
+      |> Yog.add_edge!(from: 4, to: 5, with: 10)
 
     result = MST.kruskal(in: graph, compare: &compare/2)
 
@@ -354,9 +354,9 @@ defmodule YogMSTTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
-      |> Yog.add_edge(from: 3, to: 1, with: 100)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 1, with: 100)
 
     result = MST.kruskal(in: graph, compare: &compare/2)
 
@@ -384,18 +384,18 @@ defmodule YogMSTTest do
       |> Yog.add_node(9, "9")
       |> Yog.add_node(10, "10")
       # Add edges to form a spanning tree with some extras
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 3, with: 2)
-      |> Yog.add_edge(from: 3, to: 4, with: 3)
-      |> Yog.add_edge(from: 4, to: 5, with: 4)
-      |> Yog.add_edge(from: 5, to: 6, with: 5)
-      |> Yog.add_edge(from: 6, to: 7, with: 6)
-      |> Yog.add_edge(from: 7, to: 8, with: 7)
-      |> Yog.add_edge(from: 8, to: 9, with: 8)
-      |> Yog.add_edge(from: 9, to: 10, with: 9)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 2)
+      |> Yog.add_edge!(from: 3, to: 4, with: 3)
+      |> Yog.add_edge!(from: 4, to: 5, with: 4)
+      |> Yog.add_edge!(from: 5, to: 6, with: 5)
+      |> Yog.add_edge!(from: 6, to: 7, with: 6)
+      |> Yog.add_edge!(from: 7, to: 8, with: 7)
+      |> Yog.add_edge!(from: 8, to: 9, with: 8)
+      |> Yog.add_edge!(from: 9, to: 10, with: 9)
       # Add some cycle-creating edges with higher weights
-      |> Yog.add_edge(from: 1, to: 10, with: 100)
-      |> Yog.add_edge(from: 5, to: 10, with: 50)
+      |> Yog.add_edge!(from: 1, to: 10, with: 100)
+      |> Yog.add_edge!(from: 5, to: 10, with: 50)
 
     result = MST.kruskal(in: graph, compare: &compare/2)
 
@@ -415,8 +415,8 @@ defmodule YogMSTTest do
       Yog.undirected()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 1, with: 1)
-      |> Yog.add_edge(from: 1, to: 2, with: 2)
+      |> Yog.add_edge!(from: 1, to: 1, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 2)
 
     result = MST.kruskal(in: graph, compare: &compare/2)
 
@@ -427,5 +427,131 @@ defmodule YogMSTTest do
     [edge] = result
     assert edge.from == 1
     assert edge.to == 2
+  end
+
+  # ============= Prim's Algorithm Tests =============
+
+  test "prim_simple_triangle_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 2)
+      |> Yog.add_edge!(from: 1, to: 3, with: 3)
+
+    result = MST.prim(in: graph, compare: &compare/2)
+
+    assert length(result) == 2
+    total_weight = Enum.reduce(result, 0, fn e, acc -> acc + e.weight end)
+    assert total_weight == 3
+  end
+
+  test "prim_linear_chain_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_edge!(from: 1, to: 2, with: 5)
+      |> Yog.add_edge!(from: 2, to: 3, with: 10)
+
+    result = MST.prim(in: graph, compare: &compare/2)
+
+    assert length(result) == 2
+    total_weight = Enum.reduce(result, 0, fn e, acc -> acc + e.weight end)
+    assert total_weight == 15
+  end
+
+  test "prim_single_edge_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_edge!(from: 1, to: 2, with: 10)
+
+    result = MST.prim(in: graph, compare: &compare/2)
+
+    assert length(result) == 1
+    [edge] = result
+    # We don't guarantee direction but from/to must be 1 and 2
+    nodes = [edge.from, edge.to] |> Enum.sort()
+    assert nodes == [1, 2]
+    assert edge.weight == 10
+  end
+
+  test "prim_single_node_test" do
+    graph = Yog.undirected() |> Yog.add_node(1, "A")
+    result = MST.prim(in: graph, compare: &compare/2)
+    assert result == []
+  end
+
+  test "prim_empty_graph_test" do
+    graph = Yog.undirected()
+    result = MST.prim(in: graph, compare: &compare/2)
+    assert result == []
+  end
+
+  test "prim_square_with_diagonal_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_node(4, "D")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 4, with: 1)
+      |> Yog.add_edge!(from: 4, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      |> Yog.add_edge!(from: 1, to: 4, with: 5)
+      |> Yog.add_edge!(from: 2, to: 3, with: 5)
+
+    result = MST.prim(in: graph, compare: &compare/2)
+
+    assert length(result) == 3
+    total_weight = Enum.reduce(result, 0, fn e, acc -> acc + e.weight end)
+    assert total_weight == 3
+  end
+
+  test "prim_classic_kruskal_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_node(4, "D")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 2)
+      |> Yog.add_edge!(from: 3, to: 4, with: 3)
+      |> Yog.add_edge!(from: 1, to: 4, with: 4)
+      |> Yog.add_edge!(from: 2, to: 4, with: 5)
+
+    result = MST.prim(in: graph, compare: &compare/2)
+
+    assert length(result) == 3
+    total_weight = Enum.reduce(result, 0, fn e, acc -> acc + e.weight end)
+    assert total_weight == 6
+  end
+
+  test "prim_disconnected_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_node(4, "D")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 2)
+
+    # Prim's only spans a single component. If it's completely disconnected, it returns empty list
+    # or the tree for just one component, but our Elixir wrapper doesn't provide a starting node,
+    # it lets the Gleam impl pick the first node. In the Gleam test `prim_disconnected_test` is not defined
+    # but let's test behavior: it should return for the first component it builds
+    # Since map iteration order is not guaranteed, it might be 1->2 or 3->4
+    result = MST.prim(in: graph, compare: &compare/2)
+    assert length(result) == 1
+    edge = hd(result)
+    assert edge.weight in [1, 2]
   end
 end

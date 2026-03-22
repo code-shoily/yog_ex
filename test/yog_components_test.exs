@@ -1,6 +1,271 @@
 defmodule YogComponentsTest do
   use ExUnit.Case
 
+  # ============= Connectivity Analysis Tests (Bridges & Articulation Points) =============
+
+  test "connectivity_empty_graph_test" do
+    graph = Yog.undirected()
+    result = Yog.Connectivity.analyze(in: graph)
+
+    assert result.bridges == []
+    assert result.articulation_points == []
+  end
+
+  test "connectivity_single_node_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, "A")
+
+    result = Yog.Connectivity.analyze(in: graph)
+
+    assert result.bridges == []
+    assert result.articulation_points == []
+  end
+
+  test "connectivity_two_nodes_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+
+    result = Yog.Connectivity.analyze(in: graph)
+
+    # Single edge is a bridge
+    assert length(result.bridges) == 1
+    assert {1, 2} in result.bridges
+
+    # Neither node is an articulation point (only 2 nodes)
+    assert result.articulation_points == []
+  end
+
+  test "connectivity_linear_chain_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_node(4, "D")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+
+    result = Yog.Connectivity.analyze(in: graph)
+
+    # All edges are bridges in a linear chain
+    assert length(result.bridges) == 3
+    assert {1, 2} in result.bridges
+    assert {2, 3} in result.bridges
+    assert {3, 4} in result.bridges
+
+    # Middle nodes are articulation points
+    assert length(result.articulation_points) == 2
+    assert 2 in result.articulation_points
+    assert 3 in result.articulation_points
+  end
+
+  test "connectivity_triangle_no_bridges_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 1, with: 1)
+
+    result = Yog.Connectivity.analyze(in: graph)
+
+    # No bridges in a cycle (triangle)
+    assert result.bridges == []
+    # No articulation points in a triangle
+    assert result.articulation_points == []
+  end
+
+  test "connectivity_bridge_between_triangles_test" do
+    # Two triangles connected by a single edge (bridge)
+    #   1 - 2      4 - 5
+    #    \ /        \ /
+    #     3 -------- 6
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_node(4, "D")
+      |> Yog.add_node(5, "E")
+      |> Yog.add_node(6, "F")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      |> Yog.add_edge!(from: 4, to: 5, with: 1)
+      |> Yog.add_edge!(from: 5, to: 6, with: 1)
+      |> Yog.add_edge!(from: 6, to: 4, with: 1)
+      |> Yog.add_edge!(from: 3, to: 6, with: 1)
+
+    result = Yog.Connectivity.analyze(in: graph)
+
+    # Only the connecting edge is a bridge
+    assert length(result.bridges) == 1
+    assert {3, 6} in result.bridges
+
+    # The endpoints of the bridge are articulation points
+    assert length(result.articulation_points) == 2
+    assert 3 in result.articulation_points
+    assert 6 in result.articulation_points
+  end
+
+  test "connectivity_star_graph_test" do
+    # Star graph: node 1 connected to all others
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, "Center")
+      |> Yog.add_node(2, "A")
+      |> Yog.add_node(3, "B")
+      |> Yog.add_node(4, "C")
+      |> Yog.add_node(5, "D")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 3, with: 1)
+      |> Yog.add_edge!(from: 1, to: 4, with: 1)
+      |> Yog.add_edge!(from: 1, to: 5, with: 1)
+
+    result = Yog.Connectivity.analyze(in: graph)
+
+    # All edges are bridges in a star
+    assert length(result.bridges) == 4
+
+    # Only the center is an articulation point
+    assert length(result.articulation_points) == 1
+    assert 1 in result.articulation_points
+  end
+
+  test "connectivity_diamond_test" do
+    # Diamond shape: two paths from 1 to 4
+    #   1
+    #  / \
+    # 2   3
+    #  \ /
+    #   4
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, "Top")
+      |> Yog.add_node(2, "Left")
+      |> Yog.add_node(3, "Right")
+      |> Yog.add_node(4, "Bottom")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 3, with: 1)
+      |> Yog.add_edge!(from: 2, to: 4, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+
+    result = Yog.Connectivity.analyze(in: graph)
+
+    # No bridges (multiple paths between all pairs)
+    assert result.bridges == []
+    # No articulation points in a diamond
+    assert result.articulation_points == []
+  end
+
+  test "connectivity_complex_graph_test" do
+    # Complex graph with multiple bridges and articulation points
+    #     1 - 2 - 3
+    #         |   |
+    #         4 - 5 - 6
+    #             |
+    #             7 - 8
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_node(4, "D")
+      |> Yog.add_node(5, "E")
+      |> Yog.add_node(6, "F")
+      |> Yog.add_node(7, "G")
+      |> Yog.add_node(8, "H")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 2, to: 4, with: 1)
+      |> Yog.add_edge!(from: 3, to: 5, with: 1)
+      |> Yog.add_edge!(from: 4, to: 5, with: 1)
+      |> Yog.add_edge!(from: 5, to: 6, with: 1)
+      |> Yog.add_edge!(from: 5, to: 7, with: 1)
+      |> Yog.add_edge!(from: 7, to: 8, with: 1)
+
+    result = Yog.Connectivity.analyze(in: graph)
+
+    # Bridges: 1-2, 5-6, 5-7, 7-8
+    assert length(result.bridges) == 4
+    assert {1, 2} in result.bridges
+    assert {5, 6} in result.bridges
+    assert {5, 7} in result.bridges
+    assert {7, 8} in result.bridges
+
+    # Articulation points: 2, 5, 7
+    assert length(result.articulation_points) == 3
+    assert 2 in result.articulation_points
+    assert 5 in result.articulation_points
+    assert 7 in result.articulation_points
+  end
+
+  test "connectivity_disconnected_graph_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_node(4, "D")
+      |> Yog.add_node(5, "E")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      |> Yog.add_edge!(from: 4, to: 5, with: 1)
+
+    result = Yog.Connectivity.analyze(in: graph)
+
+    # All edges are bridges (within their components)
+    assert length(result.bridges) == 3
+
+    # Middle node of second component is articulation point
+    assert length(result.articulation_points) == 1
+    assert 4 in result.articulation_points
+  end
+
+  test "connectivity_complete_graph_test" do
+    # Complete graph K4 - no bridges or articulation points
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_node(4, "D")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 3, with: 1)
+      |> Yog.add_edge!(from: 1, to: 4, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 2, to: 4, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+
+    result = Yog.Connectivity.analyze(in: graph)
+
+    # No bridges in a complete graph
+    assert result.bridges == []
+    # No articulation points in a complete graph
+    assert result.articulation_points == []
+  end
+
+  test "connectivity_bridge_ordering_test" do
+    # Bridges should be stored in canonical order (lower ID first)
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(5, "A")
+      |> Yog.add_node(3, "B")
+      |> Yog.add_edge!(from: 5, to: 3, with: 1)
+
+    result = Yog.Connectivity.analyze(in: graph)
+
+    # Bridge should be {3, 5} (ordered)
+    assert result.bridges == [{3, 5}]
+  end
+
   # ============= Basic SCC Tests =============
 
   # Single node with no edges
@@ -9,7 +274,7 @@ defmodule YogComponentsTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -31,8 +296,8 @@ defmodule YogComponentsTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -47,9 +312,9 @@ defmodule YogComponentsTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
-      |> Yog.add_edge(from: 3, to: 1, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 1, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -68,7 +333,7 @@ defmodule YogComponentsTest do
     graph =
       Yog.directed()
       |> Yog.add_node(1, "A")
-      |> Yog.add_edge(from: 1, to: 1, with: 1)
+      |> Yog.add_edge!(from: 1, to: 1, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -82,8 +347,8 @@ defmodule YogComponentsTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 1, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 1, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -104,11 +369,11 @@ defmodule YogComponentsTest do
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
       # Cycle 1: 1->2->1
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 1, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 1, with: 1)
       # Cycle 2: 3->4->3
-      |> Yog.add_edge(from: 3, to: 4, with: 1)
-      |> Yog.add_edge(from: 4, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      |> Yog.add_edge!(from: 4, to: 3, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -128,11 +393,11 @@ defmodule YogComponentsTest do
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
       # Cycle: 1->2->3->1
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
-      |> Yog.add_edge(from: 3, to: 1, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 1, with: 1)
       # Non-cycle node: 4
-      |> Yog.add_edge(from: 3, to: 4, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -155,12 +420,12 @@ defmodule YogComponentsTest do
       |> Yog.add_node(3, "3")
       |> Yog.add_node(4, "4")
       |> Yog.add_node(5, "5")
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
-      |> Yog.add_edge(from: 3, to: 1, with: 1)
-      |> Yog.add_edge(from: 3, to: 4, with: 1)
-      |> Yog.add_edge(from: 4, to: 5, with: 1)
-      |> Yog.add_edge(from: 5, to: 4, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      |> Yog.add_edge!(from: 4, to: 5, with: 1)
+      |> Yog.add_edge!(from: 5, to: 4, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -179,11 +444,11 @@ defmodule YogComponentsTest do
       |> Yog.add_node(2, "Left")
       |> Yog.add_node(3, "Right")
       |> Yog.add_node(4, "Bottom")
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 1, to: 3, with: 1)
-      |> Yog.add_edge(from: 2, to: 4, with: 1)
-      |> Yog.add_edge(from: 3, to: 4, with: 1)
-      |> Yog.add_edge(from: 4, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 3, with: 1)
+      |> Yog.add_edge!(from: 2, to: 4, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      |> Yog.add_edge!(from: 4, to: 2, with: 1)
 
     # Cycle: 2->4->2
 
@@ -204,12 +469,12 @@ defmodule YogComponentsTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       # All edges in both directions
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 1, with: 1)
-      |> Yog.add_edge(from: 1, to: 3, with: 1)
-      |> Yog.add_edge(from: 3, to: 1, with: 1)
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
-      |> Yog.add_edge(from: 3, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 1, with: 1)
+      |> Yog.add_edge!(from: 1, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 2, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -233,18 +498,18 @@ defmodule YogComponentsTest do
       |> Yog.add_node(5, "5")
       |> Yog.add_node(6, "6")
       # Cycle 1: 1<->2
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 1, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 1, with: 1)
       # Connection: 2->3
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
       # Cycle 2: 3<->4
-      |> Yog.add_edge(from: 3, to: 4, with: 1)
-      |> Yog.add_edge(from: 4, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      |> Yog.add_edge!(from: 4, to: 3, with: 1)
       # Connection: 4->5
-      |> Yog.add_edge(from: 4, to: 5, with: 1)
+      |> Yog.add_edge!(from: 4, to: 5, with: 1)
       # Cycle 3: 5<->6
-      |> Yog.add_edge(from: 5, to: 6, with: 1)
-      |> Yog.add_edge(from: 6, to: 5, with: 1)
+      |> Yog.add_edge!(from: 5, to: 6, with: 1)
+      |> Yog.add_edge!(from: 6, to: 5, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -267,15 +532,15 @@ defmodule YogComponentsTest do
       |> Yog.add_node(6, "6")
       |> Yog.add_node(7, "7")
       # Large cycle: 1->2->3->4->1
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
-      |> Yog.add_edge(from: 3, to: 4, with: 1)
-      |> Yog.add_edge(from: 4, to: 1, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      |> Yog.add_edge!(from: 4, to: 1, with: 1)
       # Small cycle: 5<->6
-      |> Yog.add_edge(from: 5, to: 6, with: 1)
-      |> Yog.add_edge(from: 6, to: 5, with: 1)
+      |> Yog.add_edge!(from: 5, to: 6, with: 1)
+      |> Yog.add_edge!(from: 6, to: 5, with: 1)
       # Single node
-      |> Yog.add_edge(from: 7, to: 1, with: 1)
+      |> Yog.add_edge!(from: 7, to: 1, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -295,10 +560,10 @@ defmodule YogComponentsTest do
       |> Yog.add_node(3, "R")
       |> Yog.add_node(4, "LL")
       |> Yog.add_node(5, "LR")
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 1, to: 3, with: 1)
-      |> Yog.add_edge(from: 2, to: 4, with: 1)
-      |> Yog.add_edge(from: 2, to: 5, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 3, with: 1)
+      |> Yog.add_edge!(from: 2, to: 4, with: 1)
+      |> Yog.add_edge!(from: 2, to: 5, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -318,9 +583,9 @@ defmodule YogComponentsTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 1, with: 1)
-      |> Yog.add_edge(from: 2, to: 2, with: 1)
-      |> Yog.add_edge(from: 3, to: 3, with: 1)
+      |> Yog.add_edge!(from: 1, to: 1, with: 1)
+      |> Yog.add_edge!(from: 2, to: 2, with: 1)
+      |> Yog.add_edge!(from: 3, to: 3, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -343,14 +608,14 @@ defmodule YogComponentsTest do
       |> Yog.add_node(7, "7")
       |> Yog.add_node(8, "8")
       # Cycle: 1->2->3->4->5->6->7->8->1
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
-      |> Yog.add_edge(from: 3, to: 4, with: 1)
-      |> Yog.add_edge(from: 4, to: 5, with: 1)
-      |> Yog.add_edge(from: 5, to: 6, with: 1)
-      |> Yog.add_edge(from: 6, to: 7, with: 1)
-      |> Yog.add_edge(from: 7, to: 8, with: 1)
-      |> Yog.add_edge(from: 8, to: 1, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      |> Yog.add_edge!(from: 4, to: 5, with: 1)
+      |> Yog.add_edge!(from: 5, to: 6, with: 1)
+      |> Yog.add_edge!(from: 6, to: 7, with: 1)
+      |> Yog.add_edge!(from: 7, to: 8, with: 1)
+      |> Yog.add_edge!(from: 8, to: 1, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -371,14 +636,14 @@ defmodule YogComponentsTest do
       |> Yog.add_node(4, "4")
       |> Yog.add_node(5, "5")
       # Outer cycle: 1->2->3->4->5->1
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
-      |> Yog.add_edge(from: 3, to: 4, with: 1)
-      |> Yog.add_edge(from: 4, to: 5, with: 1)
-      |> Yog.add_edge(from: 5, to: 1, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      |> Yog.add_edge!(from: 4, to: 5, with: 1)
+      |> Yog.add_edge!(from: 5, to: 1, with: 1)
       # Inner shortcuts
-      |> Yog.add_edge(from: 2, to: 4, with: 1)
-      |> Yog.add_edge(from: 3, to: 5, with: 1)
+      |> Yog.add_edge!(from: 2, to: 4, with: 1)
+      |> Yog.add_edge!(from: 3, to: 5, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -401,13 +666,13 @@ defmodule YogComponentsTest do
       |> Yog.add_node(4, "B2")
       |> Yog.add_node(5, "C1")
       # Subgraph A: 1<->2
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 1, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 1, with: 1)
       # Subgraph B: 3<->4
-      |> Yog.add_edge(from: 3, to: 4, with: 1)
-      |> Yog.add_edge(from: 4, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      |> Yog.add_edge!(from: 4, to: 3, with: 1)
       # Subgraph C: 5 (isolated with self-loop)
-      |> Yog.add_edge(from: 5, to: 5, with: 1)
+      |> Yog.add_edge!(from: 5, to: 5, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -430,14 +695,14 @@ defmodule YogComponentsTest do
       |> Yog.add_node(4, "funcC")
       |> Yog.add_node(5, "helper")
       # main calls funcA
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
       # Mutual recursion: funcA <-> funcB
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
-      |> Yog.add_edge(from: 3, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 2, with: 1)
       # funcB calls funcC
-      |> Yog.add_edge(from: 3, to: 4, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
       # funcC calls helper
-      |> Yog.add_edge(from: 4, to: 5, with: 1)
+      |> Yog.add_edge!(from: 4, to: 5, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -458,18 +723,18 @@ defmodule YogComponentsTest do
       |> Yog.add_node(4, "blog")
       |> Yog.add_node(5, "archive")
       # index links to everything
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 1, to: 3, with: 1)
-      |> Yog.add_edge(from: 1, to: 4, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 3, with: 1)
+      |> Yog.add_edge!(from: 1, to: 4, with: 1)
       # about and contact link to each other
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
-      |> Yog.add_edge(from: 3, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 2, with: 1)
       # blog and archive link to each other
-      |> Yog.add_edge(from: 4, to: 5, with: 1)
-      |> Yog.add_edge(from: 5, to: 4, with: 1)
+      |> Yog.add_edge!(from: 4, to: 5, with: 1)
+      |> Yog.add_edge!(from: 5, to: 4, with: 1)
       # Everything links back to index
-      |> Yog.add_edge(from: 2, to: 1, with: 1)
-      |> Yog.add_edge(from: 4, to: 1, with: 1)
+      |> Yog.add_edge!(from: 2, to: 1, with: 1)
+      |> Yog.add_edge!(from: 4, to: 1, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -492,11 +757,11 @@ defmodule YogComponentsTest do
       |> Yog.add_node(3, "libB")
       |> Yog.add_node(4, "core")
       # app depends on libA and libB
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 1, to: 3, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 3, with: 1)
       # Both libs depend on core
-      |> Yog.add_edge(from: 2, to: 4, with: 1)
-      |> Yog.add_edge(from: 3, to: 4, with: 1)
+      |> Yog.add_edge!(from: 2, to: 4, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
 
     result = Yog.Components.scc(graph)
 
@@ -504,5 +769,101 @@ defmodule YogComponentsTest do
     assert length(result) == 4
 
     assert Enum.all?(result, fn comp -> length(comp) == 1 end)
+  end
+
+  # ============= Kosaraju's Algorithm Tests =============
+
+  test "kosaraju_single_node_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+
+    result = Yog.Components.kosaraju(graph)
+    assert length(result) == 2
+  end
+
+  test "kosaraju_empty_graph_test" do
+    graph = Yog.directed()
+    result = Yog.Components.kosaraju(graph)
+    assert result == []
+  end
+
+  test "kosaraju_simple_cycle_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 1, with: 1)
+
+    result = Yog.Components.kosaraju(graph)
+    assert length(result) == 1
+    [comp] = result
+    assert Enum.sort(comp) == [1, 2, 3]
+  end
+
+  test "kosaraju_two_separate_cycles_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_node(4, "D")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 1, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      |> Yog.add_edge!(from: 4, to: 3, with: 1)
+
+    result = Yog.Components.kosaraju(graph)
+    assert length(result) == 2
+    assert Enum.all?(result, fn comp -> length(comp) == 2 end)
+  end
+
+  test "kosaraju_classic_example_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "1")
+      |> Yog.add_node(2, "2")
+      |> Yog.add_node(3, "3")
+      |> Yog.add_node(4, "4")
+      |> Yog.add_node(5, "5")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      |> Yog.add_edge!(from: 4, to: 5, with: 1)
+      |> Yog.add_edge!(from: 5, to: 4, with: 1)
+
+    result = Yog.Components.kosaraju(graph)
+    assert length(result) == 2
+    sizes = result |> Enum.map(&length/1) |> Enum.sort()
+    assert sizes == [2, 3]
+  end
+
+  test "kosaraju_chain_of_cycles_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "1")
+      |> Yog.add_node(2, "2")
+      |> Yog.add_node(3, "3")
+      |> Yog.add_node(4, "4")
+      |> Yog.add_node(5, "5")
+      |> Yog.add_node(6, "6")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 1, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      |> Yog.add_edge!(from: 4, to: 3, with: 1)
+      |> Yog.add_edge!(from: 4, to: 5, with: 1)
+      |> Yog.add_edge!(from: 5, to: 6, with: 1)
+      |> Yog.add_edge!(from: 6, to: 5, with: 1)
+
+    result = Yog.Components.kosaraju(graph)
+    assert length(result) == 3
+    assert Enum.all?(result, fn comp -> length(comp) == 2 end)
   end
 end

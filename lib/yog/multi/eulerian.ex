@@ -1,0 +1,257 @@
+defmodule Yog.Multi.Eulerian do
+  @moduledoc """
+  Eulerian path and circuit detection for multigraphs.
+
+  An Eulerian path is a walk that traverses every edge exactly once.
+  An Eulerian circuit is an Eulerian path that starts and ends at the same node.
+
+  This module provides Hierholzer's algorithm adapted for multigraphs.
+  """
+
+  alias Yog.Multi.Model
+
+  @doc """
+  Returns `true` if the multigraph has an Eulerian circuit.
+
+  A closed walk that traverses every edge exactly once.
+
+  Conditions:
+  - **Undirected:** all nodes have even degree and the graph is connected
+  - **Directed:** every node has equal in-degree and out-degree and the
+    graph is (weakly) connected
+
+  ## Time Complexity
+
+  O(V + E)
+
+  ## Examples
+
+      if Yog.Multi.Eulerian.has_eulerian_circuit?(multi) do
+        circuit = Yog.Multi.Eulerian.find_eulerian_circuit(multi)
+      end
+  """
+  @spec has_eulerian_circuit?(Model.t()) :: boolean()
+  def has_eulerian_circuit?(graph) do
+    cond do
+      map_size(graph.nodes) == 0 ->
+        false
+
+      graph.kind == :undirected ->
+        all_even_degree?(graph) and connected?(graph)
+
+      graph.kind == :directed ->
+        all_balanced_degree?(graph) and connected?(graph)
+    end
+  end
+
+  @doc """
+  Returns `true` if the multigraph has an Eulerian path.
+
+  An open walk that traverses every edge exactly once.
+
+  Conditions:
+  - **Undirected:** exactly 0 or 2 nodes have odd degree and the graph is connected
+  - **Directed:** at most one node with (out − in = 1), at most one with
+    (in − out = 1), all others balanced; graph must be connected
+
+  ## Time Complexity
+
+  O(V + E)
+  """
+  @spec has_eulerian_path?(Model.t()) :: boolean()
+  def has_eulerian_path?(graph) do
+    cond do
+      map_size(graph.nodes) == 0 ->
+        false
+
+      graph.kind == :undirected ->
+        odd_count =
+          graph.nodes
+          |> Map.keys()
+          |> Enum.filter(fn n -> rem(Model.out_degree(graph, n), 2) == 1 end)
+          |> length()
+
+        (odd_count == 0 or odd_count == 2) and connected?(graph)
+
+      graph.kind == :directed ->
+        {starts, ends, balanced} =
+          graph.nodes
+          |> Map.keys()
+          |> Enum.reduce({0, 0, true}, fn n, {s, e, ok} ->
+            diff = Model.out_degree(graph, n) - Model.in_degree(graph, n)
+
+            case diff do
+              1 -> {s + 1, e, ok}
+              -1 -> {s, e + 1, ok}
+              0 -> {s, e, ok}
+              _ -> {s, e, false}
+            end
+          end)
+
+        balanced and
+          ((starts == 0 and ends == 0) or (starts == 1 and ends == 1)) and
+          connected?(graph)
+    end
+  end
+
+  @doc """
+  Finds an Eulerian circuit using Hierholzer's algorithm adapted for multigraphs.
+
+  Returns the circuit as a list of `EdgeId`s, or `:none` if no circuit exists.
+
+  ## Time Complexity
+
+  O(E)
+
+  ## Examples
+
+      case Yog.Multi.Eulerian.find_eulerian_circuit(multi) do
+        {:some, edge_ids} -> traverse_circuit(edge_ids)
+        :none -> :no_circuit
+      end
+  """
+  @spec find_eulerian_circuit(Model.t()) :: {:some, [Model.edge_id()]} | :none
+  def find_eulerian_circuit(graph) do
+    if has_eulerian_circuit?(graph) do
+      case Model.all_nodes(graph) |> List.first() do
+        nil -> :none
+        start -> run_hierholzer(graph, start)
+      end
+    else
+      :none
+    end
+  end
+
+  @doc """
+  Finds an Eulerian path using Hierholzer's algorithm adapted for multigraphs.
+
+  Returns the path as a list of `EdgeId`s, or `:none` if no path exists.
+
+  ## Time Complexity
+
+  O(E)
+
+  ## Examples
+
+      case Yog.Multi.Eulerian.find_eulerian_path(multi) do
+        {:some, edge_ids} -> traverse_path(edge_ids)
+        :none -> :no_path
+      end
+  """
+  @spec find_eulerian_path(Model.t()) :: {:some, [Model.edge_id()]} | :none
+  def find_eulerian_path(graph) do
+    if has_eulerian_path?(graph) do
+      case find_path_start(graph) do
+        nil -> :none
+        start -> run_hierholzer(graph, start)
+      end
+    else
+      :none
+    end
+  end
+
+  # ============================================================
+  # Private Helpers
+  # ============================================================
+
+  defp all_even_degree?(graph) do
+    graph.nodes
+    |> Map.keys()
+    |> Enum.all?(fn n -> rem(Model.out_degree(graph, n), 2) == 0 end)
+  end
+
+  defp all_balanced_degree?(graph) do
+    graph.nodes
+    |> Map.keys()
+    |> Enum.all?(fn n ->
+      Model.in_degree(graph, n) == Model.out_degree(graph, n)
+    end)
+  end
+
+  defp connected?(graph) do
+    nodes = Map.keys(graph.nodes)
+
+    if nodes == [] do
+      true
+    else
+      source = hd(nodes)
+      visited = bfs_visited(graph, source)
+
+      # All nodes should be reachable
+      Enum.all?(nodes, fn n -> n in visited end)
+    end
+  end
+
+  defp bfs_visited(graph, source) do
+    do_bfs_visited(graph, [source], MapSet.new([source]))
+  end
+
+  defp do_bfs_visited(_graph, [], visited), do: MapSet.to_list(visited)
+
+  defp do_bfs_visited(graph, [current | rest], visited) do
+    neighbors =
+      Model.successors(graph, current)
+      |> Enum.map(fn {n, _, _} -> n end)
+      |> Enum.filter(fn n -> not MapSet.member?(visited, n) end)
+
+    new_visited =
+      Enum.reduce(neighbors, visited, fn n, acc -> MapSet.put(acc, n) end)
+
+    do_bfs_visited(graph, rest ++ neighbors, new_visited)
+  end
+
+  defp find_path_start(graph) do
+    cond do
+      graph.kind == :undirected ->
+        # Start at any node with odd degree, or any node if all even
+        case Enum.find(Model.all_nodes(graph), fn n ->
+               rem(Model.out_degree(graph, n), 2) == 1
+             end) do
+          nil -> List.first(Model.all_nodes(graph))
+          node -> node
+        end
+
+      graph.kind == :directed ->
+        # Start at node with out_degree = in_degree + 1, or any balanced node
+        case Enum.find(Model.all_nodes(graph), fn n ->
+               Model.out_degree(graph, n) == Model.in_degree(graph, n) + 1
+             end) do
+          nil -> List.first(Model.all_nodes(graph))
+          node -> node
+        end
+    end
+  end
+
+  defp run_hierholzer(graph, start) do
+    all_ids = Model.all_edge_ids(graph) |> MapSet.new()
+    {_, path} = do_hierholzer(graph, start, all_ids, [])
+
+    if path == [] do
+      :none
+    else
+      {:some, path}
+    end
+  end
+
+  defp do_hierholzer(graph, current, available, path) do
+    case pick_edge(graph, current, available) do
+      nil ->
+        {available, path}
+
+      {next_node, eid} ->
+        available2 = MapSet.delete(available, eid)
+        {av3, built} = do_hierholzer(graph, next_node, available2, path)
+        {av3, [eid | built]}
+    end
+  end
+
+  defp pick_edge(graph, current, available) do
+    graph
+    |> Model.successors(current)
+    |> Enum.find(fn {_, eid, _} -> MapSet.member?(available, eid) end)
+    |> case do
+      nil -> nil
+      {next, eid, _} -> {next, eid}
+    end
+  end
+end

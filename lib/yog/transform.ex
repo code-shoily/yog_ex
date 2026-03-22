@@ -156,4 +156,74 @@ defmodule Yog.Transform do
   """
   @spec subgraph(Yog.graph(), [Yog.node_id()]) :: Yog.graph()
   defdelegate subgraph(graph, keeping), to: :yog@transform
+
+  @doc """
+  Filters edges by a predicate, preserving all nodes.
+
+  The predicate receives `(src, dst, weight)` and returns `true` to keep.
+
+  ## Examples
+
+      # Keep only edges with weight >= 10
+      heavy = Yog.Transform.filter_edges(graph, fn _src, _dst, w -> w >= 10 end)
+
+      # Remove self-loops
+      no_loops = Yog.Transform.filter_edges(graph, fn s, d, _w -> s != d end)
+  """
+  @spec filter_edges(Yog.graph(), (Yog.node_id(), Yog.node_id(), term() -> boolean())) ::
+          Yog.graph()
+  defdelegate filter_edges(graph, predicate), to: :yog@transform
+
+  @doc """
+  Creates the complement of a graph.
+
+  Connects all non-adjacent node pairs, removes existing edges.
+  Self-loops are never added.
+
+  ## Examples
+
+      comp = Yog.Transform.complement(graph, 1)
+      # Non-connected pairs now connected with weight 1
+  """
+  @spec complement(Yog.graph(), term()) :: Yog.graph()
+  defdelegate complement(graph, default_weight), to: :yog@transform
+
+  @doc """
+  Converts an undirected graph to directed. O(1) — just a flag change.
+
+  Already-directed graphs are returned unchanged.
+  """
+  @spec to_directed(Yog.graph()) :: Yog.graph()
+  defdelegate to_directed(graph), to: :yog@transform
+
+  @doc """
+  Converts a directed graph to undirected by mirroring edges.
+
+  The `resolve` function handles conflicting weights when both A→B and B→A exist.
+
+  ## Examples
+
+      undirected = Yog.Transform.to_undirected(graph, &min/2)
+  """
+  @spec to_undirected(Yog.graph(), (term(), term() -> term())) :: Yog.graph()
+  defdelegate to_undirected(graph, resolve), to: :yog@transform
+
+  @doc """
+  Contracts an edge by merging node `b` into node `a`.
+
+  All of `b`'s edges are redirected to `a`, with conflicting edge weights
+  combined using `combine_weight`. Self-loops are removed. Node `b`'s data is lost.
+
+  ## Examples
+
+      contracted = Yog.Transform.contract(graph, 1, 2, &Kernel.+/2)
+      # Node 2 merged into node 1
+  """
+  @spec contract(
+          Yog.graph(),
+          Yog.node_id(),
+          Yog.node_id(),
+          (term(), term() -> term())
+        ) :: Yog.graph()
+  defdelegate contract(graph, a, b, combine_weight), to: :yog@transform
 end

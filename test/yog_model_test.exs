@@ -11,8 +11,8 @@ defmodule YogModelTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.Model.add_edge(1, 2, 10)
-      |> Yog.Model.add_edge_with_combine(1, 2, 5, &Kernel.+/2)
+      |> Yog.Model.add_edge!(1, 2, 10)
+      |> Yog.Model.add_edge_with_combine!(1, 2, 5, &Kernel.+/2)
 
     # Edge weight should be 10 + 5 = 15
     assert Yog.successors(graph, 1) == [{2, 15}]
@@ -23,8 +23,8 @@ defmodule YogModelTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.Model.add_edge(1, 2, 10)
-      |> Yog.Model.add_edge_with_combine(1, 2, 25, &max/2)
+      |> Yog.Model.add_edge!(1, 2, 10)
+      |> Yog.Model.add_edge_with_combine!(1, 2, 25, &max/2)
 
     # Edge weight should be max(10, 25) = 25
     assert Yog.successors(graph, 1) == [{2, 25}]
@@ -35,8 +35,8 @@ defmodule YogModelTest do
       Yog.undirected()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.Model.add_edge(1, 2, 10)
-      |> Yog.Model.add_edge_with_combine(1, 2, 5, &Kernel.+/2)
+      |> Yog.Model.add_edge!(1, 2, 10)
+      |> Yog.Model.add_edge_with_combine!(1, 2, 5, &Kernel.+/2)
 
     # Both directions should have combined weight
     assert Yog.successors(graph, 1) == [{2, 15}]
@@ -66,8 +66,8 @@ defmodule YogModelTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, with: 10)
-      |> Yog.add_edge(from: 2, to: 3, with: 20)
+      |> Yog.add_edge!(from: 1, to: 2, with: 10)
+      |> Yog.add_edge!(from: 2, to: 3, with: 20)
       |> Yog.Model.remove_node(2)
 
     # Node 2 removed
@@ -86,8 +86,8 @@ defmodule YogModelTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, with: 10)
-      |> Yog.add_edge(from: 2, to: 3, with: 20)
+      |> Yog.add_edge!(from: 1, to: 2, with: 10)
+      |> Yog.add_edge!(from: 2, to: 3, with: 20)
       |> Yog.Model.remove_node(2)
 
     # Both directions should be cleaned up
@@ -120,7 +120,7 @@ defmodule YogModelTest do
 
     assert Yog.Model.order(graph) == 2
 
-    graph = Yog.add_edge(graph, from: 1, to: 2, with: 10)
+    graph = Yog.add_edge!(graph, from: 1, to: 2, with: 10)
     assert Yog.Model.order(graph) == 2
   end
 
@@ -146,11 +146,11 @@ defmodule YogModelTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge(from: 1, to: 2, with: 1.0)
-      |> Yog.add_edge(from: 1, to: 3, with: 2.0)
-      |> Yog.add_edge(from: 2, to: 3, with: 1.5)
-      |> Yog.add_edge(from: 3, to: 4, with: 3.0)
-      |> Yog.add_edge(from: 2, to: 4, with: 2.5)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1.0)
+      |> Yog.add_edge!(from: 1, to: 3, with: 2.0)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1.5)
+      |> Yog.add_edge!(from: 3, to: 4, with: 3.0)
+      |> Yog.add_edge!(from: 2, to: 4, with: 2.5)
 
     # Verify structure through public API
     assert length(Yog.all_nodes(graph)) == 4
@@ -164,7 +164,7 @@ defmodule YogModelTest do
     graph =
       Yog.directed()
       |> Yog.add_node(1, "Node A")
-      |> Yog.add_edge(from: 1, to: 1, with: 5)
+      |> Yog.add_edge!(from: 1, to: 1, with: 5)
 
     # Node should point to itself
     assert Yog.successors(graph, 1) == [{1, 5}]
@@ -176,7 +176,7 @@ defmodule YogModelTest do
       Yog.directed()
       |> Yog.add_node(1, 100)
       |> Yog.add_node(2, 200)
-      |> Yog.add_edge(from: 1, to: 2, with: "labeled_edge")
+      |> Yog.add_edge!(from: 1, to: 2, with: "labeled_edge")
 
     assert Yog.successors(graph, 1) == [{2, "labeled_edge"}]
   end
@@ -189,8 +189,8 @@ defmodule YogModelTest do
       |> Yog.add_node(1, "Node A")
       |> Yog.add_node(2, "Node B")
       |> Yog.add_node(3, "Node C")
-      |> Yog.add_edge(from: 1, to: 2, with: 10)
-      |> Yog.add_edge(from: 1, to: 3, with: 20)
+      |> Yog.add_edge!(from: 1, to: 2, with: 10)
+      |> Yog.add_edge!(from: 1, to: 3, with: 20)
 
     neighbors = Yog.neighbors(graph, 1)
     successors = Yog.successors(graph, 1)
@@ -205,8 +205,8 @@ defmodule YogModelTest do
       |> Yog.add_node(1, "Node A")
       |> Yog.add_node(2, "Node B")
       |> Yog.add_node(3, "Node C")
-      |> Yog.add_edge(from: 1, to: 2, with: 10)
-      |> Yog.add_edge(from: 1, to: 3, with: 20)
+      |> Yog.add_edge!(from: 1, to: 2, with: 10)
+      |> Yog.add_edge!(from: 1, to: 3, with: 20)
 
     neighbors = Yog.neighbors(graph, 1)
     assert length(neighbors) == 2
@@ -220,8 +220,8 @@ defmodule YogModelTest do
       |> Yog.add_node(1, "Node A")
       |> Yog.add_node(2, "Node B")
       |> Yog.add_node(3, "Node C")
-      |> Yog.add_edge(from: 2, to: 1, with: 10)
-      |> Yog.add_edge(from: 3, to: 1, with: 20)
+      |> Yog.add_edge!(from: 2, to: 1, with: 10)
+      |> Yog.add_edge!(from: 3, to: 1, with: 20)
 
     neighbors = Yog.neighbors(graph, 1)
     assert length(neighbors) == 2
@@ -236,9 +236,9 @@ defmodule YogModelTest do
       |> Yog.add_node(2, "Node B")
       |> Yog.add_node(3, "Node C")
       |> Yog.add_node(4, "Node D")
-      |> Yog.add_edge(from: 1, to: 2, with: 10)
-      |> Yog.add_edge(from: 1, to: 3, with: 20)
-      |> Yog.add_edge(from: 4, to: 1, with: 30)
+      |> Yog.add_edge!(from: 1, to: 2, with: 10)
+      |> Yog.add_edge!(from: 1, to: 3, with: 20)
+      |> Yog.add_edge!(from: 4, to: 1, with: 30)
 
     neighbors = Yog.neighbors(graph, 1)
     assert length(neighbors) == 3
@@ -252,8 +252,8 @@ defmodule YogModelTest do
       Yog.directed()
       |> Yog.add_node(1, "Node A")
       |> Yog.add_node(2, "Node B")
-      |> Yog.add_edge(from: 1, to: 2, with: 10)
-      |> Yog.add_edge(from: 2, to: 1, with: 20)
+      |> Yog.add_edge!(from: 1, to: 2, with: 10)
+      |> Yog.add_edge!(from: 2, to: 1, with: 20)
 
     neighbors = Yog.neighbors(graph, 1)
     # Should only include each neighbor once
@@ -277,8 +277,8 @@ defmodule YogModelTest do
       |> Yog.add_node(1, "Node A")
       |> Yog.add_node(2, "Node B")
       |> Yog.add_node(3, "Node C")
-      |> Yog.add_edge(from: 1, to: 2, with: 100)
-      |> Yog.add_edge(from: 1, to: 3, with: 200)
+      |> Yog.add_edge!(from: 1, to: 2, with: 100)
+      |> Yog.add_edge!(from: 1, to: 3, with: 200)
 
     successor_ids = Yog.successor_ids(graph, 1)
     successors = Yog.successors(graph, 1) |> Enum.map(&elem(&1, 0))
@@ -290,8 +290,36 @@ defmodule YogModelTest do
     graph =
       Yog.directed()
       |> Yog.add_node(1, "Node A")
-      |> Yog.add_edge(from: 1, to: 1, with: 5)
+      |> Yog.add_edge!(from: 1, to: 1, with: 5)
 
     assert Yog.successor_ids(graph, 1) == [1]
+  end
+
+  # ============= Coverage Test for All Delegates =============
+
+  test "all_model_delegates_test" do
+    # explicitly call all Yog.Model delegates to ensure mix coveralls picks them up
+    graph = Yog.Model.new(:directed)
+    graph = Yog.Model.add_node(graph, 1, "A")
+    graph = Yog.Model.add_node(graph, 2, "B")
+    graph = Yog.Model.add_edge!(graph, 1, 2, 10)
+    graph = Yog.Model.add_edge_ensured(graph, 2, 3, 5, "C")
+
+    assert Yog.Model.order(graph) == 3
+    assert length(Yog.Model.all_nodes(graph)) == 3
+    assert Yog.Model.successors(graph, 1) == [{2, 10}]
+    assert Yog.Model.successor_ids(graph, 1) == [2]
+    assert Yog.Model.predecessors(graph, 2) == [{1, 10}]
+    assert length(Yog.Model.neighbors(graph, 2)) == 2
+
+    graph = Yog.Model.add_edge_with_combine!(graph, 1, 2, 5, &Kernel.+/2)
+    assert Yog.Model.successors(graph, 1) == [{2, 15}]
+
+    graph = Yog.Model.remove_node(graph, 2)
+    assert Yog.Model.order(graph) == 2
+
+    assert Yog.Model.type(graph) == :directed
+    assert is_map(Yog.Model.nodes(graph))
+    assert Yog.Model.node(graph, 1) == "A"
   end
 end

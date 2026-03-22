@@ -1,7 +1,7 @@
 defmodule YogEx.MixProject do
   use Mix.Project
 
-  @version "1.1.0"
+  @version "5.1.0"
   @source_url "https://github.com/code-shoily/yog_ex"
 
   def project do
@@ -19,7 +19,22 @@ defmodule YogEx.MixProject do
       # Docs
       name: "YogEx",
       source_url: @source_url,
-      docs: docs()
+      docs: docs(),
+
+      # Test Coverage
+      test_coverage: [tool: ExCoveralls]
+    ]
+  end
+
+  def cli do
+    [
+      preferred_envs: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test,
+        "coveralls.github": :test
+      ]
     ]
   end
 
@@ -29,9 +44,10 @@ defmodule YogEx.MixProject do
 
   defp deps do
     [
-      {:yog, ">= 1.3.0", manager: :rebar3},
+      {:yog, ">= 5.0.0", manager: :rebar3},
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
-      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:excoveralls, "~> 0.18", only: :test}
     ]
   end
 

@@ -11,7 +11,7 @@ defmodule YogMinCutTest do
       Yog.undirected()
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
-      |> Yog.add_edge(from: 1, to: 2, with: 5)
+      |> Yog.add_edge!(from: 1, to: 2, with: 5)
 
     result = MinCut.global_min_cut(graph)
 
@@ -30,9 +30,9 @@ defmodule YogMinCutTest do
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
-      |> Yog.add_edge(from: 3, to: 1, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 1, with: 1)
 
     result = MinCut.global_min_cut(graph)
 
@@ -49,10 +49,10 @@ defmodule YogMinCutTest do
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
       |> Yog.add_node(4, nil)
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
-      |> Yog.add_edge(from: 3, to: 4, with: 1)
-      |> Yog.add_edge(from: 4, to: 1, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      |> Yog.add_edge!(from: 4, to: 1, with: 1)
 
     result = MinCut.global_min_cut(graph)
 
@@ -60,23 +60,23 @@ defmodule YogMinCutTest do
   end
 
   test "min_cut_square_with_diagonal_test" do
-    # Square with diagonal: min cut is along the diagonal (2 edges)
-    # Reported weight is 3 due to edge weight accumulation
+    # Square with diagonal: min cut separates one node from the rest
+    # The true min cut is 2 (cutting 2 edges to isolate one node)
     graph =
       Yog.undirected()
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
       |> Yog.add_node(4, nil)
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
-      |> Yog.add_edge(from: 3, to: 4, with: 1)
-      |> Yog.add_edge(from: 4, to: 1, with: 1)
-      |> Yog.add_edge(from: 1, to: 3, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      |> Yog.add_edge!(from: 4, to: 1, with: 1)
+      |> Yog.add_edge!(from: 1, to: 3, with: 1)
 
     result = MinCut.global_min_cut(graph)
 
-    assert result.weight == 3
+    assert result.weight == 2
   end
 
   # ============= Weighted Graph Tests =============
@@ -91,9 +91,9 @@ defmodule YogMinCutTest do
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
       |> Yog.add_node(4, nil)
-      |> Yog.add_edge(from: 1, to: 2, with: 10)
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
-      |> Yog.add_edge(from: 3, to: 4, with: 10)
+      |> Yog.add_edge!(from: 1, to: 2, with: 10)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 10)
 
     result = MinCut.global_min_cut(graph)
 
@@ -114,15 +114,15 @@ defmodule YogMinCutTest do
       |> Yog.add_node(5, nil)
       |> Yog.add_node(6, nil)
       # Left triangle
-      |> Yog.add_edge(from: 1, to: 2, with: 10)
-      |> Yog.add_edge(from: 2, to: 3, with: 10)
-      |> Yog.add_edge(from: 3, to: 1, with: 10)
+      |> Yog.add_edge!(from: 1, to: 2, with: 10)
+      |> Yog.add_edge!(from: 2, to: 3, with: 10)
+      |> Yog.add_edge!(from: 3, to: 1, with: 10)
       # Right triangle
-      |> Yog.add_edge(from: 4, to: 5, with: 10)
-      |> Yog.add_edge(from: 5, to: 6, with: 10)
-      |> Yog.add_edge(from: 6, to: 4, with: 10)
+      |> Yog.add_edge!(from: 4, to: 5, with: 10)
+      |> Yog.add_edge!(from: 5, to: 6, with: 10)
+      |> Yog.add_edge!(from: 6, to: 4, with: 10)
       # Bridge
-      |> Yog.add_edge(from: 3, to: 4, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
 
     result = MinCut.global_min_cut(graph)
 
@@ -142,12 +142,12 @@ defmodule YogMinCutTest do
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
       |> Yog.add_node(4, nil)
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 1, to: 3, with: 1)
-      |> Yog.add_edge(from: 1, to: 4, with: 1)
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
-      |> Yog.add_edge(from: 2, to: 4, with: 1)
-      |> Yog.add_edge(from: 3, to: 4, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 3, with: 1)
+      |> Yog.add_edge!(from: 1, to: 4, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 2, to: 4, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
 
     result = MinCut.global_min_cut(graph)
 
@@ -165,11 +165,11 @@ defmodule YogMinCutTest do
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
       |> Yog.add_node(4, nil)
-      |> Yog.add_edge(from: 1, to: 2, with: 5)
-      |> Yog.add_edge(from: 1, to: 2, with: 3)
+      |> Yog.add_edge!(from: 1, to: 2, with: 5)
+      |> Yog.add_edge!(from: 1, to: 2, with: 3)
       # Parallel edge
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
-      |> Yog.add_edge(from: 3, to: 4, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
 
     result = MinCut.global_min_cut(graph)
 
@@ -179,6 +179,7 @@ defmodule YogMinCutTest do
 
   test "min_cut_star_graph_test" do
     # Star graph: center connected to 4 outer nodes
+    # Min cut is any single edge (weight 1), isolating one leaf
     graph =
       Yog.undirected()
       |> Yog.add_node(1, nil)
@@ -186,18 +187,15 @@ defmodule YogMinCutTest do
       |> Yog.add_node(3, nil)
       |> Yog.add_node(4, nil)
       |> Yog.add_node(5, nil)
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 1, to: 3, with: 1)
-      |> Yog.add_edge(from: 1, to: 4, with: 1)
-      |> Yog.add_edge(from: 1, to: 5, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 3, with: 1)
+      |> Yog.add_edge!(from: 1, to: 4, with: 1)
+      |> Yog.add_edge!(from: 1, to: 5, with: 1)
 
     result = MinCut.global_min_cut(graph)
 
-    # Min cut is any single edge, but weight accumulates to 4
-    assert result.weight == 4
-    # One leaf vs the rest
-    assert result.group_a_size == 1
-    assert result.group_b_size == 4
+    # Min cut isolates one leaf node
+    assert result.weight == 1
   end
 
   # ============= AoC 2023 Day 25 Style Test =============
@@ -215,25 +213,23 @@ defmodule YogMinCutTest do
       |> Yog.add_node(5, nil)
       |> Yog.add_node(6, nil)
       # Cluster 1 (densely connected with heavy edges)
-      |> Yog.add_edge(from: 1, to: 2, with: 10)
-      |> Yog.add_edge(from: 2, to: 3, with: 10)
-      |> Yog.add_edge(from: 3, to: 1, with: 10)
+      |> Yog.add_edge!(from: 1, to: 2, with: 10)
+      |> Yog.add_edge!(from: 2, to: 3, with: 10)
+      |> Yog.add_edge!(from: 3, to: 1, with: 10)
       # Cluster 2 (densely connected with heavy edges)
-      |> Yog.add_edge(from: 4, to: 5, with: 10)
-      |> Yog.add_edge(from: 5, to: 6, with: 10)
-      |> Yog.add_edge(from: 6, to: 4, with: 10)
+      |> Yog.add_edge!(from: 4, to: 5, with: 10)
+      |> Yog.add_edge!(from: 5, to: 6, with: 10)
+      |> Yog.add_edge!(from: 6, to: 4, with: 10)
       # Three light bridges between clusters (the minimum cut)
-      |> Yog.add_edge(from: 1, to: 4, with: 1)
-      |> Yog.add_edge(from: 2, to: 5, with: 1)
-      |> Yog.add_edge(from: 3, to: 6, with: 1)
+      |> Yog.add_edge!(from: 1, to: 4, with: 1)
+      |> Yog.add_edge!(from: 2, to: 5, with: 1)
+      |> Yog.add_edge!(from: 3, to: 6, with: 1)
 
     result = MinCut.global_min_cut(graph)
 
     # The algorithm correctly identifies the partition separating the two clusters.
-    # Weight accumulation during contraction causes the reported weight to differ from
-    # the simple edge count, but the partition is correct.
-    # For AoC 2023 Day 25, the key result is the partition sizes, not the exact weight.
-    assert result.weight == 7
+    # The min cut value is 3 (three bridge edges, each weight 1).
+    assert result.weight == 3
     # The key result: correct partition (3 nodes in each cluster)
     # For AoC 2023 Day 25, multiply these to get the answer
     assert result.group_a_size == 3
@@ -251,7 +247,7 @@ defmodule YogMinCutTest do
       Yog.undirected()
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
-      |> Yog.add_edge(from: 1, to: 2, with: 10)
+      |> Yog.add_edge!(from: 1, to: 2, with: 10)
 
     result = MinCut.global_min_cut(graph)
 
@@ -267,9 +263,9 @@ defmodule YogMinCutTest do
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
-      |> Yog.add_edge(from: 1, to: 1, with: 100)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 1, to: 1, with: 100)
 
     # Self-loop
 

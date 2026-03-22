@@ -196,4 +196,120 @@ defmodule YogBuilderGridTest do
     # Can go to all 4 directions (including descent)
     assert length(middle_successors) == 4
   end
+
+  # ============= New Topologies and Predicates =============
+
+  test "from_2d_list_with_topology_test" do
+    grid_data = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+    # Using queen topology (8 directions) and always predicate
+    grid_result =
+      Grid.from_2d_list_with_topology(
+        grid_data,
+        :directed,
+        Grid.queen(),
+        Grid.always()
+      )
+
+    graph = Grid.to_graph(grid_result)
+
+    # Center node (4) should have 8 neighbors
+    center = Grid.coord_to_id(1, 1, 3)
+    successors = Yog.successors(graph, center)
+    assert length(successors) == 8
+  end
+
+  test "bishop_topology_test" do
+    grid_data = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+
+    grid_result =
+      Grid.from_2d_list_with_topology(grid_data, :directed, Grid.bishop(), Grid.always())
+
+    graph = Grid.to_graph(grid_result)
+
+    # Center node (1,1) -> neighbors (0,0), (0,2), (2,0), (2,2)
+    center = Grid.coord_to_id(1, 1, 3)
+    successors = Yog.successors(graph, center)
+    assert length(successors) == 4
+  end
+
+  test "rook_topology_test" do
+    grid_data = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+
+    grid_result =
+      Grid.from_2d_list_with_topology(grid_data, :directed, Grid.rook(), Grid.always())
+
+    graph = Grid.to_graph(grid_result)
+
+    # Center node (1,1) -> neighbors (0,1), (1,0), (1,2), (2,1)
+    center = Grid.coord_to_id(1, 1, 3)
+    successors = Yog.successors(graph, center)
+    assert length(successors) == 4
+  end
+
+  test "knight_topology_test" do
+    grid_data = [
+      [1, 2, 3, 4, 5],
+      [6, 7, 8, 9, 10],
+      [11, 12, 13, 14, 15],
+      [16, 17, 18, 19, 20],
+      [21, 22, 23, 24, 25]
+    ]
+
+    grid_result =
+      Grid.from_2d_list_with_topology(grid_data, :directed, Grid.knight(), Grid.always())
+
+    graph = Grid.to_graph(grid_result)
+
+    # Center node (2,2) -> 8 knight jumps
+    center = Grid.coord_to_id(2, 2, 5)
+    successors = Yog.successors(graph, center)
+    assert length(successors) == 8
+  end
+
+  test "avoiding_predicate_test" do
+    grid_data = [[1, 2, 1], [1, 2, 1], [1, 1, 1]]
+    # Cannot move into a cell with value 2
+    grid_result =
+      Grid.from_2d_list_with_topology(
+        grid_data,
+        :directed,
+        Grid.rook(),
+        Grid.avoiding(2)
+      )
+
+    graph = Grid.to_graph(grid_result)
+
+    # From (0,0), can move to (1,0) but not (0,1)
+    start = Grid.coord_to_id(0, 0, 3)
+
+    successors =
+      Yog.successors(graph, start) |> Enum.map(fn {id, _weight} -> Grid.id_to_coord(id, 3) end)
+
+    assert {1, 0} in successors
+    refute {0, 1} in successors
+  end
+
+  test "walkable_predicate_test" do
+    grid_data = [["A", ".", "A"], ["A", ".", "A"], ["A", "A", "A"]]
+    # Can only move into a cell with value "."
+    grid_result =
+      Grid.from_2d_list_with_topology(
+        grid_data,
+        :directed,
+        Grid.rook(),
+        Grid.walkable(".")
+      )
+
+    graph = Grid.to_graph(grid_result)
+
+    # From (0,1) = ".", successors are (1,1) only, not (0,0) or (0,2) or (1,1).
+    start = Grid.coord_to_id(0, 1, 3)
+
+    successors =
+      Yog.successors(graph, start) |> Enum.map(fn {id, _weight} -> Grid.id_to_coord(id, 3) end)
+
+    assert {1, 1} in successors
+    refute {0, 0} in successors
+    refute {0, 2} in successors
+  end
 end

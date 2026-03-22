@@ -9,8 +9,8 @@ defmodule YogTraversalTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
 
     assert Yog.Traversal.walk(in: graph, from: 1, using: :breadth_first) == [1, 2, 3]
   end
@@ -23,10 +23,10 @@ defmodule YogTraversalTest do
       |> Yog.add_node(3, "Right")
       |> Yog.add_node(4, "LL")
       |> Yog.add_node(5, "LR")
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 1, to: 3, with: 1)
-      |> Yog.add_edge(from: 2, to: 4, with: 1)
-      |> Yog.add_edge(from: 2, to: 5, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 3, with: 1)
+      |> Yog.add_edge!(from: 2, to: 4, with: 1)
+      |> Yog.add_edge!(from: 2, to: 5, with: 1)
 
     result = Yog.Traversal.walk(in: graph, from: 1, using: :breadth_first)
 
@@ -42,9 +42,9 @@ defmodule YogTraversalTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
-      |> Yog.add_edge(from: 3, to: 1, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 1, with: 1)
 
     result = Yog.Traversal.walk(in: graph, from: 1, using: :breadth_first)
     assert result == [1, 2, 3]
@@ -70,8 +70,8 @@ defmodule YogTraversalTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
 
     result = Yog.Traversal.walk(in: graph, from: 2, using: :breadth_first)
 
@@ -87,8 +87,8 @@ defmodule YogTraversalTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
 
     assert Yog.Traversal.walk(in: graph, from: 1, using: :depth_first) == [1, 2, 3]
   end
@@ -101,10 +101,10 @@ defmodule YogTraversalTest do
       |> Yog.add_node(3, "Right")
       |> Yog.add_node(4, "LL")
       |> Yog.add_node(5, "LR")
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 1, to: 3, with: 1)
-      |> Yog.add_edge(from: 2, to: 4, with: 1)
-      |> Yog.add_edge(from: 2, to: 5, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 3, with: 1)
+      |> Yog.add_edge!(from: 2, to: 4, with: 1)
+      |> Yog.add_edge!(from: 2, to: 5, with: 1)
 
     result = Yog.Traversal.walk(in: graph, from: 1, using: :depth_first)
 
@@ -119,9 +119,9 @@ defmodule YogTraversalTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
-      |> Yog.add_edge(from: 3, to: 1, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 1, with: 1)
 
     result = Yog.Traversal.walk(in: graph, from: 1, using: :depth_first)
     assert result == [1, 2, 3]
@@ -143,10 +143,10 @@ defmodule YogTraversalTest do
       |> Yog.add_node(2, "Left")
       |> Yog.add_node(3, "Right")
       |> Yog.add_node(4, "Bottom")
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 1, to: 3, with: 1)
-      |> Yog.add_edge(from: 2, to: 4, with: 1)
-      |> Yog.add_edge(from: 3, to: 4, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 3, with: 1)
+      |> Yog.add_edge!(from: 2, to: 4, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
 
     result = Yog.Traversal.walk(in: graph, from: 1, using: :depth_first)
 
@@ -163,9 +163,9 @@ defmodule YogTraversalTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
-      |> Yog.add_edge(from: 3, to: 4, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
 
     result =
       Yog.Traversal.walk_until(
@@ -185,9 +185,9 @@ defmodule YogTraversalTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
-      |> Yog.add_edge(from: 3, to: 4, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
 
     result =
       Yog.Traversal.walk_until(
@@ -206,8 +206,8 @@ defmodule YogTraversalTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
 
     result =
       Yog.Traversal.walk_until(
@@ -225,7 +225,7 @@ defmodule YogTraversalTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
 
     result =
       Yog.Traversal.walk_until(
@@ -246,10 +246,10 @@ defmodule YogTraversalTest do
       |> Yog.add_node(3, "Right")
       |> Yog.add_node(4, "LL")
       |> Yog.add_node(5, "LR")
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
-      |> Yog.add_edge(from: 1, to: 3, with: 1)
-      |> Yog.add_edge(from: 2, to: 4, with: 1)
-      |> Yog.add_edge(from: 2, to: 5, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 3, with: 1)
+      |> Yog.add_edge!(from: 2, to: 4, with: 1)
+      |> Yog.add_edge!(from: 2, to: 5, with: 1)
 
     result =
       Yog.Traversal.walk_until(
@@ -272,8 +272,8 @@ defmodule YogTraversalTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge(from: 1, to: 1, with: 1)
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 1, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
 
     assert Yog.Traversal.walk(in: graph, from: 1, using: :breadth_first) == [1, 2]
   end
@@ -284,8 +284,401 @@ defmodule YogTraversalTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
 
     assert Yog.Traversal.walk(in: graph, from: 1, using: :breadth_first) == [1, 2]
+  end
+
+  # ============= fold_walk Tests =============
+
+  test "fold_walk_bfs_distance_limit_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_node(4, "D")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+
+    result =
+      Yog.Traversal.fold_walk(
+        over: graph,
+        from: 1,
+        using: :breadth_first,
+        initial: [],
+        with: fn acc, node, meta ->
+          if meta.depth <= 2 do
+            {:continue, [node | acc]}
+          else
+            {:stop, acc}
+          end
+        end
+      )
+
+    assert Enum.sort(result) == [1, 2, 3]
+  end
+
+  # ============= Implicit Fold Tests =============
+
+  test "implicit_fold_bfs_chain_test" do
+    successors = fn state ->
+      case state do
+        1 -> [2]
+        2 -> [3]
+        _ -> []
+      end
+    end
+
+    result =
+      Yog.Traversal.implicit_fold(
+        from: 1,
+        using: :breadth_first,
+        successors_of: successors,
+        initial: [],
+        with: fn acc, node, _meta -> {:continue, [node | acc]} end
+      )
+
+    assert Enum.sort(result) == [1, 2, 3]
+  end
+
+  test "implicit_fold_by_bfs_chain_test" do
+    successors = fn state ->
+      case state do
+        # Both lead to nodes that have the same visited key
+        1 -> [2, 3]
+        2 -> [4]
+        3 -> [4]
+        _ -> []
+      end
+    end
+
+    result =
+      Yog.Traversal.implicit_fold_by(
+        from: 1,
+        using: :breadth_first,
+        successors_of: successors,
+        # Group by odd/even
+        visited_by: fn state -> rem(state, 2) end,
+        initial: [],
+        with: fn acc, node, _meta -> {:continue, [node | acc]} end
+      )
+
+    # Starting at 1 (odd).
+    # Its successors are 2 (even) and 3 (odd).
+    # 3 will be ignored because 1 already marked the 'odd' key visited.
+    # From 2 (even), its successor is 4 (even), which is ignored because 2 marked the 'even' key visited.
+    assert Enum.sort(result) == [1, 2]
+  end
+
+  # ============= Cycle Detection Tests =============
+
+  test "cyclic_and_acyclic_test" do
+    graph_acyclic =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+
+    assert Yog.acyclic?(graph_acyclic) == true
+    assert Yog.cyclic?(graph_acyclic) == false
+
+    graph_cyclic =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 1, with: 1)
+
+    assert Yog.acyclic?(graph_cyclic) == false
+    assert Yog.cyclic?(graph_cyclic) == true
+  end
+
+  # ============= find_path Tests =============
+
+  test "find_path_linear_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+
+    assert Yog.Traversal.find_path(graph, 1, 3) == [1, 2, 3]
+  end
+
+  test "find_path_shortest_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      # Long way in weight but short in edges
+      |> Yog.add_edge!(from: 1, to: 3, with: 10)
+
+    assert Yog.Traversal.find_path(graph, 1, 3) == [1, 3]
+  end
+
+  test "find_path_none_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+
+    assert Yog.Traversal.find_path(graph, 1, 2) == nil
+  end
+
+  test "find_path_self_test" do
+    graph = Yog.directed() |> Yog.add_node(1, "A")
+    assert Yog.Traversal.find_path(graph, 1, 1) == [1]
+  end
+
+  # ============= Implicit Dijkstra Tests =============
+
+  test "implicit_dijkstra_linear_test" do
+    successors = fn n ->
+      if n < 5 do
+        [{n + 1, 10}]
+      else
+        []
+      end
+    end
+
+    result =
+      Yog.Traversal.implicit_dijkstra(
+        from: 1,
+        initial: -1,
+        successors_of: successors,
+        with: fn _acc, node, cost ->
+          if node == 5 do
+            {:halt, cost}
+          else
+            {:continue, -1}
+          end
+        end
+      )
+
+    # Path: 1->2->3->4->5 = 4 edges * 10 = 40
+    assert result == 40
+  end
+
+  test "implicit_dijkstra_multiple_paths_test" do
+    # Two paths to goal: expensive direct vs cheap indirect
+    successors = fn pos ->
+      case pos do
+        1 -> [{2, 100}, {3, 10}]
+        2 -> [{4, 1}]
+        3 -> [{2, 5}]
+        _ -> []
+      end
+    end
+
+    result =
+      Yog.Traversal.implicit_dijkstra(
+        from: 1,
+        initial: -1,
+        successors_of: successors,
+        with: fn _acc, node, cost ->
+          if node == 2 do
+            {:halt, cost}
+          else
+            {:continue, -1}
+          end
+        end
+      )
+
+    # Should take path 1->3->2 (cost 15) not 1->2 (cost 100)
+    assert result == 15
+  end
+
+  test "implicit_dijkstra_grid_test" do
+    successors = fn {x, y} ->
+      [
+        {{x + 1, y}, 1},
+        {{x - 1, y}, 1},
+        {{x, y + 1}, 1},
+        {{x, y - 1}, 1}
+      ]
+      |> Enum.filter(fn {{nx, ny}, _} -> nx >= 0 and ny >= 0 and nx <= 3 and ny <= 3 end)
+    end
+
+    result =
+      Yog.Traversal.implicit_dijkstra(
+        from: {0, 0},
+        initial: -1,
+        successors_of: successors,
+        with: fn _acc, {x, y}, cost ->
+          if x == 3 and y == 3 do
+            {:halt, cost}
+          else
+            {:continue, -1}
+          end
+        end
+      )
+
+    # Manhattan distance from (0,0) to (3,3) is 6
+    assert result == 6
+  end
+
+  test "implicit_dijkstra_no_path_test" do
+    successors = fn n ->
+      if n < 3 do
+        [{n + 1, 1}]
+      else
+        []
+      end
+    end
+
+    result =
+      Yog.Traversal.implicit_dijkstra(
+        from: 1,
+        initial: :unreachable,
+        successors_of: successors,
+        with: fn acc, _node, _cost -> {:continue, acc} end
+      )
+
+    # Goal unreachable, returns initial accumulator
+    assert result == :unreachable
+  end
+
+  test "implicit_dijkstra_start_is_goal_test" do
+    successors = fn n -> [{n + 1, 10}] end
+
+    result =
+      Yog.Traversal.implicit_dijkstra(
+        from: 42,
+        initial: -1,
+        successors_of: successors,
+        with: fn _acc, node, cost ->
+          if node == 42 do
+            {:halt, cost}
+          else
+            {:continue, -1}
+          end
+        end
+      )
+
+    # Start is goal, cost is 0
+    assert result == 0
+  end
+
+  test "implicit_dijkstra_weighted_edges_test" do
+    successors = fn n ->
+      case n do
+        1 -> [{2, 5}, {3, 100}]
+        2 -> [{3, 10}]
+        _ -> []
+      end
+    end
+
+    result =
+      Yog.Traversal.implicit_dijkstra(
+        from: 1,
+        initial: -1,
+        successors_of: successors,
+        with: fn _acc, node, cost ->
+          if node == 3 do
+            {:halt, cost}
+          else
+            {:continue, -1}
+          end
+        end
+      )
+
+    # Should take path 1->2->3 (cost 15) not 1->3 (cost 100)
+    assert result == 15
+  end
+
+  test "implicit_dijkstra_with_cycle_test" do
+    successors = fn n ->
+      case n do
+        1 -> [{2, 10}]
+        2 -> [{3, 5}, {1, 1}]
+        3 -> [{4, 1}]
+        _ -> []
+      end
+    end
+
+    result =
+      Yog.Traversal.implicit_dijkstra(
+        from: 1,
+        initial: -1,
+        successors_of: successors,
+        with: fn _acc, node, cost ->
+          if node == 4 do
+            {:halt, cost}
+          else
+            {:continue, -1}
+          end
+        end
+      )
+
+    # Path: 1->2->3->4 = 10+5+1 = 16
+    # Cycle back to 1 is ignored (1->2->1 would be 11, not better than reaching 1 initially with 0)
+    assert result == 16
+  end
+
+  test "implicit_dijkstra_stop_control_test" do
+    successors = fn n ->
+      case n do
+        1 -> [{2, 1}, {3, 1}]
+        2 -> [{4, 1}]
+        3 -> [{4, 1}]
+        _ -> []
+      end
+    end
+
+    visited =
+      Yog.Traversal.implicit_dijkstra(
+        from: 1,
+        initial: [],
+        successors_of: successors,
+        with: fn acc, node, _cost ->
+          new_acc = [node | acc]
+          # Stop exploring from node 2, but continue with other nodes
+          if node == 2 do
+            {:stop, new_acc}
+          else
+            {:continue, new_acc}
+          end
+        end
+      )
+
+    # Should visit 1, 2, 3, but not explore from 2 (so 4 might not be reached from 2)
+    assert 1 in visited
+    assert 2 in visited
+    assert 3 in visited
+  end
+
+  test "implicit_dijkstra_accumulate_all_costs_test" do
+    successors = fn n ->
+      case n do
+        1 -> [{2, 10}, {3, 5}]
+        2 -> [{4, 5}]
+        3 -> [{4, 20}]
+        _ -> []
+      end
+    end
+
+    costs =
+      Yog.Traversal.implicit_dijkstra(
+        from: 1,
+        initial: %{},
+        successors_of: successors,
+        with: fn acc, node, cost ->
+          {:continue, Map.put(acc, node, cost)}
+        end
+      )
+
+    # Check that shortest costs were recorded
+    assert costs[1] == 0
+    assert costs[2] == 10
+    assert costs[3] == 5
+    # via 2 (10+5), not via 3 (5+20)
+    assert costs[4] == 15
   end
 end

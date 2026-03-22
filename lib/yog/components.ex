@@ -1,17 +1,9 @@
 defmodule Yog.Components do
   @moduledoc """
-  Algorithms for finding connected components in graphs.
+  Algorithms for finding connected components.
+  Deprecated. Use `Yog.Connectivity` instead.
   """
-
-  @doc """
-  Finds the Strongly Connected Components (SCC) of a directed graph using
-  Tarjan's strongly connected components algorithm.
-
-  Returns a list of components, where each component is a list of its node IDs.
-  The components are returned in reverse topological order.
-  """
-  @spec scc(Yog.graph()) :: [[Yog.node_id()]]
-  def scc(graph) do
-    :yog@components.strongly_connected_components(graph)
-  end
+  defdelegate scc(graph), to: Yog.Connectivity
+  defdelegate strongly_connected_components(graph), to: Yog.Connectivity
+  defdelegate kosaraju(graph), to: Yog.Connectivity
 end
