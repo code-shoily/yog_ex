@@ -1,6 +1,8 @@
 defmodule YogTest do
   use ExUnit.Case
 
+  doctest Yog
+
   describe "Yog Model Tests" do
     # Test creating a new directed graph
     test "new_directed_graph_test" do
@@ -519,7 +521,7 @@ defmodule YogTest do
       g1 = Yog.add_unweighted_edge!(g1, 2, 4)
       g1 = Yog.add_simple_edge!(g1, from: 3, to: 4)
       g1 = Yog.add_simple_edge!(g1, 3, 5)
-      g1 = Yog.add_edge_ensured(g1, 3, 6, 10, "D")
+      g1 = Yog.add_edge_ensure(g1, 3, 6, 10, "D")
 
       assert Yog.graph?(g1) == true
     end
