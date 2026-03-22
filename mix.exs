@@ -44,8 +44,8 @@ defmodule YogEx.MixProject do
 
   defp deps do
     [
-      {:yog, "~> 5.1", manager: :rebar3, override: true},
-      {:yog_io, ">= 1.0.0", manager: :rebar3, override: true},
+      {:yog, "~> 5.1", manager: :rebar3, app: false, override: true},
+      {:yog_io, ">= 1.0.0", manager: :rebar3, app: false},
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.18", only: :test}
@@ -59,6 +59,7 @@ defmodule YogEx.MixProject do
       licenses: ["Apache-2.0"],
       links: %{
         "GitHub" => @source_url,
+        "Changelog" => @source_url <> "/blob/main/CHANGELOG.md",
         "Yog (Gleam)" => "https://hexdocs.pm/yog"
       }
     ]
@@ -66,7 +67,7 @@ defmodule YogEx.MixProject do
 
   defp docs do
     [
-      main: "Yog",
+      main: "README",
       extras: ["README.md", "CHANGELOG.md"],
       source_ref: "v#{@version}",
       source_url: @source_url
