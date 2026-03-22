@@ -1,6 +1,8 @@
 defmodule YogCentralityTest do
   use ExUnit.Case
 
+  doctest Yog.Centrality
+
   # Helper to create a simple test graph
   defp simple_graph do
     Yog.directed()
