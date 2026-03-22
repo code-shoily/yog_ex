@@ -22,7 +22,7 @@
 
 A graph algorithm library for Elixir, providing implementations of classic graph algorithms with a functional API. It acts as an ergonomic wrapper around the core implementation built in Gleam ([Yog](https://hex.pm/packages/yog)).
 
-🔷 **Powered by [Yog](https://hex.pm/packages/yog)** — The same battle-tested graph engine, with idiomatic Elixir APIs
+🔷 **Powered by [Yog](https://hex.pm/packages/yog)** — The same graph engine, with idiomatic Elixir APIs
 
 ## Features
 
@@ -33,7 +33,8 @@ A graph algorithm library for Elixir, providing implementations of classic graph
 - **Graph Traversal**: BFS and DFS with early termination and path finding
 - **Graph Transformations**: Transpose (O(1)!), map, filter, merge, subgraph extraction, edge contraction
 - **Graph Operations**: Union, intersection, difference, Cartesian product, graph power, isomorphism
-- **Graph Visualization**: ASCII, Mermaid, DOT (Graphviz), and JSON rendering
+- **Graph Serialization & I/O**: First-class support for GraphML, GDF, JSON, LEDA, Pajek, and TGF allowing interoperability with standard tools via `Yog.IO.*`
+- **Graph Visualization**: ASCII, Mermaid, and DOT (Graphviz) rendering
 - **Minimum Spanning Tree**: Kruskal's and Prim's algorithms with Union-Find and Priority Queues
 - **Minimum Cut**: Stoer-Wagner algorithm for global min-cut
 - **Network Health**: Diameter, radius, eccentricity, assortativity, average path length
@@ -211,6 +212,28 @@ closeness = Yog.Centrality.closeness(graph)
 degree = Yog.Centrality.degree(graph)
 ```
 
+### Graph I/O & Interoperability
+
+```elixir
+# Create graph
+graph =
+  Yog.directed()
+  |> Yog.add_node(1, "Alice")
+  |> Yog.add_node(2, "Bob")
+  |> Yog.add_edge!(from: 1, to: 2, with: "follows")
+
+# Serialize to popular formats like GraphML, TGF, LEDA, Pajek, JSON, or GDF
+graphml_string = Yog.IO.GraphML.serialize(graph)
+json_string = Yog.IO.JSON.serialize(graph)
+pajek_string = Yog.IO.Pajek.serialize(graph)
+
+# Parse from string or read from file
+{:ok, {:graphml_result, loaded_graph, _warnings}} = Yog.IO.GraphML.parse(graphml_string)
+
+# Read directly from file
+# {:ok, loaded} = Yog.IO.Pajek.read("network.net")
+```
+
 ## Examples
 
 Detailed examples are located in the [examples/](https://github.com/code-shoily/yog_ex/tree/main/examples) directory:
@@ -245,7 +268,7 @@ Detailed examples are located in the [examples/](https://github.com/code-shoily/
 - [Graph Generation Showcase](examples/graph_generation_showcase.exs) - ⭐ All classic graph patterns with statistics
 - [DOT rendering](examples/render_dot.exs) - Exporting graphs to Graphviz format
 - [Mermaid rendering](examples/render_mermaid.exs) - Generating Mermaid diagrams
-- [JSON rendering](examples/render_json.exs) - Exporting graphs to JSON for web use
+- [Graph I/O](examples/render_json.exs) - Exporting matrices and objects to JSON and other formats for interoperability
 
 ### Running Examples
 
@@ -313,7 +336,8 @@ Detailed documentation for each algorithm can be found on [HexDocs](https://hexd
 | `Yog.Transform` | SCC (Tarjan/Kosaraju), topological sort, connectivity |
 | `Yog.MST` | Minimum spanning trees (Kruskal's, Prim's) |
 | `Yog.Dag.*` | DAG-specific algorithms (longest path, LCA, transitive closure) |
-| `Yog.Render.*` | ASCII, DOT, Mermaid, and JSON visualization |
+| `Yog.Render.*` | ASCII, DOT, Mermaid visualization |
+| `Yog.IO.*` | Serialization to/from GraphML, GDF, JSON, LEDA, Pajek, and TGF |
 | `Yog.DisjointSet` | Union-Find with path compression and union by rank |
 
 ## Performance Characteristics

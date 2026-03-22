@@ -44,7 +44,8 @@ defmodule YogEx.MixProject do
 
   defp deps do
     [
-      {:yog, ">= 5.1.0", manager: :rebar3},
+      {:yog, "~> 5.1", manager: :rebar3, override: true},
+      {:yog_io, ">= 1.0.0", manager: :rebar3, override: true},
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.18", only: :test}
