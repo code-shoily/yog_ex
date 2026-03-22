@@ -1,6 +1,8 @@
 defmodule YogDisjointSetTest do
   use ExUnit.Case
 
+  doctest Yog.DisjointSet
+
   alias Yog.DisjointSet
 
   # ============= Creation Tests =============
