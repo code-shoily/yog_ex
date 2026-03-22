@@ -149,7 +149,7 @@ defmodule Yog.Property.Clique do
       iex> # Empty graph has no cliques
       iex> empty = Yog.undirected()
       iex> Yog.Property.Clique.all_maximal_cliques(empty)
-      [MapSet.new([])]
+      []
 
   ## Time Complexity
 

@@ -374,6 +374,7 @@ defmodule Yog.Pathfinding.AStar do
       ...> #  {0, 0, :north}, successors, key_fn,
       ...> #  goal_fn, 0, &(&1 + &2), compare, h
       ...> #)
+      ...> # {:some, 20}
   """
   @spec implicit_a_star_by(
           state,

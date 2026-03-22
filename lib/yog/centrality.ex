@@ -300,7 +300,7 @@ defmodule Yog.Centrality do
       ...>   |> Yog.add_node(3, "B")
       ...>   |> Yog.add_edges!([{1, 2, 1}, {1, 3, 1}])
       iex> scores = Yog.Centrality.eigenvector(graph)
-      iex> scores[1] == scores[2]
+      iex> scores[1] > scores[2]
       true
   """
   @spec eigenvector(Yog.graph(), keyword()) :: centrality_scores()
