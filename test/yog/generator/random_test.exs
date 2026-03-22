@@ -3,6 +3,8 @@ defmodule Yog.Generator.RandomTest do
 
   alias Yog.Generator.Random
 
+  doctest Random
+
   # Helper to count edges in an undirected graph
   defp edge_count(graph) do
     {:graph, _type, _nodes, out_edges, _in_edges} = graph

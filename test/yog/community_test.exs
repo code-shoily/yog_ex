@@ -3,6 +3,8 @@ defmodule Yog.CommunityTest do
 
   alias Yog.Community
 
+  doctest Community
+
   # ============= Utility Functions Tests =============
 
   test "to_dict_basic_test" do

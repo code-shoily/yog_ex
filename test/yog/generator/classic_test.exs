@@ -3,6 +3,8 @@ defmodule Yog.Generator.ClassicTest do
 
   alias Yog.Generator.Classic
 
+  doctest Classic
+
   # ============= Complete Graph Tests =============
 
   test "complete_undirected_test" do

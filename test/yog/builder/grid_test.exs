@@ -3,6 +3,8 @@ defmodule Yog.Builder.GridTest do
 
   alias Yog.Builder.Grid
 
+  doctest Grid
+
   # Basic grid building tests
 
   test "from_2d_list_creates_grid_test" do

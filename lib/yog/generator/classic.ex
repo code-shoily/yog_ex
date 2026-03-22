@@ -344,7 +344,7 @@ defmodule Yog.Generator.Classic do
       ...> length(Yog.neighbors(grid, 0))
       2
       iex> # Interior nodes have degree 4
-      ...> length(Yog.neighbors(grid, 4))
+      ...> length(Yog.neighbors(grid, 5))
       4
 
   ## Use Cases

@@ -229,8 +229,8 @@ defmodule Yog.Generator.Random do
       iex> tree = Yog.Generator.Random.random_tree(10)
       iex> Yog.Model.order(tree)
       10
-      iex> # A tree has exactly n-1 edges (undirected, so 2*(n-1) neighbors total)
-      ...> Yog.Model.size(tree)
+      iex> # A tree has exactly n-1 edges
+      ...> Yog.Model.edge_count(tree)
       9
 
   ## Properties
