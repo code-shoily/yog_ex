@@ -773,14 +773,16 @@ defmodule Yog.Traversal do
       iex> Yog.Traversal.topological_sort(graph)
       {:ok, [1, 2, 3]}
 
-  iex> # Cycle detection
-  iex> {:ok, cyclic_graph} =
-  ...>   Yog.directed()
-  ...>   |> Yog.add_node(1, "A")
-  ...>   |> Yog.add_node(2, "B")
-  ...>   |> Yog.add_edges([{1, 2, 1}, {2, 1, 1}])
-  iex> Yog.Traversal.topological_sort(cyclic_graph)
-  {:error, :contains_cycle}
+  Cycle detection returns an error:
+
+      iex> {:ok, cyclic_graph} =
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(1, "A")
+      ...>   |> Yog.add_node(2, "B")
+      ...>   |> Yog.add_edges([{1, 2, 1}, {2, 1, 1}])
+      iex> Yog.Traversal.topological_sort(cyclic_graph)
+      {:error, :contains_cycle}
+
   """
   @spec topological_sort(Yog.graph()) :: {:ok, [Yog.node_id()]} | {:error, :contains_cycle}
   def topological_sort(graph) do

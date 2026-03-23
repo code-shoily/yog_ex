@@ -62,7 +62,7 @@ Add YogEx to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:yog_ex, "~> 0.51.0"}
+    {:yog_ex, "~> 0.52.1"}
   ]
 end
 ```
@@ -73,32 +73,20 @@ Then run:
 mix deps.get
 ```
 
-### Adding I/O Support (Optional)
+### Graph I/O Support
 
-YogEx includes graph I/O modules (`Yog.IO.*`) for formats like GraphML, GDF, JSON, LEDA, Pajek, and TGF. However, due to dependency conflicts with Gleam packages, `yog_io` is **not** included as a default dependency.
+YogEx includes comprehensive graph I/O modules (`Yog.IO.*`) for popular formats:
 
-**If you need graph I/O functionality**, add `yog_io` to your dependencies:
+- **GraphML** - XML-based format (Gephi, yEd, Cytoscape, NetworkX)
+- **GDF** - GUESS Graph Format (Gephi)
+- **Pajek** - Social network analysis (.net format)
+- **LEDA** - Library of Efficient Data types and Algorithms
+- **TGF** - Trivial Graph Format
+- **JSON** - Adjacency list and matrix formats
 
-```elixir
-def deps do
-  [
-    {:yog_ex, "~> 0.51.0"},
-    {:yog_io, "~> 1.0", manager: :rebar3, app: false, override: true}
-  ]
-end
-```
+**All I/O modules are implemented in pure Elixir** and work out of the box with the base YogEx installation. No additional dependencies are required.
 
-**Why `override: true`?** The `yog` package (a Gleam library) requires `app: false` to work with Elixir, but `yog_io` depends on `yog` without this flag. The `override: true` tells Mix to use your configuration instead.
-
-**What features require yog_io?**
-- `Yog.IO.GraphML` - GraphML format serialization/parsing
-- `Yog.IO.GDF` - GUESS GDF format I/O
-- `Yog.IO.JSON` - JSON export (write-only)
-- `Yog.IO.LEDA` - LEDA format I/O
-- `Yog.IO.Pajek` - Pajek NET format I/O
-- `Yog.IO.TGF` - Trivial Graph Format I/O
-
-All other YogEx features (pathfinding, generators, centrality, community detection, etc.) work without `yog_io`.
+The previous `yog_io` Gleam package is no longer needed and has been fully replaced with native Elixir implementations.
 
 ## Quick Start
 
@@ -405,21 +393,36 @@ mix test test/yog/pathfinding/dijkstra_test.exs
 - `test/` — Unit tests and doctests
 - `examples/` — Real-world usage examples
 
-### Publishing to Hex
+### Publishing to Hex (For Maintainers)
 
-Due to Gleam package requirements, publishing to Hex requires a special environment configuration:
+Due to Gleam package requirements, publishing to Hex requires a special environment configuration.
 
+**Pre-publishing checklist:**
+1. Update version in `mix.exs` (`@version`)
+2. Update `CHANGELOG.md` with release date and changes
+3. Ensure version is consistent in README.md examples
+4. Run `mix test` - all tests must pass
+5. Run `mix credo --strict` - no issues
+6. Update git: `git add .` and commit changes
+
+**Publishing command:**
 ```sh
-# Publish the package
 MIX_ENV=publish mix hex.publish package
 ```
 
 **Why `MIX_ENV=publish`?**
-- The publish environment uses a simplified dependency configuration without `manager: :rebar3`
-- Hex.pm doesn't allow these flags in published packages
-- Local development still uses the full configuration with `manager: :rebar3, app: false`
+- The `:publish` environment uses a simplified dependency configuration without `manager: :rebar3`
+- Hex.pm doesn't allow `manager`, `app`, or `override` flags in published packages
+- Local development (`:dev`, `:test`) still uses the full configuration with `manager: :rebar3, app: false, override: true`
+- This is defined in `mix.exs` using `defp deps(env)` with pattern matching
 
-**Documentation:** HexDocs automatically builds and publishes documentation from your package source code. No separate docs publishing step is needed - your docs will be available at `https://hexdocs.pm/yog_ex` shortly after publishing the package.
+**Documentation:** HexDocs automatically builds and publishes documentation from your package source code. No separate docs publishing step is needed - your docs will be available at `https://hexdocs.pm/yog_ex` shortly (5-15 minutes) after publishing the package.
+
+**After publishing:**
+1. Verify package: `mix hex.info yog_ex`
+2. Check package page: https://hex.pm/packages/yog_ex
+3. Wait for docs to build: https://hexdocs.pm/yog_ex
+4. Tag the release: `git tag v0.52.1 && git push --tags`
 
 ## AI Assistance
 

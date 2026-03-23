@@ -1,7 +1,7 @@
 defmodule YogEx.MixProject do
   use Mix.Project
 
-  @version "0.51.0"
+  @version "0.52.1"
   @source_url "https://github.com/code-shoily/yog_ex"
 
   def project do
@@ -59,11 +59,7 @@ defmodule YogEx.MixProject do
 
   defp deps(_) do
     [
-      {:yog, "~> 5.1", manager: :rebar3, app: false, override: true},
-      # Note: yog_io is NOT included as a dependency to avoid conflicts during hex publishing.
-      # The I/O modules (Yog.IO.*) are included in the package but require users to add
-      # yog_io to their own deps if they need I/O functionality. See README for details.
-      {:yog_io, ">= 1.0.0", manager: :rebar3, app: false, only: [:dev, :test], runtime: false},
+      {:yog, "~> 5.1", manager: :rebar3, app: false},
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.18", only: :test}
@@ -85,7 +81,7 @@ defmodule YogEx.MixProject do
 
   defp docs do
     [
-      main: "README",
+      main: "readme",
       extras: ["README.md", "CHANGELOG.md"],
       source_ref: "v#{@version}",
       source_url: @source_url

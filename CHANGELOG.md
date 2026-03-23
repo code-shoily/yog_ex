@@ -8,6 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > [!NOTE]
 > **Versioning Scheme**: Starting from `0.51.0`, YogEx versions map to upstream Yog versions as follows: `Yog A.B._` maps to `YogEx 0.AB.0`. Internal YogEx fixes increment the patch version (e.g., `0.51.1`). This will continue until YogEx reaches parity/confidence with upstream versioning.
 
+## [0.52.1] - 2026-03-22
+
+### Changed
+- **I/O Modules**: All graph I/O modules (`Yog.IO.GraphML`, `Yog.IO.GDF`, `Yog.IO.Pajek`, `Yog.IO.LEDA`, `Yog.IO.TGF`, `Yog.IO.JSON`) are now implemented in **pure Elixir** and work out of the box without any additional dependencies.
+- **Dependencies**: Completely removed `yog_io` dependency. Users no longer need to manually add `yog_io` to their dependencies.
+- **Installation**: Simplified installation - YogEx now works with all features using just `{:yog_ex, "~> 0.52.1"}`.
+
+### Implementation Details
+- **GraphML**: Implemented using Erlang's `:xmerl` library for XML parsing and serialization
+- **GDF**: Pure Elixir CSV parser with support for duplicate column names and proper escaping
+- **Pajek**: Case-insensitive parser with support for quoted/unquoted labels and comments
+- **LEDA**: Native implementation supporting 1-indexed nodes and sequential ordering
+- **TGF**: Simple text-based format parser
+- **JSON**: Pure Elixir serialization for adjacency lists and matrices
+
+### Fixed
+- Resolved dependency conflicts that previously required users to manually configure `yog_io` with `manager: :rebar3, app: false, override: true`
+- Eliminated Gleam package dependencies for I/O functionality
+
 ## [0.51.0] - 2026-03-22
 
 ### Added
