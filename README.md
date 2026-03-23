@@ -77,10 +77,7 @@ mix deps.get
 >
 > ```elixir
 > {:yog_ex, "~> 0.52.3"},
-> {:gleam_stdlib, "~> 0.69", manager: :rebar3, override: true},
-> {:gleam_json, "~> 3.0", manager: :rebar3, override: true},
-> {:gleamy_structures, "~> 1.2", manager: :rebar3, override: true},
-> {:gleamy_bench, "~> 0.6", manager: :rebar3, override: true}
+> {:gleam_stdlib, "~> 0.69", manager: :rebar3, override: true}
 > ```
 
 ### Graph I/O Support
