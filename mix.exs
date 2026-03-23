@@ -22,7 +22,18 @@ defmodule YogEx.MixProject do
       docs: docs(),
 
       # Test Coverage
-      test_coverage: [tool: ExCoveralls]
+      test_coverage: [tool: ExCoveralls],
+      # Suppress warnings for Erlang and Gleam modules
+      xref: [
+        exclude: [
+          # Erlang stdlib modules (xmerl)
+          :xmerl_scan,
+          :xmerl_xpath,
+
+          # Gleam yog modules - use regex pattern
+          ~r/^:yog@.*/
+        ]
+      ]
     ]
   end
 
