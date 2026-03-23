@@ -1,7 +1,7 @@
 defmodule YogEx.MixProject do
   use Mix.Project
 
-  @version "0.52.1"
+  @version "0.52.2"
   @source_url "https://github.com/code-shoily/yog_ex"
 
   def project do
@@ -62,9 +62,7 @@ defmodule YogEx.MixProject do
   defp deps(:publish) do
     [
       {:yog, "~> 5.1"},
-      {:ex_doc, "~> 0.31", only: :dev, runtime: false},
-      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
-      {:excoveralls, "~> 0.18", only: :test}
+      {:ex_doc, "~> 0.31", runtime: false}
     ]
   end
 

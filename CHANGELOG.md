@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > [!NOTE]
 > **Versioning Scheme**: Starting from `0.51.0`, YogEx versions map to upstream Yog versions as follows: `Yog A.B._` maps to `YogEx 0.AB.0`. Internal YogEx fixes increment the patch version (e.g., `0.51.1`). This will continue until YogEx reaches parity/confidence with upstream versioning.
 
+## [0.52.2] - 2026-03-22
+
+### Fixed
+- Documentation now builds correctly on HexDocs (fixed ex_doc configuration in publish environment)
+
 ## [0.52.1] - 2026-03-22
 
 ### Changed
