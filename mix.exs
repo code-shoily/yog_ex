@@ -60,10 +60,6 @@ defmodule YogEx.MixProject do
   defp deps(:publish) do
     [
       {:yog, "~> 5.1"},
-      {:gleam_stdlib, "~> 0.69", override: true},
-      {:gleam_json, "~> 3.0", override: true},
-      {:gleamy_structures, "~> 1.2", override: true},
-      {:gleamy_bench, "~> 0.6", override: true},
       {:ex_doc, "~> 0.40", only: :dev, runtime: false}
     ]
   end

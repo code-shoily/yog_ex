@@ -62,7 +62,7 @@ Add YogEx to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:yog_ex, "~> 0.52.2"}
+    {:yog_ex, "~> 0.52.3"}
   ]
 end
 ```
@@ -72,6 +72,16 @@ Then run:
 ```bash
 mix deps.get
 ```
+
+> **Note on Gleam Dependencies**: YogEx depends on [Yog](https://hex.pm/packages/yog), which is built in Gleam and uses rebar3. Due to limitations in Mix's rebar3 integration, transitive dependencies may not be automatically fetched. If you encounter compilation errors about missing Gleam dependencies (`gleam_stdlib`, `gleam_json`, `gleamy_structures`, `gleamy_bench`), add them explicitly to your `mix.exs`:
+>
+> ```elixir
+> {:yog_ex, "~> 0.52.3"},
+> {:gleam_stdlib, "~> 0.69", manager: :rebar3, override: true},
+> {:gleam_json, "~> 3.0", manager: :rebar3, override: true},
+> {:gleamy_structures, "~> 1.2", manager: :rebar3, override: true},
+> {:gleamy_bench, "~> 0.6", manager: :rebar3, override: true}
+> ```
 
 ### Graph I/O Support
 
