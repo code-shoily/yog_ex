@@ -57,19 +57,17 @@ defmodule YogEx.MixProject do
     deps(Mix.env())
   end
 
-  # Environment-specific dependencies to support hex publishing
-  # Use MIX_ENV=publish for publishing package and docs to hex
   defp deps(:publish) do
     [
       {:yog, "~> 5.1"},
-      {:ex_doc, "~> 0.31", runtime: false}
+      {:ex_doc, "~> 0.40", only: :dev, runtime: false}
     ]
   end
 
   defp deps(_) do
     [
       {:yog, "~> 5.1", manager: :rebar3, app: false},
-      {:ex_doc, "~> 0.31", only: :dev, runtime: false},
+      {:ex_doc, "~> 0.40", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.18", only: :test}
     ]
