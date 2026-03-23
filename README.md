@@ -57,14 +57,14 @@ A graph algorithm library for Elixir, providing implementations of classic graph
 
 ### Basic Installation
 
-Add YogEx to your list of dependencies in `mix.exs`:
+Add YogEx to your list of dependencies in `mix.exs` (or `Mix.install([...])` for LiveBook or Scripts):
 
 ```elixir
 def deps do
   [
     {:yog_ex, "~> 0.52.3"},
-    {:yog, "~> 5.1.1", app: false, override: true},
-    {:gleam_stdlib, "~> 0.69", app: false, override: true},
+    {:yog, "~> 5.1.1", manager: :rebar3, override: true},
+    {:gleam_stdlib, "~> 0.69", manager: :rebar3, override: true},
   ]
 end
 ```
