@@ -20,9 +20,9 @@
 [![Hex Version](https://img.shields.io/hexpm/v/yog_ex.svg)](https://hex.pm/packages/yog_ex)
 [![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/yog_ex/)
 
-A graph algorithm library for Elixir, providing implementations of classic graph algorithms with a functional API. It acts as an ergonomic wrapper around the core implementation built in Gleam ([Yog](https://hex.pm/packages/yog)).
+A comprehensive **pure Elixir** graph algorithm library providing implementations of classic graph algorithms with a functional API. Formerly a wrapper around the Gleam [Yog](https://hex.pm/packages/yog) library, YogEx is now fully implemented in Elixir with no external runtime dependencies.
 
-🔷 **Powered by [Yog](https://hex.pm/packages/yog)** — The same graph engine, with idiomatic Elixir APIs
+🔷 **Pure Elixir** — No Gleam dependencies, just fast native Elixir graph algorithms
 
 ## Features
 
@@ -62,9 +62,7 @@ Add YogEx to your list of dependencies in `mix.exs` (or `Mix.install([...])` for
 ```elixir
 def deps do
   [
-    {:yog_ex, "~> 0.52.3"},
-    {:yog, "~> 5.1.1", manager: :rebar3, override: true},
-    {:gleam_stdlib, "~> 0.69", manager: :rebar3, override: true},
+    {:yog_ex, "~> 0.60.0"}
   ]
 end
 ```
@@ -85,10 +83,6 @@ YogEx includes comprehensive graph I/O modules (`Yog.IO.*`) for popular formats:
 - **LEDA** - Library of Efficient Data types and Algorithms
 - **TGF** - Trivial Graph Format
 - **JSON** - Adjacency list and matrix formats
-
-**All I/O modules are implemented in pure Elixir** and work out of the box with the base YogEx installation. No additional dependencies are required.
-
-The previous `yog_io` Gleam package is no longer needed and has been fully replaced with native Elixir implementations.
 
 ## Quick Start
 
@@ -264,31 +258,37 @@ pajek_string = Yog.IO.Pajek.serialize(graph)
 Detailed examples are located in the [examples/](https://github.com/code-shoily/yog_ex/tree/main/examples) directory:
 
 ### Pathfinding & Optimization
+
 - [GPS Navigation](examples/gps_navigation.exs) - Shortest path using A* and heuristics
 - [City Distance Matrix](examples/city_distance_matrix.exs) - Floyd-Warshall for all-pairs shortest paths
 - [Network Bandwidth](examples/network_bandwidth.exs) - ⭐ Max flow for bandwidth optimization with bottleneck analysis
 - [Network Cable Layout](examples/network_cable_layout.exs) - Minimum Spanning Tree using Kruskal's
 
 ### Matching & Assignment
+
 - [Job Matching](examples/job_matching.exs) - ⭐ Max flow for bipartite matching and assignment problems
 - [Job Assignment](examples/job_assignment.exs) - Bipartite maximum matching
 - [Medical Residency](examples/medical_residency.exs) - Stable marriage matching (Gale-Shapley algorithm)
 
 ### Graph Analysis
+
 - [Social Network Analysis](examples/social_network_analysis.exs) - Finding communities using SCCs
 - [Global Minimum Cut](examples/global_min_cut.exs) - Stoer-Wagner algorithm
 - [Bridges of Königsberg](examples/bridges_of_konigsberg.exs) - Eulerian circuit and path detection
 
 ### Ordering & Scheduling
+
 - [Task Scheduling](examples/task_scheduling.exs) - Basic topological sorting
 - [Task Ordering](examples/task_ordering.exs) - Lexicographical topological sort
 
 ### Traversal & Exploration
+
 - [Cave Path Counting](examples/cave_path_counting.exs) - Custom DFS with backtracking
 - [Flood Fill](examples/flood_fill.exs) - BFS-based region exploration
 - [Number of Islands](examples/number_of_islands.exs) - Connected component counting
 
 ### Graph Construction & Visualization
+
 - [Graph Creation](examples/graph_creation.exs) - Comprehensive guide to 10+ ways of creating graphs
 - [Graph Generation Showcase](examples/graph_generation_showcase.exs) - ⭐ All classic graph patterns with statistics
 - [DOT rendering](examples/render_dot.exs) - Exporting graphs to Graphviz format
@@ -391,25 +391,12 @@ mix test test/yog/pathfinding/dijkstra_test.exs
 
 ### Project Structure
 
-- `lib/yog/` — Core graph library modules (Elixir wrappers around Gleam)
+- `lib/yog/` — Core graph library modules (pure Elixir)
 - `test/` — Unit tests and doctests
 - `examples/` — Real-world usage examples
 
-### Migration Status
-
-YogEx is currently migrating from a Gleam wrapper library to a **pure Elixir** implementation.
-
-- **Migration Tracker:** [`MIGRATION_STATUS.md`](MIGRATION_STATUS.md) — Live status of all 58 modules
-- **Current Status:** 6/58 modules complete (I/O modules already pure Elixir)
-- **API Compatibility:** 100% backward compatible — no breaking changes
-
-The graph data structure remains `{:graph, kind, nodes, out_edges, in_edges}` throughout the migration, ensuring existing code continues to work without modification.
-
-### Publishing to Hex (For Maintainers)
-
-Due to Gleam package requirements, publishing to Hex requires a special environment configuration.
-
 **Pre-publishing checklist:**
+
 1. Update version in `mix.exs` (`@version`)
 2. Update `CHANGELOG.md` with release date and changes
 3. Ensure version is consistent in README.md examples
@@ -418,23 +405,19 @@ Due to Gleam package requirements, publishing to Hex requires a special environm
 6. Update git: `git add .` and commit changes
 
 **Publishing command:**
-```sh
-MIX_ENV=publish mix hex.publish package
-```
 
-**Why `MIX_ENV=publish`?**
-- The `:publish` environment uses a simplified dependency configuration without `manager: :rebar3`
-- Hex.pm doesn't allow `manager`, `app`, or `override` flags in published packages
-- Local development (`:dev`, `:test`) still uses the full configuration with `manager: :rebar3, app: false, override: true`
-- This is defined in `mix.exs` using `defp deps(env)` with pattern matching
+```sh
+mix hex.publish package
+```
 
 **Documentation:** HexDocs automatically builds and publishes documentation from your package source code. No separate docs publishing step is needed - your docs will be available at `https://hexdocs.pm/yog_ex` shortly (5-15 minutes) after publishing the package.
 
 **After publishing:**
+
 1. Verify package: `mix hex.info yog_ex`
 2. Check package page: https://hex.pm/packages/yog_ex
 3. Wait for docs to build: https://hexdocs.pm/yog_ex
-4. Tag the release: `git tag v0.52.2 && git push --tags`
+4. Tag the release: `git tag v1.0.0 && git push --tags`
 
 ## AI Assistance
 
