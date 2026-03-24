@@ -199,7 +199,7 @@ defmodule Yog.Community.LocalCommunity do
     end
   end
 
-  # credo:disable-for-next-line Credo.Check.Refactor.FunctionLength
+  # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity
   defp do_detect(graph, s, k_in, k_out, cache, opts, iters, weight_fn, seeds) do
     bound = boundary_of(graph, s)
     current_f = fitness(k_in, k_out, opts.alpha)
