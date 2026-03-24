@@ -279,7 +279,6 @@ defmodule Yog.Community do
       iex> is_float(q)
       true
   """
-  @spec modularity(Yog.graph(), communities()) :: float()
   def modularity(graph, %Result{} = communities) do
     Metrics.modularity(graph, Result.to_map(communities))
   end

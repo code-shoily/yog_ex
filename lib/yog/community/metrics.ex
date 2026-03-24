@@ -8,8 +8,6 @@ defmodule Yog.Community.Metrics do
   - Graph and community density
   """
 
-  alias Yog.Community
-
   @doc """
   Calculates modularity for a given community partition.
 
@@ -30,7 +28,6 @@ defmodule Yog.Community.Metrics do
       iex> is_float(q)
       true
   """
-  @spec modularity(Yog.graph(), Community.communities()) :: float()
   def modularity(graph, communities) do
     # Modularity formula: Q = (1/2m) * Σ_ij [A_ij - (k_i * k_j / 2m)] * δ(c_i, c_j)
     # where m = number of edges, A = adjacency matrix, k = degree, c = community, δ = kronecker delta
@@ -302,7 +299,6 @@ defmodule Yog.Community.Metrics do
       iex> is_float(avg_cd)
       true
   """
-  @spec average_community_density(Yog.graph(), Community.communities()) :: float()
   def average_community_density(graph, communities) do
     # Calculate for each community and average
     # Convert assignments map to dictionary (community_id -> set of nodes)

@@ -154,7 +154,7 @@ defmodule Yog.Pathfinding.Dijkstra do
         compare: &Yog.Utils.compare/2
       )
   """
-  @spec implicit_dijkstra(keyword()) :: {:some, any()} | :none
+  @spec implicit_dijkstra(keyword()) :: {:ok, any()} | :error
   def implicit_dijkstra(opts) do
     from = Keyword.fetch!(opts, :from)
     successors = Keyword.fetch!(opts, :successors_with_cost)
@@ -179,7 +179,7 @@ defmodule Yog.Pathfinding.Dijkstra do
     * `:add` - Function to add two weights
     * `:compare` - Function to compare weights
   """
-  @spec implicit_dijkstra_by(keyword()) :: {:some, any()} | :none
+  @spec implicit_dijkstra_by(keyword()) :: {:ok, any()} | :error
   def implicit_dijkstra_by(opts) do
     from = Keyword.fetch!(opts, :from)
     successors = Keyword.fetch!(opts, :successors_with_cost)

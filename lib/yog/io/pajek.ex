@@ -355,9 +355,6 @@ defmodule Yog.IO.Pajek do
 
         {:warning, warning} ->
           parse_edges_loop(rest, graph, edge_parser, [warning | warnings])
-
-        {:error, error} ->
-          {:error, error}
       end
     end
   end

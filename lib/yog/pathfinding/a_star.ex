@@ -106,7 +106,7 @@ defmodule Yog.Pathfinding.AStar do
         heuristic: fn n -> 10 - n end
       )
   """
-  @spec implicit_a_star(keyword()) :: {:some, any()} | :none
+  @spec implicit_a_star(keyword()) :: {:ok, any()} | :error
   def implicit_a_star(opts) do
     from = Keyword.fetch!(opts, :from)
     successors = Keyword.fetch!(opts, :successors_with_cost)
@@ -133,7 +133,7 @@ defmodule Yog.Pathfinding.AStar do
     * `:compare` - Function to compare weights
     * `:heuristic` - Function estimating cost to goal: `fn(state) -> cost`
   """
-  @spec implicit_a_star_by(keyword()) :: {:some, any()} | :none
+  @spec implicit_a_star_by(keyword()) :: {:ok, any()} | :error
   def implicit_a_star_by(opts) do
     from = Keyword.fetch!(opts, :from)
     successors = Keyword.fetch!(opts, :successors_with_cost)

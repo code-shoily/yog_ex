@@ -295,9 +295,6 @@ defmodule Yog.IO.LEDA do
         {:warning, warning} ->
           # Skip this edge but continue
           parse_edges_loop(rest, graph, edge_parser, remaining - 1, [warning | warnings])
-
-        {:error, error} ->
-          {:error, error}
       end
     end
   end
