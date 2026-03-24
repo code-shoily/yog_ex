@@ -17,7 +17,7 @@ defmodule RenderJson do
 
     # Basic JSON rendering
     IO.puts("--- Basic JSON Rendering ---")
-    json_basic = Yog.Render.to_json(graph)
+    json_basic = Yog.IO.JSON.to_json(graph, Yog.IO.JSON.default_export_options())
     IO.puts(json_basic)
 
     IO.puts("\nThis JSON can be used with D3.js, Cytoscape.js, or other visualization libraries.")

@@ -46,25 +46,27 @@ defmodule NetworkBandwidth do
     IO.puts(" RouterD (4) -> Dest (5): 15 Mbps\n")
 
     # Find maximum bandwidth from source to destination
-    result = Yog.MaxFlow.edmonds_karp(
-      in: network,
-      from: 0,
-      to: 5,
-      zero: 0,
-      add: &(&1 + &2),
-      subtract: fn a, b -> a - b end,
-      compare: fn a, b -> if a < b, do: :lt, else: if(a > b, do: :gt, else: :eq) end,
-      min: &min/2
-    )
+    result =
+      Yog.Flow.MaxFlow.edmonds_karp(
+        network,
+        0,
+        5,
+        0,
+        &(&1 + &2),
+        fn a, b -> a - b end,
+        fn a, b -> a <= b end,
+        &min/2
+      )
 
     IO.puts("Maximum bandwidth from source to destination: #{result.max_flow} Mbps")
 
     # Find the minimum cut (bottleneck in the network)
-    cut = Yog.MaxFlow.min_cut(
-      result: result,
-      zero: 0,
-      compare: fn a, b -> if a < b, do: :lt, else: if(a > b, do: :gt, else: :eq) end
-    )
+    cut =
+      Yog.Flow.MaxFlow.min_cut(
+        result,
+        0,
+        fn a, b -> a <= b end
+      )
 
     IO.puts("\n=== Minimum Cut Analysis ===")
     IO.puts("This identifies the bottleneck that limits network capacity.\n")
@@ -81,6 +83,7 @@ defmodule NetworkBandwidth do
   end
 
   defp print_node_list([]), do: IO.puts(" (none)")
+
   defp print_node_list(nodes) do
     nodes
     |> Enum.each(fn node -> IO.puts(" Node #{node}") end)

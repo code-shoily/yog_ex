@@ -26,11 +26,11 @@ defmodule CityDistanceMatrix do
     IO.puts("--- All-Pairs Shortest Paths (Floyd-Warshall) ---")
 
     case Yog.Pathfinding.FloydWarshall.floyd_warshall(
-      in: graph,
-      zero: 0,
-      add: &(&1 + &2),
-      compare: fn a, b -> if a < b, do: :lt, else: if(a > b, do: :gt, else: :eq) end
-    ) do
+           graph,
+           0,
+           &(&1 + &2),
+           fn a, b -> if a < b, do: :lt, else: if(a > b, do: :gt, else: :eq) end
+         ) do
       {:ok, matrix} ->
         # Matrix is Map({from_id, to_id} => Weight)
         Enum.each(matrix, fn {{from, to}, weight} ->

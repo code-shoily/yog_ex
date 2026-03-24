@@ -20,42 +20,44 @@ defmodule RenderDot do
 
     # 1. Basic DOT output
     IO.puts("--- Basic DOT Output ---")
-    dot_basic = Yog.Render.to_dot(graph)
+    dot_basic = Yog.Render.DOT.to_dot(graph, Yog.Render.DOT.default_options())
     IO.puts(dot_basic)
 
     # 2. Find shortest path and highlight it
     IO.puts("\n--- DOT with Path Highlighting ---")
 
-    result = Yog.Pathfinding.Dijkstra.shortest_path(
-      in: graph,
-      from: 1,
-      to: 3,
-      zero: 0,
-      add: &(&1 + &2),
-      compare: fn a, b -> if a < b, do: :lt, else: if(a > b, do: :gt, else: :eq) end
-    )
+    result =
+      Yog.Pathfinding.Dijkstra.shortest_path(
+        in: graph,
+        from: 1,
+        to: 3,
+        zero: 0,
+        add: &(&1 + &2),
+        compare: fn a, b -> if a < b, do: :lt, else: if(a > b, do: :gt, else: :eq) end
+      )
 
     case result do
-      {:some, {:path, nodes, _total}} ->
+      {:ok, %Yog.Pathfinding.Path{nodes: nodes}} ->
         # Highlight the path
-        dot_highlighted = Yog.Render.to_dot(
-          graph,
-          options: %{
-            highlighted_nodes: nodes,
+        options = %{
+          Yog.Render.DOT.default_options()
+          | highlighted_nodes: nodes,
             highlighted_edges: path_to_edges(nodes)
-          }
-        )
+        }
+
+        dot_highlighted = Yog.Render.DOT.to_dot(graph, options)
         IO.puts(dot_highlighted)
         IO.puts("\nSave this output to a file and run:")
         IO.puts("  dot -Tpng -o graph.png graph.dot")
 
-      :none ->
+      :error ->
         IO.puts("No path found")
     end
   end
 
   defp path_to_edges([]), do: []
   defp path_to_edges([_]), do: []
+
   defp path_to_edges([a, b | rest]) do
     [{a, b} | path_to_edges([b | rest])]
   end

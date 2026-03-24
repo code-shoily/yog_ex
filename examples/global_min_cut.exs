@@ -32,7 +32,7 @@ defmodule GlobalMinCut do
       |> Yog.add_edge!(from: 5, to: 3, with: 1)
 
     IO.puts("--- Global Minimum Cut ---")
-    result = Yog.MinCut.global_min_cut(graph)
+    result = Yog.Flow.MinCut.global_min_cut(graph)
 
     IO.puts("Min cut weight: #{result.weight}")
     IO.puts("Group A size: #{result.group_a_size}")

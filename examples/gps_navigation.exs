@@ -30,23 +30,22 @@ defmodule GpsNavigation do
       end
     end
 
-    result = Yog.Pathfinding.AStar.astar(
-      in: road_network,
-      from: 1,
-      to: 3,
-      zero: 0,
-      add: &(&1 + &2),
-      compare: fn a, b -> if a < b, do: :lt, else: if(a > b, do: :gt, else: :eq) end,
-      heuristic: straight_line_distance
-    )
+    result =
+      Yog.Pathfinding.AStar.a_star(
+        in: road_network,
+        from: 1,
+        to: 3,
+        zero: 0,
+        add: &(&1 + &2),
+        compare: fn a, b -> if a < b, do: :lt, else: if(a > b, do: :gt, else: :eq) end,
+        heuristic: straight_line_distance
+      )
 
     case result do
-      {:some, {:path, _nodes, total_weight}} ->
-        # Path(path: [1, 2, 3], total_weight: 25)
-        # Prints: Fastest route takes 25 minutes
-        IO.puts("Fastest route takes #{total_weight} minutes")
+      {:ok, %Yog.Pathfinding.Path{weight: weight}} ->
+        IO.puts("Fastest route takes #{weight} minutes")
 
-      :none ->
+      :error ->
         IO.puts("No route found")
     end
   end

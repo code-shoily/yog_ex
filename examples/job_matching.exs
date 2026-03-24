@@ -35,16 +35,17 @@ defmodule JobMatching do
       |> Yog.add_edge!(from: 7, to: 9, with: 1)
       |> Yog.add_edge!(from: 8, to: 9, with: 1)
 
-    result = Yog.MaxFlow.edmonds_karp(
-      in: network,
-      from: 0,
-      to: 9,
-      zero: 0,
-      add: &(&1 + &2),
-      subtract: fn a, b -> a - b end,
-      compare: fn a, b -> if a < b, do: :lt, else: if(a > b, do: :gt, else: :eq) end,
-      min: &min/2
-    )
+    result =
+      Yog.Flow.MaxFlow.edmonds_karp(
+        network,
+        0,
+        9,
+        0,
+        &(&1 + &2),
+        fn a, b -> a - b end,
+        fn a, b -> a <= b end,
+        &min/2
+      )
 
     IO.puts("Maximum matching: #{result.max_flow} people can be assigned to jobs")
 
@@ -54,9 +55,7 @@ defmodule JobMatching do
       IO.puts("Only #{result.max_flow} jobs can be filled with qualified candidates.")
     end
 
-    IO.puts("\nAssignments (by analyzing flow):")
-    IO.puts("To see actual assignments, check which edges from candidates to jobs have flow > 0")
-
+    # Extract assignments from the residual graph
     candidates = [
       {1, "Alice"},
       {2, "Bob"},
@@ -71,11 +70,13 @@ defmodule JobMatching do
       {8, "Designer"}
     ]
 
+    IO.puts("\nAssignments:")
     assignments = extract_assignments(result.residual_graph, network, candidates, jobs)
     print_assignments(assignments)
   end
 
   defp extract_assignments(_residual, _original, [], _jobs), do: []
+
   defp extract_assignments(residual, original, [{candidate_id, candidate_name} | rest_candidates], jobs) do
     case find_assignment(residual, original, candidate_id, candidate_name, jobs) do
       {:ok, match} -> [match | extract_assignments(residual, original, rest_candidates, jobs)]
@@ -84,12 +85,13 @@ defmodule JobMatching do
   end
 
   defp find_assignment(_residual, _original, _candidate_id, _candidate_name, []), do: {:error, nil}
-  defp find_assignment(residual, original, candidate_id, candidate_name, [{job_id, job_name} | rest_jobs]) do
-    original_capacity = Yog.successors(original, candidate_id)
-                        |> find_edge_weight(job_id)
 
-    residual_capacity = Yog.successors(residual, candidate_id)
-                        |> find_edge_weight(job_id)
+  defp find_assignment(residual, original, candidate_id, candidate_name, [{job_id, job_name} | rest_jobs]) do
+    # Get original capacity from the original graph
+    original_capacity = get_edge_capacity(original, candidate_id, job_id)
+
+    # Get residual capacity from the residual graph (which is a map)
+    residual_capacity = Map.get(residual, {candidate_id, job_id}, 0)
 
     case {original_capacity, residual_capacity} do
       {1, 0} -> {:ok, {candidate_name, job_name}}
@@ -97,16 +99,21 @@ defmodule JobMatching do
     end
   end
 
-  defp find_edge_weight([], _target), do: 0
-  defp find_edge_weight([{node, weight} | rest], target) do
-    if node == target do
-      weight
-    else
-      find_edge_weight(rest, target)
+  defp get_edge_capacity(graph, from, to) do
+    case Yog.successors(graph, from) do
+      successors when is_list(successors) ->
+        case List.keyfind(successors, to, 0) do
+          {^to, weight} -> weight
+          nil -> 0
+        end
+
+      _ ->
+        0
     end
   end
 
   defp print_assignments([]), do: nil
+
   defp print_assignments([{candidate, job} | rest]) do
     IO.puts("  #{candidate} -> #{job}")
     print_assignments(rest)

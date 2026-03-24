@@ -30,7 +30,7 @@ defmodule CavePathCounting do
 
   defp count_paths(graph, current, visited_small, can_revisit_one) do
     # Get node data from graph structure
-    nodes = elem(graph, 2)
+    nodes = graph.nodes
     cave_name = Map.get(nodes, current)
 
     case cave_name do
