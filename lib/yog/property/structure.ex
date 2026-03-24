@@ -71,10 +71,12 @@ defmodule Yog.Property.Structure do
         if n > 0 and Model.edge_count(graph) == n - 1 do
           nodes = Model.all_nodes(graph)
 
+          in_edges = graph.in_edges
+
           in_degrees =
-            Enum.reduce(nodes, %{}, fn node, acc ->
-              Map.put(acc, node, length(Model.predecessors(graph, node)))
-            end)
+            for node <- nodes, reduce: %{} do
+              acc -> Map.put(acc, node, map_size(Map.get(in_edges, node, %{})))
+            end
 
           roots = Enum.filter(nodes, fn node -> Map.get(in_degrees, node) == 0 end)
 

@@ -58,12 +58,12 @@ defmodule Yog.Pathfinding do
       ...>   |> Yog.add_node(2, "B")
       ...>   |> Yog.add_node(3, "C")
       ...>   |> Yog.add_edges([{1, 2, 5}, {2, 3, 3}, {1, 3, 10}])
-      iex> {:some, {:path, nodes, weight}} = Yog.Pathfinding.shortest_path(
+      iex> {:ok, path} = Yog.Pathfinding.shortest_path(
       ...>   in: graph, from: 1, to: 3,
       ...>   zero: 0, add: &+/2,
       ...>   compare: fn a, b when a < b -> :lt; a, b when a > b -> :gt; _, _ -> :eq end
       ...> )
-      iex> weight
+      iex> path.weight
       8
   """
   defdelegate shortest_path(opts), to: Dijkstra

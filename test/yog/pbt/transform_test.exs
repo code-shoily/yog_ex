@@ -82,5 +82,77 @@ defmodule Yog.PBT.TransformTest do
         end
       end
     end
+
+    property "transpose(transpose(G)) == G" do
+      check all(graph <- graph_gen()) do
+        assert graph == graph |> Yog.transpose() |> Yog.transpose()
+      end
+    end
+
+    property "filter_edges consistency" do
+      check all(graph <- graph_gen()) do
+        predicate = fn _u, _v, _w -> :rand.uniform() > 0.5 end
+        filtered = Yog.filter_edges(graph, predicate)
+
+        # Ensure node counts remain the same
+        assert Yog.node_count(filtered) == Yog.node_count(graph)
+
+        # Removed edges wouldn't exist anymore
+        # No extra edges should have been added
+        assert Yog.edge_count(filtered) <= Yog.edge_count(graph)
+      end
+    end
+
+    property "complement invariants" do
+      check all(graph <- graph_gen()) do
+        comp = Yog.complement(graph, :default)
+
+        # Complement has exactly same nodes
+        assert Yog.all_nodes(comp) |> MapSet.new() == Yog.all_nodes(graph) |> MapSet.new()
+
+        # If we take complement again with weights strictly :default and map graph to :default
+        comp_of_comp = Yog.complement(comp, :default)
+
+        normalized_graph =
+          graph
+          |> Yog.map_edges(fn _ -> :default end)
+          # self-loops are lost in complement, so strip them from normalized_graph
+          |> Yog.filter_edges(fn u, v, _ -> u != v end)
+
+        assert Yog.all_edges(comp_of_comp) |> MapSet.new() ==
+                 Yog.all_edges(normalized_graph) |> MapSet.new()
+      end
+    end
+
+    property "to_directed / to_undirected invariants" do
+      check all(graph <- graph_gen()) do
+        directed = Yog.to_directed(graph)
+        assert Yog.Model.type(directed) == :directed
+
+        # If it was undirected, directing it should not change its nodes
+        assert Yog.node_count(directed) == Yog.node_count(graph)
+
+        undirected = Yog.to_undirected(graph, fn a, _b -> a end)
+        assert Yog.Model.type(undirected) == :undirected
+      end
+    end
+
+    property "contract reduces node count by 1 (if B exists and B != A)" do
+      check all(graph <- graph_gen()) do
+        nodes = Yog.all_nodes(graph)
+
+        if length(nodes) >= 2 do
+          [a, b | _] = Enum.shuffle(nodes)
+
+          contracted = Yog.contract(graph, a, b, fn w1, w2 -> {w1, w2} end)
+
+          assert Yog.node_count(contracted) == Yog.node_count(graph) - 1
+          # Node B is gone
+          assert not Yog.has_node?(contracted, b)
+          # Node A remains
+          assert Yog.has_node?(contracted, a)
+        end
+      end
+    end
   end
 end

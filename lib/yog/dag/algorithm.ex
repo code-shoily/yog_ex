@@ -179,8 +179,10 @@ defmodule Yog.DAG.Algorithm do
   end
 
   defp solve_transitive_reachability(graph, sorted_nodes) do
+    out_edges = graph.out_edges
+
     Enum.reduce(sorted_nodes, %{}, fn node, acc ->
-      successors = Yog.Model.successors(graph, node) |> Enum.map(fn {n, _} -> n end)
+      successors = Map.get(out_edges, node, %{}) |> Map.keys()
 
       all_reachable =
         Enum.reduce(successors, MapSet.new(successors), fn child, set_acc ->
@@ -193,10 +195,12 @@ defmodule Yog.DAG.Algorithm do
   end
 
   defp add_closure_edges(graph, node, targets) do
-    Enum.reduce(MapSet.to_list(targets), graph, fn target, g_acc ->
-      existing_targets = Yog.Model.successors(g_acc, node) |> Enum.map(fn {n, _} -> n end)
+    # Get existing neighbors once as a MapSet for O(1) checks
+    out_edges = graph.out_edges
+    existing = Map.get(out_edges, node, %{}) |> Map.keys() |> MapSet.new()
 
-      if target in existing_targets do
+    Enum.reduce(targets, graph, fn target, g_acc ->
+      if MapSet.member?(existing, target) do
         g_acc
       else
         Yog.add_edge!(g_acc, node, target, 1)
@@ -398,16 +402,18 @@ defmodule Yog.DAG.Algorithm do
   end
 
   defp build_related_fn(graph, :descendants) do
+    out_edges = graph.out_edges
+
     fn node ->
-      Yog.Model.successors(graph, node)
-      |> Enum.map(fn {n, _} -> n end)
+      Map.get(out_edges, node, %{}) |> Map.keys()
     end
   end
 
   defp build_related_fn(graph, :ancestors) do
+    in_edges = graph.in_edges
+
     fn node ->
-      Yog.Model.predecessors(graph, node)
-      |> Enum.map(fn {n, _} -> n end)
+      Map.get(in_edges, node, %{}) |> Map.keys()
     end
   end
 

@@ -218,13 +218,12 @@ defmodule Yog.Transform do
   @spec filter_nodes(Yog.graph(), (term() -> boolean())) :: Yog.graph()
   def filter_nodes(%Yog.Graph{} = graph, predicate) do
     kept_nodes = Map.filter(graph.nodes, fn {_id, data} -> predicate.(data) end)
-    kept_ids = MapSet.new(Map.keys(kept_nodes))
 
     prune_edges = fn outer_map ->
       outer_map
-      |> Map.filter(fn {src, _} -> MapSet.member?(kept_ids, src) end)
+      |> Map.filter(fn {src, _} -> Map.has_key?(kept_nodes, src) end)
       |> Map.new(fn {src, inner_map} ->
-        {src, Map.filter(inner_map, fn {dst, _} -> MapSet.member?(kept_ids, dst) end)}
+        {src, Map.filter(inner_map, fn {dst, _} -> Map.has_key?(kept_nodes, dst) end)}
       end)
     end
 
@@ -268,24 +267,30 @@ defmodule Yog.Transform do
           Yog.graph()
   def filter_edges(%Yog.Graph{} = graph, predicate) do
     new_out =
-      graph.out_edges
-      |> Map.new(fn {src, inner_map} ->
-        filtered_inner =
-          Map.filter(inner_map, fn {dst, weight} -> predicate.(src, dst, weight) end)
+      for {src, inner_map} <- graph.out_edges, reduce: %{} do
+        acc ->
+          filtered_inner =
+            Map.filter(inner_map, fn {dst, weight} -> predicate.(src, dst, weight) end)
 
-        {src, filtered_inner}
-      end)
-      |> Map.filter(fn {_src, inner_map} -> map_size(inner_map) > 0 end)
+          if map_size(filtered_inner) > 0 do
+            Map.put(acc, src, filtered_inner)
+          else
+            acc
+          end
+      end
 
     new_in =
-      graph.in_edges
-      |> Map.new(fn {dst, inner_map} ->
-        filtered_inner =
-          Map.filter(inner_map, fn {src, weight} -> predicate.(src, dst, weight) end)
+      for {dst, inner_map} <- graph.in_edges, reduce: %{} do
+        acc ->
+          filtered_inner =
+            Map.filter(inner_map, fn {src, weight} -> predicate.(src, dst, weight) end)
 
-        {dst, filtered_inner}
-      end)
-      |> Map.filter(fn {_dst, inner_map} -> map_size(inner_map) > 0 end)
+          if map_size(filtered_inner) > 0 do
+            Map.put(acc, dst, filtered_inner)
+          else
+            acc
+          end
+      end
 
     %{graph | out_edges: new_out, in_edges: new_in}
   end
@@ -322,30 +327,47 @@ defmodule Yog.Transform do
   - Testing graph density (sparse ↔ dense complement)
   """
   @spec complement(Yog.graph(), term()) :: Yog.graph()
-  def complement(%Yog.Graph{} = graph, default_weight) do
+  def complement(%Yog.Graph{kind: kind} = graph, default_weight) do
     node_ids = Map.keys(graph.nodes)
-    init_graph = %{graph | out_edges: %{}, in_edges: %{}}
 
-    Enum.reduce(node_ids, init_graph, fn src, acc_graph ->
-      Enum.reduce(node_ids, acc_graph, fn dst, acc ->
-        if src == dst do
-          acc
-        else
-          has_edge =
-            case Map.fetch(graph.out_edges, src) do
-              {:ok, inner} -> Map.has_key?(inner, dst)
-              :error -> false
+    out_edges =
+      for src <- node_ids, reduce: %{} do
+        acc_outer ->
+          inner =
+            for dst <- node_ids, src != dst, reduce: %{} do
+              acc_inner ->
+                has_edge =
+                  case Map.fetch(graph.out_edges, src) do
+                    {:ok, old_inner} -> Map.has_key?(old_inner, dst)
+                    :error -> false
+                  end
+
+                if has_edge do
+                  acc_inner
+                else
+                  Map.put(acc_inner, dst, default_weight)
+                end
             end
 
-          if has_edge do
-            acc
+          if map_size(inner) > 0 do
+            Map.put(acc_outer, src, inner)
           else
-            {:ok, new_graph} = Model.add_edge(acc, src, dst, default_weight)
-            new_graph
+            acc_outer
           end
+      end
+
+    in_edges =
+      if kind == :directed do
+        for {src, inners} <- out_edges, {dst, weight} <- inners, reduce: %{} do
+          acc_in ->
+            inner = Map.get(acc_in, dst, %{}) |> Map.put(src, weight)
+            Map.put(acc_in, dst, inner)
         end
-      end)
-    end)
+      else
+        out_edges
+      end
+
+    %{graph | out_edges: out_edges, in_edges: in_edges}
   end
 
   @doc """

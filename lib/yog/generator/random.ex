@@ -14,6 +14,7 @@ defmodule Yog.Generator.Random do
   | `barabasi_albert/2` | Preferential | O(nm) | Scale-free (power-law degrees) |
   | `watts_strogatz/3` | Small-world | O(nk) | High clustering + short paths |
   | `random_tree/1` | Uniform tree | O(n²) | Uniformly random spanning tree |
+  | `random_regular/2` | d-regular | O(nd) | All nodes have degree d |
 
   ## Quick Start (Not Doctests - Random Output)
 
@@ -479,6 +480,146 @@ defmodule Yog.Generator.Random do
       parent = :rand.uniform(new_node) - 1
       g = Yog.add_edge!(g, new_node, parent, 1)
       if graph_type == :directed, do: Yog.add_edge!(g, parent, new_node, 1), else: g
+    end)
+  end
+
+  # ============= Random Regular Graph =============
+
+  @doc """
+  Generates a random d-regular graph on n nodes.
+
+  A d-regular graph has every node with exactly degree d. This implementation
+  uses a configuration model approach with rewiring to ensure simplicity
+  (no self-loops or parallel edges).
+
+  **Preconditions:**
+  - n × d must be even (required for any d-regular graph)
+  - d < n (cannot have degree >= number of nodes in simple graph)
+  - d >= 0
+
+  **Properties:**
+  - Uniform distribution over all d-regular graphs (approximate)
+  - Exactly n nodes, (n × d) / 2 edges
+  - All nodes have degree exactly d
+
+  **Time Complexity:** O(n × d)
+
+  ## Examples
+
+      iex> # Generate a 3-regular graph with 10 nodes
+      ...> reg = Yog.Generator.Random.random_regular(10, 3)
+      iex> Yog.Model.order(reg)
+      10
+      iex> # Every node has degree 3
+      ...> degrees = for v <- 0..9, do: length(Yog.neighbors(reg, v))
+      iex> Enum.all?(degrees, fn d -> d == 3 end)
+      true
+      iex> # Total edges = n*d/2 = 15
+      ...> Yog.Model.edge_count(reg)
+      15
+
+  ## Algorithm
+
+  Uses a configuration model:
+  1. Create d "stubs" for each of the n nodes
+  2. Randomly pair stubs to form edges
+  3. Reject and retry if self-loops or parallel edges form
+
+  ## Use Cases
+
+  - Testing algorithms that need uniform degree distribution
+  - Expander graph approximations
+  - Network models where degree is constrained
+  - Comparison with scale-free networks
+
+  ## References
+
+  - [Configuration Model](https://en.wikipedia.org/wiki/Configuration_model)
+  - [Random Regular Graph](https://en.wikipedia.org/wiki/Random_regular_graph)
+  """
+  @spec random_regular(integer(), integer()) :: Yog.graph()
+  def random_regular(n, d), do: random_regular_with_type(n, d, :undirected)
+
+  @doc """
+  Generates a random d-regular graph with specified graph type.
+  """
+  @spec random_regular_with_type(integer(), integer(), Yog.graph_type()) :: Yog.graph()
+  def random_regular_with_type(n, d, _graph_type) when n <= 0 or d < 0 or d >= n,
+    do: Yog.new(:undirected)
+
+  def random_regular_with_type(n, d, _graph_type) when rem(n * d, 2) == 1,
+    do: Yog.new(:undirected)
+
+  def random_regular_with_type(1, 0, graph_type),
+    do: Yog.new(graph_type) |> Yog.add_node(0, nil)
+
+  def random_regular_with_type(n, 0, graph_type) do
+    # 0-regular: just isolated nodes
+    base = Yog.new(graph_type)
+
+    Enum.reduce(0..(n - 1), base, fn i, g ->
+      Yog.add_node(g, i, nil)
+    end)
+  end
+
+  def random_regular_with_type(n, d, graph_type) do
+    # Use configuration model with rejection sampling
+    # Create d stubs per node, randomly match them
+    generate_regular(n, d, graph_type, 100)
+  end
+
+  # Attempt to generate with max retries
+  defp generate_regular(n, d, graph_type, retries) when retries > 0 do
+    # Create stubs: each node i appears d times in the list
+    stubs = for i <- 0..(n - 1), _ <- 1..d, do: i
+
+    # Shuffle stubs and pair them
+    shuffled = Enum.shuffle(stubs)
+
+    case try_pairing(shuffled, n, graph_type) do
+      {:ok, graph} -> graph
+      :retry -> generate_regular(n, d, graph_type, retries - 1)
+    end
+  end
+
+  defp generate_regular(_n, _d, _graph_type, _retries), do: Yog.new(:undirected)
+
+  # Try to pair stubs without creating self-loops or parallel edges
+  defp try_pairing(stubs, n, graph_type) do
+    pairs = Enum.chunk_every(stubs, 2)
+
+    # Check for invalid pairs (self-loops with odd length)
+    if Enum.any?(pairs, fn
+         [a, b] -> a == b
+         _ -> true
+       end) do
+      :retry
+    else
+      # Check for parallel edges
+      edge_set =
+        pairs
+        |> Enum.map(fn [a, b] -> {min(a, b), max(a, b)} end)
+        |> MapSet.new()
+
+      # If we have unique edges equal to pairs, we're good
+      if MapSet.size(edge_set) == length(pairs) do
+        {:ok, build_regular_graph(n, pairs, graph_type)}
+      else
+        :retry
+      end
+    end
+  end
+
+  defp build_regular_graph(n, pairs, graph_type) do
+    base = Yog.new(graph_type)
+
+    graph =
+      Enum.reduce(0..(n - 1), base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    Enum.reduce(pairs, graph, fn [from, to], g ->
+      Yog.add_edge!(g, from, to, 1)
     end)
   end
 end

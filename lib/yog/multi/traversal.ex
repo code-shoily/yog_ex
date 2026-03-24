@@ -39,23 +39,23 @@ defmodule Yog.Multi.Traversal do
   """
   @spec bfs(Model.t(), Yog.node_id()) :: [Yog.node_id()]
   def bfs(graph, source) do
-    do_bfs(graph, [source], MapSet.new([source]), MapSet.new(), [])
+    queue = :queue.in(source, :queue.new())
+    do_bfs(graph, queue, MapSet.new([source]), MapSet.new(), [])
   end
 
-  defp do_bfs(_graph, [], _visited_nodes, _visited_edges, result) do
-    Enum.reverse(result)
-  end
+  defp do_bfs(graph, queue, visited_nodes, visited_edges, result) do
+    case :queue.out(queue) do
+      {{:value, current}, rest} ->
+        successors = Model.successors(graph, current)
 
-  defp do_bfs(graph, [current | rest], visited_nodes, visited_edges, result) do
-    # Add current node to result (we're processing it now)
-    new_result = [current | result]
+        {new_queue, new_visited_nodes, new_visited_edges} =
+          Enum.reduce(successors, {rest, visited_nodes, visited_edges}, &bfs_fold/2)
 
-    successors = Model.successors(graph, current)
+        do_bfs(graph, new_queue, new_visited_nodes, new_visited_edges, [current | result])
 
-    {new_queue, new_visited_nodes, new_visited_edges} =
-      Enum.reduce(successors, {rest, visited_nodes, visited_edges}, &bfs_fold/2)
-
-    do_bfs(graph, new_queue, new_visited_nodes, new_visited_edges, new_result)
+      {:empty, _} ->
+        Enum.reverse(result)
+    end
   end
 
   defp bfs_fold({neighbor, edge_id, _data}, {q, vn, ve}) do
@@ -72,7 +72,7 @@ defmodule Yog.Multi.Traversal do
       {q, vn, ve}
     else
       new_vn = MapSet.put(vn, neighbor)
-      {q ++ [neighbor], new_vn, ve}
+      {:queue.in(neighbor, q), new_vn, ve}
     end
   end
 
@@ -182,7 +182,7 @@ defmodule Yog.Multi.Traversal do
     do_fold_walk(
       graph,
       # Queue: {node, parent_node, edge_id}
-      [{from, nil, nil}],
+      :queue.in({from, nil, nil}, :queue.new()),
       # Depth map
       %{from => 0},
       # Visited edges
@@ -192,41 +192,43 @@ defmodule Yog.Multi.Traversal do
     )
   end
 
-  defp do_fold_walk(_graph, [], _depths, _visited_edges, acc, _folder) do
-    acc
-  end
-
   defp do_fold_walk(
          graph,
-         [{current, parent, edge_id} | rest],
+         queue,
          depths,
          visited_edges,
          acc,
          folder
        ) do
-    depth = Map.fetch!(depths, current)
+    case :queue.out(queue) do
+      {{:value, {current, parent, edge_id}}, rest} ->
+        depth = Map.fetch!(depths, current)
 
-    meta = %{
-      depth: depth,
-      parent: if(parent, do: {parent, edge_id}, else: nil)
-    }
+        meta = %{
+          depth: depth,
+          parent: if(parent, do: {parent, edge_id}, else: nil)
+        }
 
-    case folder.(acc, current, meta) do
-      {:halt, new_acc} ->
-        new_acc
+        case folder.(acc, current, meta) do
+          {:halt, new_acc} ->
+            new_acc
 
-      {:stop, new_acc} ->
-        do_fold_walk(graph, rest, depths, visited_edges, new_acc, folder)
+          {:stop, new_acc} ->
+            do_fold_walk(graph, rest, depths, visited_edges, new_acc, folder)
 
-      {:continue, new_acc} ->
-        successors = Model.successors(graph, current)
+          {:continue, new_acc} ->
+            successors = Model.successors(graph, current)
 
-        {new_queue, new_depths, new_visited} =
-          Enum.reduce(successors, {rest, depths, visited_edges}, fn succ, acc2 ->
-            fold_walk_reducer(succ, current, depth, acc2)
-          end)
+            {new_queue, new_depths, new_visited} =
+              Enum.reduce(successors, {rest, depths, visited_edges}, fn succ, acc2 ->
+                fold_walk_reducer(succ, current, depth, acc2)
+              end)
 
-        do_fold_walk(graph, new_queue, new_depths, new_visited, new_acc, folder)
+            do_fold_walk(graph, new_queue, new_depths, new_visited, new_acc, folder)
+        end
+
+      {:empty, _} ->
+        acc
     end
   end
 
@@ -236,7 +238,7 @@ defmodule Yog.Multi.Traversal do
     else
       new_ve = MapSet.put(ve, succ_edge_id)
       new_d = Map.put_new(d, neighbor, depth + 1)
-      {q ++ [{neighbor, current, succ_edge_id}], new_d, new_ve}
+      {:queue.in({neighbor, current, succ_edge_id}, q), new_d, new_ve}
     end
   end
 end
