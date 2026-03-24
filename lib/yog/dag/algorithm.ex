@@ -155,7 +155,7 @@ defmodule Yog.DAG.Algorithm do
       ...>   |> Yog.add_edge!(:b, :c, 1)
       ...> )
       iex> closure = Yog.DAG.Algorithm.transitive_closure(dag)
-      iex> is_tuple(closure)
+      iex> is_struct(closure, Yog.DAG)
       true
   """
   @spec transitive_closure(Yog.DAG.t()) :: Yog.DAG.t()
@@ -225,7 +225,7 @@ defmodule Yog.DAG.Algorithm do
       ...>   |> Yog.add_edge!(:b, :c, 1)
       ...> )
       iex> reduction = Yog.DAG.Algorithm.transitive_reduction(dag)
-      iex> is_tuple(reduction)
+      iex> is_struct(reduction, Yog.DAG)
       true
   """
   @spec transitive_reduction(Yog.DAG.t()) :: Yog.DAG.t()

@@ -2,10 +2,11 @@ defmodule Yog.DAG.Model do
   @moduledoc """
   Core DAG type and basic operations.
 
-  This module provides the opaque `Yog.DAG` type that wraps a regular graph
+  This module provides the `Yog.DAG` struct that wraps a regular graph
   and guarantees acyclicity at the type level.
   """
 
+  alias Yog.DAG
   alias Yog.Property.Cyclicity
 
   @typedoc """
@@ -14,7 +15,7 @@ defmodule Yog.DAG.Model do
   Unlike a regular `Graph`, a `DAG` is statically proven to contain no cycles,
   enabling total functions for operations like topological sorting.
   """
-  @type t :: {:dag, Yog.graph()}
+  @type t :: %DAG{graph: Yog.Graph.t()}
 
   @typedoc "Error type representing why a graph cannot be treated as a DAG."
   @type error :: :cycle_detected
@@ -22,9 +23,9 @@ defmodule Yog.DAG.Model do
   @doc """
   Creates a new, empty DAG.
   """
-  @spec new(Yog.graph_type()) :: t()
-  def new(type) do
-    {:dag, Yog.new(type)}
+  @spec new(Yog.Model.graph_type()) :: t()
+  def new(_type) do
+    %DAG{graph: Yog.Graph.new(:directed)}
   end
 
   @doc """
@@ -38,9 +39,13 @@ defmodule Yog.DAG.Model do
   O(V + E)
   """
   @spec from_graph(Yog.graph()) :: {:ok, t()} | {:error, :cycle_detected}
-  def from_graph(graph) do
+  def from_graph(%Yog.Graph{kind: :undirected}) do
+    {:error, :cycle_detected}
+  end
+
+  def from_graph(%Yog.Graph{} = graph) do
     if Cyclicity.acyclic?(graph) do
-      {:ok, {:dag, graph}}
+      {:ok, %DAG{graph: graph}}
     else
       {:error, :cycle_detected}
     end
@@ -53,7 +58,7 @@ defmodule Yog.DAG.Model do
   or when you want to export the DAG to formats that accept general graphs.
   """
   @spec to_graph(t()) :: Yog.graph()
-  def to_graph({:dag, graph}), do: graph
+  def to_graph(%DAG{graph: graph}), do: graph
 
   @doc """
   Adds a node to the DAG.
@@ -65,8 +70,8 @@ defmodule Yog.DAG.Model do
   O(1)
   """
   @spec add_node(t(), Yog.node_id(), any()) :: t()
-  def add_node({:dag, graph}, id, data) do
-    {:dag, Yog.add_node(graph, id, data)}
+  def add_node(%DAG{graph: graph}, id, data) do
+    %DAG{graph: Yog.Model.add_node(graph, id, data)}
   end
 
   @doc """
@@ -79,8 +84,8 @@ defmodule Yog.DAG.Model do
   O(V + E) in the worst case (removing all edges of the node).
   """
   @spec remove_node(t(), Yog.node_id()) :: t()
-  def remove_node({:dag, graph}, id) do
-    {:dag, Yog.Model.remove_node(graph, id)}
+  def remove_node(%DAG{graph: graph}, id) do
+    %DAG{graph: Yog.Model.remove_node(graph, id)}
   end
 
   @doc """
@@ -93,8 +98,8 @@ defmodule Yog.DAG.Model do
   O(1)
   """
   @spec remove_edge(t(), Yog.node_id(), Yog.node_id()) :: t()
-  def remove_edge({:dag, graph}, from, to) do
-    {:dag, Yog.Model.remove_edge(graph, from, to)}
+  def remove_edge(%DAG{graph: graph}, from, to) do
+    %DAG{graph: Yog.Model.remove_edge(graph, from, to)}
   end
 
   @doc """
@@ -109,12 +114,12 @@ defmodule Yog.DAG.Model do
   """
   @spec add_edge(t(), Yog.node_id(), Yog.node_id(), any()) ::
           {:ok, t()} | {:error, :cycle_detected}
-  def add_edge({:dag, graph}, from, to, weight) do
+  def add_edge(%DAG{graph: graph}, from, to, weight) do
     # add_edge! returns the graph directly (or raises on error like missing node)
     new_graph = Yog.add_edge!(graph, from, to, weight)
 
     if Cyclicity.acyclic?(new_graph) do
-      {:ok, {:dag, new_graph}}
+      {:ok, %DAG{graph: new_graph}}
     else
       {:error, :cycle_detected}
     end

@@ -7,6 +7,8 @@ defmodule Yog.Multi.Traversal do
   node may be reached via multiple edges.
   """
 
+  # credo:disable-for-this-file Credo.Check.Refactor.AppendSingleItem
+
   alias Yog.Multi.Model
 
   @typedoc "Control flow for fold_walk traversal"

@@ -16,6 +16,8 @@ defmodule Yog.Pathfinding.Bidirectional do
   - Designed for point-to-point queries.
   """
 
+  # credo:disable-for-this-file Credo.Check.Refactor.AppendSingleItem
+
   alias Yog.Model
   alias Yog.Pathfinding.Path
 

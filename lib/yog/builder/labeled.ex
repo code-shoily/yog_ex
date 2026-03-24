@@ -46,7 +46,7 @@ defmodule Yog.Builder.Labeled do
   alias Yog.Model
 
   @typedoc "Builder type: {:labeled_builder, kind, graph, label_to_id, next_id}"
-  @type builder :: {:labeled_builder, Yog.graph_type(), Yog.graph(), map(), integer()}
+  @type builder :: {:labeled_builder, Model.graph_type(), Yog.graph(), map(), integer()}
 
   @typedoc "Any type can be used as a label"
   @type label :: term()
@@ -86,7 +86,7 @@ defmodule Yog.Builder.Labeled do
       iex> is_tuple(builder)
       true
   """
-  @spec new(Yog.graph_type()) :: builder()
+  @spec new(Model.graph_type()) :: builder()
   def new(graph_type) do
     {:labeled_builder, graph_type, Model.new(graph_type), %{}, 0}
   end
@@ -205,7 +205,7 @@ defmodule Yog.Builder.Labeled do
       iex> builder = Yog.Builder.Labeled.from_list(:directed, edges)
       iex> {:ok, [{"B", 5}]} = Yog.Builder.Labeled.successors(builder, "A")
   """
-  @spec from_list(Yog.graph_type(), [{label(), label(), term()}]) :: builder()
+  @spec from_list(Model.graph_type(), [{label(), label(), term()}]) :: builder()
   def from_list(graph_type, edges) do
     Enum.reduce(edges, new(graph_type), fn {src, dst, weight}, builder ->
       add_edge(builder, src, dst, weight)
@@ -221,7 +221,7 @@ defmodule Yog.Builder.Labeled do
       iex> builder = Yog.Builder.Labeled.from_unweighted_list(:directed, edges)
       iex> {:ok, [{"B", nil}]} = Yog.Builder.Labeled.successors(builder, "A")
   """
-  @spec from_unweighted_list(Yog.graph_type(), [{label(), label()}]) :: builder()
+  @spec from_unweighted_list(Model.graph_type(), [{label(), label()}]) :: builder()
   def from_unweighted_list(graph_type, edges) do
     Enum.reduce(edges, new(graph_type), fn {src, dst}, builder ->
       add_unweighted_edge(builder, src, dst)

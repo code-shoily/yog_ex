@@ -51,7 +51,7 @@ defmodule Yog.Community.Walktrap do
   """
 
   alias Yog.Community
-  alias Yog.Community.{Result, Dendrogram}
+  alias Yog.Community.{Dendrogram, Result}
   alias Yog.Model
 
   @typedoc "Options for Walktrap algorithm"

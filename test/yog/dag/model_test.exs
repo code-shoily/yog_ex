@@ -19,7 +19,7 @@ defmodule Yog.DAG.ModelTest do
   describe "construction" do
     test "new/1 creates empty DAG" do
       dag = Model.new(:directed)
-      assert {:dag, _} = dag
+      assert %Yog.DAG{} = dag
     end
 
     test "from_graph/1 creates DAG from acyclic graph" do
@@ -29,7 +29,7 @@ defmodule Yog.DAG.ModelTest do
         |> Yog.add_node(2, "B")
         |> Yog.add_edge!(1, 2, 10)
 
-      assert {:ok, {:dag, _}} = Model.from_graph(graph)
+      assert {:ok, %Yog.DAG{}} = Model.from_graph(graph)
     end
 
     test "from_graph/1 returns error for cyclic graph" do
@@ -47,6 +47,7 @@ defmodule Yog.DAG.ModelTest do
       dag = Model.new(:directed)
       graph = Model.to_graph(dag)
       assert is_struct(graph, Yog.Graph)
+      assert graph.kind == :directed
     end
   end
 

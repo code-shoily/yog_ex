@@ -56,9 +56,9 @@ defmodule Yog.Flow.MaxFlow do
   - [Wikipedia: Max-Flow Min-Cut Theorem](https://en.wikipedia.org/wiki/Max-flow_min-cut_theorem)
   """
 
-  alias Yog.Model
   alias Yog.Flow.MaxFlowResult
   alias Yog.Flow.MinCutResult
+  alias Yog.Model
 
   @typedoc """
   Result of a max flow computation.
@@ -245,6 +245,7 @@ defmodule Yog.Flow.MaxFlow do
               if MapSet.member?(v, to) do
                 {q, v}
               else
+                # credo:disable-for-next-line Credo.Check.Refactor.AppendSingleItem
                 new_q = :queue.in({to, path ++ [{from, to}]}, q)
                 new_v = MapSet.put(v, to)
                 {new_q, new_v}

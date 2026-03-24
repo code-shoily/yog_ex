@@ -43,6 +43,7 @@ defmodule Yog.Traversal do
   """
 
   alias Yog.Model
+  alias Yog.PQ
 
   @typedoc """
   Traversal order for graph walking algorithms.
@@ -806,70 +807,72 @@ defmodule Yog.Traversal do
     successors = Keyword.fetch!(opts, :successors_of)
     folder = Keyword.fetch!(opts, :with)
 
-    # Priority queue as sorted list: [{cost, node}]
-    frontier = [{0, from}]
+    # Priority queue using pairing heap: min-heap ordered by cost
+    frontier =
+      PQ.new(fn {cost_a, _}, {cost_b, _} -> cost_a <= cost_b end)
+      |> PQ.push({0, from})
+
     best = %{}
 
-    do_implicit_dijkstra(frontier, best, initial, successors, folder)
+    do_implicit_dijkstra_pq(frontier, best, initial, successors, folder)
   end
 
-  defp do_implicit_dijkstra([], _best, acc, _successors, _folder), do: acc
+  defp do_implicit_dijkstra_pq(pq, best, acc, successors, folder) do
+    if PQ.empty?(pq) do
+      acc
+    else
+      {:ok, {cost, node}, rest_pq} = PQ.pop(pq)
 
-  defp do_implicit_dijkstra([{cost, node} | rest], best, acc, successors, folder) do
-    # Skip if we've already found a better path to this node
-    case Map.get(best, node) do
-      nil ->
-        new_best = Map.put(best, node, cost)
-        {control, new_acc} = folder.(acc, node, cost)
+      # Skip if we've already found a better path to this node
+      case Map.get(best, node) do
+        nil ->
+          new_best = Map.put(best, node, cost)
+          {control, new_acc} = folder.(acc, node, cost)
 
-        case control do
-          :halt ->
-            new_acc
+          case control do
+            :halt ->
+              new_acc
 
-          :stop ->
-            do_implicit_dijkstra(rest, new_best, new_acc, successors, folder)
+            :stop ->
+              do_implicit_dijkstra_pq(rest_pq, new_best, new_acc, successors, folder)
 
-          :continue ->
-            next_frontier =
-              Enum.reduce(successors.(node), rest, fn {nb_node, edge_cost}, q ->
-                new_cost = cost + edge_cost
+            :continue ->
+              next_pq =
+                Enum.reduce(successors.(node), rest_pq, fn {nb_node, edge_cost}, acc_pq ->
+                  new_cost = cost + edge_cost
 
-                # Only add if we haven't seen this node or found a better path
-                case Map.get(new_best, nb_node) do
-                  nil -> insert_sorted(q, {new_cost, nb_node})
-                  prev_cost when prev_cost <= new_cost -> q
-                  _ -> insert_sorted(q, {new_cost, nb_node})
-                end
-              end)
+                  # Only add if we haven't seen this node or found a better path
+                  case Map.get(new_best, nb_node) do
+                    nil -> PQ.push(acc_pq, {new_cost, nb_node})
+                    prev_cost when prev_cost <= new_cost -> acc_pq
+                    _ -> PQ.push(acc_pq, {new_cost, nb_node})
+                  end
+                end)
 
-            do_implicit_dijkstra(next_frontier, new_best, new_acc, successors, folder)
-        end
+              do_implicit_dijkstra_pq(next_pq, new_best, new_acc, successors, folder)
+          end
 
-      prev_cost when prev_cost < cost ->
-        # Stale entry - skip
-        do_implicit_dijkstra(rest, best, acc, successors, folder)
+        prev_cost when prev_cost < cost ->
+          # Stale entry - skip
+          do_implicit_dijkstra_pq(rest_pq, best, acc, successors, folder)
 
-      _ ->
-        # Same or better cost already recorded
-        do_implicit_dijkstra(rest, best, acc, successors, folder)
+        _ ->
+          # Same or better cost already recorded
+          do_implicit_dijkstra_pq(rest_pq, best, acc, successors, folder)
+      end
     end
-  end
-
-  defp insert_sorted(list, item) do
-    {cost, _} = item
-    {before, after_rest} = Enum.split_while(list, fn {c, _} -> c <= cost end)
-    before ++ [item | after_rest]
   end
 
   @doc """
   Performs a lexicographically smallest topological sort.
 
-  Uses a heap-based version of Kahn's algorithm to ensure that when multiple
-  nodes have in-degree 0, the smallest one (according to `compare_nodes`) is chosen first.
+  Uses a priority queue (pairing heap) version of Kahn's algorithm to ensure
+  that when multiple nodes have in-degree 0, the smallest one (according to
+  `compare_nodes`) is chosen first.
 
   The comparison function operates on **node data**, not node IDs.
 
-  Returns `{:error, nil}` if the graph contains a cycle.
+  Returns `{:error, :contains_cycle}` if the graph contains a cycle.
 
   **Time Complexity:** O(V log V + E) due to heap operations
 
@@ -908,76 +911,68 @@ defmodule Yog.Traversal do
       end)
       |> Map.new()
 
-    # Create a priority queue using a sorted list
-    initial_queue =
+    # Create a priority queue with custom comparator based on node data
+    # We store {node_data, node_id} pairs and compare by node_data
+    pq_compare = fn {data_a, id_a}, {data_b, id_b} ->
+      compare_nodes.(data_a, data_b) == :lt or
+        (compare_nodes.(data_a, data_b) == :eq and id_a <= id_b)
+    end
+
+    pq = PQ.new(pq_compare)
+
+    initial_pq =
       in_degrees
       |> Enum.filter(fn {_id, degree} -> degree == 0 end)
-      |> Enum.map(fn {id, _} -> id end)
-      |> Enum.sort(fn id_a, id_b ->
-        data_a = Map.get(nodes, id_a)
-        data_b = Map.get(nodes, id_b)
-        compare_nodes.(data_a, data_b) == :lt
-      end)
+      |> Enum.map(fn {id, _} -> {Map.get(nodes, id), id} end)
+      |> Enum.reduce(pq, fn item, acc -> PQ.push(acc, item) end)
 
-    do_lexical_kahn(graph, initial_queue, in_degrees, [], length(all_nodes), compare_nodes, nodes)
+    do_lexical_kahn_pq(graph, initial_pq, in_degrees, [], length(all_nodes), nodes)
   end
 
-  defp do_lexical_kahn(_graph, [], _in_degrees, acc, total_count, _compare, _nodes) do
-    if length(acc) == total_count do
-      {:ok, Enum.reverse(acc)}
+  defp do_lexical_kahn_pq(_graph, _pq, _in_degrees, acc, total_count, _nodes)
+       when total_count == 0 do
+    if Enum.empty?(acc) do
+      {:ok, []}
     else
-      {:error, :contains_cycle}
+      {:ok, Enum.reverse(acc)}
     end
   end
 
-  defp do_lexical_kahn(graph, [head | rest_q], in_degrees, acc, total_count, compare, nodes) do
+  defp do_lexical_kahn_pq(graph, pq, in_degrees, acc, total_count, nodes) do
+    if PQ.empty?(pq) do
+      if length(acc) == total_count do
+        {:ok, Enum.reverse(acc)}
+      else
+        {:error, :contains_cycle}
+      end
+    else
+      {:ok, {_, head}, rest_pq} = PQ.pop(pq)
+      do_lexical_kahn_pq_step(graph, rest_pq, in_degrees, [head | acc], total_count, nodes)
+    end
+  end
+
+  defp do_lexical_kahn_pq_step(graph, pq, in_degrees, acc, total_count, nodes) do
+    head = hd(acc)
     neighbors = Model.successor_ids(graph, head)
 
-    {next_q, next_in_degrees} =
-      Enum.reduce(neighbors, {rest_q, in_degrees}, fn neighbor, {q, degrees} ->
+    {next_pq, next_in_degrees} =
+      Enum.reduce(neighbors, {pq, in_degrees}, fn neighbor, {acc_pq, degrees} ->
         current_degree = Map.get(degrees, neighbor, 0)
         new_degree = current_degree - 1
         new_degrees = Map.put(degrees, neighbor, new_degree)
 
-        updated_q =
+        updated_pq =
           if new_degree == 0 do
-            insert_sorted_by(
-              q,
-              neighbor,
-              fn id ->
-                data = Map.get(nodes, id)
-                # Return a sortable representation
-                data
-              end,
-              compare
-            )
+            neighbor_data = Map.get(nodes, neighbor)
+            PQ.push(acc_pq, {neighbor_data, neighbor})
           else
-            q
+            acc_pq
           end
 
-        {updated_q, new_degrees}
+        {updated_pq, new_degrees}
       end)
 
-    do_lexical_kahn(
-      graph,
-      next_q,
-      next_in_degrees,
-      [head | acc],
-      total_count,
-      compare,
-      nodes
-    )
-  end
-
-  defp insert_sorted_by(list, item, key_fn, compare) do
-    item_key = key_fn.(item)
-
-    {before, after_rest} =
-      Enum.split_while(list, fn id ->
-        compare.(key_fn.(id), item_key) == :lt
-      end)
-
-    before ++ [item | after_rest]
+    do_lexical_kahn_pq(graph, next_pq, next_in_degrees, acc, total_count, nodes)
   end
 
   # =============================================================================

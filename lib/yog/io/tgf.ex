@@ -96,7 +96,7 @@ defmodule Yog.IO.TGF do
         end
       end)
 
-    # Combine with separator
+    # credo:disable-for-next-line Credo.Check.Refactor.AppendSingleItem
     (node_lines ++ ["#"] ++ edge_lines ++ [""])
     |> Enum.join("\n")
   end

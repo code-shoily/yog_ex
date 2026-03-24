@@ -174,9 +174,7 @@ defmodule Yog.Community.FluidCommunities do
               end
           end
 
-        if not can_move do
-          {curr_asgn, curr_sizes, has_changed, current_seed}
-        else
+        if can_move do
           # Calculate density sums for neighbor communities
           density_sums =
             Model.successors(graph, node)
@@ -229,9 +227,7 @@ defmodule Yog.Community.FluidCommunities do
                 c -> c != best_c
               end
 
-            if not changing do
-              {curr_asgn, curr_sizes, has_changed, new_seed}
-            else
+            if changing do
               # Perform the move
               next_asgn = Map.put(curr_asgn, node, best_c)
 
@@ -251,8 +247,12 @@ defmodule Yog.Community.FluidCommunities do
               next_sizes = Map.put(temp_sizes, best_c, best_c_size + 1)
 
               {next_asgn, next_sizes, true, new_seed}
+            else
+              {curr_asgn, curr_sizes, has_changed, new_seed}
             end
           end
+        else
+          {curr_asgn, curr_sizes, has_changed, current_seed}
         end
       end)
 

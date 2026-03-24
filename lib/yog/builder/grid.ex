@@ -28,7 +28,7 @@ defmodule Yog.Builder.Grid do
   Use these with A* pathfinding on grids:
 
   - `manhattan_distance/3` - For 4-way (rook) movement
-  - `chebyshev_distance/3` - For 8-way (queen) movement  
+  - `chebyshev_distance/3` - For 8-way (queen) movement
   - `octile_distance/3` - For 8-way with diagonal costs
 
   ## Movement Predicates
@@ -42,8 +42,8 @@ defmodule Yog.Builder.Grid do
   > The API remains unchanged.
   """
 
-  alias Yog.Model
   alias Yog.Builder.GridGraph
+  alias Yog.Model
 
   @typedoc "Grid builder type: {:grid_builder, graph, rows, cols}"
   @type grid :: {:grid_builder, Yog.graph(), integer(), integer()}
@@ -73,7 +73,8 @@ defmodule Yog.Builder.Grid do
       iex> is_struct(grid, Yog.Builder.GridGraph)
       true
   """
-  @spec from_2d_list([[term()]], Yog.graph_type(), (term(), term() -> boolean())) :: GridGraph.t()
+  @spec from_2d_list([[term()]], Model.graph_type(), (term(), term() -> boolean())) ::
+          GridGraph.t()
   def from_2d_list(grid_data, graph_type, can_move_fn) do
     from_2d_list_with_topology(grid_data, graph_type, rook(), can_move_fn)
   end
@@ -97,8 +98,8 @@ defmodule Yog.Builder.Grid do
       iex> is_struct(grid, Yog.Builder.GridGraph)
       true
   """
-  @spec from_2d_list_with_topology([[term()]], Yog.graph_type(), topology(), (term(), term() ->
-                                                                                boolean())) ::
+  @spec from_2d_list_with_topology([[term()]], Model.graph_type(), topology(), (term(), term() ->
+                                                                                  boolean())) ::
           GridGraph.t()
   def from_2d_list_with_topology(grid_data, graph_type, topology, can_move_fn) do
     rows = length(grid_data)

@@ -78,7 +78,7 @@ defmodule Yog.Builder.Toroidal do
 
   O(rows × cols)
   """
-  @spec from_2d_list([[term()]], Yog.graph_type(), (term(), term() -> boolean())) ::
+  @spec from_2d_list([[term()]], Model.graph_type(), (term(), term() -> boolean())) ::
           GridGraph.t()
   def from_2d_list(grid_data, graph_type, can_move_fn) do
     from_2d_list_with_topology(grid_data, graph_type, rook(), can_move_fn)
@@ -102,7 +102,7 @@ defmodule Yog.Builder.Toroidal do
   """
   @spec from_2d_list_with_topology(
           [[term()]],
-          Yog.graph_type(),
+          Model.graph_type(),
           topology(),
           (term(), term() -> boolean())
         ) ::

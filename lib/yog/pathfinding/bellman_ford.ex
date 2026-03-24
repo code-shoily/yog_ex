@@ -561,9 +561,7 @@ defmodule Yog.Pathfinding.BellmanFord do
             end)
           end)
 
-        if not any_change do
-          {:error, :no_goal}
-        else
+        if any_change do
           do_implicit_bellman_ford(
             successors,
             key_fn,
@@ -573,6 +571,8 @@ defmodule Yog.Pathfinding.BellmanFord do
             next_distances,
             max_iter - 1
           )
+        else
+          {:error, :no_goal}
         end
       end
     end

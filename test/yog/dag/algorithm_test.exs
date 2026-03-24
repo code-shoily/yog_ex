@@ -207,7 +207,7 @@ defmodule Yog.DAG.AlgorithmTest do
       _graph = Model.to_graph(reduction)
 
       # Verify it's still a valid DAG
-      assert {:dag, _} = reduction
+      assert %Yog.DAG{} = reduction
       assert Model.to_graph(reduction) |> Yog.all_nodes() |> length() == 3
     end
 
@@ -226,7 +226,7 @@ defmodule Yog.DAG.AlgorithmTest do
       reduction = Algorithm.transitive_reduction(dag)
 
       # Verify it's still a valid DAG
-      assert {:dag, _} = reduction
+      assert %Yog.DAG{} = reduction
       assert Model.to_graph(reduction) |> Yog.all_nodes() |> length() == 4
     end
   end

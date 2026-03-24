@@ -65,9 +65,7 @@ defmodule Yog.Community do
   - **Local Community**: When the graph is massive/infinite and you only care about the immediate community around specific seeds
   - **Fluid Communities**: Fast and allows finding exactly `k` communities
   """
-
-  alias Yog.Community.Metrics
-  alias Yog.Community.{Result, Dendrogram, Overlapping}
+  alias Yog.Community.{Dendrogram, Metrics, Overlapping, Result}
 
   @typedoc "Community identifier"
   @type community_id :: integer()

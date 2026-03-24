@@ -49,7 +49,7 @@ defmodule Yog.Community.Louvain do
   - [Wikipedia: Louvain Method](https://en.wikipedia.org/wiki/Louvain_method)
   """
 
-  alias Yog.Community.{Result, Dendrogram}
+  alias Yog.Community.{Dendrogram, Metrics, Result}
 
   @typedoc "Options for the Louvain algorithm"
   @type louvain_options :: %{
@@ -177,7 +177,7 @@ defmodule Yog.Community.Louvain do
 
     communities = Result.new(normalized_assignments)
 
-    q = Yog.Community.Metrics.modularity(graph, Result.to_map(communities))
+    q = Metrics.modularity(graph, Result.to_map(communities))
     new_history = [q | mod_history]
 
     if not improved or phase >= options.max_iterations do

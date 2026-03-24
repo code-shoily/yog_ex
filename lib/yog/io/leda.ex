@@ -35,6 +35,8 @@ defmodule Yog.IO.LEDA do
   - **Reversal edges**: Third field indicates index for undirected graphs
   """
 
+  # credo:disable-for-this-file Credo.Check.Refactor.AppendSingleItem
+
   alias Yog.Model
 
   @doc """
@@ -83,7 +85,6 @@ defmodule Yog.IO.LEDA do
         "#{from} #{to} 0 |{#{serialized}}|"
       end)
 
-    # Combine all sections
     (["LEDA.GRAPH", "string", "string", direction, "#{node_count}"] ++
        node_lines ++ ["#{edge_count}"] ++ edge_lines ++ [""])
     |> Enum.join("\n")

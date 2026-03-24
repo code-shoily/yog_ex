@@ -5,9 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-> [!NOTE]
-> **Versioning Scheme**: Starting from `0.51.0`, YogEx versions map to upstream Yog versions as follows: `Yog A.B._` maps to `YogEx 0.AB.0`. Internal YogEx fixes increment the patch version (e.g., `0.51.1`). This will continue until YogEx reaches parity/confidence with upstream versioning.
-
 ## [0.60.0] - 2026-03-23
 
 ### Added
@@ -18,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Graph Structure**: Changed from tuple format `{:graph, kind, nodes, out_edges, in_edges}` to proper Elixir struct `%Yog.Graph{kind, nodes, out_edges, in_edges}`
+- **Improved priority queue usage**: Now uses `Yog.PQ` (pairing heap) instead of sorted lists
+  - `lexicographical_topological_sort`: O(V log V + E) vs O(V² + E) previously
+  - `implicit_dijkstra`: O(E log V) vs O(E × V) previously
+  - More efficient for large graphs
 - **Module Reorganization**:
   - `Yog.Pathfinding` (facade) → Removed, use individual modules directly
   - `Yog.MaxFlow` → `Yog.Flow.MaxFlow`

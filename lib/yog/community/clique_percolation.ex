@@ -52,7 +52,7 @@ defmodule Yog.Community.CliquePercolation do
   > Bron-Kerbosch algorithm from Yog.Property.Clique.
   """
 
-  alias Yog.Community.{Result, Overlapping}
+  alias Yog.Community.{Overlapping, Result}
   alias Yog.Property.Clique
 
   @typedoc "Options for Clique Percolation Method"

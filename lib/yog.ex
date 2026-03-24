@@ -108,9 +108,15 @@ defmodule Yog do
   - **Efficient**: Optimal data structures (pairing heaps, union-find)
   - **Documented**: Every function has examples
   """
+  alias Yog.Graph
+  alias Yog.Model
+  alias Yog.Transform
+  alias Yog.Traversal
 
   # Re-exporting core types
+  @type t() :: Graph.t()
   @type node_id() :: integer()
+  @type graph_type() :: :directed | :undirected
   @type edge_tuple() :: {node_id(), node_id(), any()}
   @type graph() :: any()
   @type order() :: :breadth_first | :depth_first
@@ -199,7 +205,7 @@ defmodule Yog do
       true
   """
   @spec directed() :: graph()
-  def directed, do: Yog.Model.new(:directed)
+  def directed, do: Model.new(:directed)
 
   @doc """
   Creates a new empty undirected graph.
@@ -214,7 +220,7 @@ defmodule Yog do
       true
   """
   @spec undirected() :: graph()
-  def undirected, do: Yog.Model.new(:undirected)
+  def undirected, do: Model.new(:undirected)
 
   @doc """
   Creates a new empty graph of the specified type.
@@ -231,7 +237,7 @@ defmodule Yog do
   """
   @spec new(:directed | :undirected) :: graph()
   def new(type) do
-    Yog.Model.new(type)
+    Model.new(type)
   end
 
   # ============= Modification =============
@@ -249,7 +255,7 @@ defmodule Yog do
       [1, 2]
   """
   @spec add_node(graph(), node_id(), any()) :: graph()
-  defdelegate add_node(graph, id, data), to: Yog.Model
+  defdelegate add_node(graph, id, data), to: Model
 
   @doc """
   Adds an edge to the graph.
@@ -282,7 +288,7 @@ defmodule Yog do
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
     weight = Keyword.fetch!(opts, :with)
-    Yog.Model.add_edge(graph, from, to, weight)
+    Model.add_edge(graph, from, to, weight)
   end
 
   @doc """
@@ -297,7 +303,7 @@ defmodule Yog do
   """
   @spec add_edge(graph(), node_id(), node_id(), any()) :: {:ok, graph()} | {:error, String.t()}
   def add_edge(graph, from, to, weight) do
-    Yog.Model.add_edge(graph, from, to, weight)
+    Model.add_edge(graph, from, to, weight)
   end
 
   @doc """
@@ -315,7 +321,7 @@ defmodule Yog do
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
     weight = Keyword.fetch!(opts, :with)
-    Yog.Model.add_edge_ensure(graph, from, to, weight, nil)
+    Model.add_edge_ensure(graph, from, to, weight, nil)
   end
 
   @doc """
@@ -329,7 +335,7 @@ defmodule Yog do
       [{2, 10}]
   """
   def add_edge!(graph, from, to, weight) do
-    Yog.Model.add_edge_ensure(graph, from, to, weight, nil)
+    Model.add_edge_ensure(graph, from, to, weight, nil)
   end
 
   @doc """
@@ -356,7 +362,7 @@ defmodule Yog do
     to = Keyword.fetch!(opts, :to)
     weight = Keyword.fetch!(opts, :with)
     default = Keyword.get(opts, :default, nil)
-    Yog.Model.add_edge_ensure(graph, from, to, weight, default)
+    Model.add_edge_ensure(graph, from, to, weight, default)
   end
 
   @doc """
@@ -369,7 +375,7 @@ defmodule Yog do
       [{2, 10}]
   """
   def add_edge_ensure(graph, from, to, weight, default) do
-    Yog.Model.add_edge_ensure(graph, from, to, weight, default)
+    Model.add_edge_ensure(graph, from, to, weight, default)
   end
 
   @doc """
@@ -400,7 +406,7 @@ defmodule Yog do
   """
   @spec add_edge_with(graph(), node_id(), node_id(), any(), (node_id() -> any())) :: graph()
   def add_edge_with(graph, from, to, weight, default_fn) do
-    Yog.Model.add_edge_with(graph, from, to, weight, default_fn)
+    Model.add_edge_with(graph, from, to, weight, default_fn)
   end
 
   @doc """
@@ -425,7 +431,7 @@ defmodule Yog do
   def add_unweighted_edge(graph, opts) when is_list(opts) do
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
-    Yog.Model.add_edge(graph, from, to, nil)
+    Model.add_edge(graph, from, to, nil)
   end
 
   @doc """
@@ -444,7 +450,7 @@ defmodule Yog do
   @spec add_unweighted_edge(graph(), node_id(), node_id()) ::
           {:ok, graph()} | {:error, String.t()}
   def add_unweighted_edge(graph, from, to) do
-    Yog.Model.add_edge(graph, from, to, nil)
+    Model.add_edge(graph, from, to, nil)
   end
 
   @doc """
@@ -463,11 +469,11 @@ defmodule Yog do
   def add_unweighted_edge!(graph, opts) when is_list(opts) do
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
-    Yog.Model.add_edge_ensure(graph, from, to, nil, nil)
+    Model.add_edge_ensure(graph, from, to, nil, nil)
   end
 
   def add_unweighted_edge!(graph, from, to) do
-    Yog.Model.add_edge_ensure(graph, from, to, nil, nil)
+    Model.add_edge_ensure(graph, from, to, nil, nil)
   end
 
   @doc """
@@ -492,7 +498,7 @@ defmodule Yog do
   def add_simple_edge(graph, opts) when is_list(opts) do
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
-    Yog.Model.add_edge(graph, from, to, 1)
+    Model.add_edge(graph, from, to, 1)
   end
 
   @doc """
@@ -510,7 +516,7 @@ defmodule Yog do
   """
   @spec add_simple_edge(graph(), node_id(), node_id()) :: {:ok, graph()} | {:error, String.t()}
   def add_simple_edge(graph, from, to) do
-    Yog.Model.add_edge(graph, from, to, 1)
+    Model.add_edge(graph, from, to, 1)
   end
 
   @doc """
@@ -529,11 +535,11 @@ defmodule Yog do
   def add_simple_edge!(graph, opts) when is_list(opts) do
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
-    Yog.Model.add_edge_ensure(graph, from, to, 1, nil)
+    Model.add_edge_ensure(graph, from, to, 1, nil)
   end
 
   def add_simple_edge!(graph, from, to) do
-    Yog.Model.add_edge_ensure(graph, from, to, 1, nil)
+    Model.add_edge_ensure(graph, from, to, 1, nil)
   end
 
   @doc """
@@ -557,7 +563,7 @@ defmodule Yog do
       2
   """
   @spec add_edges(graph(), [edge_tuple()]) :: {:ok, graph()} | {:error, String.t()}
-  defdelegate add_edges(graph, edges), to: Yog.Model
+  defdelegate add_edges(graph, edges), to: Model
 
   @doc """
   Adds multiple edges to the graph, raising on error.
@@ -599,7 +605,7 @@ defmodule Yog do
   """
   @spec add_simple_edges(graph(), [{node_id(), node_id()}]) ::
           {:ok, graph()} | {:error, String.t()}
-  defdelegate add_simple_edges(graph, edges), to: Yog.Model
+  defdelegate add_simple_edges(graph, edges), to: Model
 
   @doc """
   Adds multiple unweighted edges (weight = nil).
@@ -620,7 +626,7 @@ defmodule Yog do
   """
   @spec add_unweighted_edges(graph(), [{node_id(), node_id()}]) ::
           {:ok, graph()} | {:error, String.t()}
-  defdelegate add_unweighted_edges(graph, edges), to: Yog.Model
+  defdelegate add_unweighted_edges(graph, edges), to: Model
 
   # ============= Query =============
 
@@ -639,7 +645,7 @@ defmodule Yog do
       [{2, 10}]
   """
   @spec successors(graph(), node_id()) :: [{node_id(), term()}]
-  defdelegate successors(graph, id), to: Yog.Model
+  defdelegate successors(graph, id), to: Model
 
   @doc """
   Gets nodes you came FROM to reach the given node (predecessors).
@@ -656,7 +662,7 @@ defmodule Yog do
       [{1, 10}]
   """
   @spec predecessors(graph(), node_id()) :: [{node_id(), term()}]
-  defdelegate predecessors(graph, id), to: Yog.Model
+  defdelegate predecessors(graph, id), to: Model
 
   @doc """
   Gets node IDs you can travel TO from the given node.
@@ -675,7 +681,7 @@ defmodule Yog do
       [2, 3]
   """
   @spec successor_ids(graph(), node_id()) :: [node_id()]
-  defdelegate successor_ids(graph, id), to: Yog.Model
+  defdelegate successor_ids(graph, id), to: Model
 
   @doc """
   Gets all nodes connected to the given node, regardless of direction.
@@ -695,7 +701,7 @@ defmodule Yog do
       2
   """
   @spec neighbors(graph(), node_id()) :: [{node_id(), term()}]
-  defdelegate neighbors(graph, id), to: Yog.Model
+  defdelegate neighbors(graph, id), to: Model
 
   @doc """
   Returns all unique node IDs that have edges in the graph.
@@ -711,7 +717,7 @@ defmodule Yog do
       [1, 2]
   """
   @spec all_nodes(graph()) :: [node_id()]
-  defdelegate all_nodes(graph), to: Yog.Model
+  defdelegate all_nodes(graph), to: Model
 
   # ============= Analysis =============
 
@@ -736,7 +742,7 @@ defmodule Yog do
       true
   """
   @spec cyclic?(graph()) :: boolean()
-  defdelegate cyclic?(graph), to: Yog.Traversal
+  defdelegate cyclic?(graph), to: Traversal
 
   @doc """
   Determines if a graph is acyclic (contains no cycles).
@@ -758,7 +764,7 @@ defmodule Yog do
       true
   """
   @spec acyclic?(graph()) :: boolean()
-  defdelegate acyclic?(graph), to: Yog.Traversal
+  defdelegate acyclic?(graph), to: Traversal
 
   # ============= Transform =============
 
@@ -777,7 +783,7 @@ defmodule Yog do
       [{1, 10}]
   """
   @spec transpose(graph()) :: graph()
-  defdelegate transpose(graph), to: Yog.Transform
+  defdelegate transpose(graph), to: Transform
 
   @doc """
   Creates a new graph where node labels are transformed.
@@ -794,7 +800,7 @@ defmodule Yog do
       "A"
   """
   @spec map_nodes(graph(), (any() -> any())) :: graph()
-  defdelegate map_nodes(graph, func), to: Yog.Transform
+  defdelegate map_nodes(graph, func), to: Transform
 
   @doc """
   Creates a new graph where edge weights are transformed.
@@ -811,7 +817,7 @@ defmodule Yog do
       [{2, 20}]
   """
   @spec map_edges(graph(), (any() -> any())) :: graph()
-  defdelegate map_edges(graph, func), to: Yog.Transform
+  defdelegate map_edges(graph, func), to: Transform
 
   @doc """
   Filter nodes by a predicate. Removes nodes that don't match the predicate
@@ -829,7 +835,7 @@ defmodule Yog do
       [1]
   """
   @spec filter_nodes(graph(), (any() -> boolean())) :: graph()
-  defdelegate filter_nodes(graph, predicate), to: Yog.Transform
+  defdelegate filter_nodes(graph, predicate), to: Transform
 
   @doc """
   Filter edges by a predicate. Removes edges that don't match the predicate.
@@ -847,7 +853,7 @@ defmodule Yog do
       [{3, 20}]
   """
   @spec filter_edges(graph(), (node_id(), node_id(), any() -> boolean())) :: graph()
-  defdelegate filter_edges(graph, predicate), to: Yog.Transform
+  defdelegate filter_edges(graph, predicate), to: Transform
 
   @doc """
   Returns the complement of the graph (edges that don't exist in the original).
@@ -873,7 +879,7 @@ defmodule Yog do
       [{1, 1}]
   """
   @spec complement(graph(), any()) :: graph()
-  defdelegate complement(graph, default_weight), to: Yog.Transform
+  defdelegate complement(graph, default_weight), to: Transform
 
   @doc """
   Merges two graphs. Combines nodes and edges from both graphs.
@@ -895,7 +901,7 @@ defmodule Yog do
       3
   """
   @spec merge(graph(), graph()) :: graph()
-  defdelegate merge(base, other), to: Yog.Transform
+  defdelegate merge(base, other), to: Transform
 
   @doc """
   Extracts a subgraph keeping only the specified nodes.
@@ -913,7 +919,7 @@ defmodule Yog do
       [1, 2]
   """
   @spec subgraph(graph(), [node_id()]) :: graph()
-  defdelegate subgraph(graph, ids), to: Yog.Transform
+  defdelegate subgraph(graph, ids), to: Transform
 
   @doc """
   Converts an undirected graph to directed.
@@ -930,7 +936,7 @@ defmodule Yog do
       [{2, 10}]
   """
   @spec to_directed(graph()) :: graph()
-  defdelegate to_directed(graph), to: Yog.Transform
+  defdelegate to_directed(graph), to: Transform
 
   @doc """
   Converts a directed graph to undirected.
@@ -950,7 +956,7 @@ defmodule Yog do
       1
   """
   @spec to_undirected(graph(), (any(), any() -> any())) :: graph()
-  defdelegate to_undirected(graph, resolve_fn), to: Yog.Transform
+  defdelegate to_undirected(graph, resolve_fn), to: Transform
 
   @doc """
   Contracts (merges) two nodes into a single node.
@@ -968,7 +974,7 @@ defmodule Yog do
       2
   """
   @spec contract(graph(), node_id(), node_id(), (any(), any() -> any())) :: graph()
-  defdelegate contract(graph, merge_a, merge_b, combine_fn), to: Yog.Transform
+  defdelegate contract(graph, merge_a, merge_b, combine_fn), to: Transform
 
   # ============= Construction from various formats =============
 
@@ -987,7 +993,7 @@ defmodule Yog do
   @spec from_edges(:directed | :undirected, [{node_id(), node_id(), any()}]) :: graph()
   def from_edges(type, edges) do
     Enum.reduce(edges, new(type), fn {src, dst, weight}, g ->
-      Yog.Model.add_edge_ensure(g, src, dst, weight, nil)
+      Model.add_edge_ensure(g, src, dst, weight, nil)
     end)
   end
 
@@ -1004,7 +1010,7 @@ defmodule Yog do
   @spec from_unweighted_edges(:directed | :undirected, [{node_id(), node_id()}]) :: graph()
   def from_unweighted_edges(type, edges) do
     Enum.reduce(edges, new(type), fn {src, dst}, g ->
-      Yog.Model.add_edge_ensure(g, src, dst, nil, nil)
+      Model.add_edge_ensure(g, src, dst, nil, nil)
     end)
   end
 
@@ -1023,10 +1029,10 @@ defmodule Yog do
   def from_adjacency_list(type, adjacency_list) do
     Enum.reduce(adjacency_list, new(type), fn {src, edges}, g ->
       # First, ensure the source node exists
-      g = Yog.Model.add_node(g, src, nil)
+      g = Model.add_node(g, src, nil)
       # Then add all edges
       Enum.reduce(edges, g, fn {dst, weight}, acc ->
-        Yog.Model.add_edge_ensure(acc, src, dst, weight, nil)
+        Model.add_edge_ensure(acc, src, dst, weight, nil)
       end)
     end)
   end
@@ -1049,7 +1055,7 @@ defmodule Yog do
   """
   @spec walk(graph(), node_id(), :breadth_first | :depth_first) :: [node_id()]
   def walk(graph, start_id, order) do
-    Yog.Traversal.walk(graph, start_id, order)
+    Traversal.walk(graph, start_id, order)
   end
 
   @doc """
@@ -1071,7 +1077,7 @@ defmodule Yog do
   @spec walk_until(graph(), node_id(), :breadth_first | :depth_first, (node_id() -> boolean())) ::
           [node_id()]
   def walk_until(graph, start_id, order, condition) do
-    Yog.Traversal.walk_until(graph, start_id, order, condition)
+    Traversal.walk_until(graph, start_id, order, condition)
   end
 
   @doc """
@@ -1100,6 +1106,6 @@ defmodule Yog do
         ) :: acc
         when acc: var
   def fold_walk(graph, start_id, order, initial, folder) do
-    Yog.Traversal.fold_walk(graph, start_id, order, initial, folder)
+    Traversal.fold_walk(graph, start_id, order, initial, folder)
   end
 end

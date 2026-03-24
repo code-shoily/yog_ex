@@ -63,7 +63,7 @@ defmodule Yog.Community.Leiden do
   > Leiden algorithm with refinement step for well-connected communities.
   """
 
-  alias Yog.Community.{Result, Dendrogram}
+  alias Yog.Community.{Dendrogram, Result}
   alias Yog.Model
 
   @typedoc "Options for the Leiden algorithm"

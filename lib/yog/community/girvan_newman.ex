@@ -52,7 +52,7 @@ defmodule Yog.Community.GirvanNewman do
   > algorithm for edge betweenness centrality calculation using Yog.PQ priority queue.
   """
 
-  alias Yog.Community.{Result, Dendrogram}
+  alias Yog.Community.{Dendrogram, Result}
   alias Yog.Model
   alias Yog.PQ
 
