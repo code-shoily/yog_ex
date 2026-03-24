@@ -8,6 +8,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > [!NOTE]
 > **Versioning Scheme**: Starting from `0.51.0`, YogEx versions map to upstream Yog versions as follows: `Yog A.B._` maps to `YogEx 0.AB.0`. Internal YogEx fixes increment the patch version (e.g., `0.51.1`). This will continue until YogEx reaches parity/confidence with upstream versioning.
 
+## [0.60.0] - 2026-03-23
+
+### Added
+- **Pure Elixir Implementation**: Complete migration from Gleam wrapper to 100% pure Elixir implementation
+  - All 58 modules now implemented in pure Elixir with zero Gleam dependencies
+  - Removed all Gleam dependencies (`:yog`, `:gleam_stdlib`, `:gleam_json`, `:gleamy_structures`, `:gleamy_bench`)
+  - Installation is now as simple as `{:yog_ex, "~> 0.60"}` with no additional configuration required
+
+### Changed
+- **Graph Structure**: Changed from tuple format `{:graph, kind, nodes, out_edges, in_edges}` to proper Elixir struct `%Yog.Graph{kind, nodes, out_edges, in_edges}`
+- **Module Reorganization**:
+  - `Yog.Pathfinding` (facade) → Removed, use individual modules directly
+  - `Yog.MaxFlow` → `Yog.Flow.MaxFlow`
+  - `Yog.MinCut` → `Yog.Flow.MinCut`
+  - `Yog.Render` modules → `Yog.Render.DOT`, `Yog.Render.Mermaid`, `Yog.Render.ASCII`
+  - `Yog.Generators` → `Yog.Generator.Classic`, `Yog.Generator.Random`
+- **API Updates**:
+  - Pathfinding functions now return `%Yog.Pathfinding.Path{}` struct with `weight` field (was `total_weight`)
+  - `edmonds_karp/8` compare function now expects boolean return (`<=` instead of `:lt/:eq/:gt`)
+  - `floyd_warshall/4` uses positional arguments instead of keyword arguments
+  - `global_min_cut/1` moved from `Yog.MinCut` to `Yog.Flow.MinCut`
+
+### Migration Guide
+- **Installation**: Remove all Gleam-related dependencies from your `mix.exs`, keep only `{:yog_ex, "~> 0.60"}`
+- **Graph access**: Replace `elem(graph, 2)` with `graph.nodes`, `elem(graph, 1)` with `graph.kind`
+- **Module names**: Update any `Yog.MaxFlow` calls to `Yog.Flow.MaxFlow`, etc.
+- **Compare functions**: Update compare functions to return booleans instead of `:lt/:eq/:gt`
+
 ## [0.52.3] - 2026-03-22
 
 ### Fixed

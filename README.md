@@ -417,7 +417,7 @@ mix hex.publish package
 1. Verify package: `mix hex.info yog_ex`
 2. Check package page: https://hex.pm/packages/yog_ex
 3. Wait for docs to build: https://hexdocs.pm/yog_ex
-4. Tag the release: `git tag v1.0.0 && git push --tags`
+4. Tag the release: `git tag v0.60.0 && git push --tags`
 
 ## AI Assistance
 
