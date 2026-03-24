@@ -375,6 +375,10 @@ Detailed documentation for each algorithm can be found on [HexDocs](https://hexd
 - **Stable Marriage**: O(n²) Gale-Shapley with deterministic proposal ordering
 - **Test Suite**: 1000+ tests including doctests ensuring equivalence to the core Gleam suite
 
+## Property-Based Testing
+
+This library uses property-based testing (PBT) via `StreamData` to ensure that algorithms hold up against a wide range of automatically generated graph structures. See the [PROPERTIES.md](PROPERTIES.md) for a complete catalog of all algorithmic invariants (hypotheses) verified by the test suite.
+
 ## Development
 
 ### Running Tests
