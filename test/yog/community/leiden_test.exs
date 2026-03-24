@@ -1,24 +1,23 @@
-defmodule Yog.Community.LouvainTest do
+defmodule Yog.Community.LeidenTest do
   @moduledoc """
-  Tests for Yog.Community.Louvain module.
+  Tests for Yog.Community.Leiden module.
 
-  Louvain algorithm is a greedy optimization method for community detection
-  that maximizes modularity.
+  Leiden algorithm is an improvement over Louvain that guarantees
+  well-connected communities and is typically faster.
   """
 
   use ExUnit.Case
 
-  alias Yog.Community.Louvain
+  alias Yog.Community.Leiden
   alias Yog.Community.Metrics
 
-  doctest Louvain
+  doctest Leiden
 
   # ============================================================
   # Basic Detection Tests
   # ============================================================
 
   test "detect finds communities in two triangles connected by bridge" do
-    # Two triangles connected by a single edge
     graph =
       Yog.undirected()
       |> Yog.add_node(0, nil)
@@ -38,22 +37,21 @@ defmodule Yog.Community.LouvainTest do
       # Bridge edge
       |> Yog.add_edge!(from: 2, to: 3, with: 1)
 
-    comms = Louvain.detect(graph)
+    comms = Leiden.detect(graph)
 
-    # Should find at least 2 communities (may find more due to local optima on small graphs)
+    # Should find at least 2 communities
     assert comms.num_communities >= 2
     assert comms.num_communities <= 6
 
     # All nodes should be assigned
     assert map_size(comms.assignments) == 6
 
-    # Modularity should be positive for this clear community structure
+    # Modularity should be positive
     q = Metrics.modularity(graph, comms)
     assert q > 0.0
   end
 
   test "detect on complete graph K5" do
-    # K5 should converge to 1 community (or close to it)
     graph =
       Yog.undirected()
       |> Yog.add_node(0, nil)
@@ -74,7 +72,7 @@ defmodule Yog.Community.LouvainTest do
         {3, 4, 1}
       ])
 
-    comms = Louvain.detect(graph)
+    comms = Leiden.detect(graph)
 
     # A complete graph should ideally be 1 community
     assert comms.num_communities >= 1
@@ -85,7 +83,6 @@ defmodule Yog.Community.LouvainTest do
   end
 
   test "detect on two disjoint triangles" do
-    # Two disjoint triangles should have positive modularity
     graph =
       Yog.undirected()
       |> Yog.add_node(0, nil)
@@ -103,7 +100,7 @@ defmodule Yog.Community.LouvainTest do
         {5, 3, 1}
       ])
 
-    comms = Louvain.detect(graph)
+    comms = Leiden.detect(graph)
     q = Metrics.modularity(graph, comms)
 
     # Modularity should be positive for clear community structure
@@ -128,35 +125,11 @@ defmodule Yog.Community.LouvainTest do
       seed: 123
     ]
 
-    comms = Louvain.detect_with_options(graph, opts)
+    comms = Leiden.detect_with_options(graph, opts)
 
-    # Should produce valid communities
     assert comms.num_communities >= 1
     assert map_size(comms.assignments) == 3
   end
-
-  test "detect on empty graph" do
-    graph = Yog.undirected()
-    comms = Louvain.detect(graph)
-
-    assert comms.num_communities == 0
-    assert comms.assignments == %{}
-  end
-
-  test "detect on single node" do
-    graph =
-      Yog.undirected()
-      |> Yog.add_node(0, nil)
-
-    comms = Louvain.detect(graph)
-
-    assert comms.num_communities == 1
-    assert comms.assignments[0] == 0
-  end
-
-  # ============================================================
-  # Hierarchical Detection Tests
-  # ============================================================
 
   test "detect_hierarchical returns dendrogram" do
     graph =
@@ -171,18 +144,13 @@ defmodule Yog.Community.LouvainTest do
         {2, 3, 1}
       ])
 
-    dendrogram = Louvain.detect_hierarchical(graph)
+    dendrogram = Leiden.detect_hierarchical(graph)
 
-    # Should have multiple levels
     assert length(dendrogram.levels) > 0
     assert is_list(dendrogram.merge_order)
   end
 
-  # ============================================================
-  # Stats Detection Tests
-  # ============================================================
-
-  test "detect_with_stats returns communities with statistics" do
+  test "detect_hierarchical_with_options" do
     graph =
       Yog.undirected()
       |> Yog.add_node(0, nil)
@@ -195,12 +163,26 @@ defmodule Yog.Community.LouvainTest do
       ])
 
     opts = [seed: 42]
-    {communities, stats} = Louvain.detect_with_stats(graph, opts)
+    dendrogram = Leiden.detect_hierarchical_with_options(graph, opts)
 
-    assert communities.num_communities >= 1
-    assert is_map(communities.assignments)
-    assert is_map(stats)
-    assert Map.has_key?(stats, :num_phases)
-    assert Map.has_key?(stats, :final_modularity)
+    assert length(dendrogram.levels) > 0
+  end
+
+  test "detect on empty graph" do
+    graph = Yog.undirected()
+    comms = Leiden.detect(graph)
+
+    assert comms.num_communities == 0
+  end
+
+  test "detect on single node" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(0, nil)
+
+    comms = Leiden.detect(graph)
+
+    assert comms.num_communities == 1
+    assert comms.assignments[0] == 0
   end
 end
