@@ -33,20 +33,21 @@ defmodule Yog.Pathfinding.BellmanFord do
       |> Yog.add_edge(:b, :c, -3)
       |> Yog.add_edge(:a, :c, 2)
 
-      compare = fn a, b when a < b -> :lt; a, b when a > b -> :gt; _, _ -> :eq end
+      compare = &Yog.Utils.compare/2
       BellmanFord.bellman_ford(graph, :a, :c, 0, &(&1+&2), compare)
       #=> {:shortest_path, {:path, [:a, :b, :c], 1}}
   """
 
-  alias Yog.Pathfinding.Utils
+  alias Yog.Model
+  alias Yog.Pathfinding.Path
 
   @typedoc "Result type for Bellman-Ford shortest path queries"
-  @type result(weight) ::
-          {:shortest_path, Utils.path(weight)} | :negative_cycle | :no_path
+  @type result ::
+          {:ok, Path.t()} | {:error, :negative_cycle} | {:error, :no_path}
 
   @typedoc "Result type for implicit Bellman-Ford queries"
   @type implicit_result(weight) ::
-          {:found_goal, weight} | :detected_negative_cycle | :no_goal
+          {:ok, weight} | {:error, :negative_cycle} | {:error, :no_goal}
 
   # ============================================================
   # Keyword-style API (for Pathfinding module delegation)
@@ -66,16 +67,16 @@ defmodule Yog.Pathfinding.BellmanFord do
 
   ## Examples
 
-      Pathfinding.bellman_ford(
+      Pathfinding.BellmanFord.bellman_ford(
         in: graph,
         from: :a,
         to: :c,
         zero: 0,
         add: &(&1 + &2),
-        compare: fn a, b when a < b -> :lt; a, b when a > b -> :gt; _, _ -> :eq end
+        compare: &Yog.Utils.compare/2
       )
   """
-  @spec bellman_ford(keyword()) :: result(any())
+  @spec bellman_ford(keyword()) :: result()
   def bellman_ford(opts) do
     graph = Keyword.fetch!(opts, :in)
     from = Keyword.fetch!(opts, :from)
@@ -107,7 +108,7 @@ defmodule Yog.Pathfinding.BellmanFord do
         is_goal: fn n -> n == 10 end,
         zero: 0,
         add: &(&1 + &2),
-        compare: fn a, b when a < b -> :lt; a, b when a > b -> :gt; _, _ -> :eq end
+        compare: &Yog.Utils.compare/2
       )
   """
   @spec implicit_bellman_ford(keyword()) :: implicit_result(any())
@@ -166,9 +167,9 @@ defmodule Yog.Pathfinding.BellmanFord do
 
   ## Returns
 
-    * `{:shortest_path, path}` - A `Path` struct containing the nodes and weight
-    * `:negative_cycle` - A negative cycle was detected
-    * `:no_path` - No path exists between the nodes
+    * `{:ok, path}` - A `Path` struct containing the nodes and weight
+    * `{:error, :negative_cycle}` - A negative cycle was detected
+    * `{:error, :no_path}` - No path exists between the nodes
 
   ## Examples
 
@@ -178,9 +179,12 @@ defmodule Yog.Pathfinding.BellmanFord do
       ...> |> Yog.add_node(:c, nil)
       ...> |> Yog.add_edge!(:a, :b, 4)
       ...> |> Yog.add_edge!(:b, :c, -3)
-      iex> compare = fn a, b when a < b -> :lt; a, b when a > b -> :gt; _, _ -> :eq end
-      iex> BellmanFord.bellman_ford(graph, :a, :c, 0, &(&1 + &2), compare)
-      {:shortest_path, {:path, [:a, :b, :c], 1}}
+      iex> compare = &Yog.Utils.compare/2
+      iex> {:ok, path} = BellmanFord.bellman_ford(graph, :a, :c, 0, &(&1 + &2), compare)
+      iex> path.nodes
+      [:a, :b, :c]
+      iex> path.weight
+      1
 
       iex> # Graph with negative cycle
       iex> bad_graph = Yog.directed()
@@ -188,9 +192,9 @@ defmodule Yog.Pathfinding.BellmanFord do
       ...> |> Yog.add_node(:b, nil)
       ...> |> Yog.add_edge!(:a, :b, 1)
       ...> |> Yog.add_edge!(:b, :a, -3)
-      iex> compare = fn a, b when a < b -> :lt; a, b when a > b -> :gt; _, _ -> :eq end
+      iex> compare = &Yog.Utils.compare/2
       iex> BellmanFord.bellman_ford(bad_graph, :a, :b, 0, &(&1 + &2), compare)
-      :negative_cycle
+      {:error, :negative_cycle}
   """
   @spec bellman_ford(
           Yog.t(),
@@ -199,26 +203,43 @@ defmodule Yog.Pathfinding.BellmanFord do
           weight,
           (weight, weight -> weight),
           (weight, weight -> :lt | :eq | :gt)
-        ) :: result(weight)
+        ) :: result()
         when weight: var
   def bellman_ford(graph, from, to, zero, add, compare) do
-    gleam_compare = fn a, b ->
-      case compare.(a, b) do
-        :lt -> :lt
-        :eq -> :eq
-        :gt -> :gt
+    nodes = Model.all_nodes(graph)
+    edges = get_all_edges(graph)
+    node_count = length(nodes)
+
+    # Initialize distances
+    initial_distances = %{from => zero}
+    initial_predecessors = %{}
+
+    # Relax edges |V| - 1 times
+    {distances, predecessors} =
+      if node_count <= 1 do
+        {initial_distances, initial_predecessors}
+      else
+        Enum.reduce(1..(node_count - 1), {initial_distances, initial_predecessors}, fn _,
+                                                                                       {dist,
+                                                                                        pred} ->
+          relax_all_edges(edges, dist, pred, add, compare)
+        end)
       end
-    end
 
-    case :yog@pathfinding@bellman_ford.bellman_ford(graph, from, to, zero, add, gleam_compare) do
-      {:shortest_path, {:path, nodes, weight}} ->
-        {:shortest_path, Utils.path(nodes, weight)}
+    # Check for negative cycles with one more relaxation
+    {final_distances, _} = relax_all_edges(edges, distances, predecessors, add, compare)
 
-      :negative_cycle ->
-        :negative_cycle
+    if negative_cycle_detected?(nodes, distances, final_distances, compare) do
+      {:error, :negative_cycle}
+    else
+      case Map.fetch(distances, to) do
+        {:ok, weight} ->
+          path = reconstruct_path_from_predecessors(predecessors, from, to)
+          {:ok, Path.new(path, weight, :bellman_ford)}
 
-      :no_path ->
-        :no_path
+        :error ->
+          {:error, :no_path}
+      end
     end
   end
 
@@ -233,13 +254,15 @@ defmodule Yog.Pathfinding.BellmanFord do
       ...> |> Yog.add_node(3, nil)
       ...> |> Yog.add_edge!(1, 2, 4)
       ...> |> Yog.add_edge!(2, 3, -3)
-      iex> BellmanFord.bellman_ford_int(graph, 1, 3)
-      {:shortest_path, {:path, [1, 2, 3], 1}}
+      iex> {:ok, path} = BellmanFord.bellman_ford_int(graph, 1, 3)
+      iex> path.nodes
+      [1, 2, 3]
+      iex> path.weight
+      1
   """
-  @spec bellman_ford_int(Yog.t(), Yog.node_id(), Yog.node_id()) :: result(integer())
+  @spec bellman_ford_int(Yog.t(), Yog.node_id(), Yog.node_id()) :: result()
   def bellman_ford_int(graph, from, to) do
-    :yog@pathfinding@bellman_ford.bellman_ford_int(graph, from, to)
-    |> wrap_result()
+    bellman_ford(graph, from, to, 0, &(&1 + &2), &Yog.Utils.compare/2)
   end
 
   @doc """
@@ -247,10 +270,9 @@ defmodule Yog.Pathfinding.BellmanFord do
 
   Convenience function for float weights.
   """
-  @spec bellman_ford_float(Yog.t(), Yog.node_id(), Yog.node_id()) :: result(float())
+  @spec bellman_ford_float(Yog.t(), Yog.node_id(), Yog.node_id()) :: result()
   def bellman_ford_float(graph, from, to) do
-    :yog@pathfinding@bellman_ford.bellman_ford_float(graph, from, to)
-    |> wrap_result()
+    bellman_ford(graph, from, to, 0.0, &(&1 + &2), &Yog.Utils.compare/2)
   end
 
   @doc """
@@ -266,33 +288,20 @@ defmodule Yog.Pathfinding.BellmanFord do
           (any(), any() -> :lt | :eq | :gt)
         ) :: %{Yog.node_id() => any()}
   def relaxation_passes(graph, from, zero, add, compare) do
-    gleam_compare = fn a, b ->
-      case compare.(a, b) do
-        :lt -> :lt
-        :eq -> :eq
-        :gt -> :gt
-      end
-    end
+    nodes = Model.all_nodes(graph)
+    edges = get_all_edges(graph)
+    node_count = length(nodes)
 
-    all_nodes = :yog@model.all_nodes(graph)
-    node_count = length(all_nodes)
-    initial_distances = :gleam@dict.from_list([{from, zero}])
-    initial_predecessors = :gleam@dict.new()
+    initial_distances = %{from => zero}
+    initial_predecessors = %{}
 
-    {distances, _predecessors} =
-      :yog@pathfinding@bellman_ford.relaxation_passes(
-        graph,
-        all_nodes,
-        initial_distances,
-        initial_predecessors,
-        node_count - 1,
-        add,
-        gleam_compare
-      )
+    {distances, _} =
+      Enum.reduce(1..(node_count - 1), {initial_distances, initial_predecessors}, fn _,
+                                                                                     {dist, pred} ->
+        relax_all_edges(edges, dist, pred, add, compare)
+      end)
 
     distances
-    |> :gleam@dict.to_list()
-    |> Map.new()
   end
 
   @doc """
@@ -306,33 +315,32 @@ defmodule Yog.Pathfinding.BellmanFord do
           (any(), any() -> :lt | :eq | :gt)
         ) :: boolean()
   def has_negative_cycle?(graph, from, zero, add, compare) do
-    gleam_compare = fn a, b ->
-      case compare.(a, b) do
-        :lt -> :lt
-        :eq -> :eq
-        :gt -> :gt
-      end
-    end
+    nodes = Model.all_nodes(graph)
+    edges = get_all_edges(graph)
+    node_count = length(nodes)
 
-    :yog@pathfinding@bellman_ford.has_negative_cycle(graph, from, zero, add, gleam_compare)
+    initial_distances = %{from => zero}
+
+    # Relax |V| - 1 times
+    distances =
+      Enum.reduce(1..(node_count - 1), initial_distances, fn _, dist ->
+        relax_all_edges_no_pred(edges, dist, add, compare)
+      end)
+
+    # One more relaxation to check for negative cycles
+    final_distances = relax_all_edges_no_pred(edges, distances, add, compare)
+
+    negative_cycle_detected?(nodes, distances, final_distances, compare)
   end
 
   @doc """
   Reconstructs a path from the predecessor map returned by Bellman-Ford.
   """
   @spec reconstruct_path(%{Yog.node_id() => Yog.node_id()}, Yog.node_id(), Yog.node_id(), any()) ::
-          Utils.path(any())
+          Path.t()
   def reconstruct_path(predecessors, from, to, weight) do
-    # Convert Elixir map to Gleam dict
-    gleam_pred =
-      predecessors
-      |> Map.to_list()
-      |> :gleam@dict.from_list()
-
-    {:path, nodes, weight} =
-      :yog@pathfinding@bellman_ford.reconstruct_path(gleam_pred, from, to, weight)
-
-    Utils.path(nodes, weight)
+    path = reconstruct_path_from_predecessors(predecessors, from, to)
+    Path.new(path, weight, :bellman_ford)
   end
 
   @doc """
@@ -352,9 +360,9 @@ defmodule Yog.Pathfinding.BellmanFord do
 
   ## Returns
 
-    * `{:found_goal, cost}` - Minimum cost to reach goal
-    * `:detected_negative_cycle` - A negative cycle was found
-    * `:no_goal` - Goal is unreachable
+    * `{:ok, cost}` - Minimum cost to reach goal
+    * `{:error, :negative_cycle}` - A negative cycle was found
+    * `{:error, :no_goal}` - Goal is unreachable
 
   ## Examples
 
@@ -365,11 +373,12 @@ defmodule Yog.Pathfinding.BellmanFord do
       ...>   3 -> [{4, -3}]
       ...>   4 -> []
       ...> end
-      iex> BellmanFord.implicit_bellman_ford(
+      iex> {:ok, cost} = BellmanFord.implicit_bellman_ford(
       ...>   1, successors, fn x -> x == 4 end,
-      ...>   0, &(&1 + &2), fn a, b when a < b -> :lt; a, b when a > b -> :gt; _, _ -> :eq end
+      ...>   0, &(&1 + &2), &Yog.Utils.compare/2
       ...> )
-      {:found_goal, -6}
+      iex> cost
+      -6
   """
   @spec implicit_bellman_ford(
           state,
@@ -381,22 +390,7 @@ defmodule Yog.Pathfinding.BellmanFord do
         ) :: implicit_result(cost)
         when state: var, cost: var
   def implicit_bellman_ford(from, successors, is_goal, zero, add, compare) do
-    gleam_compare = fn a, b ->
-      case compare.(a, b) do
-        :lt -> :lt
-        :eq -> :eq
-        :gt -> :gt
-      end
-    end
-
-    :yog@pathfinding@bellman_ford.implicit_bellman_ford(
-      from,
-      successors,
-      is_goal,
-      zero,
-      add,
-      gleam_compare
-    )
+    implicit_bellman_ford_by(from, successors, fn x -> x end, is_goal, zero, add, compare)
   end
 
   @doc """
@@ -425,30 +419,162 @@ defmodule Yog.Pathfinding.BellmanFord do
         ) :: implicit_result(cost)
         when state: var, cost: var
   def implicit_bellman_ford_by(from, successors, key_fn, is_goal, zero, add, compare) do
-    gleam_compare = fn a, b ->
-      case compare.(a, b) do
-        :lt -> :lt
-        :eq -> :eq
-        :gt -> :gt
+    # For implicit graphs, we don't know the total node count
+    # So we use a limit on iterations and detect when distances stabilize
+    initial_distances = %{key_fn.(from) => {from, zero}}
+
+    do_implicit_bellman_ford(successors, key_fn, is_goal, add, compare, initial_distances, 1000)
+  end
+
+  # Helper functions
+
+  defp get_all_edges(graph) do
+    nodes = Model.all_nodes(graph)
+
+    Enum.flat_map(nodes, fn u ->
+      successors = Model.successors(graph, u)
+      Enum.map(successors, fn {v, weight} -> {u, v, weight} end)
+    end)
+  end
+
+  # Relax all edges, tracking predecessors
+  defp relax_all_edges(edges, distances, predecessors, add, compare) do
+    Enum.reduce(edges, {distances, predecessors}, fn {u, v, weight}, {dist, pred} ->
+      case Map.fetch(dist, u) do
+        {:ok, dist_u} ->
+          new_dist_v = add.(dist_u, weight)
+
+          case Map.fetch(dist, v) do
+            {:ok, current_dist_v} ->
+              if compare.(new_dist_v, current_dist_v) == :lt do
+                {Map.put(dist, v, new_dist_v), Map.put(pred, v, u)}
+              else
+                {dist, pred}
+              end
+
+            :error ->
+              {Map.put(dist, v, new_dist_v), Map.put(pred, v, u)}
+          end
+
+        :error ->
+          {dist, pred}
+      end
+    end)
+  end
+
+  # Relax all edges without tracking predecessors
+  defp relax_all_edges_no_pred(edges, distances, add, compare) do
+    Enum.reduce(edges, distances, fn {u, v, weight}, dist ->
+      case Map.fetch(dist, u) do
+        {:ok, dist_u} ->
+          new_dist_v = add.(dist_u, weight)
+
+          case Map.fetch(dist, v) do
+            {:ok, current_dist_v} ->
+              if compare.(new_dist_v, current_dist_v) == :lt do
+                Map.put(dist, v, new_dist_v)
+              else
+                dist
+              end
+
+            :error ->
+              Map.put(dist, v, new_dist_v)
+          end
+
+        :error ->
+          dist
+      end
+    end)
+  end
+
+  defp negative_cycle_detected?(nodes, old_distances, new_distances, compare) do
+    Enum.any?(nodes, fn node ->
+      old_val = Map.get(old_distances, node)
+      new_val = Map.get(new_distances, node)
+
+      if old_val == nil or new_val == nil do
+        false
+      else
+        compare.(new_val, old_val) == :lt
+      end
+    end)
+  end
+
+  defp reconstruct_path_from_predecessors(predecessors, from, to) do
+    reconstruct_path_recursive(predecessors, from, to, [to])
+  end
+
+  defp reconstruct_path_recursive(_predecessors, from, current, acc) when current == from do
+    acc
+  end
+
+  defp reconstruct_path_recursive(predecessors, from, current, acc) do
+    case Map.fetch(predecessors, current) do
+      {:ok, prev} -> reconstruct_path_recursive(predecessors, from, prev, [prev | acc])
+      # No path exists
+      :error -> []
+    end
+  end
+
+  defp do_implicit_bellman_ford(successors, key_fn, is_goal, add, compare, distances, max_iter) do
+    # First, check if we've reached the goal
+    goal_result =
+      Enum.find_value(distances, fn {_, {state, dist}} ->
+        if is_goal.(state) do
+          {:ok, dist}
+        else
+          nil
+        end
+      end)
+
+    if goal_result do
+      goal_result
+    else
+      if max_iter <= 0 do
+        # Too many iterations, likely a negative cycle
+        {:error, :negative_cycle}
+      else
+        # Build a list of all state-distance pairs to process
+        state_dist_pairs = Enum.map(distances, fn {_, {state, dist}} -> {state, dist} end)
+
+        # Relax all edges from all current states
+        {next_distances, any_change} =
+          Enum.reduce(state_dist_pairs, {distances, false}, fn {state, state_dist},
+                                                               {dists, changed} ->
+            next_states = successors.(state)
+
+            Enum.reduce(next_states, {dists, changed}, fn {next_state, cost}, {acc, ch} ->
+              key = key_fn.(next_state)
+              new_dist = add.(state_dist, cost)
+
+              case Map.fetch(acc, key) do
+                {:ok, {_, current_dist}} ->
+                  if compare.(new_dist, current_dist) == :lt do
+                    {Map.put(acc, key, {next_state, new_dist}), true}
+                  else
+                    {acc, ch}
+                  end
+
+                :error ->
+                  {Map.put(acc, key, {next_state, new_dist}), true}
+              end
+            end)
+          end)
+
+        if not any_change do
+          {:error, :no_goal}
+        else
+          do_implicit_bellman_ford(
+            successors,
+            key_fn,
+            is_goal,
+            add,
+            compare,
+            next_distances,
+            max_iter - 1
+          )
+        end
       end
     end
-
-    :yog@pathfinding@bellman_ford.implicit_bellman_ford_by(
-      from,
-      successors,
-      key_fn,
-      is_goal,
-      zero,
-      add,
-      gleam_compare
-    )
   end
-
-  # Private helper to wrap Gleam result
-  defp wrap_result({:shortest_path, {:path, nodes, weight}}) do
-    {:shortest_path, Utils.path(nodes, weight)}
-  end
-
-  defp wrap_result(:negative_cycle), do: :negative_cycle
-  defp wrap_result(:no_path), do: :no_path
 end

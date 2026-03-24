@@ -25,8 +25,8 @@ defmodule Yog.Transform do
   ## Functor Laws
 
   The mapping operations satisfy functor laws:
-  - Identity: `map_nodes(g, fn(x) { x }) == g`
-  - Composition: `map_nodes(map_nodes(g, f), h) == map_nodes(g, fn(x) { h(f(x)) })`
+  - Identity: `map_nodes(g, fn x -> x end) == g`
+  - Composition: `map_nodes(map_nodes(g, f), h) == map_nodes(g, fn x -> h.(f.(x)) end)`
 
   ## Use Cases
 
@@ -34,7 +34,12 @@ defmodule Yog.Transform do
   - **Type Conversion**: Changing node/edge data types for algorithm requirements
   - **Subgraph Extraction**: Working with portions of large graphs
   - **Weight Normalization**: Preprocessing edge weights
+
+  > **Migration Note:** This module was ported from Gleam to pure Elixir in v0.53.0.
+  > The API remains unchanged.
   """
+
+  alias Yog.Model
 
   @doc """
   Reverses the direction of every edge in the graph (graph transpose).
@@ -67,7 +72,9 @@ defmodule Yog.Transform do
   - Reversing dependencies in a DAG
   """
   @spec transpose(Yog.graph()) :: Yog.graph()
-  defdelegate transpose(graph), to: :yog@transform
+  def transpose(%Yog.Graph{} = graph) do
+    %{graph | out_edges: graph.in_edges, in_edges: graph.out_edges}
+  end
 
   @doc """
   Transforms node data using a function, preserving graph structure.
@@ -87,7 +94,7 @@ defmodule Yog.Transform do
       ...>   |> Yog.add_node(2, "bob")
       iex> uppercased = Yog.Transform.map_nodes(graph, &String.upcase/1)
       iex> # Nodes now contain "ALICE" and "BOB"
-      iex> elem(uppercased, 2)[1]
+      iex> uppercased.nodes[1]
       "ALICE"
 
   ## Type Changes
@@ -100,11 +107,14 @@ defmodule Yog.Transform do
       ...>   |> Yog.add_node(1, "5")
       ...>   |> Yog.add_node(2, "10")
       iex> int_graph = Yog.Transform.map_nodes(graph, fn s -> String.to_integer(s) end)
-      iex> elem(int_graph, 2)[1]
+      iex> int_graph.nodes[1]
       5
   """
   @spec map_nodes(Yog.graph(), (term() -> term())) :: Yog.graph()
-  defdelegate map_nodes(graph, fun), to: :yog@transform
+  def map_nodes(%Yog.Graph{} = graph, fun) do
+    new_nodes = Map.new(graph.nodes, fn {id, data} -> {id, fun.(data)} end)
+    %{graph | nodes: new_nodes}
+  end
 
   @doc """
   Transforms edge weights using a function, preserving graph structure.
@@ -157,7 +167,21 @@ defmodule Yog.Transform do
       [{2, "short"}]
   """
   @spec map_edges(Yog.graph(), (term() -> term())) :: Yog.graph()
-  defdelegate map_edges(graph, fun), to: :yog@transform
+  def map_edges(%Yog.Graph{} = graph, fun) do
+    transform_inner = fn inner_map ->
+      Map.new(inner_map, fn {dst, weight} -> {dst, fun.(weight)} end)
+    end
+
+    transform_outer = fn outer_map ->
+      Map.new(outer_map, fn {src, inner_map} -> {src, transform_inner.(inner_map)} end)
+    end
+
+    %{
+      graph
+      | out_edges: transform_outer.(graph.out_edges),
+        in_edges: transform_outer.(graph.in_edges)
+    }
+  end
 
   @doc """
   Filters nodes by a predicate, automatically pruning connected edges.
@@ -182,7 +206,7 @@ defmodule Yog.Transform do
       ...>   String.starts_with?(s, "a")
       ...> end)
       iex> # Result has nodes 1 and 3, edge 1->2 is removed (node 2 gone)
-      iex> map_size(elem(filtered, 2))
+      iex> map_size(filtered.nodes)
       2
 
   ## Use Cases
@@ -192,7 +216,25 @@ defmodule Yog.Transform do
   - Filter by node importance/centrality
   """
   @spec filter_nodes(Yog.graph(), (term() -> boolean())) :: Yog.graph()
-  defdelegate filter_nodes(graph, predicate), to: :yog@transform
+  def filter_nodes(%Yog.Graph{} = graph, predicate) do
+    kept_nodes = Map.filter(graph.nodes, fn {_id, data} -> predicate.(data) end)
+    kept_ids = MapSet.new(Map.keys(kept_nodes))
+
+    prune_edges = fn outer_map ->
+      outer_map
+      |> Map.filter(fn {src, _} -> MapSet.member?(kept_ids, src) end)
+      |> Map.new(fn {src, inner_map} ->
+        {src, Map.filter(inner_map, fn {dst, _} -> MapSet.member?(kept_ids, dst) end)}
+      end)
+    end
+
+    %{
+      graph
+      | nodes: kept_nodes,
+        out_edges: prune_edges.(graph.out_edges),
+        in_edges: prune_edges.(graph.in_edges)
+    }
+  end
 
   @doc """
   Filters edges by a predicate, preserving all nodes.
@@ -224,7 +266,20 @@ defmodule Yog.Transform do
   """
   @spec filter_edges(Yog.graph(), (Yog.node_id(), Yog.node_id(), term() -> boolean())) ::
           Yog.graph()
-  defdelegate filter_edges(graph, predicate), to: :yog@transform
+  def filter_edges(%Yog.Graph{} = graph, predicate) do
+    filter_outer = fn outer_map ->
+      outer_map
+      |> Map.new(fn {src, inner_map} ->
+        filtered_inner =
+          Map.filter(inner_map, fn {dst, weight} -> predicate.(src, dst, weight) end)
+
+        {src, filtered_inner}
+      end)
+      |> Map.filter(fn {_src, inner_map} -> map_size(inner_map) > 0 end)
+    end
+
+    %{graph | out_edges: filter_outer.(graph.out_edges), in_edges: filter_outer.(graph.in_edges)}
+  end
 
   @doc """
   Creates the complement of a graph.
@@ -258,7 +313,31 @@ defmodule Yog.Transform do
   - Testing graph density (sparse ↔ dense complement)
   """
   @spec complement(Yog.graph(), term()) :: Yog.graph()
-  defdelegate complement(graph, default_weight), to: :yog@transform
+  def complement(%Yog.Graph{} = graph, default_weight) do
+    node_ids = Map.keys(graph.nodes)
+    init_graph = %{graph | out_edges: %{}, in_edges: %{}}
+
+    Enum.reduce(node_ids, init_graph, fn src, acc_graph ->
+      Enum.reduce(node_ids, acc_graph, fn dst, acc ->
+        if src == dst do
+          acc
+        else
+          has_edge =
+            case Map.fetch(graph.out_edges, src) do
+              {:ok, inner} -> Map.has_key?(inner, dst)
+              :error -> false
+            end
+
+          if has_edge do
+            acc
+          else
+            {:ok, new_graph} = Model.add_edge(acc, src, dst, default_weight)
+            new_graph
+          end
+        end
+      end)
+    end)
+  end
 
   @doc """
   Combines two graphs, with the second graph's data taking precedence on conflicts.
@@ -300,7 +379,22 @@ defmodule Yog.Transform do
   - Building graphs incrementally from multiple sources
   """
   @spec merge(Yog.graph(), Yog.graph()) :: Yog.graph()
-  defdelegate merge(base, other), to: :yog@transform
+  def merge(%Yog.Graph{} = graph1, %Yog.Graph{} = graph2) do
+    merge_inner = fn m1, m2 -> Map.merge(m1, m2) end
+
+    merge_outer = fn outer1, outer2 ->
+      Map.merge(outer1, outer2, fn _src, inner1, inner2 ->
+        merge_inner.(inner1, inner2)
+      end)
+    end
+
+    %{
+      graph1
+      | nodes: Map.merge(graph1.nodes, graph2.nodes),
+        out_edges: merge_outer.(graph1.out_edges, graph2.out_edges),
+        in_edges: merge_outer.(graph1.in_edges, graph2.in_edges)
+    }
+  end
 
   @doc """
   Extracts a subgraph containing only the specified nodes and their connecting edges.
@@ -341,7 +435,26 @@ defmodule Yog.Transform do
   - `subgraph/2` - Filters by explicit node IDs (e.g., "keep nodes [1, 5, 7]")
   """
   @spec subgraph(Yog.graph(), [Yog.node_id()]) :: Yog.graph()
-  defdelegate subgraph(graph, keeping), to: :yog@transform
+  def subgraph(%Yog.Graph{} = graph, ids) do
+    id_set = MapSet.new(ids)
+
+    filtered_nodes = Map.filter(graph.nodes, fn {id, _} -> MapSet.member?(id_set, id) end)
+
+    prune = fn outer ->
+      outer
+      |> Map.filter(fn {src, _} -> MapSet.member?(id_set, src) end)
+      |> Map.new(fn {src, inner} ->
+        {src, Map.filter(inner, fn {dst, _} -> MapSet.member?(id_set, dst) end)}
+      end)
+    end
+
+    %{
+      graph
+      | nodes: filtered_nodes,
+        out_edges: prune.(graph.out_edges),
+        in_edges: prune.(graph.in_edges)
+    }
+  end
 
   @doc """
   Contracts an edge by merging node `b` into node `a`.
@@ -406,7 +519,39 @@ defmodule Yog.Transform do
           Yog.node_id(),
           (term(), term() -> term())
         ) :: Yog.graph()
-  defdelegate contract(graph, a, b, combine_weight), to: :yog@transform
+  def contract(%Yog.Graph{} = graph, a, b, combine_weight) do
+    b_out = Map.get(graph.out_edges, b, %{})
+
+    graph_with_out_edges =
+      Enum.reduce(b_out, graph, fn {neighbor, weight}, acc_g ->
+        if neighbor == a || neighbor == b do
+          acc_g
+        else
+          {:ok, g} = Model.add_edge_with_combine(acc_g, a, neighbor, weight, combine_weight)
+          g
+        end
+      end)
+
+    final_graph =
+      case graph.kind do
+        :undirected ->
+          graph_with_out_edges
+
+        :directed ->
+          b_in = Map.get(graph_with_out_edges.in_edges, b, %{})
+
+          Enum.reduce(b_in, graph_with_out_edges, fn {neighbor, weight}, acc_g ->
+            if neighbor == a || neighbor == b do
+              acc_g
+            else
+              {:ok, g} = Model.add_edge_with_combine(acc_g, neighbor, a, weight, combine_weight)
+              g
+            end
+          end)
+      end
+
+    Model.remove_node(final_graph, b)
+  end
 
   @doc """
   Converts an undirected graph to a directed graph.
@@ -429,11 +574,13 @@ defmodule Yog.Transform do
       ...>   |> Yog.add_edge!(from: 1, to: 2, with: 10)
       iex> directed = Yog.Transform.to_directed(undirected)
       iex> # Has edges: 1->2 and 2->1 (both with weight 10)
-      iex> elem(directed, 1)
+      iex> directed.kind
       :directed
   """
   @spec to_directed(Yog.graph()) :: Yog.graph()
-  defdelegate to_directed(graph), to: :yog@transform
+  def to_directed(%Yog.Graph{} = graph) do
+    %{graph | kind: :directed}
+  end
 
   @doc """
   Converts a directed graph to an undirected graph.
@@ -473,5 +620,26 @@ defmodule Yog.Transform do
       [{2, 5}]
   """
   @spec to_undirected(Yog.graph(), (term(), term() -> term())) :: Yog.graph()
-  defdelegate to_undirected(graph, resolve), to: :yog@transform
+  def to_undirected(%Yog.Graph{kind: :undirected} = graph, _resolve) do
+    graph
+  end
+
+  def to_undirected(%Yog.Graph{kind: :directed} = graph, resolve) do
+    symmetric_out =
+      Enum.reduce(graph.out_edges, graph.out_edges, fn {src, inner}, acc_outer ->
+        Enum.reduce(inner, acc_outer, fn {dst, weight}, acc ->
+          dst_inner = Map.get(acc, dst, %{})
+
+          updated_inner =
+            case Map.fetch(dst_inner, src) do
+              {:ok, existing} -> Map.put(dst_inner, src, resolve.(existing, weight))
+              :error -> Map.put(dst_inner, src, weight)
+            end
+
+          Map.put(acc, dst, updated_inner)
+        end)
+      end)
+
+    %{graph | kind: :undirected, out_edges: symmetric_out, in_edges: symmetric_out}
+  end
 end

@@ -228,7 +228,7 @@ defmodule Yog.Multi.Traversal do
     end
   end
 
-  defp fold_walk_reducer({neighbor, succ_edge_id, _data}, current, depth, acc2 = {q, d, ve}) do
+  defp fold_walk_reducer({neighbor, succ_edge_id, _data}, current, depth, {q, d, ve} = acc2) do
     if MapSet.member?(ve, succ_edge_id) do
       acc2
     else

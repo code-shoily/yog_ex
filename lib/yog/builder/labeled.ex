@@ -5,7 +5,7 @@ defmodule Yog.Builder.Labeled do
   This module provides a convenient way to build graphs when your nodes are
   naturally identified by strings, atoms, or other types, rather than integers.
 
-  ## Example Usage (Not a doctest - delegates to Erlang)
+  ## Example Usage
 
       # Build a graph with string labels
       builder = Yog.Builder.Labeled.directed()
@@ -19,7 +19,7 @@ defmodule Yog.Builder.Labeled do
       {:ok, home_id} = Yog.Builder.Labeled.get_id(builder, "home")
 
       # Use with pathfinding
-      case Yog.Pathfinding.shortest_path(
+      case Yog.Pathfinding.Dijkstra.shortest_path(
         in: graph,
         from: home_id,
         to: gym_id,
@@ -35,13 +35,18 @@ defmodule Yog.Builder.Labeled do
 
   For building from existing data, use the `from_list` functions:
 
-      # edges = [{"A", "B", 5}, {"B", "C", 3}, {"A", "C", 10}]
-      # builder = Yog.Builder.Labeled.from_list(:directed, edges)
-      # graph = Yog.Builder.Labeled.to_graph(builder)
+      edges = [{"A", "B", 5}, {"B", "C", 3}, {"A", "C", 10}]
+      builder = Yog.Builder.Labeled.from_list(:directed, edges)
+      graph = Yog.Builder.Labeled.to_graph(builder)
+
+  > **Migration Note:** This module was ported from Gleam to pure Elixir in v0.53.0.
+  > The API remains unchanged.
   """
 
-  @typedoc "Opaque builder type"
-  @type builder :: term()
+  alias Yog.Model
+
+  @typedoc "Builder type: {:labeled_builder, kind, graph, label_to_id, next_id}"
+  @type builder :: {:labeled_builder, Yog.graph_type(), Yog.graph(), map(), integer()}
 
   @typedoc "Any type can be used as a label"
   @type label :: term()
@@ -58,7 +63,7 @@ defmodule Yog.Builder.Labeled do
       true
   """
   @spec directed() :: builder()
-  defdelegate directed(), to: :yog@builder@labeled
+  def directed, do: new(:directed)
 
   @doc """
   Creates a new labeled undirected graph builder.
@@ -70,7 +75,7 @@ defmodule Yog.Builder.Labeled do
       true
   """
   @spec undirected() :: builder()
-  defdelegate undirected(), to: :yog@builder@labeled
+  def undirected, do: new(:undirected)
 
   @doc """
   Creates a new labeled graph builder of the specified type.
@@ -82,7 +87,9 @@ defmodule Yog.Builder.Labeled do
       true
   """
   @spec new(Yog.graph_type()) :: builder()
-  defdelegate new(graph_type), to: :yog@builder@labeled
+  def new(graph_type) do
+    {:labeled_builder, graph_type, Model.new(graph_type), %{}, 0}
+  end
 
   # ============= Node Operations =============
 
@@ -97,7 +104,10 @@ defmodule Yog.Builder.Labeled do
       ["Node A"]
   """
   @spec add_node(builder(), label()) :: builder()
-  defdelegate add_node(builder, label), to: :yog@builder@labeled
+  def add_node(builder, label) do
+    {new_builder, _id} = ensure_node(builder, label)
+    new_builder
+  end
 
   @doc """
   Gets or creates a node for the given label.
@@ -113,7 +123,19 @@ defmodule Yog.Builder.Labeled do
       true
   """
   @spec ensure_node(builder(), label()) :: {builder(), Yog.node_id()}
-  defdelegate ensure_node(builder, label), to: :yog@builder@labeled
+  def ensure_node({:labeled_builder, kind, graph, label_to_id, next_id} = builder, label) do
+    case Map.fetch(label_to_id, label) do
+      {:ok, id} ->
+        {builder, id}
+
+      :error ->
+        id = next_id
+        new_graph = Model.add_node(graph, id, label)
+        new_mapping = Map.put(label_to_id, label, id)
+        new_builder = {:labeled_builder, kind, new_graph, new_mapping, id + 1}
+        {new_builder, id}
+    end
+  end
 
   # ============= Edge Operations =============
 
@@ -131,7 +153,15 @@ defmodule Yog.Builder.Labeled do
       [{"B", 10}]
   """
   @spec add_edge(builder(), label(), label(), term()) :: builder()
-  defdelegate add_edge(builder, from, to, weight), to: :yog@builder@labeled
+  def add_edge(builder, from, to, weight) do
+    {builder_with_src, src_id} = ensure_node(builder, from)
+    {builder_with_both, dst_id} = ensure_node(builder_with_src, to)
+
+    {:labeled_builder, kind, graph, label_to_id, next_id} = builder_with_both
+    {:ok, new_graph} = Model.add_edge(graph, src_id, dst_id, weight)
+
+    {:labeled_builder, kind, new_graph, label_to_id, next_id}
+  end
 
   @doc """
   Adds an unweighted edge between two labeled nodes.
@@ -143,12 +173,14 @@ defmodule Yog.Builder.Labeled do
       iex> {:ok, [{"B", nil}]} = Yog.Builder.Labeled.successors(builder, "A")
   """
   @spec add_unweighted_edge(builder(), label(), label()) :: builder()
-  defdelegate add_unweighted_edge(builder, from, to), to: :yog@builder@labeled
+  def add_unweighted_edge(builder, from, to) do
+    add_edge(builder, from, to, nil)
+  end
 
   @doc """
-  Adds a simple edge with no weight data between two labeled nodes.
+  Adds a simple edge with weight 1 between two labeled nodes.
 
-  Unlike `add_unweighted_edge/3` which stores weight as 1, this stores no weight.
+  Unlike `add_unweighted_edge/3` which stores weight as nil, this stores weight as 1.
 
   ## Examples
 
@@ -158,7 +190,9 @@ defmodule Yog.Builder.Labeled do
       true
   """
   @spec add_simple_edge(builder(), label(), label()) :: builder()
-  defdelegate add_simple_edge(builder, from, to), to: :yog@builder@labeled
+  def add_simple_edge(builder, from, to) do
+    add_edge(builder, from, to, 1)
+  end
 
   # ============= Batch Construction =============
 
@@ -172,7 +206,11 @@ defmodule Yog.Builder.Labeled do
       iex> {:ok, [{"B", 5}]} = Yog.Builder.Labeled.successors(builder, "A")
   """
   @spec from_list(Yog.graph_type(), [{label(), label(), term()}]) :: builder()
-  defdelegate from_list(graph_type, edges), to: :yog@builder@labeled
+  def from_list(graph_type, edges) do
+    Enum.reduce(edges, new(graph_type), fn {src, dst, weight}, builder ->
+      add_edge(builder, src, dst, weight)
+    end)
+  end
 
   @doc """
   Creates a builder from a list of unweighted labeled edges.
@@ -184,7 +222,11 @@ defmodule Yog.Builder.Labeled do
       iex> {:ok, [{"B", nil}]} = Yog.Builder.Labeled.successors(builder, "A")
   """
   @spec from_unweighted_list(Yog.graph_type(), [{label(), label()}]) :: builder()
-  defdelegate from_unweighted_list(graph_type, edges), to: :yog@builder@labeled
+  def from_unweighted_list(graph_type, edges) do
+    Enum.reduce(edges, new(graph_type), fn {src, dst}, builder ->
+      add_unweighted_edge(builder, src, dst)
+    end)
+  end
 
   # ============= Conversion =============
 
@@ -202,7 +244,9 @@ defmodule Yog.Builder.Labeled do
       true
   """
   @spec to_graph(builder()) :: Yog.graph()
-  defdelegate to_graph(builder), to: :yog@builder@labeled
+  def to_graph({:labeled_builder, _kind, graph, _label_to_id, _next_id}) do
+    graph
+  end
 
   @doc """
   Gets the label-to-ID registry as a map.
@@ -218,7 +262,9 @@ defmodule Yog.Builder.Labeled do
       0
   """
   @spec to_registry(builder()) :: %{label() => Yog.node_id()}
-  defdelegate to_registry(builder), to: :yog@builder@labeled
+  def to_registry({:labeled_builder, _kind, _graph, label_to_id, _next_id}) do
+    label_to_id
+  end
 
   # ============= Queries =============
 
@@ -239,10 +285,10 @@ defmodule Yog.Builder.Labeled do
       {:error, nil}
   """
   @spec get_id(builder(), label()) :: {:ok, Yog.node_id()} | {:error, nil}
-  def get_id(builder, label) do
-    case :yog@builder@labeled.get_id(builder, label) do
+  def get_id({:labeled_builder, _kind, _graph, label_to_id, _next_id}, label) do
+    case Map.fetch(label_to_id, label) do
       {:ok, id} -> {:ok, id}
-      {:error, _} -> {:error, nil}
+      :error -> {:error, nil}
     end
   end
 
@@ -258,7 +304,9 @@ defmodule Yog.Builder.Labeled do
       ["A", "B"]
   """
   @spec all_labels(builder()) :: [label()]
-  defdelegate all_labels(builder), to: :yog@builder@labeled
+  def all_labels({:labeled_builder, _kind, _graph, label_to_id, _next_id}) do
+    Map.keys(label_to_id)
+  end
 
   @doc """
   Gets the next available node ID.
@@ -275,7 +323,9 @@ defmodule Yog.Builder.Labeled do
       1
   """
   @spec next_id(builder()) :: Yog.node_id()
-  defdelegate next_id(builder), to: :yog@builder@labeled
+  def next_id({:labeled_builder, _kind, _graph, _label_to_id, next_id}) do
+    next_id
+  end
 
   @doc """
   Gets the successors of a node by its label.
@@ -291,10 +341,15 @@ defmodule Yog.Builder.Labeled do
       {:ok, [{"B", 10}]}
   """
   @spec successors(builder(), label()) :: {:ok, [{label(), term()}]} | {:error, nil}
-  def successors(builder, label) do
-    case :yog@builder@labeled.successors(builder, label) do
-      {:ok, edges} -> {:ok, edges}
-      {:error, _} -> {:error, nil}
+  def successors({:labeled_builder, _kind, graph, label_to_id, _next_id}, label) do
+    case Map.fetch(label_to_id, label) do
+      {:ok, id} ->
+        successor_edges = Model.successors(graph, id)
+        labeled_edges = map_ids_to_labels(successor_edges, graph)
+        {:ok, labeled_edges}
+
+      :error ->
+        {:error, nil}
     end
   end
 
@@ -312,10 +367,26 @@ defmodule Yog.Builder.Labeled do
       {:ok, [{"A", 5}]}
   """
   @spec predecessors(builder(), label()) :: {:ok, [{label(), term()}]} | {:error, nil}
-  def predecessors(builder, label) do
-    case :yog@builder@labeled.predecessors(builder, label) do
-      {:ok, edges} -> {:ok, edges}
-      {:error, _} -> {:error, nil}
+  def predecessors({:labeled_builder, _kind, graph, label_to_id, _next_id}, label) do
+    case Map.fetch(label_to_id, label) do
+      {:ok, id} ->
+        predecessor_edges = Model.predecessors(graph, id)
+        labeled_edges = map_ids_to_labels(predecessor_edges, graph)
+        {:ok, labeled_edges}
+
+      :error ->
+        {:error, nil}
     end
+  end
+
+  # ============= Private Helpers =============
+
+  defp map_ids_to_labels(edges, graph) do
+    Enum.flat_map(edges, fn {node_id, edge_data} ->
+      case Model.node(graph, node_id) do
+        nil -> []
+        label -> [{label, edge_data}]
+      end
+    end)
   end
 end

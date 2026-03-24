@@ -18,7 +18,7 @@ defmodule Yog.Traversal do
   - `walk/1` / `walk/3`: Simple traversals returning visited nodes in order
   - `fold_walk/1`: Generic traversal with custom fold function and metadata
   - `topological_sort/1`: Ordering for DAGs (uses Kahn's algorithm)
-  - `is_cyclic/1` / `is_acyclic/1`: Cycle detection
+  - `cyclic?/1` / `acyclic?/1`: Cycle detection
 
   ## Walk Control
 
@@ -37,7 +37,12 @@ defmodule Yog.Traversal do
   - [Wikipedia: Graph Traversal](https://en.wikipedia.org/wiki/Graph_traversal)
   - [CP-Algorithms: DFS/BFS](https://cp-algorithms.com/graph/breadth-first-search.html)
   - [Wikipedia: Topological Sorting](https://en.wikipedia.org/wiki/Topological_sorting)
+
+  > **Migration Note:** This module was ported from Gleam to pure Elixir in v0.53.0.
+  > The API remains unchanged.
   """
+
+  alias Yog.Model
 
   @typedoc """
   Traversal order for graph walking algorithms.
@@ -168,13 +173,14 @@ defmodule Yog.Traversal do
     graph = Keyword.fetch!(opts, :in)
     order = Keyword.fetch!(opts, :using)
 
-    gleam_order =
-      case order do
-        :breadth_first -> :breadth_first
-        :depth_first -> :depth_first
-      end
-
-    :yog@traversal.walk(graph, from, gleam_order)
+    fold_walk(
+      over: graph,
+      from: from,
+      using: order,
+      initial: [],
+      with: fn acc, node_id, _meta -> {:continue, [node_id | acc]} end
+    )
+    |> Enum.reverse()
   end
 
   @doc """
@@ -192,13 +198,7 @@ defmodule Yog.Traversal do
   """
   @spec walk(Yog.graph(), Yog.node_id(), order()) :: [Yog.node_id()]
   def walk(graph, from, order) do
-    gleam_order =
-      case order do
-        :breadth_first -> :breadth_first
-        :depth_first -> :depth_first
-      end
-
-    :yog@traversal.walk(graph, from, gleam_order)
+    walk(in: graph, from: from, using: order)
   end
 
   @doc """
@@ -234,13 +234,22 @@ defmodule Yog.Traversal do
     order = Keyword.fetch!(opts, :using)
     should_stop = Keyword.fetch!(opts, :until)
 
-    gleam_order =
-      case order do
-        :breadth_first -> :breadth_first
-        :depth_first -> :depth_first
-      end
+    fold_walk(
+      over: graph,
+      from: from,
+      using: order,
+      initial: [],
+      with: fn acc, node_id, _meta ->
+        new_acc = [node_id | acc]
 
-    :yog@traversal.walk_until(graph, from, gleam_order, should_stop)
+        if should_stop.(node_id) do
+          {:halt, new_acc}
+        else
+          {:continue, new_acc}
+        end
+      end
+    )
+    |> Enum.reverse()
   end
 
   @doc """
@@ -260,13 +269,7 @@ defmodule Yog.Traversal do
   @spec walk_until(Yog.graph(), Yog.node_id(), order(), (Yog.node_id() -> boolean())) ::
           [Yog.node_id()]
   def walk_until(graph, from, order, should_stop) do
-    gleam_order =
-      case order do
-        :breadth_first -> :breadth_first
-        :depth_first -> :depth_first
-      end
-
-    :yog@traversal.walk_until(graph, from, gleam_order, should_stop)
+    walk_until(in: graph, from: from, using: order, until: should_stop)
   end
 
   @doc """
@@ -382,33 +385,27 @@ defmodule Yog.Traversal do
     initial = Keyword.fetch!(opts, :initial)
     folder = Keyword.fetch!(opts, :with)
 
-    # Wrap the Elixir folder to bridge the Gleam WalkMetadata type
-    gleam_folder = fn acc, node_id, walk_metadata ->
-      # WalkMetadata is {:walk_metadata, depth, parent}
-      {:walk_metadata, depth, parent} = walk_metadata
+    start_metadata = %{depth: 0, parent: nil}
 
-      elixir_parent =
-        case parent do
-          {:some, p} -> p
-          :none -> nil
-        end
+    case order do
+      :breadth_first ->
+        do_fold_walk_bfs(
+          graph,
+          :queue.in({from, start_metadata}, :queue.new()),
+          MapSet.new(),
+          initial,
+          folder
+        )
 
-      elixir_meta = %{depth: depth, parent: elixir_parent}
-
-      case folder.(acc, node_id, elixir_meta) do
-        {:continue, new_acc} -> {:continue, new_acc}
-        {:stop, new_acc} -> {:stop, new_acc}
-        {:halt, new_acc} -> {:halt, new_acc}
-      end
+      :depth_first ->
+        do_fold_walk_dfs(
+          graph,
+          [{from, start_metadata}],
+          MapSet.new(),
+          initial,
+          folder
+        )
     end
-
-    gleam_order =
-      case order do
-        :breadth_first -> :breadth_first
-        :depth_first -> :depth_first
-      end
-
-    :yog@traversal.fold_walk(graph, from, gleam_order, initial, gleam_folder)
   end
 
   @doc """
@@ -435,31 +432,7 @@ defmodule Yog.Traversal do
         ) :: acc
         when acc: var
   def fold_walk(graph, from, order, initial, folder) do
-    gleam_folder = fn acc, node_id, walk_metadata ->
-      {:walk_metadata, depth, parent} = walk_metadata
-
-      elixir_parent =
-        case parent do
-          {:some, p} -> p
-          :none -> nil
-        end
-
-      elixir_meta = %{depth: depth, parent: elixir_parent}
-
-      case folder.(acc, node_id, elixir_meta) do
-        {:continue, new_acc} -> {:continue, new_acc}
-        {:stop, new_acc} -> {:stop, new_acc}
-        {:halt, new_acc} -> {:halt, new_acc}
-      end
-    end
-
-    gleam_order =
-      case order do
-        :breadth_first -> :breadth_first
-        :depth_first -> :depth_first
-      end
-
-    :yog@traversal.fold_walk(graph, from, gleam_order, initial, gleam_folder)
+    fold_walk(over: graph, from: from, using: order, initial: initial, with: folder)
   end
 
   @doc """
@@ -502,25 +475,27 @@ defmodule Yog.Traversal do
     successors = Keyword.fetch!(opts, :successors_of)
     folder = Keyword.fetch!(opts, :with)
 
-    gleam_folder = fn acc, node, walk_metadata ->
-      {:walk_metadata, depth, parent} = walk_metadata
+    start_meta = %{depth: 0, parent: nil}
 
-      elixir_parent =
-        case parent do
-          {:some, p} -> p
-          :none -> nil
-        end
+    case order do
+      :breadth_first ->
+        do_implicit_bfs(
+          :queue.in({from, start_meta}, :queue.new()),
+          MapSet.new(),
+          initial,
+          successors,
+          folder
+        )
 
-      elixir_meta = %{depth: depth, parent: elixir_parent}
-
-      case folder.(acc, node, elixir_meta) do
-        {:continue, new_acc} -> {:continue, new_acc}
-        {:stop, new_acc} -> {:stop, new_acc}
-        {:halt, new_acc} -> {:halt, new_acc}
-      end
+      :depth_first ->
+        do_implicit_dfs(
+          [{from, start_meta}],
+          MapSet.new(),
+          initial,
+          successors,
+          folder
+        )
     end
-
-    :yog@traversal.implicit_fold(from, order, initial, successors, gleam_folder)
   end
 
   @doc """
@@ -549,35 +524,21 @@ defmodule Yog.Traversal do
 
   ## Example
 
-      iex> # Search where nodes carry both value and step count
-      iex> # but we only want to visit each value once (first-visit wins)
-      iex> successors = fn {pos, steps} ->
-      ...>   if pos < 5, do: [{pos + 1, steps + 1}], else: []
+      iex> # Search with state that includes extra data
+      iex> successors = fn {pos, _extra} ->
+      ...>   if pos < 3, do: [{pos + 1, :new_data}], else: []
       ...> end
+      iex> visited_by = fn {pos, _} -> pos end
       iex> result = Yog.Traversal.implicit_fold_by(
-      ...>   from: {1, 0},
+      ...>   from: {1, :initial},
       ...>   using: :breadth_first,
       ...>   initial: [],
       ...>   successors_of: successors,
-      ...>   visited_by: fn {pos, _steps} -> pos end,
-      ...>   with: fn acc, {pos, _steps}, _meta -> {:continue, [pos | acc]} end
+      ...>   visited_by: visited_by,
+      ...>   with: fn acc, {pos, _}, _meta -> {:continue, [pos | acc]} end
       ...> )
       iex> Enum.sort(result)
-      [1, 2, 3, 4, 5]
-
-  ## Use Cases
-
-  - **Puzzle solving**: `{board_state, moves}` → dedupe by `board_state`
-  - **Path finding with budget**: `{pos, fuel_left}` → dedupe by `pos`
-  - **Game state search**: `{position, inventory}` → dedupe by `position`
-  - **Graph search with metadata**: `{node_id, path_history}` → dedupe by `node_id`
-
-  ## Comparison to `implicit_fold`
-
-  - `implicit_fold`: Deduplicates by the entire node value
-  - `implicit_fold_by`: Deduplicates by `visited_by(node)` but keeps full node
-
-  Similar to SQL's `DISTINCT ON(key)` or Python's `key=` parameter.
+      [1, 2, 3]
   """
   @spec implicit_fold_by(keyword()) :: any()
   def implicit_fold_by(opts) do
@@ -585,124 +546,32 @@ defmodule Yog.Traversal do
     order = Keyword.fetch!(opts, :using)
     initial = Keyword.fetch!(opts, :initial)
     successors = Keyword.fetch!(opts, :successors_of)
-    visited_by = Keyword.fetch!(opts, :visited_by)
+    key_fn = Keyword.fetch!(opts, :visited_by)
     folder = Keyword.fetch!(opts, :with)
 
-    gleam_folder = fn acc, node, walk_metadata ->
-      {:walk_metadata, depth, parent} = walk_metadata
+    start_meta = %{depth: 0, parent: nil}
 
-      elixir_parent =
-        case parent do
-          {:some, p} -> p
-          :none -> nil
-        end
+    case order do
+      :breadth_first ->
+        do_implicit_bfs_by(
+          :queue.in({from, start_meta}, :queue.new()),
+          MapSet.new(),
+          initial,
+          successors,
+          key_fn,
+          folder
+        )
 
-      elixir_meta = %{depth: depth, parent: elixir_parent}
-
-      case folder.(acc, node, elixir_meta) do
-        {:continue, new_acc} -> {:continue, new_acc}
-        {:stop, new_acc} -> {:stop, new_acc}
-        {:halt, new_acc} -> {:halt, new_acc}
-      end
+      :depth_first ->
+        do_implicit_dfs_by(
+          [{from, start_meta}],
+          MapSet.new(),
+          initial,
+          successors,
+          key_fn,
+          folder
+        )
     end
-
-    :yog@traversal.implicit_fold_by(from, order, initial, successors, visited_by, gleam_folder)
-  end
-
-  @doc """
-  Traverses an *implicit* weighted graph using Dijkstra's algorithm,
-  folding over visited nodes in order of increasing cost.
-
-  Like `implicit_fold` but uses a priority queue so nodes are visited
-  cheapest-first. Ideal for shortest-path problems on implicit state spaces
-  where edge costs vary — e.g., state-space search with Manhattan moves, or
-  multi-robot coordination where multiple robots share a key-bitmask state.
-
-  - `successors_of`: Given a node, return `[{neighbor, edge_cost}]`.
-    Include only valid transitions (filtering here avoids dead states).
-  - `with`: Called once per node, with `(acc, node, cost_so_far)`.
-    Return `{:halt, result}` to stop immediately, `{:stop, acc}` to skip
-    expanding this node's successors, or `{:continue, acc}` to continue.
-
-  Internally maintains a map of best-known costs;
-  stale priority-queue entries are automatically skipped.
-
-  ## Options
-
-  - `:from` - Starting state
-  - `:initial` - Initial accumulator value
-  - `:successors_of` - `fn state -> [{neighbor, cost}]` returns neighbors with edge costs
-  - `:with` - Folder function `(acc, node, cost_so_far) -> {control, acc}`
-
-  The folder receives the accumulated cost to reach the node as the third argument.
-  Control values: `:continue`, `:stop`, `:halt`.
-
-  ## Examples
-
-      iex> # Find shortest path cost to target
-      iex> successors = fn n ->
-      ...>   if n < 5 do
-      ...>     [{n + 1, 10}]
-      ...>   else
-      ...>     []
-      ...>   end
-      ...> end
-      iex> result = Yog.Traversal.implicit_dijkstra(
-      ...>   from: 1,
-      ...>   initial: -1,
-      ...>   successors_of: successors,
-      ...>   with: fn _acc, node, cost ->
-      ...>     if node == 5 do
-      ...>       {:halt, cost}
-      ...>     else
-      ...>       {:continue, -1}
-      ...>     end
-      ...>   end
-      ...> )
-      iex> result
-      40
-
-  ### Two paths to goal: expensive direct vs cheap indirect
-
-      iex> successors = fn pos ->
-      ...>   case pos do
-      ...>     1 -> [{2, 100}, {3, 10}]
-      ...>     2 -> [{4, 1}]
-      ...>     3 -> [{2, 5}]
-      ...>     _ -> []
-      ...>   end
-      ...> end
-      iex> result = Yog.Traversal.implicit_dijkstra(
-      ...>   from: 1,
-      ...>   initial: -1,
-      ...>   successors_of: successors,
-      ...>   with: fn _acc, node, cost ->
-      ...>     if node == 2 do
-      ...>       {:halt, cost}
-      ...>     else
-      ...>       {:continue, -1}
-      ...>     end
-      ...>   end
-      ...> )
-      iex> result
-      15
-  """
-  @spec implicit_dijkstra(keyword()) :: any()
-  def implicit_dijkstra(opts) do
-    from = Keyword.fetch!(opts, :from)
-    initial = Keyword.fetch!(opts, :initial)
-    successors = Keyword.fetch!(opts, :successors_of)
-    folder = Keyword.fetch!(opts, :with)
-
-    gleam_folder = fn acc, node, cost ->
-      case folder.(acc, node, cost) do
-        {:continue, new_acc} -> {:continue, new_acc}
-        {:stop, new_acc} -> {:stop, new_acc}
-        {:halt, new_acc} -> {:halt, new_acc}
-      end
-    end
-
-    :yog@traversal.implicit_dijkstra(from, initial, successors, gleam_folder)
   end
 
   @doc """
@@ -718,39 +587,53 @@ defmodule Yog.Traversal do
 
   ## Example
 
-      iex> {:ok, graph} =
+      iex> graph =
       ...>   Yog.directed()
       ...>   |> Yog.add_node(1, "A")
       ...>   |> Yog.add_node(2, "B")
       ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edges([{1, 2, 1}, {2, 3, 1}, {3, 1, 1}])
-      iex> Yog.Traversal.is_cyclic(graph)
+      ...>   |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}, {3, 1, 1}])
+      iex> Yog.Traversal.cyclic?(graph)
       true
   """
-  @spec is_cyclic(Yog.graph()) :: boolean()
-  defdelegate is_cyclic(graph), to: :yog@traversal
+  @spec cyclic?(Yog.graph()) :: boolean()
+  def cyclic?(graph) do
+    case graph.kind do
+      :directed ->
+        case topological_sort(graph) do
+          {:error, :contains_cycle} -> true
+          _ -> false
+        end
+
+      :undirected ->
+        nodes = Model.all_nodes(graph)
+        do_has_undirected_cycle(graph, nodes, MapSet.new())
+    end
+  end
 
   @doc """
   Determines if a graph is acyclic (contains no cycles).
 
-  This is the logical opposite of `is_cyclic`. For directed graphs, returning
+  This is the logical opposite of `cyclic?`. For directed graphs, returning
   `true` means the graph is a Directed Acyclic Graph (DAG).
 
   **Time Complexity:** O(V + E)
 
   ## Example
 
-      iex> {:ok, graph} =
+      iex> graph =
       ...>   Yog.directed()
       ...>   |> Yog.add_node(1, "A")
       ...>   |> Yog.add_node(2, "B")
       ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edges([{1, 2, 1}, {2, 3, 1}])
-      iex> Yog.Traversal.is_acyclic(graph)
+      ...>   |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}])
+      iex> Yog.Traversal.acyclic?(graph)
       true
   """
-  @spec is_acyclic(Yog.graph()) :: boolean()
-  defdelegate is_acyclic(graph), to: :yog@traversal
+  @spec acyclic?(Yog.graph()) :: boolean()
+  def acyclic?(graph) do
+    not cyclic?(graph)
+  end
 
   @doc """
   Performs a topological sort on a directed graph using Kahn's algorithm.
@@ -764,109 +647,68 @@ defmodule Yog.Traversal do
 
   ## Example
 
-      iex> {:ok, graph} =
+      iex> graph =
       ...>   Yog.directed()
       ...>   |> Yog.add_node(1, "A")
       ...>   |> Yog.add_node(2, "B")
       ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edges([{1, 2, 1}, {2, 3, 1}])
+      ...>   |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}])
       iex> Yog.Traversal.topological_sort(graph)
       {:ok, [1, 2, 3]}
 
-  Cycle detection returns an error:
-
-      iex> {:ok, cyclic_graph} =
+      iex> # Graph with cycle
+      iex> graph =
       ...>   Yog.directed()
       ...>   |> Yog.add_node(1, "A")
       ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_edges([{1, 2, 1}, {2, 1, 1}])
-      iex> Yog.Traversal.topological_sort(cyclic_graph)
+      ...>   |> Yog.add_edges!([{1, 2, 1}, {2, 1, 1}])
+      iex> Yog.Traversal.topological_sort(graph)
       {:error, :contains_cycle}
-
   """
   @spec topological_sort(Yog.graph()) :: {:ok, [Yog.node_id()]} | {:error, :contains_cycle}
   def topological_sort(graph) do
-    case :yog@traversal.topological_sort(graph) do
-      {:ok, order} -> {:ok, order}
-      {:error, nil} -> {:error, :contains_cycle}
-    end
+    all_nodes = Model.all_nodes(graph)
+    %Yog.Graph{in_edges: in_edges} = graph
+
+    in_degrees =
+      Enum.map(all_nodes, fn id ->
+        degree =
+          case Map.fetch(in_edges, id) do
+            {:ok, inner} -> map_size(inner)
+            :error -> 0
+          end
+
+        {id, degree}
+      end)
+      |> Map.new()
+
+    queue =
+      in_degrees
+      |> Enum.filter(fn {_id, degree} -> degree == 0 end)
+      |> Enum.map(fn {id, _} -> id end)
+
+    do_kahn(graph, queue, in_degrees, [], length(all_nodes))
   end
 
   @doc """
-  Performs a lexicographical topological sort.
+  Finds the shortest path between two nodes using BFS.
 
-  When multiple nodes are available to be placed next in the sorted order, this
-  variant strictly prefers the node with the "smallest" value based on the provided
-  `compare` function, which operates on **node data** (not node IDs).
-
-  Uses a heap-based version of Kahn's algorithm to ensure that when multiple
-  nodes have in-degree 0, the smallest one (according to `compare_nodes`) is chosen first.
-
-  The comparison function operates on **node data**, not node IDs, allowing intuitive
-  comparisons like alphabetical ordering for strings.
-
-  Returns `{:error, :contains_cycle}` if the graph contains a cycle.
-
-  **Time Complexity:** O(V log V + E) due to heap operations
-
-  ## Examples
-
-  ### Get alphabetical ordering by node data
-
-      iex> {:ok, graph} =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "charlie")
-      ...>   |> Yog.add_node(2, "alpha")
-      ...>   |> Yog.add_node(3, "bravo")
-      ...>   |> Yog.add_edges([{1, 3, 1}, {3, 2, 1}])
-      iex> {:ok, order} = Yog.Traversal.lexicographical_topological_sort(graph, &<=/2)
-      iex> order
-      [1, 3, 2]
-
-  ### Custom comparison by priority
-
-      iex> {:ok, graph} =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, %{priority: 3})
-      ...>   |> Yog.add_node(2, %{priority: 1})
-      ...>   |> Yog.add_node(3, %{priority: 2})
-      ...>   |> Yog.add_edges([{2, 3, 1}, {3, 1, 1}])
-      iex> {:ok, order} = Yog.Traversal.lexicographical_topological_sort(
-      ...>   graph,
-      ...>   fn a, b -> a.priority <= b.priority end
-      ...> )
-      iex> order
-      [2, 3, 1]
-  """
-  @spec lexicographical_topological_sort(Yog.graph(), (any(), any() -> boolean())) ::
-          {:ok, [Yog.node_id()]} | {:error, :contains_cycle}
-  def lexicographical_topological_sort(graph, compare_fn) do
-    case :yog@traversal.lexicographical_topological_sort(graph, compare_fn) do
-      {:ok, order} -> {:ok, order}
-      {:error, nil} -> {:error, :contains_cycle}
-    end
-  end
-
-  @doc """
-  Finds the shortest path between two nodes in an unweighted graph using BFS.
-
-  Returns a list of node IDs forming the path, or `nil` if no path exists.
-
-  This is an Elixir-specific helper function that builds on `fold_walk`.
+  Returns a list of node IDs representing the path from `from` to `to`,
+  or `nil` if no path exists.
 
   ## Example
 
-      iex> {:ok, graph} =
+      iex> graph =
       ...>   Yog.directed()
       ...>   |> Yog.add_node(1, "A")
       ...>   |> Yog.add_node(2, "B")
       ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edges([{1, 2, 1}, {2, 3, 1}])
+      ...>   |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      ...>   |> Yog.add_edge!(from: 2, to: 3, with: 1)
       iex> Yog.Traversal.find_path(graph, 1, 3)
       [1, 2, 3]
 
-  ### No path exists
-
+      iex> # No path exists
       iex> graph =
       ...>   Yog.directed()
       ...>   |> Yog.add_node(1, "A")
@@ -874,47 +716,561 @@ defmodule Yog.Traversal do
       iex> Yog.Traversal.find_path(graph, 1, 2)
       nil
 
-  ### Self path
-
+      iex> # Same node
       iex> graph = Yog.directed() |> Yog.add_node(1, "A")
       iex> Yog.Traversal.find_path(graph, 1, 1)
       [1]
   """
   @spec find_path(Yog.graph(), Yog.node_id(), Yog.node_id()) :: [Yog.node_id()] | nil
   def find_path(graph, from, to) do
-    if from == to do
-      [from]
-    else
-      # We use fold_walk to build a parent map using BFS (shortest path for unweighted).
-      parents =
-        fold_walk(
-          over: graph,
-          from: from,
-          using: :breadth_first,
-          initial: %{},
-          with: fn acc, node, meta ->
-            acc = if meta.parent, do: Map.put(acc, node, meta.parent), else: acc
-
-            if node == to do
-              {:halt, acc}
+    parents =
+      fold_walk(
+        over: graph,
+        from: from,
+        using: :breadth_first,
+        initial: %{},
+        with: fn acc, node_id, meta ->
+          new_acc =
+            if meta.parent && !Map.has_key?(acc, node_id) do
+              Map.put(acc, node_id, meta.parent)
             else
-              {:continue, acc}
+              acc
             end
-          end
-        )
 
-      if Map.has_key?(parents, to) do
-        reconstruct_path(parents, from, to, [to])
-      else
+          if node_id == to do
+            {:halt, new_acc}
+          else
+            {:continue, new_acc}
+          end
+        end
+      )
+
+    cond do
+      from == to ->
+        [from]
+
+      !Map.has_key?(parents, to) ->
         nil
+
+      true ->
+        # Reconstruct path
+        reconstruct_path(parents, to, [to])
+    end
+  end
+
+  defp reconstruct_path(_parents, node, acc) when node == nil, do: acc
+
+  defp reconstruct_path(parents, node, acc) do
+    case Map.get(parents, node) do
+      nil -> acc
+      parent -> reconstruct_path(parents, parent, [parent | acc])
+    end
+  end
+
+  @doc """
+  Traverse an implicit weighted graph using Dijkstra's algorithm.
+
+  Like `implicit_fold` but uses a priority queue so nodes are visited
+  cheapest-first. Ideal for shortest-path problems on implicit state spaces
+  where edge costs vary.
+
+  ## Options
+
+  - `:from` - Starting node
+  - `:initial` - Initial accumulator value
+  - `:successors_of` - `fn node -> [{neighbor, cost}]`
+  - `:with` - Folder `(acc, node, cost_so_far) -> {control, acc}`
+
+  ## Example
+
+      iex> # Shortest path in an implicit chain
+      iex> successors = fn n ->
+      ...>   if n < 5, do: [{n + 1, 10}], else: []
+      ...> end
+      iex> result = Yog.Traversal.implicit_dijkstra(
+      ...>   from: 1,
+      ...>   initial: -1,
+      ...>   successors_of: successors,
+      ...>   with: fn _acc, node, cost ->
+      ...>     if node == 5, do: {:halt, cost}, else: {:continue, -1}
+      ...>   end
+      ...> )
+      iex> # Path: 1->2->3->4->5 = 4 edges * 10 = 40
+      iex> result
+      40
+  """
+  @spec implicit_dijkstra(keyword()) :: any()
+  def implicit_dijkstra(opts) do
+    from = Keyword.fetch!(opts, :from)
+    initial = Keyword.fetch!(opts, :initial)
+    successors = Keyword.fetch!(opts, :successors_of)
+    folder = Keyword.fetch!(opts, :with)
+
+    # Priority queue as sorted list: [{cost, node}]
+    frontier = [{0, from}]
+    best = %{}
+
+    do_implicit_dijkstra(frontier, best, initial, successors, folder)
+  end
+
+  defp do_implicit_dijkstra([], _best, acc, _successors, _folder), do: acc
+
+  defp do_implicit_dijkstra([{cost, node} | rest], best, acc, successors, folder) do
+    # Skip if we've already found a better path to this node
+    case Map.get(best, node) do
+      nil ->
+        new_best = Map.put(best, node, cost)
+        {control, new_acc} = folder.(acc, node, cost)
+
+        case control do
+          :halt ->
+            new_acc
+
+          :stop ->
+            do_implicit_dijkstra(rest, new_best, new_acc, successors, folder)
+
+          :continue ->
+            next_frontier =
+              Enum.reduce(successors.(node), rest, fn {nb_node, edge_cost}, q ->
+                new_cost = cost + edge_cost
+
+                # Only add if we haven't seen this node or found a better path
+                case Map.get(new_best, nb_node) do
+                  nil -> insert_sorted(q, {new_cost, nb_node})
+                  prev_cost when prev_cost <= new_cost -> q
+                  _ -> insert_sorted(q, {new_cost, nb_node})
+                end
+              end)
+
+            do_implicit_dijkstra(next_frontier, new_best, new_acc, successors, folder)
+        end
+
+      prev_cost when prev_cost < cost ->
+        # Stale entry - skip
+        do_implicit_dijkstra(rest, best, acc, successors, folder)
+
+      _ ->
+        # Same or better cost already recorded
+        do_implicit_dijkstra(rest, best, acc, successors, folder)
+    end
+  end
+
+  defp insert_sorted(list, item) do
+    {cost, _} = item
+    {before, after_rest} = Enum.split_while(list, fn {c, _} -> c <= cost end)
+    before ++ [item | after_rest]
+  end
+
+  @doc """
+  Performs a lexicographically smallest topological sort.
+
+  Uses a heap-based version of Kahn's algorithm to ensure that when multiple
+  nodes have in-degree 0, the smallest one (according to `compare_nodes`) is chosen first.
+
+  The comparison function operates on **node data**, not node IDs.
+
+  Returns `{:error, nil}` if the graph contains a cycle.
+
+  **Time Complexity:** O(V log V + E) due to heap operations
+
+  ## Example
+
+      iex> graph =
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(1, "c")
+      ...>   |> Yog.add_node(2, "a")
+      ...>   |> Yog.add_node(3, "b")
+      ...>   |> Yog.add_edges!([{1, 3, 1}, {2, 3, 1}])
+      iex> Yog.Traversal.lexicographical_topological_sort(graph, fn a, b ->
+      ...>   cond do
+      ...>     a < b -> :lt
+      ...>     a > b -> :gt
+      ...>     true -> :eq
+      ...>   end
+      ...> end)
+      {:ok, [2, 1, 3]}  # "a" comes before "c"
+  """
+  @spec lexicographical_topological_sort(Yog.graph(), (term(), term() -> :lt | :eq | :gt)) ::
+          {:ok, [Yog.node_id()]} | {:error, :contains_cycle}
+  def lexicographical_topological_sort(graph, compare_nodes) do
+    all_nodes = Model.all_nodes(graph)
+    %Yog.Graph{nodes: nodes, in_edges: in_edges} = graph
+
+    in_degrees =
+      Enum.map(all_nodes, fn id ->
+        degree =
+          case Map.fetch(in_edges, id) do
+            {:ok, inner} -> map_size(inner)
+            :error -> 0
+          end
+
+        {id, degree}
+      end)
+      |> Map.new()
+
+    # Create a priority queue using a sorted list
+    initial_queue =
+      in_degrees
+      |> Enum.filter(fn {_id, degree} -> degree == 0 end)
+      |> Enum.map(fn {id, _} -> id end)
+      |> Enum.sort(fn id_a, id_b ->
+        data_a = Map.get(nodes, id_a)
+        data_b = Map.get(nodes, id_b)
+        compare_nodes.(data_a, data_b) == :lt
+      end)
+
+    do_lexical_kahn(graph, initial_queue, in_degrees, [], length(all_nodes), compare_nodes, nodes)
+  end
+
+  defp do_lexical_kahn(_graph, [], _in_degrees, acc, total_count, _compare, _nodes) do
+    if length(acc) == total_count do
+      {:ok, Enum.reverse(acc)}
+    else
+      {:error, :contains_cycle}
+    end
+  end
+
+  defp do_lexical_kahn(graph, [head | rest_q], in_degrees, acc, total_count, compare, nodes) do
+    neighbors = Model.successor_ids(graph, head)
+
+    {next_q, next_in_degrees} =
+      Enum.reduce(neighbors, {rest_q, in_degrees}, fn neighbor, {q, degrees} ->
+        current_degree = Map.get(degrees, neighbor, 0)
+        new_degree = current_degree - 1
+        new_degrees = Map.put(degrees, neighbor, new_degree)
+
+        updated_q =
+          if new_degree == 0 do
+            insert_sorted_by(
+              q,
+              neighbor,
+              fn id ->
+                data = Map.get(nodes, id)
+                # Return a sortable representation
+                data
+              end,
+              compare
+            )
+          else
+            q
+          end
+
+        {updated_q, new_degrees}
+      end)
+
+    do_lexical_kahn(
+      graph,
+      next_q,
+      next_in_degrees,
+      [head | acc],
+      total_count,
+      compare,
+      nodes
+    )
+  end
+
+  defp insert_sorted_by(list, item, key_fn, compare) do
+    item_key = key_fn.(item)
+
+    {before, after_rest} =
+      Enum.split_while(list, fn id ->
+        compare.(key_fn.(id), item_key) == :lt
+      end)
+
+    before ++ [item | after_rest]
+  end
+
+  # =============================================================================
+  # Private Helper Functions
+  # =============================================================================
+
+  # BFS with fold and metadata
+  defp do_fold_walk_bfs(graph, q, visited, acc, folder) do
+    case :queue.out(q) do
+      {:empty, _} ->
+        acc
+
+      {{:value, {node_id, metadata}}, rest} ->
+        if MapSet.member?(visited, node_id) do
+          do_fold_walk_bfs(graph, rest, visited, acc, folder)
+        else
+          {control, new_acc} = folder.(acc, node_id, metadata)
+          new_visited = MapSet.put(visited, node_id)
+
+          case control do
+            :halt ->
+              new_acc
+
+            :stop ->
+              do_fold_walk_bfs(graph, rest, new_visited, new_acc, folder)
+
+            :continue ->
+              next_nodes = Model.successor_ids(graph, node_id)
+
+              next_queue =
+                Enum.reduce(next_nodes, rest, fn next_id, current_queue ->
+                  next_meta = %{
+                    depth: metadata.depth + 1,
+                    parent: node_id
+                  }
+
+                  :queue.in({next_id, next_meta}, current_queue)
+                end)
+
+              do_fold_walk_bfs(graph, next_queue, new_visited, new_acc, folder)
+          end
+        end
+    end
+  end
+
+  # DFS with fold and metadata
+  defp do_fold_walk_dfs(graph, stack, visited, acc, folder) do
+    case stack do
+      [] ->
+        acc
+
+      [{node_id, metadata} | tail] ->
+        if MapSet.member?(visited, node_id) do
+          do_fold_walk_dfs(graph, tail, visited, acc, folder)
+        else
+          {control, new_acc} = folder.(acc, node_id, metadata)
+          new_visited = MapSet.put(visited, node_id)
+
+          case control do
+            :halt ->
+              new_acc
+
+            :stop ->
+              do_fold_walk_dfs(graph, tail, new_visited, new_acc, folder)
+
+            :continue ->
+              next_nodes = Model.successor_ids(graph, node_id)
+
+              next_stack =
+                Enum.reduce(Enum.reverse(next_nodes), tail, fn next_id, current_stack ->
+                  next_meta = %{
+                    depth: metadata.depth + 1,
+                    parent: node_id
+                  }
+
+                  [{next_id, next_meta} | current_stack]
+                end)
+
+              do_fold_walk_dfs(graph, next_stack, new_visited, new_acc, folder)
+          end
+        end
+    end
+  end
+
+  # Implicit BFS: same as do_fold_walk_bfs but uses a successors function
+  defp do_implicit_bfs(q, visited, acc, successors, folder) do
+    case :queue.out(q) do
+      {:empty, _} ->
+        acc
+
+      {{:value, {node_id, metadata}}, rest} ->
+        if MapSet.member?(visited, node_id) do
+          do_implicit_bfs(rest, visited, acc, successors, folder)
+        else
+          {control, new_acc} = folder.(acc, node_id, metadata)
+          new_visited = MapSet.put(visited, node_id)
+
+          case control do
+            :halt ->
+              new_acc
+
+            :stop ->
+              do_implicit_bfs(rest, new_visited, new_acc, successors, folder)
+
+            :continue ->
+              next_queue =
+                Enum.reduce(successors.(node_id), rest, fn next_id, q2 ->
+                  :queue.in(
+                    {next_id, %{depth: metadata.depth + 1, parent: node_id}},
+                    q2
+                  )
+                end)
+
+              do_implicit_bfs(next_queue, new_visited, new_acc, successors, folder)
+          end
+        end
+    end
+  end
+
+  # Implicit DFS: same as do_fold_walk_dfs but uses a successors function
+  defp do_implicit_dfs(stack, visited, acc, successors, folder) do
+    case stack do
+      [] ->
+        acc
+
+      [{node_id, metadata} | tail] ->
+        if MapSet.member?(visited, node_id) do
+          do_implicit_dfs(tail, visited, acc, successors, folder)
+        else
+          {control, new_acc} = folder.(acc, node_id, metadata)
+          new_visited = MapSet.put(visited, node_id)
+
+          case control do
+            :halt ->
+              new_acc
+
+            :stop ->
+              do_implicit_dfs(tail, new_visited, new_acc, successors, folder)
+
+            :continue ->
+              next_stack =
+                Enum.reduce(Enum.reverse(successors.(node_id)), tail, fn next_id, stk ->
+                  [{next_id, %{depth: metadata.depth + 1, parent: node_id}} | stk]
+                end)
+
+              do_implicit_dfs(next_stack, new_visited, new_acc, successors, folder)
+          end
+        end
+    end
+  end
+
+  # Implicit BFS with custom key function for deduplication
+  defp do_implicit_bfs_by(q, visited, acc, successors, key_fn, folder) do
+    case :queue.out(q) do
+      {:empty, _} ->
+        acc
+
+      {{:value, {node_id, metadata}}, rest} ->
+        node_key = key_fn.(node_id)
+
+        if MapSet.member?(visited, node_key) do
+          do_implicit_bfs_by(rest, visited, acc, successors, key_fn, folder)
+        else
+          {control, new_acc} = folder.(acc, node_id, metadata)
+          new_visited = MapSet.put(visited, node_key)
+
+          case control do
+            :halt ->
+              new_acc
+
+            :stop ->
+              do_implicit_bfs_by(rest, new_visited, new_acc, successors, key_fn, folder)
+
+            :continue ->
+              next_queue =
+                Enum.reduce(successors.(node_id), rest, fn next_id, q2 ->
+                  :queue.in(
+                    {next_id, %{depth: metadata.depth + 1, parent: node_id}},
+                    q2
+                  )
+                end)
+
+              do_implicit_bfs_by(next_queue, new_visited, new_acc, successors, key_fn, folder)
+          end
+        end
+    end
+  end
+
+  # Implicit DFS with custom key function for deduplication
+  defp do_implicit_dfs_by(stack, visited, acc, successors, key_fn, folder) do
+    case stack do
+      [] ->
+        acc
+
+      [{node_id, metadata} | tail] ->
+        node_key = key_fn.(node_id)
+
+        if MapSet.member?(visited, node_key) do
+          do_implicit_dfs_by(tail, visited, acc, successors, key_fn, folder)
+        else
+          {control, new_acc} = folder.(acc, node_id, metadata)
+          new_visited = MapSet.put(visited, node_key)
+
+          case control do
+            :halt ->
+              new_acc
+
+            :stop ->
+              do_implicit_dfs_by(tail, new_visited, new_acc, successors, key_fn, folder)
+
+            :continue ->
+              next_stack =
+                Enum.reduce(Enum.reverse(successors.(node_id)), tail, fn next_id, stk ->
+                  [{next_id, %{depth: metadata.depth + 1, parent: node_id}} | stk]
+                end)
+
+              do_implicit_dfs_by(next_stack, new_visited, new_acc, successors, key_fn, folder)
+          end
+        end
+    end
+  end
+
+  # Kahn's algorithm for topological sort
+  defp do_kahn(_graph, [], _in_degrees, acc, total_count) do
+    if length(acc) == total_count do
+      {:ok, Enum.reverse(acc)}
+    else
+      {:error, :contains_cycle}
+    end
+  end
+
+  defp do_kahn(graph, [head | tail], in_degrees, acc, total_count) do
+    neighbors = Model.successor_ids(graph, head)
+
+    {next_queue, next_in_degrees} =
+      Enum.reduce(neighbors, {tail, in_degrees}, fn neighbor, {q, degrees} ->
+        current_degree = Map.get(degrees, neighbor, 0)
+        new_degree = current_degree - 1
+        new_degrees = Map.put(degrees, neighbor, new_degree)
+
+        new_q =
+          if new_degree == 0 do
+            [neighbor | q]
+          else
+            q
+          end
+
+        {new_q, new_degrees}
+      end)
+
+    do_kahn(graph, next_queue, next_in_degrees, [head | acc], total_count)
+  end
+
+  # Check for cycles in undirected graphs
+  defp do_has_undirected_cycle(_graph, [], _visited), do: false
+
+  defp do_has_undirected_cycle(graph, [node | rest], visited) do
+    if MapSet.member?(visited, node) do
+      do_has_undirected_cycle(graph, rest, visited)
+    else
+      {cycle?, new_visited} = check_undirected_cycle(graph, node, nil, visited)
+
+      if cycle? do
+        true
+      else
+        do_has_undirected_cycle(graph, rest, new_visited)
       end
     end
   end
 
-  defp reconstruct_path(_parents, start, start, path), do: path
+  defp check_undirected_cycle(graph, node, parent, visited) do
+    new_visited = MapSet.put(visited, node)
+    neighbors = Model.successor_ids(graph, node)
 
-  defp reconstruct_path(parents, start, target, path) do
-    parent = Map.get(parents, target)
-    reconstruct_path(parents, start, parent, [parent | path])
+    Enum.reduce_while(neighbors, {false, new_visited}, fn neighbor, {_, current_visited} ->
+      if MapSet.member?(current_visited, neighbor) do
+        is_parent = parent == neighbor
+
+        if is_parent do
+          {:cont, {false, current_visited}}
+        else
+          {:halt, {true, current_visited}}
+        end
+      else
+        {has_cycle?, next_visited} =
+          check_undirected_cycle(graph, neighbor, node, current_visited)
+
+        if has_cycle? do
+          {:halt, {true, next_visited}}
+        else
+          {:cont, {false, next_visited}}
+        end
+      end
+    end)
   end
 end

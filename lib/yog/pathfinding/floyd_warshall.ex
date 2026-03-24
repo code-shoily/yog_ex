@@ -66,6 +66,8 @@ defmodule Yog.Pathfinding.FloydWarshall do
   - [CP-Algorithms: Floyd-Warshall](https://cp-algorithms.com/graph/all-pair-shortest-path-floyd-warshall.html)
   """
 
+  alias Yog.Model
+
   @typedoc """
   Distance matrix: map from `{from, to}` tuple to distance.
   """
@@ -96,7 +98,7 @@ defmodule Yog.Pathfinding.FloydWarshall do
       ...> |> Yog.add_edge!(from: 1, to: 2, with: 4)
       ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
       ...> |> Yog.add_edge!(from: 1, to: 3, with: 10)
-      iex> compare = fn a, b when a < b -> :lt; a, b when a > b -> :gt; _, _ -> :eq end
+      iex> compare = &Yog.Utils.compare/2
       iex> {:ok, distances} = Yog.Pathfinding.FloydWarshall.floyd_warshall(graph, 0, &(&1 + &2), compare)
       iex> # Shortest path from 1 to 3 should be 1->2->3 = 5, not direct 10
       ...> distances[{1, 3}]
@@ -108,7 +110,7 @@ defmodule Yog.Pathfinding.FloydWarshall do
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
       ...> |> Yog.add_edge!(from: 2, to: 1, with: -3)
-      iex> compare = fn a, b when a < b -> :lt; a, b when a > b -> :gt; _, _ -> :eq end
+      iex> compare = &Yog.Utils.compare/2
       iex> Yog.Pathfinding.FloydWarshall.floyd_warshall(bad_graph, 0, &(&1 + &2), compare)
       {:error, :negative_cycle}
   """
@@ -119,12 +121,26 @@ defmodule Yog.Pathfinding.FloydWarshall do
           (any(), any() -> :lt | :eq | :gt)
         ) :: {:ok, distance_matrix()} | {:error, :negative_cycle}
   def floyd_warshall(graph, zero, add, compare) do
-    case :yog@pathfinding@floyd_warshall.floyd_warshall(graph, zero, add, compare) do
-      {:ok, gleam_dict} ->
-        {:ok, wrap_distance_matrix(gleam_dict)}
+    nodes = Model.all_nodes(graph)
 
-      {:error, _} ->
-        {:error, :negative_cycle}
+    # Initialize distance matrix
+    initial_dist = initialize_distances(nodes, graph, zero)
+
+    # Floyd-Warshall main algorithm
+    final_dist =
+      Enum.reduce(nodes, initial_dist, fn k, acc_dist ->
+        Enum.reduce(nodes, acc_dist, fn i, acc_dist_i ->
+          Enum.reduce(nodes, acc_dist_i, fn j, acc_dist_j ->
+            relax_via_intermediate(i, j, k, acc_dist_j, add, compare)
+          end)
+        end)
+      end)
+
+    # Check for negative cycles
+    if has_negative_cycle?(nodes, final_dist, compare) do
+      {:error, :negative_cycle}
+    else
+      {:ok, final_dist}
     end
   end
 
@@ -135,10 +151,7 @@ defmodule Yog.Pathfinding.FloydWarshall do
           {:ok, %{required({Yog.node_id(), Yog.node_id()}) => integer()}}
           | {:error, :negative_cycle}
   def floyd_warshall_int(graph) do
-    case :yog@pathfinding@floyd_warshall.floyd_warshall_int(graph) do
-      {:ok, gleam_dict} -> {:ok, wrap_distance_matrix(gleam_dict)}
-      {:error, _} -> {:error, :negative_cycle}
-    end
+    floyd_warshall(graph, 0, &(&1 + &2), &Yog.Utils.compare/2)
   end
 
   @doc """
@@ -148,10 +161,7 @@ defmodule Yog.Pathfinding.FloydWarshall do
           {:ok, %{required({Yog.node_id(), Yog.node_id()}) => float()}}
           | {:error, :negative_cycle}
   def floyd_warshall_float(graph) do
-    case :yog@pathfinding@floyd_warshall.floyd_warshall_float(graph) do
-      {:ok, gleam_dict} -> {:ok, wrap_distance_matrix(gleam_dict)}
-      {:error, _} -> {:error, :negative_cycle}
-    end
+    floyd_warshall(graph, 0.0, &(&1 + &2), &Yog.Utils.compare/2)
   end
 
   @doc """
@@ -166,13 +176,75 @@ defmodule Yog.Pathfinding.FloydWarshall do
           (any(), any() -> :lt | :eq | :gt)
         ) :: boolean()
   def detect_negative_cycle?(graph, zero, add, compare) do
-    :yog@pathfinding@floyd_warshall.detect_negative_cycle(graph, zero, add, compare)
+    case floyd_warshall(graph, zero, add, compare) do
+      {:error, :negative_cycle} -> true
+      {:ok, _} -> false
+    end
   end
 
-  # Private helper to wrap Gleam distance matrix
-  defp wrap_distance_matrix(gleam_dict) do
-    gleam_dict
-    |> :gleam@dict.to_list()
-    |> Map.new()
+  # Initialize distance matrix with direct edge weights
+  defp initialize_distances(nodes, graph, zero) do
+    # Start with diagonal (self-distances = zero)
+    initial =
+      Enum.reduce(nodes, %{}, fn i, acc ->
+        Map.put(acc, {i, i}, zero)
+      end)
+
+    # Add direct edges
+    Enum.reduce(nodes, initial, fn i, acc ->
+      successors = Model.successors(graph, i)
+
+      Enum.reduce(successors, acc, fn {j, weight}, acc_inner ->
+        # Keep the minimum weight if multiple edges exist
+        case Map.fetch(acc_inner, {i, j}) do
+          {:ok, existing} ->
+            if compare_weights(weight, existing, &Yog.Utils.compare/2) == :lt do
+              Map.put(acc_inner, {i, j}, weight)
+            else
+              acc_inner
+            end
+
+          :error ->
+            Map.put(acc_inner, {i, j}, weight)
+        end
+      end)
+    end)
+  end
+
+  # Try to relax distance from i to j via intermediate k
+  defp relax_via_intermediate(i, j, k, dist, add, compare) do
+    with {:ok, dist_ik} <- Map.fetch(dist, {i, k}),
+         {:ok, dist_kj} <- Map.fetch(dist, {k, j}) do
+      new_dist = add.(dist_ik, dist_kj)
+
+      case Map.fetch(dist, {i, j}) do
+        {:ok, current} ->
+          if compare_weights(new_dist, current, compare) == :lt do
+            Map.put(dist, {i, j}, new_dist)
+          else
+            dist
+          end
+
+        :error ->
+          Map.put(dist, {i, j}, new_dist)
+      end
+    else
+      :error -> dist
+    end
+  end
+
+  # Check if any node has negative distance to itself
+  defp has_negative_cycle?(nodes, dist, compare) do
+    Enum.any?(nodes, fn i ->
+      case Map.fetch(dist, {i, i}) do
+        {:ok, d} -> compare_weights(d, 0, compare) == :lt
+        :error -> false
+      end
+    end)
+  end
+
+  # Compare two weights using the comparison function
+  defp compare_weights(a, b, compare) do
+    compare.(a, b)
   end
 end

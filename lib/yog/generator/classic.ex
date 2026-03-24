@@ -93,7 +93,7 @@ defmodule Yog.Generator.Classic do
   - Clique detection benchmarks
   """
   @spec complete(integer()) :: Yog.graph()
-  defdelegate complete(n), to: :yog@generator@classic
+  def complete(n), do: complete_with_type(n, :undirected)
 
   @doc """
   Generates a complete graph with specified graph type.
@@ -107,7 +107,33 @@ defmodule Yog.Generator.Classic do
       4
   """
   @spec complete_with_type(integer(), Yog.graph_type()) :: Yog.graph()
-  defdelegate complete_with_type(n, graph_type), to: :yog@generator@classic
+  def complete_with_type(n, graph_type) when n > 0 do
+    base = Yog.new(graph_type)
+
+    # Add all nodes
+    graph =
+      Enum.reduce(0..(n - 1), base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # Add all edges (each pair connects both ways for undirected)
+    edges = for i <- 0..(n - 1)//1, j <- 0..(n - 1)//1, i != j, do: {i, j, 1}
+
+    edges
+    |> maybe_filter_undirected(graph_type)
+    |> Enum.reduce(graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
+
+  def complete_with_type(_n, _graph_type), do: Yog.new(:undirected)
+
+  defp maybe_filter_undirected(edges, :undirected) do
+    # For undirected graphs, only keep edges where from < to
+    Enum.filter(edges, fn {from, to, _} -> from < to end)
+  end
+
+  defp maybe_filter_undirected(edges, :directed), do: edges
 
   # ============= Cycle Graph =============
 
@@ -137,13 +163,28 @@ defmodule Yog.Generator.Classic do
   - Hamiltonian cycle benchmarks
   """
   @spec cycle(integer()) :: Yog.graph()
-  defdelegate cycle(n), to: :yog@generator@classic
+  def cycle(n), do: cycle_with_type(n, :undirected)
 
   @doc """
   Generates a cycle graph with specified graph type.
   """
   @spec cycle_with_type(integer(), Yog.graph_type()) :: Yog.graph()
-  defdelegate cycle_with_type(n, graph_type), to: :yog@generator@classic
+  def cycle_with_type(n, _graph_type) when n < 3, do: Yog.new(:undirected)
+
+  def cycle_with_type(n, graph_type) do
+    base = Yog.new(graph_type)
+
+    graph =
+      Enum.reduce(0..(n - 1), base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    edges = for i <- 0..(n - 1)//1, do: {i, rem(i + 1, n), 1}
+
+    Enum.reduce(edges, graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
 
   # ============= Path Graph =============
 
@@ -174,13 +215,29 @@ defmodule Yog.Generator.Classic do
   - Pathfinding benchmarks
   """
   @spec path(integer()) :: Yog.graph()
-  defdelegate path(n), to: :yog@generator@classic
+  def path(n), do: path_with_type(n, :undirected)
 
   @doc """
   Generates a path graph with specified graph type.
   """
   @spec path_with_type(integer(), Yog.graph_type()) :: Yog.graph()
-  defdelegate path_with_type(n, graph_type), to: :yog@generator@classic
+  def path_with_type(n, _graph_type) when n <= 0, do: Yog.new(:undirected)
+  def path_with_type(1, graph_type), do: Yog.new(graph_type) |> Yog.add_node(0, nil)
+
+  def path_with_type(n, graph_type) do
+    base = Yog.new(graph_type)
+
+    graph =
+      Enum.reduce(0..(n - 1), base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    edges = if n >= 2, do: for(i <- 0..(n - 2)//1, do: {i, i + 1, 1}), else: []
+
+    Enum.reduce(edges, graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
 
   # ============= Star Graph =============
 
@@ -211,13 +268,29 @@ defmodule Yog.Generator.Classic do
   - Broadcast scenarios
   """
   @spec star(integer()) :: Yog.graph()
-  defdelegate star(n), to: :yog@generator@classic
+  def star(n), do: star_with_type(n, :undirected)
 
   @doc """
   Generates a star graph with specified graph type.
   """
   @spec star_with_type(integer(), Yog.graph_type()) :: Yog.graph()
-  defdelegate star_with_type(n, graph_type), to: :yog@generator@classic
+  def star_with_type(n, _graph_type) when n <= 0, do: Yog.new(:undirected)
+  def star_with_type(1, graph_type), do: Yog.new(graph_type) |> Yog.add_node(0, nil)
+
+  def star_with_type(n, graph_type) do
+    base = Yog.new(graph_type)
+
+    graph =
+      Enum.reduce(0..(n - 1), base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    edges = if n >= 2, do: for(i <- 1..(n - 1)//1, do: {0, i, 1}), else: []
+
+    Enum.reduce(edges, graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
 
   # ============= Wheel Graph =============
 
@@ -248,13 +321,37 @@ defmodule Yog.Generator.Classic do
   - Spoke-hub distribution
   """
   @spec wheel(integer()) :: Yog.graph()
-  defdelegate wheel(n), to: :yog@generator@classic
+  def wheel(n), do: wheel_with_type(n, :undirected)
 
   @doc """
   Generates a wheel graph with specified graph type.
   """
   @spec wheel_with_type(integer(), Yog.graph_type()) :: Yog.graph()
-  defdelegate wheel_with_type(n, graph_type), to: :yog@generator@classic
+  def wheel_with_type(n, _graph_type) when n < 4, do: Yog.new(:undirected)
+
+  def wheel_with_type(n, graph_type) do
+    base = Yog.new(graph_type)
+
+    # Add all nodes: 0 is center, 1..(n-1) are rim
+    graph =
+      Enum.reduce(0..(n - 1), base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # Spokes: center (0) to each rim node
+    spokes = for i <- 1..(n - 1), do: {0, i, 1}
+
+    # Rim cycle: edges between consecutive rim nodes
+    rim =
+      for i <- 1..(n - 1)//1 do
+        next = if(i == n - 1, do: 1, else: i + 1)
+        {i, next, 1}
+      end
+
+    Enum.reduce(spokes ++ rim, graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
 
   # ============= Bipartite Graphs =============
 
@@ -285,13 +382,36 @@ defmodule Yog.Generator.Classic do
   - Recommender systems
   """
   @spec complete_bipartite(integer(), integer()) :: Yog.graph()
-  defdelegate complete_bipartite(m, n), to: :yog@generator@classic
+  def complete_bipartite(m, n), do: complete_bipartite_with_type(m, n, :undirected)
 
   @doc """
   Generates a complete bipartite graph with specified graph type.
   """
   @spec complete_bipartite_with_type(integer(), integer(), Yog.graph_type()) :: Yog.graph()
-  defdelegate complete_bipartite_with_type(m, n, graph_type), to: :yog@generator@classic
+  def complete_bipartite_with_type(m, n, graph_type) when m >= 0 and n >= 0 do
+    base = Yog.new(graph_type)
+
+    # Total nodes: m + n
+    # First partition: 0..(m-1)
+    # Second partition: m..(m+n-1)
+    total = m + n
+
+    graph =
+      if total > 0 do
+        Enum.reduce(0..(total - 1), base, fn i, g ->
+          Yog.add_node(g, i, nil)
+        end)
+      else
+        base
+      end
+
+    # All edges from first partition to second
+    edges = for i <- 0..(m - 1)//1, j <- m..(total - 1)//1, do: {i, j, 1}
+
+    Enum.reduce(edges, graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
 
   # ============= Trees =============
 
@@ -317,13 +437,38 @@ defmodule Yog.Generator.Classic do
   - Search tree benchmarks
   """
   @spec binary_tree(integer()) :: Yog.graph()
-  defdelegate binary_tree(depth), to: :yog@generator@classic
+  def binary_tree(depth), do: binary_tree_with_type(depth, :undirected)
 
   @doc """
   Generates a binary tree with specified graph type.
   """
   @spec binary_tree_with_type(integer(), Yog.graph_type()) :: Yog.graph()
-  defdelegate binary_tree_with_type(depth, graph_type), to: :yog@generator@classic
+  def binary_tree_with_type(depth, _graph_type) when depth < 0, do: Yog.new(:undirected)
+  def binary_tree_with_type(0, graph_type), do: Yog.new(graph_type) |> Yog.add_node(0, nil)
+
+  def binary_tree_with_type(depth, graph_type) do
+    base = Yog.new(graph_type)
+
+    # Total nodes: 2^(depth+1) - 1
+    total_nodes = Integer.pow(2, depth + 1) - 1
+
+    graph =
+      Enum.reduce(0..(total_nodes - 1)//1, base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # For each non-leaf node, add edges to its children
+    # Node i has children at 2i+1 and 2i+2
+    edges =
+      for i <- 0..(Integer.pow(2, depth) - 2)//1,
+          left = 2 * i + 1,
+          right = 2 * i + 2,
+          do: [{i, left, 1}, {i, right, 1}]
+
+    Enum.reduce(List.flatten(edges), graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
 
   # ============= Grid Graphs =============
 
@@ -354,13 +499,48 @@ defmodule Yog.Generator.Classic do
   - Spatial simulations
   """
   @spec grid_2d(integer(), integer()) :: Yog.graph()
-  defdelegate grid_2d(rows, cols), to: :yog@generator@classic
+  def grid_2d(rows, cols), do: grid_2d_with_type(rows, cols, :undirected)
 
   @doc """
   Generates a 2D grid with specified graph type.
   """
   @spec grid_2d_with_type(integer(), integer(), Yog.graph_type()) :: Yog.graph()
-  defdelegate grid_2d_with_type(rows, cols, graph_type), to: :yog@generator@classic
+  def grid_2d_with_type(rows, cols, _graph_type) when rows <= 0 or cols <= 0,
+    do: Yog.new(:undirected)
+
+  def grid_2d_with_type(rows, cols, graph_type) do
+    base = Yog.new(graph_type)
+    total = rows * cols
+
+    graph =
+      Enum.reduce(0..(total - 1), base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # Generate edges between adjacent cells
+    # Node at (r, c) has index r * cols + c
+    horizontal_edges =
+      if cols >= 2 do
+        for r <- 0..(rows - 1)//1,
+            c <- 0..(cols - 2)//1,
+            do: {r * cols + c, r * cols + c + 1, 1}
+      else
+        []
+      end
+
+    vertical_edges =
+      if rows >= 2 do
+        for r <- 0..(rows - 2)//1,
+            c <- 0..(cols - 1)//1,
+            do: {r * cols + c, (r + 1) * cols + c, 1}
+      else
+        []
+      end
+
+    Enum.reduce(horizontal_edges ++ vertical_edges, graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
 
   # ============= Special Graphs =============
 
@@ -390,13 +570,38 @@ defmodule Yog.Generator.Classic do
   - Chromatic number 3
   """
   @spec petersen() :: Yog.graph()
-  defdelegate petersen(), to: :yog@generator@classic
+  def petersen, do: petersen_with_type(:undirected)
 
   @doc """
   Generates the Petersen graph with specified graph type.
   """
   @spec petersen_with_type(Yog.graph_type()) :: Yog.graph()
-  defdelegate petersen_with_type(graph_type), to: :yog@generator@classic
+  def petersen_with_type(graph_type) do
+    # Petersen graph has 10 nodes arranged as two pentagons:
+    # - Outer pentagon: nodes 0, 1, 2, 3, 4 (5-cycle)
+    # - Inner star: nodes 5, 6, 7, 8, 9 (5-cycle)
+    # - Spokes connecting outer to inner
+
+    base = Yog.new(graph_type)
+
+    graph =
+      Enum.reduce(0..9, base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # Outer pentagon edges (0-1-2-3-4-0)
+    outer_edges = [{0, 1, 1}, {1, 2, 1}, {2, 3, 1}, {3, 4, 1}, {4, 0, 1}]
+
+    # Inner star edges (5-7-9-6-8-5) - note this is a 5-pointed star
+    inner_edges = [{5, 7, 1}, {7, 9, 1}, {9, 6, 1}, {6, 8, 1}, {8, 5, 1}]
+
+    # Spokes connecting outer to inner (0-5, 1-6, 2-7, 3-8, 4-9)
+    spokes = [{0, 5, 1}, {1, 6, 1}, {2, 7, 1}, {3, 8, 1}, {4, 9, 1}]
+
+    Enum.reduce(outer_edges ++ inner_edges ++ spokes, graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
 
   # ============= Empty Graph =============
 
@@ -415,11 +620,19 @@ defmodule Yog.Generator.Classic do
       0
   """
   @spec empty(integer()) :: Yog.graph()
-  defdelegate empty(n), to: :yog@generator@classic
+  def empty(n), do: empty_with_type(n, :undirected)
 
   @doc """
   Generates an empty graph with specified graph type.
   """
   @spec empty_with_type(integer(), Yog.graph_type()) :: Yog.graph()
-  defdelegate empty_with_type(n, graph_type), to: :yog@generator@classic
+  def empty_with_type(n, _graph_type) when n <= 0, do: Yog.new(:undirected)
+
+  def empty_with_type(n, graph_type) do
+    base = Yog.new(graph_type)
+
+    Enum.reduce(0..(n - 1), base, fn i, g ->
+      Yog.add_node(g, i, nil)
+    end)
+  end
 end

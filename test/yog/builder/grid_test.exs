@@ -10,13 +10,12 @@ defmodule Yog.Builder.GridTest do
   test "from_2d_list_creates_grid_test" do
     grid_data = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
 
-    grid_result = :yog@builder@grid.from_2d_list(grid_data, :directed, fn _, _ -> true end)
+    grid_result = Grid.from_2d_list(grid_data, :directed, fn _, _ -> true end)
 
-    # Check dimensions using Gleam record syntax
-    {:grid, _, rows, cols} = grid_result
-
-    assert rows == 3
-    assert cols == 3
+    # Check dimensions using struct syntax
+    assert match?(%Yog.Builder.GridGraph{}, grid_result)
+    assert grid_result.rows == 3
+    assert grid_result.cols == 3
   end
 
   test "coord_to_id_conversion_test" do
@@ -41,18 +40,18 @@ defmodule Yog.Builder.GridTest do
   test "get_cell_retrieves_correct_data_test" do
     grid_data = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
 
-    grid_result = :yog@builder@grid.from_2d_list(grid_data, :directed, fn _, _ -> true end)
+    grid_result = Grid.from_2d_list(grid_data, :directed, fn _, _ -> true end)
 
     # Get center cell
-    assert :yog@builder@grid.get_cell(grid_result, 1, 1) == {:ok, 5}
+    assert Grid.get_cell(grid_result, 1, 1) == {:ok, 5}
 
     # Get corner cells
-    assert :yog@builder@grid.get_cell(grid_result, 0, 0) == {:ok, 1}
-    assert :yog@builder@grid.get_cell(grid_result, 2, 2) == {:ok, 9}
+    assert Grid.get_cell(grid_result, 0, 0) == {:ok, 1}
+    assert Grid.get_cell(grid_result, 2, 2) == {:ok, 9}
 
     # Out of bounds
-    assert :yog@builder@grid.get_cell(grid_result, 3, 3) == {:error, nil}
-    assert :yog@builder@grid.get_cell(grid_result, -1, 0) == {:error, nil}
+    assert Grid.get_cell(grid_result, 3, 3) == {:error, nil}
+    assert Grid.get_cell(grid_result, -1, 0) == {:error, nil}
   end
 
   # Movement constraint tests
@@ -62,7 +61,7 @@ defmodule Yog.Builder.GridTest do
 
     # Can only move if height difference is at most 1
     grid_result =
-      :yog@builder@grid.from_2d_list(grid_data, :directed, fn from, to ->
+      Grid.from_2d_list(grid_data, :directed, fn from, to ->
         to - from <= 1
       end)
 
@@ -76,7 +75,7 @@ defmodule Yog.Builder.GridTest do
   test "undirected_grid_test" do
     grid_data = [[1, 2], [3, 4]]
 
-    grid_result = :yog@builder@grid.from_2d_list(grid_data, :undirected, fn _, _ -> true end)
+    grid_result = Grid.from_2d_list(grid_data, :undirected, fn _, _ -> true end)
 
     graph = Grid.to_graph(grid_result)
 
@@ -121,22 +120,22 @@ defmodule Yog.Builder.GridTest do
   test "find_node_test" do
     grid_data = [["S", ".", "."], [".", "#", "."], [".", ".", "E"]]
 
-    grid_result = :yog@builder@grid.from_2d_list(grid_data, :directed, fn _, _ -> true end)
+    grid_result = Grid.from_2d_list(grid_data, :directed, fn _, _ -> true end)
 
     # Find start node
-    start = :yog@builder@grid.find_node(grid_result, fn cell -> cell == "S" end)
+    start = Grid.find_node(grid_result, fn cell -> cell == "S" end)
     assert start == {:ok, 0}
 
     # Find end node
-    end_node = :yog@builder@grid.find_node(grid_result, fn cell -> cell == "E" end)
+    end_node = Grid.find_node(grid_result, fn cell -> cell == "E" end)
     assert end_node == {:ok, 8}
 
     # Find wall
-    wall = :yog@builder@grid.find_node(grid_result, fn cell -> cell == "#" end)
+    wall = Grid.find_node(grid_result, fn cell -> cell == "#" end)
     assert wall == {:ok, 4}
 
     # Find non-existent
-    not_found = :yog@builder@grid.find_node(grid_result, fn cell -> cell == "X" end)
+    not_found = Grid.find_node(grid_result, fn cell -> cell == "X" end)
     assert not_found == {:error, nil}
   end
 
@@ -146,7 +145,7 @@ defmodule Yog.Builder.GridTest do
     # Simple 3x3 grid where all moves are valid
     grid_data = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
 
-    grid_result = :yog@builder@grid.from_2d_list(grid_data, :directed, fn _, _ -> true end)
+    grid_result = Grid.from_2d_list(grid_data, :directed, fn _, _ -> true end)
 
     graph = Grid.to_graph(grid_result)
 
@@ -178,7 +177,7 @@ defmodule Yog.Builder.GridTest do
 
     # Can only climb 1 unit at a time, but descend any amount
     grid_result =
-      :yog@builder@grid.from_2d_list(grid_data, :directed, fn from, to ->
+      Grid.from_2d_list(grid_data, :directed, fn from, to ->
         to - from <= 1
       end)
 

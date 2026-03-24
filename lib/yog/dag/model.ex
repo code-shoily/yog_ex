@@ -80,7 +80,7 @@ defmodule Yog.DAG.Model do
   """
   @spec remove_node(t(), Yog.node_id()) :: t()
   def remove_node({:dag, graph}, id) do
-    {:dag, :yog@model.remove_node(graph, id)}
+    {:dag, Yog.Model.remove_node(graph, id)}
   end
 
   @doc """
@@ -94,7 +94,7 @@ defmodule Yog.DAG.Model do
   """
   @spec remove_edge(t(), Yog.node_id(), Yog.node_id()) :: t()
   def remove_edge({:dag, graph}, from, to) do
-    {:dag, :yog@model.remove_edge(graph, from, to)}
+    {:dag, Yog.Model.remove_edge(graph, from, to)}
   end
 
   @doc """

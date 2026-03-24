@@ -28,6 +28,8 @@ defmodule Yog.IO.GraphML do
       true
   """
 
+  alias Yog.Model
+
   @doc """
   Default GraphML serialization options.
   """
@@ -61,14 +63,14 @@ defmodule Yog.IO.GraphML do
   """
   def serialize_with_options(node_attr, edge_attr, options, graph) do
     {:graphml_options, indent, include_xml_declaration} = options
-    {:graph, type, nodes_map, _, _} = graph
+    %Yog.Graph{kind: type, nodes: nodes_map} = graph
 
     # Collect all node and edge attributes
     node_attrs_list =
       nodes_map
       |> Enum.map(fn {_id, data} -> node_attr.(data) end)
 
-    edges = get_all_edges(graph)
+    edges = Model.all_edges(graph)
 
     edge_attrs_list =
       edges
@@ -275,21 +277,6 @@ defmodule Yog.IO.GraphML do
   end
 
   # Private functions
-
-  defp get_all_edges({:graph, type, _, out_edges, _}) do
-    if type == :directed do
-      for {from, dests} <- out_edges,
-          {to, weight} <- dests do
-        {from, to, weight}
-      end
-    else
-      for {from, dests} <- out_edges,
-          {to, weight} <- dests,
-          from <= to do
-        {from, to, weight}
-      end
-    end
-  end
 
   defp escape_xml(value) do
     value

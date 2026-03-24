@@ -88,6 +88,8 @@ defmodule Yog.Property.Eulerian do
   - [CP-Algorithms: Eulerian Path](https://cp-algorithms.com/graph/euler_path.html)
   """
 
+  alias Yog.Model
+
   @doc """
   Checks if the graph contains an Eulerian circuit.
 
@@ -130,7 +132,41 @@ defmodule Yog.Property.Eulerian do
   O(V + E)
   """
   @spec has_eulerian_circuit?(Yog.graph()) :: boolean()
-  def has_eulerian_circuit?(graph), do: :yog@property@eulerian.has_eulerian_circuit(graph)
+  def has_eulerian_circuit?(graph) do
+    nodes = Model.all_nodes(graph)
+
+    if nodes == [] do
+      false
+    else
+      case graph.kind do
+        :undirected -> has_eulerian_circuit_undirected?(graph, nodes)
+        :directed -> has_eulerian_circuit_directed?(graph, nodes)
+      end
+    end
+  end
+
+  defp has_eulerian_circuit_undirected?(graph, nodes) do
+    # All nodes must have even degree
+    all_even =
+      Enum.all?(nodes, fn node ->
+        degree = length(Model.neighbor_ids(graph, node))
+        rem(degree, 2) == 0
+      end)
+
+    all_even and connected?(graph, nodes)
+  end
+
+  defp has_eulerian_circuit_directed?(graph, nodes) do
+    # All nodes must have in_degree == out_degree
+    all_balanced =
+      Enum.all?(nodes, fn node ->
+        in_deg = length(Model.predecessors(graph, node))
+        out_deg = length(Model.successors(graph, node))
+        in_deg == out_deg
+      end)
+
+    all_balanced and connected?(graph, nodes)
+  end
 
   @doc """
   Checks if the graph contains an Eulerian path.
@@ -174,7 +210,77 @@ defmodule Yog.Property.Eulerian do
   O(V + E)
   """
   @spec has_eulerian_path?(Yog.graph()) :: boolean()
-  def has_eulerian_path?(graph), do: :yog@property@eulerian.has_eulerian_path(graph)
+  def has_eulerian_path?(graph) do
+    nodes = Model.all_nodes(graph)
+
+    if nodes == [] do
+      false
+    else
+      case graph.kind do
+        :undirected -> has_eulerian_path_undirected?(graph, nodes)
+        :directed -> has_eulerian_path_directed?(graph, nodes)
+      end
+    end
+  end
+
+  defp has_eulerian_path_undirected?(graph, nodes) do
+    # 0 or 2 odd degree nodes
+    odd_count =
+      Enum.count(nodes, fn node ->
+        degree = length(Model.neighbor_ids(graph, node))
+        rem(degree, 2) == 1
+      end)
+
+    (odd_count == 0 or odd_count == 2) and connected?(graph, nodes)
+  end
+
+  defp has_eulerian_path_directed?(graph, nodes) do
+    # At most one start (out - in = 1), at most one end (in - out = 1)
+    stats =
+      Enum.reduce(nodes, {0, 0, true}, fn node, {starts, ends, valid} ->
+        in_deg = length(Model.predecessors(graph, node))
+        out_deg = length(Model.successors(graph, node))
+        diff = out_deg - in_deg
+
+        cond do
+          diff == 1 -> {starts + 1, ends, valid and starts < 1}
+          diff == -1 -> {starts, ends + 1, valid and ends < 1}
+          diff == 0 -> {starts, ends, valid}
+          true -> {starts, ends, false}
+        end
+      end)
+
+    case stats do
+      {s, e, true} when (s == 0 and e == 0) or (s == 1 and e == 1) ->
+        connected?(graph, nodes)
+
+      _ ->
+        false
+    end
+  end
+
+  # Check if graph is connected (weakly for directed)
+  defp connected?(graph, nodes) do
+    source = hd(nodes)
+    visited = bfs_visited(graph, source)
+    Enum.all?(nodes, fn n -> n in visited end)
+  end
+
+  defp bfs_visited(graph, source) do
+    do_bfs(graph, [source], MapSet.new([source]))
+  end
+
+  defp do_bfs(_graph, [], visited), do: MapSet.to_list(visited)
+
+  defp do_bfs(graph, [current | rest], visited) do
+    # For both directed and undirected, consider neighbors in both directions
+    neighbors = Model.neighbor_ids(graph, current)
+
+    new_neighbors = Enum.reject(neighbors, fn n -> MapSet.member?(visited, n) end)
+    new_visited = Enum.reduce(new_neighbors, visited, fn n, acc -> MapSet.put(acc, n) end)
+
+    do_bfs(graph, rest ++ new_neighbors, new_visited)
+  end
 
   @doc """
   Finds an Eulerian circuit in the graph using Hierholzer's algorithm.
@@ -214,9 +320,12 @@ defmodule Yog.Property.Eulerian do
   """
   @spec eulerian_circuit(Yog.graph()) :: {:ok, [Yog.node_id()]} | {:error, :no_eulerian_circuit}
   def eulerian_circuit(graph) do
-    case :yog@property@eulerian.find_eulerian_circuit(graph) do
-      {:some, circuit} -> {:ok, circuit}
-      :none -> {:error, :no_eulerian_circuit}
+    if has_eulerian_circuit?(graph) do
+      nodes = Model.all_nodes(graph)
+      start = hd(nodes)
+      {:ok, hierholzer(graph, start)}
+    else
+      {:error, :no_eulerian_circuit}
     end
   end
 
@@ -261,13 +370,138 @@ defmodule Yog.Property.Eulerian do
   """
   @spec eulerian_path(Yog.graph()) :: {:ok, [Yog.node_id()]} | {:error, :no_eulerian_path}
   def eulerian_path(graph) do
-    case :yog@property@eulerian.find_eulerian_path(graph) do
-      {:some, path} -> {:ok, path}
-      :none -> {:error, :no_eulerian_path}
+    cond do
+      has_eulerian_circuit?(graph) ->
+        {:ok, _circuit} = eulerian_circuit(graph)
+
+      has_eulerian_path?(graph) ->
+        start = find_path_start(graph)
+        {:ok, hierholzer(graph, start)}
+
+      true ->
+        {:error, :no_eulerian_path}
     end
   end
 
   defdelegate find_eulerian_path(graph), to: __MODULE__, as: :eulerian_path
+
+  # Find the start vertex for an Eulerian path
+  defp find_path_start(graph) do
+    nodes = Model.all_nodes(graph)
+
+    case graph.kind do
+      :undirected ->
+        # Find odd degree vertex
+        Enum.find(nodes, fn node ->
+          degree = length(Model.neighbor_ids(graph, node))
+          rem(degree, 2) == 1
+        end) || hd(nodes)
+
+      :directed ->
+        # Find vertex with out - in = 1
+        Enum.find(nodes, fn node ->
+          in_deg = length(Model.predecessors(graph, node))
+          out_deg = length(Model.successors(graph, node))
+          out_deg - in_deg == 1
+        end) || hd(nodes)
+    end
+  end
+
+  # Hierholzer's algorithm implementation
+  defp hierholzer(graph, start) do
+    # Build mutable edge map (using process dictionary for simplicity)
+    # edge_map: {from, to} -> count (for undirected we store both directions)
+    edge_map = build_edge_map(graph)
+
+    # Run Hierholzer
+    circuit = do_hierholzer(graph, start, edge_map, [])
+
+    # Verify all edges used
+    case graph.kind do
+      :undirected ->
+        # For undirected, reverse path to get actual circuit order
+        Enum.reverse(circuit)
+
+      :directed ->
+        Enum.reverse(circuit)
+    end
+  end
+
+  defp build_edge_map(graph) do
+    nodes = Model.all_nodes(graph)
+
+    Enum.reduce(nodes, %{}, fn from, acc ->
+      successors =
+        case graph.kind do
+          :undirected -> Model.neighbor_ids(graph, from)
+          :directed -> Model.successor_ids(graph, from)
+        end
+
+      Enum.reduce(successors, acc, fn to, acc2 ->
+        key = {from, to}
+        Map.update(acc2, key, 1, &(&1 + 1))
+      end)
+    end)
+  end
+
+  defp do_hierholzer(graph, current, edge_map, path) do
+    # Find unused edge from current
+    case find_unused_edge(graph, current, edge_map) do
+      nil ->
+        # No more edges - add to path
+        [current | path]
+
+      next ->
+        # Use this edge
+        key = {current, next}
+        new_map = Map.update!(edge_map, key, &(&1 - 1))
+
+        # Remove if count reaches 0
+        new_map =
+          if new_map[key] == 0 do
+            Map.delete(new_map, key)
+          else
+            new_map
+          end
+
+        # For undirected, also remove reverse edge
+        new_map =
+          if graph.kind == :undirected do
+            rev_key = {next, current}
+            Map.update!(new_map, rev_key, &(&1 - 1))
+          else
+            new_map
+          end
+
+        new_map =
+          if graph.kind == :undirected do
+            rev_key = {next, current}
+
+            if new_map[rev_key] == 0 do
+              Map.delete(new_map, rev_key)
+            else
+              new_map
+            end
+          else
+            new_map
+          end
+
+        do_hierholzer(graph, next, new_map, [current | path])
+    end
+  end
+
+  defp find_unused_edge(graph, current, edge_map) do
+    candidates =
+      case graph.kind do
+        :undirected -> Model.neighbor_ids(graph, current)
+        :directed -> Model.successor_ids(graph, current)
+      end
+
+    Enum.find(candidates, fn to ->
+      key = {current, to}
+      Map.get(edge_map, key, 0) > 0
+    end)
+  end
 end
 
 defmodule Yog.Eulerian do

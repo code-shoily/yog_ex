@@ -1,7 +1,6 @@
 defmodule Yog.Pathfinding.AStarTest do
   use ExUnit.Case
   alias Yog.Pathfinding.AStar
-  alias Yog.Pathfinding.Utils
 
   doctest AStar
 
@@ -25,9 +24,9 @@ defmodule Yog.Pathfinding.AStarTest do
 
     result = AStar.a_star(graph, 1, 3, 0, &add/2, &compare/2, heuristic)
 
-    assert {:some, path} = result
-    assert Utils.nodes(path) == [1, 2, 3]
-    assert Utils.total_weight(path) == 15
+    assert {:ok, path} = result
+    assert path.nodes == [1, 2, 3]
+    assert path.weight == 15
   end
 
   test "a_star_simple_test" do
@@ -46,8 +45,8 @@ defmodule Yog.Pathfinding.AStarTest do
 
     result = AStar.a_star(graph, 1, 3, 0, &add/2, &compare/2, heuristic)
 
-    assert {:some, path} = result
-    assert Utils.total_weight(path) == 15
+    assert {:ok, path} = result
+    assert path.weight == 15
   end
 
   test "a_star_int_weights_test" do
@@ -63,8 +62,8 @@ defmodule Yog.Pathfinding.AStarTest do
 
     result = AStar.a_star_int(graph, 1, 3, heuristic)
 
-    assert {:some, path} = result
-    assert Utils.total_weight(path) == 15
+    assert {:ok, path} = result
+    assert path.weight == 15
   end
 
   test "a_star_float_weights_test" do
@@ -80,8 +79,8 @@ defmodule Yog.Pathfinding.AStarTest do
 
     result = AStar.a_star_float(graph, 1, 3, heuristic)
 
-    assert {:some, path} = result
-    assert Utils.total_weight(path) == 16.0
+    assert {:ok, path} = result
+    assert path.weight == 16.0
   end
 
   test "a_star_no_path_test" do
@@ -94,7 +93,7 @@ defmodule Yog.Pathfinding.AStarTest do
 
     result = AStar.a_star(graph, 1, 2, 0, &add/2, &compare/2, heuristic)
 
-    assert result == :none
+    assert result == :error
   end
 
   test "a_star_same_start_and_goal_test" do
@@ -106,9 +105,9 @@ defmodule Yog.Pathfinding.AStarTest do
 
     result = AStar.a_star(graph, 1, 1, 0, &add/2, &compare/2, heuristic)
 
-    assert {:some, path} = result
-    assert Utils.nodes(path) == [1]
-    assert Utils.total_weight(path) == 0
+    assert {:ok, path} = result
+    assert path.nodes == [1]
+    assert path.weight == 0
   end
 
   # ============= Implicit A* Tests =============
@@ -134,7 +133,7 @@ defmodule Yog.Pathfinding.AStarTest do
         heuristic
       )
 
-    assert {:some, 6} = result
+    assert {:ok, 6} = result
   end
 
   test "implicit_a_star_no_path_test" do
@@ -157,7 +156,7 @@ defmodule Yog.Pathfinding.AStarTest do
         heuristic
       )
 
-    assert result == :none
+    assert result == :error
   end
 
   test "implicit_a_star_start_is_goal_test" do
@@ -175,6 +174,6 @@ defmodule Yog.Pathfinding.AStarTest do
         heuristic
       )
 
-    assert {:some, 0} = result
+    assert {:ok, 0} = result
   end
 end

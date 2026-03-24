@@ -8,10 +8,7 @@ defmodule Yog.CommunityTest do
   # ============= Utility Functions Tests =============
 
   test "to_dict_basic_test" do
-    communities = %{
-      assignments: %{1 => 0, 2 => 0, 3 => 1, 4 => 1},
-      num_communities: 2
-    }
+    communities = Community.Result.new(%{1 => 0, 2 => 0, 3 => 1, 4 => 1})
 
     result = Community.to_dict(communities)
 
@@ -20,37 +17,25 @@ defmodule Yog.CommunityTest do
   end
 
   test "largest_test" do
-    communities = %{
-      assignments: %{1 => 0, 2 => 0, 3 => 0, 4 => 1},
-      num_communities: 2
-    }
+    communities = Community.Result.new(%{1 => 0, 2 => 0, 3 => 0, 4 => 1})
 
     assert Community.largest(communities) == {:some, 0}
   end
 
   test "largest_empty_test" do
-    communities = %{
-      assignments: %{},
-      num_communities: 0
-    }
+    communities = Community.Result.new(%{})
 
     assert Community.largest(communities) == :none
   end
 
   test "sizes_test" do
-    communities = %{
-      assignments: %{1 => 0, 2 => 0, 3 => 1, 4 => 1, 5 => 1},
-      num_communities: 2
-    }
+    communities = Community.Result.new(%{1 => 0, 2 => 0, 3 => 1, 4 => 1, 5 => 1})
 
     assert Community.sizes(communities) == %{0 => 2, 1 => 3}
   end
 
   test "merge_test" do
-    communities = %{
-      assignments: %{1 => 0, 2 => 0, 3 => 1, 4 => 1},
-      num_communities: 2
-    }
+    communities = Community.Result.new(%{1 => 0, 2 => 0, 3 => 1, 4 => 1})
 
     merged = Community.merge(communities, source: 1, target: 0)
 
@@ -59,10 +44,7 @@ defmodule Yog.CommunityTest do
   end
 
   test "merge_same_source_target_test" do
-    communities = %{
-      assignments: %{1 => 0, 2 => 0},
-      num_communities: 1
-    }
+    communities = Community.Result.new(%{1 => 0, 2 => 0})
 
     merged = Community.merge(communities, source: 0, target: 0)
 
@@ -70,20 +52,14 @@ defmodule Yog.CommunityTest do
   end
 
   test "nodes_in_test" do
-    communities = %{
-      assignments: %{1 => 0, 2 => 0, 3 => 1, 4 => 1},
-      num_communities: 2
-    }
+    communities = Community.Result.new(%{1 => 0, 2 => 0, 3 => 1, 4 => 1})
 
     assert Community.nodes_in(communities, 0) == MapSet.new([1, 2])
     assert Community.nodes_in(communities, 1) == MapSet.new([3, 4])
   end
 
   test "for_node_test" do
-    communities = %{
-      assignments: %{1 => 0, 2 => 1},
-      num_communities: 2
-    }
+    communities = Community.Result.new(%{1 => 0, 2 => 1})
 
     assert Community.for_node(communities, 1) == {:some, 0}
     assert Community.for_node(communities, 2) == {:some, 1}
@@ -99,10 +75,7 @@ defmodule Yog.CommunityTest do
       |> Yog.add_node(2, nil)
       |> Yog.add_edge!(from: 1, to: 2, with: 1)
 
-    communities = %{
-      assignments: %{1 => 0, 2 => 0},
-      num_communities: 1
-    }
+    communities = Community.Result.new(%{1 => 0, 2 => 0})
 
     q = Community.modularity(graph, communities)
     assert is_float(q)
@@ -185,10 +158,7 @@ defmodule Yog.CommunityTest do
       |> Yog.add_node(2, nil)
       |> Yog.add_edge!(from: 1, to: 2, with: 1)
 
-    communities = %{
-      assignments: %{1 => 0, 2 => 0},
-      num_communities: 1
-    }
+    communities = Community.Result.new(%{1 => 0, 2 => 0})
 
     cd = Community.community_density(graph, communities, 0)
     assert is_float(cd)
@@ -201,10 +171,7 @@ defmodule Yog.CommunityTest do
       |> Yog.add_node(2, nil)
       |> Yog.add_edge!(from: 1, to: 2, with: 1)
 
-    communities = %{
-      assignments: %{1 => 0, 2 => 0},
-      num_communities: 1
-    }
+    communities = Community.Result.new(%{1 => 0, 2 => 0})
 
     avg_cd = Community.average_community_density(graph, communities)
     assert is_float(avg_cd)

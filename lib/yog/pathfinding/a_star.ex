@@ -33,10 +33,11 @@ defmodule Yog.Pathfinding.AStar do
       Yog.Pathfinding.AStar.a_star(graph, start, goal, 0, &(&1+&2), &Integer.compare/2, heuristic)
   """
 
-  alias Yog.Pathfinding.Utils
+  alias Yog.Model
+  alias Yog.Pathfinding.Path
 
   @typedoc "Result type for shortest path queries"
-  @type path_result(weight) :: {:some, Utils.path(weight)} | :none
+  @type path_result :: {:ok, Path.t()} | :error
 
   # ============================================================
   # Keyword-style API (for Pathfinding module delegation)
@@ -67,7 +68,7 @@ defmodule Yog.Pathfinding.AStar do
         heuristic: fn node -> estimate_to_goal(node) end
       )
   """
-  @spec a_star(keyword()) :: path_result(any())
+  @spec a_star(keyword()) :: path_result()
   def a_star(opts) do
     graph = Keyword.fetch!(opts, :in)
     from = Keyword.fetch!(opts, :from)
@@ -165,8 +166,8 @@ defmodule Yog.Pathfinding.AStar do
 
   ## Returns
 
-    * `{:some, path}` - A `Path` struct containing the nodes and total weight
-    * `:none` - No path exists between the nodes
+    * `{:ok, path}` - A `Path` struct containing the nodes and total weight
+    * `:error` - No path exists between the nodes
 
   ## Examples
 
@@ -178,18 +179,24 @@ defmodule Yog.Pathfinding.AStar do
       ...> |> Yog.add_edge!(:b, :c, 1)
       iex> # Admissible heuristic (never overestimates)
       iex> h = fn _, _ -> 0 end  # Zero heuristic = Dijkstra
-      iex> compare = fn a, b -> if a < b, do: :lt, else: (if a > b, do: :gt, else: :eq) end
-      iex> Yog.Pathfinding.AStar.a_star(graph, :a, :c, 0, &(&1 + &2), compare, h)
-      {:some, {:path, [:a, :b, :c], 5}}
+      iex> compare = &Yog.Utils.compare/2
+      iex> {:ok, path} = Yog.Pathfinding.AStar.a_star(graph, :a, :c, 0, &(&1 + &2), compare, h)
+      iex> path.nodes
+      [:a, :b, :c]
+      iex> path.weight
+      5
 
       iex> # Grid with Manhattan distance heuristic
       iex> grid = Yog.directed()
       ...> |> Yog.add_edge!({0,0}, {1,0}, 1)
       ...> |> Yog.add_edge!({1,0}, {2,0}, 1)
       iex> manhattan = fn {x1, y1}, {x2, y2} -> abs(x1-x2) + abs(y1-y2) end
-      iex> compare = fn a, b -> if a < b, do: :lt, else: (if a > b, do: :gt, else: :eq) end
-      iex> Yog.Pathfinding.AStar.a_star(grid, {0,0}, {2,0}, 0, &(&1+&2), compare, manhattan)
-      {:some, {:path, [{0,0}, {1,0}, {2,0}], 2}}
+      iex> compare = &Yog.Utils.compare/2
+      iex> {:ok, path} = Yog.Pathfinding.AStar.a_star(grid, {0,0}, {2,0}, 0, &(&1+&2), compare, manhattan)
+      iex> path.nodes
+      [{0,0}, {1,0}, {2,0}]
+      iex> path.weight
+      2
   """
   @spec a_star(
           Yog.graph(),
@@ -199,24 +206,16 @@ defmodule Yog.Pathfinding.AStar do
           (weight, weight -> weight),
           (weight, weight -> :lt | :eq | :gt),
           (Yog.node_id(), Yog.node_id() -> weight)
-        ) :: path_result(weight)
+        ) :: path_result()
         when weight: var
   def a_star(graph, from, to, zero, add, compare, heuristic) do
-    gleam_compare = fn a, b ->
-      case compare.(a, b) do
-        :lt -> :lt
-        :eq -> :eq
-        :gt -> :gt
-      end
-    end
+    # Priority queue: {f_score, g_score, node, path}
+    # f(n) = g(n) + h(n)
+    h0 = heuristic.(from, to)
+    initial_queue = [{add.(zero, h0), zero, from, [from]}]
+    initial_g_scores = %{from => zero}
 
-    case :yog@pathfinding@a_star.a_star(graph, from, to, zero, add, gleam_compare, heuristic) do
-      :none ->
-        :none
-
-      {:some, {:path, nodes, weight}} ->
-        {:some, Utils.path(nodes, weight)}
-    end
+    do_a_star(graph, initial_queue, to, add, compare, heuristic, initial_g_scores)
   end
 
   @doc """
@@ -233,20 +232,17 @@ defmodule Yog.Pathfinding.AStar do
       ...> |> Yog.add_edge!(1, 2, 4)
       ...> |> Yog.add_edge!(2, 3, 1)
       iex> h = fn _, _ -> 0 end
-      iex> Yog.Pathfinding.AStar.a_star_int(graph, 1, 3, h)
-      {:some, {:path, [1, 2, 3], 5}}
+      iex> {:ok, path} = Yog.Pathfinding.AStar.a_star_int(graph, 1, 3, h)
+      iex> path.nodes
+      [1, 2, 3]
+      iex> path.weight
+      5
   """
   @spec a_star_int(Yog.graph(), Yog.node_id(), Yog.node_id(), (Yog.node_id(), Yog.node_id() ->
                                                                  integer())) ::
-          path_result(integer())
+          path_result()
   def a_star_int(graph, from, to, heuristic) do
-    case :yog@pathfinding@a_star.a_star_int(graph, from, to, heuristic) do
-      :none ->
-        :none
-
-      {:some, {:path, nodes, weight}} ->
-        {:some, Utils.path(nodes, weight)}
-    end
+    a_star(graph, from, to, 0, &(&1 + &2), &Yog.Utils.compare/2, heuristic)
   end
 
   @doc """
@@ -263,20 +259,17 @@ defmodule Yog.Pathfinding.AStar do
       ...> |> Yog.add_edge!(1, 2, 4.5)
       ...> |> Yog.add_edge!(2, 3, 1.5)
       iex> h = fn _, _ -> 0.0 end
-      iex> Yog.Pathfinding.AStar.a_star_float(graph, 1, 3, h)
-      {:some, {:path, [1, 2, 3], 6.0}}
+      iex> {:ok, path} = Yog.Pathfinding.AStar.a_star_float(graph, 1, 3, h)
+      iex> path.nodes
+      [1, 2, 3]
+      iex> path.weight
+      6.0
   """
   @spec a_star_float(Yog.graph(), Yog.node_id(), Yog.node_id(), (Yog.node_id(), Yog.node_id() ->
                                                                    float())) ::
-          path_result(float())
+          path_result()
   def a_star_float(graph, from, to, heuristic) do
-    case :yog@pathfinding@a_star.a_star_float(graph, from, to, heuristic) do
-      :none ->
-        :none
-
-      {:some, {:path, nodes, weight}} ->
-        {:some, Utils.path(nodes, weight)}
-    end
+    a_star(graph, from, to, 0.0, &(&1 + &2), &Yog.Utils.compare/2, heuristic)
   end
 
   @doc """
@@ -296,8 +289,8 @@ defmodule Yog.Pathfinding.AStar do
 
   ## Returns
 
-    * `{:some, cost}` - Minimum cost to reach goal
-    * `:none` - Goal is unreachable
+    * `{:ok, cost}` - Minimum cost to reach goal
+    * `:error` - Goal is unreachable
 
   ## Examples
 
@@ -310,12 +303,13 @@ defmodule Yog.Pathfinding.AStar do
       ...> end
       iex> # Heuristic: distance to goal (node 4)
       iex> h = fn n -> 4 - n end
-      iex> compare = fn a, b -> if a < b, do: :lt, else: (if a > b, do: :gt, else: :eq) end
-      iex> Yog.Pathfinding.AStar.implicit_a_star(
+      iex> compare = &Yog.Utils.compare/2
+      iex> {:ok, cost} = Yog.Pathfinding.AStar.implicit_a_star(
       ...>   1, successors, fn x -> x == 4 end,
       ...>   0, &(&1 + &2), compare, h
       ...> )
-      {:some, 6}
+      iex> cost
+      6
   """
   @spec implicit_a_star(
           state,
@@ -325,26 +319,10 @@ defmodule Yog.Pathfinding.AStar do
           (cost, cost -> cost),
           (cost, cost -> :lt | :eq | :gt),
           (state -> cost)
-        ) :: {:some, cost} | :none
+        ) :: {:ok, cost} | :error
         when state: var, cost: var
   def implicit_a_star(from, successors, is_goal, zero, add, compare, heuristic) do
-    gleam_compare = fn a, b ->
-      case compare.(a, b) do
-        :lt -> :lt
-        :eq -> :eq
-        :gt -> :gt
-      end
-    end
-
-    :yog@pathfinding@a_star.implicit_a_star(
-      from,
-      successors,
-      is_goal,
-      heuristic,
-      zero,
-      add,
-      gleam_compare
-    )
+    implicit_a_star_by(from, successors, fn x -> x end, is_goal, zero, add, compare, heuristic)
   end
 
   @doc """
@@ -369,7 +347,7 @@ defmodule Yog.Pathfinding.AStar do
       iex> _key_fn = fn {x, y, _dir} -> {x, y} end
       iex> _h = fn {x, y, _} -> (10 - x) + (10 - y) end
       iex> _goal_fn = fn {x, y, _} -> x == 10 and y == 10 end
-      iex> _compare = fn a, b -> if a < b, do: :lt, else: (if a > b, do: :gt, else: :eq) end
+      iex> _compare = &Yog.Utils.compare/2
       iex> #Yog.Pathfinding.AStar.implicit_a_star_by(
       ...> #  {0, 0, :north}, _successors, _key_fn,
       ...> #  _goal_fn, 0, &(&1 + &2), _compare, _h
@@ -385,26 +363,187 @@ defmodule Yog.Pathfinding.AStar do
           (cost, cost -> cost),
           (cost, cost -> :lt | :eq | :gt),
           (state -> cost)
-        ) :: {:some, cost} | :none
+        ) :: {:ok, cost} | :error
         when state: var, cost: var
   def implicit_a_star_by(from, successors, key_fn, is_goal, zero, add, compare, heuristic) do
-    gleam_compare = fn a, b ->
-      case compare.(a, b) do
-        :lt -> :lt
-        :eq -> :eq
-        :gt -> :gt
-      end
-    end
+    h0 = heuristic.(from)
+    # Queue: {f_score, g_score, state}
+    initial_queue = [{add.(zero, h0), zero, from}]
+    initial_g_scores = %{key_fn.(from) => zero}
 
-    :yog@pathfinding@a_star.implicit_a_star_by(
-      from,
+    do_implicit_a_star(
+      initial_queue,
       successors,
       key_fn,
       is_goal,
-      heuristic,
-      zero,
       add,
-      gleam_compare
+      compare,
+      heuristic,
+      initial_g_scores
     )
+  end
+
+  # Main A* implementation for materialized graphs
+  defp do_a_star(_graph, [], _to, _add, _compare, _heuristic, _g_scores) do
+    :error
+  end
+
+  defp do_a_star(graph, [{_f, g, node, path} | rest], to, add, compare, heuristic, g_scores) do
+    key = node
+
+    # Check if this entry is outdated
+    case Map.fetch(g_scores, key) do
+      {:ok, best_g} ->
+        if compare.(g, best_g) == :gt do
+          do_a_star(graph, rest, to, add, compare, heuristic, g_scores)
+        else
+          if node == to do
+            {:ok, Path.new(Enum.reverse(path), g, :a_star)}
+          else
+            # Expand neighbors
+            successors = Model.successors(graph, node)
+
+            {new_queue, new_g_scores} =
+              Enum.reduce(successors, {rest, g_scores}, fn {neighbor, cost}, {q, gs} ->
+                new_g = add.(g, cost)
+                neighbor_key = neighbor
+
+                case Map.fetch(gs, neighbor_key) do
+                  {:ok, existing_g} ->
+                    if compare.(new_g, existing_g) == :lt do
+                      h = heuristic.(neighbor, to)
+                      f = add.(new_g, h)
+                      new_q = insert_sorted(q, {f, new_g, neighbor, [neighbor | path]}, compare)
+                      new_gs = Map.put(gs, neighbor_key, new_g)
+                      {new_q, new_gs}
+                    else
+                      {q, gs}
+                    end
+
+                  :error ->
+                    h = heuristic.(neighbor, to)
+                    f = add.(new_g, h)
+                    new_q = insert_sorted(q, {f, new_g, neighbor, [neighbor | path]}, compare)
+                    new_gs = Map.put(gs, neighbor_key, new_g)
+                    {new_q, new_gs}
+                end
+              end)
+
+            do_a_star(graph, new_queue, to, add, compare, heuristic, new_g_scores)
+          end
+        end
+
+      :error ->
+        do_a_star(graph, rest, to, add, compare, heuristic, g_scores)
+    end
+  end
+
+  # Implicit A* implementation
+  defp do_implicit_a_star(
+         [],
+         _successors,
+         _key_fn,
+         _is_goal,
+         _add,
+         _compare,
+         _heuristic,
+         _g_scores
+       ) do
+    :error
+  end
+
+  defp do_implicit_a_star(
+         [{_f, g, state} | rest],
+         successors,
+         key_fn,
+         is_goal,
+         add,
+         compare,
+         heuristic,
+         g_scores
+       ) do
+    key = key_fn.(state)
+
+    # Check if this entry is outdated
+    case Map.fetch(g_scores, key) do
+      {:ok, best_g} ->
+        if compare.(g, best_g) == :gt do
+          do_implicit_a_star(rest, successors, key_fn, is_goal, add, compare, heuristic, g_scores)
+        else
+          if is_goal.(state) do
+            {:ok, g}
+          else
+            # Expand successors
+            next_states = successors.(state)
+
+            {new_queue, new_g_scores} =
+              Enum.reduce(next_states, {rest, g_scores}, fn {next_state, cost}, {q, gs} ->
+                new_g = add.(g, cost)
+                next_key = key_fn.(next_state)
+
+                case Map.fetch(gs, next_key) do
+                  {:ok, existing_g} ->
+                    if compare.(new_g, existing_g) == :lt do
+                      h = heuristic.(next_state)
+                      f = add.(new_g, h)
+                      new_q = insert_sorted(q, {f, new_g, next_state}, compare)
+                      new_gs = Map.put(gs, next_key, new_g)
+                      {new_q, new_gs}
+                    else
+                      {q, gs}
+                    end
+
+                  :error ->
+                    h = heuristic.(next_state)
+                    f = add.(new_g, h)
+                    new_q = insert_sorted(q, {f, new_g, next_state}, compare)
+                    new_gs = Map.put(gs, next_key, new_g)
+                    {new_q, new_gs}
+                end
+              end)
+
+            do_implicit_a_star(
+              new_queue,
+              successors,
+              key_fn,
+              is_goal,
+              add,
+              compare,
+              heuristic,
+              new_g_scores
+            )
+          end
+        end
+
+      :error ->
+        do_implicit_a_star(rest, successors, key_fn, is_goal, add, compare, heuristic, g_scores)
+    end
+  end
+
+  # Insert into sorted list by f-score (priority queue)
+  defp insert_sorted([], item, _compare), do: [item]
+
+  defp insert_sorted([head | tail], item, compare) do
+    if tuple_size(item) == 3 do
+      # For implicit A* (3-tuple items): {f, g, state}
+      {f_item, _, _} = item
+      {f_head, _, _} = head
+
+      if compare.(f_item, f_head) == :lt do
+        [item, head | tail]
+      else
+        [head | insert_sorted(tail, item, compare)]
+      end
+    else
+      # For regular A* (4-tuple items): {f, g, node, path}
+      {f_item, _, _, _} = item
+      {f_head, _, _, _} = head
+
+      if compare.(f_item, f_head) == :lt do
+        [item, head | tail]
+      else
+        [head | insert_sorted(tail, item, compare)]
+      end
+    end
   end
 end

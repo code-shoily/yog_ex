@@ -8,20 +8,20 @@ defmodule YogTest do
     test "new_directed_graph_test" do
       graph = Yog.directed()
 
-      assert graph |> elem(0) == :graph
-      assert graph |> elem(1) == :directed
+      assert graph.__struct__ == Yog.Graph
+      assert graph.kind == :directed
       # nodes
-      assert graph |> elem(2) |> map_size() == 0
+      assert graph.nodes |> map_size() == 0
       # out_edges
-      assert graph |> elem(3) |> map_size() == 0
+      assert graph.out_edges |> map_size() == 0
       # in_edges
-      assert graph |> elem(4) |> map_size() == 0
+      assert graph.in_edges |> map_size() == 0
     end
 
     # Test creating a new undirected graph
     test "new_undirected_graph_test" do
       graph = Yog.undirected()
-      assert graph |> elem(1) == :undirected
+      assert graph.kind == :undirected
     end
 
     # Test adding a single node
@@ -30,7 +30,7 @@ defmodule YogTest do
         Yog.directed()
         |> Yog.add_node(1, "Node A")
 
-      nodes = graph |> elem(2)
+      nodes = graph.nodes
       assert map_size(nodes) == 1
       assert Map.get(nodes, 1) == "Node A"
     end
@@ -43,7 +43,7 @@ defmodule YogTest do
         |> Yog.add_node(2, "Node B")
         |> Yog.add_node(3, "Node C")
 
-      nodes = graph |> elem(2)
+      nodes = graph.nodes
       assert map_size(nodes) == 3
       assert Map.get(nodes, 2) == "Node B"
     end
@@ -55,7 +55,7 @@ defmodule YogTest do
         |> Yog.add_node(1, "Original")
         |> Yog.add_node(1, "Updated")
 
-      nodes = graph |> elem(2)
+      nodes = graph.nodes
       assert map_size(nodes) == 1
       assert Map.get(nodes, 1) == "Updated"
     end
@@ -68,8 +68,8 @@ defmodule YogTest do
         |> Yog.add_node(2, "Node B")
         |> Yog.add_edge!(from: 1, to: 2, with: 10)
 
-      out_edges = graph |> elem(3)
-      in_edges = graph |> elem(4)
+      out_edges = graph.out_edges
+      in_edges = graph.in_edges
 
       assert Map.get(out_edges, 1) == %{2 => 10}
       assert Map.get(in_edges, 2) == %{1 => 10}
@@ -88,7 +88,7 @@ defmodule YogTest do
         |> Yog.add_edge!(from: 1, to: 2, with: 10)
         |> Yog.add_edge!(from: 1, to: 3, with: 20)
 
-      out_edges_1 = graph |> elem(3) |> Map.get(1)
+      out_edges_1 = graph.out_edges |> Map.get(1)
       assert map_size(out_edges_1) == 2
       assert Map.get(out_edges_1, 2) == 10
       assert Map.get(out_edges_1, 3) == 20
@@ -104,7 +104,7 @@ defmodule YogTest do
         |> Yog.add_edge!(from: 1, to: 3, with: 10)
         |> Yog.add_edge!(from: 2, to: 3, with: 20)
 
-      in_edges_3 = graph |> elem(4) |> Map.get(3)
+      in_edges_3 = graph.in_edges |> Map.get(3)
       assert map_size(in_edges_3) == 2
       assert Map.get(in_edges_3, 1) == 10
       assert Map.get(in_edges_3, 2) == 20
@@ -118,8 +118,8 @@ defmodule YogTest do
         |> Yog.add_node(2, "Node B")
         |> Yog.add_edge!(from: 1, to: 2, with: 15)
 
-      out_edges = graph |> elem(3)
-      in_edges = graph |> elem(4)
+      out_edges = graph.out_edges
+      in_edges = graph.in_edges
 
       assert Map.get(out_edges, 1) == %{2 => 15}
       assert Map.get(out_edges, 2) == %{1 => 15}
@@ -137,7 +137,7 @@ defmodule YogTest do
         |> Yog.add_edge!(from: 1, to: 2, with: 10)
         |> Yog.add_edge!(from: 1, to: 2, with: 25)
 
-      out_edges = graph |> elem(3)
+      out_edges = graph.out_edges
       assert Map.get(out_edges, 1) == %{2 => 25}
     end
 
@@ -149,10 +149,10 @@ defmodule YogTest do
         |> Yog.add_node(2, 200)
         |> Yog.add_edge!(from: 1, to: 2, with: "labeled_edge")
 
-      nodes = graph |> elem(2)
+      nodes = graph.nodes
       assert Map.get(nodes, 1) == 100
 
-      out_edges = graph |> elem(3)
+      out_edges = graph.out_edges
       assert Map.get(out_edges, 1) |> Map.get(2) == "labeled_edge"
     end
 
@@ -170,9 +170,9 @@ defmodule YogTest do
         |> Yog.add_edge!(from: 3, to: 4, with: 3.0)
         |> Yog.add_edge!(from: 2, to: 4, with: 2.5)
 
-      nodes = graph |> elem(2)
-      out_edges = graph |> elem(3)
-      in_edges = graph |> elem(4)
+      nodes = graph.nodes
+      out_edges = graph.out_edges
+      in_edges = graph.in_edges
 
       assert map_size(nodes) == 4
       assert Map.get(out_edges, 1) |> map_size() == 2
@@ -188,8 +188,8 @@ defmodule YogTest do
         |> Yog.add_node(1, "Node A")
         |> Yog.add_edge!(from: 1, to: 1, with: 5)
 
-      out_edges = graph |> elem(3)
-      in_edges = graph |> elem(4)
+      out_edges = graph.out_edges
+      in_edges = graph.in_edges
 
       assert Map.get(out_edges, 1) == %{1 => 5}
       assert Map.get(in_edges, 1) == %{1 => 5}

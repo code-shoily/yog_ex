@@ -1,7 +1,6 @@
 defmodule Yog.Pathfinding.BellmanFordTest do
   use ExUnit.Case
   alias Yog.Pathfinding.BellmanFord
-  alias Yog.Pathfinding.Utils
 
   doctest Yog.Pathfinding.BellmanFord
 
@@ -23,9 +22,9 @@ defmodule Yog.Pathfinding.BellmanFordTest do
 
     result = BellmanFord.bellman_ford(graph, 1, 3, 0, &add/2, &compare/2)
 
-    assert {:shortest_path, path} = result
-    assert Utils.nodes(path) == [1, 2, 3]
-    assert Utils.total_weight(path) == 15
+    assert {:ok, path} = result
+    assert path.nodes == [1, 2, 3]
+    assert path.weight == 15
   end
 
   test "bellman_ford_direct_connection_test" do
@@ -37,9 +36,9 @@ defmodule Yog.Pathfinding.BellmanFordTest do
 
     result = BellmanFord.bellman_ford(graph, 1, 2, 0, &add/2, &compare/2)
 
-    assert {:shortest_path, path} = result
-    assert Utils.nodes(path) == [1, 2]
-    assert Utils.total_weight(path) == 10
+    assert {:ok, path} = result
+    assert path.nodes == [1, 2]
+    assert path.weight == 10
   end
 
   test "bellman_ford_same_start_and_goal_test" do
@@ -49,9 +48,9 @@ defmodule Yog.Pathfinding.BellmanFordTest do
 
     result = BellmanFord.bellman_ford(graph, 1, 1, 0, &add/2, &compare/2)
 
-    assert {:shortest_path, path} = result
-    assert Utils.nodes(path) == [1]
-    assert Utils.total_weight(path) == 0
+    assert {:ok, path} = result
+    assert path.nodes == [1]
+    assert path.weight == 0
   end
 
   test "bellman_ford_no_path_test" do
@@ -62,7 +61,7 @@ defmodule Yog.Pathfinding.BellmanFordTest do
 
     result = BellmanFord.bellman_ford(graph, 1, 2, 0, &add/2, &compare/2)
 
-    assert result == :no_path
+    assert result == {:error, :no_path}
   end
 
   # ============= Negative Weight Tests =============
@@ -80,9 +79,9 @@ defmodule Yog.Pathfinding.BellmanFordTest do
 
     result = BellmanFord.bellman_ford(graph, 1, 3, 0, &add/2, &compare/2)
 
-    assert {:shortest_path, path} = result
+    assert {:ok, path} = result
     # Should take path 1 -> 2 -> 3 (cost 1) not 1 -> 3 (cost 2)
-    assert Utils.total_weight(path) == 1
+    assert path.weight == 1
   end
 
   test "bellman_ford_all_negative_weights_test" do
@@ -96,8 +95,8 @@ defmodule Yog.Pathfinding.BellmanFordTest do
 
     result = BellmanFord.bellman_ford(graph, 1, 3, 0, &add/2, &compare/2)
 
-    assert {:shortest_path, path} = result
-    assert Utils.total_weight(path) == -3
+    assert {:ok, path} = result
+    assert path.weight == -3
   end
 
   test "bellman_ford_mixed_weights_test" do
@@ -114,9 +113,9 @@ defmodule Yog.Pathfinding.BellmanFordTest do
 
     result = BellmanFord.bellman_ford(graph, 1, 4, 0, &add/2, &compare/2)
 
-    assert {:shortest_path, path} = result
+    assert {:ok, path} = result
     # Should take path 1 -> 2 -> 4 (cost 8) not 1 -> 3 -> 4 (cost 10)
-    assert Utils.total_weight(path) == 8
+    assert path.weight == 8
   end
 
   # ============= Negative Cycle Detection =============
@@ -132,7 +131,7 @@ defmodule Yog.Pathfinding.BellmanFordTest do
 
     result = BellmanFord.bellman_ford(graph, 1, 2, 0, &add/2, &compare/2)
 
-    assert result == :negative_cycle
+    assert result == {:error, :negative_cycle}
   end
 
   test "bellman_ford_three_node_negative_cycle_test" do
@@ -148,7 +147,7 @@ defmodule Yog.Pathfinding.BellmanFordTest do
 
     result = BellmanFord.bellman_ford(graph, 1, 3, 0, &add/2, &compare/2)
 
-    assert result == :negative_cycle
+    assert result == {:error, :negative_cycle}
   end
 
   test "bellman_ford_no_negative_cycle_test" do
@@ -162,8 +161,8 @@ defmodule Yog.Pathfinding.BellmanFordTest do
 
     result = BellmanFord.bellman_ford(graph, 1, 2, 0, &add/2, &compare/2)
 
-    assert {:shortest_path, path} = result
-    assert Utils.total_weight(path) == 5
+    assert {:ok, path} = result
+    assert path.weight == 5
   end
 
   # Note: has_negative_cycle? has compatibility issues with Gleam implementation
@@ -204,8 +203,8 @@ defmodule Yog.Pathfinding.BellmanFordTest do
 
     result = BellmanFord.bellman_ford(graph, 1, 3, 0, &add/2, &compare/2)
 
-    assert {:shortest_path, path} = result
-    assert Utils.total_weight(path) == 15
+    assert {:ok, path} = result
+    assert path.weight == 15
   end
 
   test "bellman_ford_negative_better_path_test" do
@@ -221,9 +220,9 @@ defmodule Yog.Pathfinding.BellmanFordTest do
 
     result = BellmanFord.bellman_ford(graph, 1, 3, 0, &add/2, &compare/2)
 
-    assert {:shortest_path, path} = result
+    assert {:ok, path} = result
     # Should take path 1 -> 2 -> 3 (cost 5) not 1 -> 3 (cost 10)
-    assert Utils.total_weight(path) == 5
+    assert path.weight == 5
   end
 
   # ============= Weight Type Tests =============
@@ -239,8 +238,8 @@ defmodule Yog.Pathfinding.BellmanFordTest do
 
     result = BellmanFord.bellman_ford_int(graph, 1, 3)
 
-    assert {:shortest_path, path} = result
-    assert Utils.total_weight(path) == 1
+    assert {:ok, path} = result
+    assert path.weight == 1
   end
 
   test "bellman_ford_float_test" do
@@ -254,8 +253,8 @@ defmodule Yog.Pathfinding.BellmanFordTest do
 
     result = BellmanFord.bellman_ford_float(graph, 1, 3)
 
-    assert {:shortest_path, path} = result
-    assert Utils.total_weight(path) == 1.0
+    assert {:ok, path} = result
+    assert path.weight == 1.0
   end
 
   # ============= Diamond Graph Tests =============
@@ -280,9 +279,9 @@ defmodule Yog.Pathfinding.BellmanFordTest do
 
     result = BellmanFord.bellman_ford(graph, 1, 4, 0, &add/2, &compare/2)
 
-    assert {:shortest_path, path} = result
+    assert {:ok, path} = result
     # Should take path 1 -> 2 -> 4 (cost -4) not 1 -> 3 -> 4 (cost 5)
-    assert Utils.total_weight(path) == -4
+    assert path.weight == -4
   end
 
   # ============= Implicit Bellman-Ford Tests =============
@@ -305,7 +304,7 @@ defmodule Yog.Pathfinding.BellmanFordTest do
         &compare/2
       )
 
-    assert {:found_goal, -6} = result
+    assert {:ok, -6} = result
   end
 
   test "implicit_bellman_ford_no_goal_test" do
@@ -325,7 +324,7 @@ defmodule Yog.Pathfinding.BellmanFordTest do
         &compare/2
       )
 
-    assert result == :no_goal
+    assert result == {:error, :no_goal}
   end
 
   test "implicit_bellman_ford_negative_cycle_test" do
@@ -346,7 +345,7 @@ defmodule Yog.Pathfinding.BellmanFordTest do
         &compare/2
       )
 
-    assert result == :detected_negative_cycle
+    assert result == {:error, :negative_cycle}
   end
 
   test "implicit_bellman_ford_with_key_function_test" do
@@ -373,7 +372,7 @@ defmodule Yog.Pathfinding.BellmanFordTest do
         &compare/2
       )
 
-    assert {:found_goal, 0} = result
+    assert {:ok, 0} = result
   end
 
   # ============= Relaxation and Reconstruction Tests =============
@@ -407,8 +406,8 @@ defmodule Yog.Pathfinding.BellmanFordTest do
 
     result = BellmanFord.bellman_ford(graph, 1, 3, 0, &add/2, &compare/2)
 
-    assert {:shortest_path, path} = result
-    assert Utils.total_weight(path) == 15
+    assert {:ok, path} = result
+    assert path.weight == 15
   end
 
   # ============= Complex Graph Tests =============
@@ -433,9 +432,9 @@ defmodule Yog.Pathfinding.BellmanFordTest do
 
     result = BellmanFord.bellman_ford(graph, 1, 5, 0, &add/2, &compare/2)
 
-    assert {:shortest_path, path} = result
+    assert {:ok, path} = result
     # Should find the optimal path through negative edges
-    assert Utils.total_weight(path) == 4
+    assert path.weight == 4
   end
 
   # ============= Keyword API Tests =============
@@ -459,8 +458,8 @@ defmodule Yog.Pathfinding.BellmanFordTest do
         compare: &compare/2
       )
 
-    assert {:shortest_path, path} = result
-    assert Utils.total_weight(path) == 1
+    assert {:ok, path} = result
+    assert path.weight == 1
   end
 
   test "implicit_bellman_ford_keyword_api_test" do
@@ -476,6 +475,6 @@ defmodule Yog.Pathfinding.BellmanFordTest do
         compare: &compare/2
       )
 
-    assert {:found_goal, -4} = result
+    assert {:ok, -4} = result
   end
 end

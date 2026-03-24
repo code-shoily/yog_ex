@@ -306,8 +306,8 @@ defmodule Yog.Multi.Model do
         end)
       end)
 
-    # Return in Erlang-compatible tuple format
-    {:graph, graph.kind, base, forward_edges, reverse_edges}
+    # Return as Graph struct
+    %Yog.Graph{kind: graph.kind, nodes: base, out_edges: forward_edges, in_edges: reverse_edges}
   end
 
   @doc """

@@ -35,6 +35,8 @@ defmodule Yog.IO.LEDA do
   - **Reversal edges**: Third field indicates index for undirected graphs
   """
 
+  alias Yog.Model
+
   @doc """
   Default LEDA options for String node and edge data.
   """
@@ -54,7 +56,7 @@ defmodule Yog.IO.LEDA do
   """
   def serialize_with(options, graph) do
     {:leda_options, node_ser, edge_ser, _, _} = options
-    {:graph, type, nodes_map, _, _} = graph
+    %Yog.Graph{kind: type, nodes: nodes_map} = graph
 
     # Direction: -1 for directed, -2 for undirected
     direction = if type == :directed, do: "-1", else: "-2"
@@ -71,7 +73,7 @@ defmodule Yog.IO.LEDA do
       end)
 
     # Edges section
-    edges = get_all_edges(graph)
+    edges = Model.all_edges(graph)
     edge_count = length(edges)
 
     edge_lines =
@@ -164,21 +166,6 @@ defmodule Yog.IO.LEDA do
   end
 
   # Private functions
-
-  defp get_all_edges({:graph, type, _, out_edges, _}) do
-    if type == :directed do
-      for {from, dests} <- out_edges,
-          {to, weight} <- dests do
-        {from, to, weight}
-      end
-    else
-      for {from, dests} <- out_edges,
-          {to, weight} <- dests,
-          from <= to do
-        {from, to, weight}
-      end
-    end
-  end
 
   defp parse_leda(input, node_parser, edge_parser) do
     # Handle empty input
@@ -341,7 +328,7 @@ defmodule Yog.IO.LEDA do
   end
 
   defp try_add_edge(graph, from, to, weight) do
-    {:graph, _, nodes_map, _, _} = graph
+    %Yog.Graph{nodes: nodes_map} = graph
 
     if Map.has_key?(nodes_map, from) and Map.has_key?(nodes_map, to) do
       case Yog.Model.add_edge(graph, from, to, weight) do

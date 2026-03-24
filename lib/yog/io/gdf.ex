@@ -41,6 +41,8 @@ defmodule Yog.IO.GDF do
   - [GUESS Visualization Tool](https://graphexploration.cond.org/)
   """
 
+  alias Yog.Model
+
   @doc """
   Default GDF serialization options.
 
@@ -82,7 +84,7 @@ defmodule Yog.IO.GDF do
   """
   def serialize_with(node_attr, edge_attr, options, graph) do
     {:gdf_options, separator, include_types, _include_directed} = options
-    {:graph, type, nodes_map, _, _} = graph
+    %Yog.Graph{kind: type, nodes: nodes_map} = graph
 
     # Build node attributes map for all nodes
     node_attrs_list =
@@ -122,7 +124,7 @@ defmodule Yog.IO.GDF do
       end)
 
     # Build edge attributes
-    edges = get_all_edges(graph)
+    edges = Model.all_edges(graph)
 
     edge_attrs_list =
       Enum.map(edges, fn {from, to, weight} ->
@@ -354,21 +356,6 @@ defmodule Yog.IO.GDF do
 
   # Private functions
 
-  defp get_all_edges({:graph, type, _, out_edges, _}) do
-    if type == :directed do
-      for {from, dests} <- out_edges,
-          {to, weight} <- dests do
-        {from, to, weight}
-      end
-    else
-      for {from, dests} <- out_edges,
-          {to, weight} <- dests,
-          from <= to do
-        {from, to, weight}
-      end
-    end
-  end
-
   defp escape_csv(value, separator) do
     str_value = Kernel.to_string(value)
 
@@ -553,7 +540,7 @@ defmodule Yog.IO.GDF do
   end
 
   defp ensure_node_exists(graph, node_id, _edge_folder) do
-    {:graph, _, nodes_map, _, _} = graph
+    %Yog.Graph{nodes: nodes_map} = graph
 
     if Map.has_key?(nodes_map, node_id) do
       graph

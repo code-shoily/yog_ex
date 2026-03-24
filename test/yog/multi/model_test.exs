@@ -388,10 +388,9 @@ defmodule Yog.Multi.ModelTest do
 
       simple = Model.to_simple_graph(multi, &min/2)
 
-      # Verify the result is a valid graph structure (tuple format for Erlang compatibility)
-      assert is_tuple(simple)
-      assert elem(simple, 0) == :graph
-      assert elem(simple, 1) == :directed
+      # Verify the result is a valid graph structure
+      assert simple.__struct__ == Yog.Graph
+      assert simple.kind == :directed
     end
 
     test "to_simple_graph_min_edges/1 returns a valid graph" do
@@ -405,9 +404,8 @@ defmodule Yog.Multi.ModelTest do
 
       simple = Model.to_simple_graph_min_edges(multi)
 
-      assert is_tuple(simple)
-      assert elem(simple, 0) == :graph
-      assert elem(simple, 1) == :directed
+      assert simple.__struct__ == Yog.Graph
+      assert simple.kind == :directed
     end
 
     test "to_simple_graph_sum_edges/2 returns a valid graph" do
@@ -421,9 +419,8 @@ defmodule Yog.Multi.ModelTest do
 
       simple = Model.to_simple_graph_sum_edges(multi, &Kernel.+/2)
 
-      assert is_tuple(simple)
-      assert elem(simple, 0) == :graph
-      assert elem(simple, 1) == :directed
+      assert simple.__struct__ == Yog.Graph
+      assert simple.kind == :directed
     end
   end
 

@@ -1,7 +1,6 @@
 defmodule Yog.Pathfinding.DijkstraTest do
   use ExUnit.Case
   alias Yog.Pathfinding.Dijkstra
-  alias Yog.Pathfinding.Utils
 
   doctest Dijkstra
 
@@ -23,9 +22,9 @@ defmodule Yog.Pathfinding.DijkstraTest do
 
     result = Dijkstra.shortest_path(graph, 1, 3, 0, &add/2, &compare/2)
 
-    assert {:some, path} = result
-    assert Utils.nodes(path) == [1, 2, 3]
-    assert Utils.total_weight(path) == 15
+    assert {:ok, path} = result
+    assert path.nodes == [1, 2, 3]
+    assert path.weight == 15
   end
 
   test "shortest_path_direct_connection_test" do
@@ -37,9 +36,9 @@ defmodule Yog.Pathfinding.DijkstraTest do
 
     result = Dijkstra.shortest_path(graph, 1, 2, 0, &add/2, &compare/2)
 
-    assert {:some, path} = result
-    assert Utils.nodes(path) == [1, 2]
-    assert Utils.total_weight(path) == 10
+    assert {:ok, path} = result
+    assert path.nodes == [1, 2]
+    assert path.weight == 10
   end
 
   test "shortest_path_same_start_and_goal_test" do
@@ -49,9 +48,9 @@ defmodule Yog.Pathfinding.DijkstraTest do
 
     result = Dijkstra.shortest_path(graph, 1, 1, 0, &add/2, &compare/2)
 
-    assert {:some, path} = result
-    assert Utils.nodes(path) == [1]
-    assert Utils.total_weight(path) == 0
+    assert {:ok, path} = result
+    assert path.nodes == [1]
+    assert path.weight == 0
   end
 
   test "shortest_path_no_path_test" do
@@ -62,7 +61,7 @@ defmodule Yog.Pathfinding.DijkstraTest do
 
     result = Dijkstra.shortest_path(graph, 1, 2, 0, &add/2, &compare/2)
 
-    assert result == :none
+    assert result == :error
   end
 
   test "shortest_path_invalid_start_test" do
@@ -70,7 +69,7 @@ defmodule Yog.Pathfinding.DijkstraTest do
 
     result = Dijkstra.shortest_path(graph, 99, 1, 0, &add/2, &compare/2)
 
-    assert result == :none
+    assert result == :error
   end
 
   test "shortest_path_invalid_goal_test" do
@@ -80,7 +79,7 @@ defmodule Yog.Pathfinding.DijkstraTest do
 
     result = Dijkstra.shortest_path(graph, 1, 99, 0, &add/2, &compare/2)
 
-    assert result == :none
+    assert result == :error
   end
 
   # ============= Multiple Path Tests =============
@@ -100,8 +99,8 @@ defmodule Yog.Pathfinding.DijkstraTest do
 
     result = Dijkstra.shortest_path(graph, 1, 3, 0, &add/2, &compare/2)
 
-    assert {:some, path} = result
-    assert Utils.total_weight(path) == 15
+    assert {:ok, path} = result
+    assert path.weight == 15
   end
 
   test "shortest_path_direct_vs_indirect_test" do
@@ -118,9 +117,9 @@ defmodule Yog.Pathfinding.DijkstraTest do
 
     result = Dijkstra.shortest_path(graph, 1, 3, 0, &add/2, &compare/2)
 
-    assert {:some, path} = result
-    assert Utils.nodes(path) == [1, 2, 3]
-    assert Utils.total_weight(path) == 10
+    assert {:ok, path} = result
+    assert path.nodes == [1, 2, 3]
+    assert path.weight == 10
   end
 
   # ============= Diamond Graph Tests =============
@@ -145,9 +144,9 @@ defmodule Yog.Pathfinding.DijkstraTest do
 
     result = Dijkstra.shortest_path(graph, 1, 4, 0, &add/2, &compare/2)
 
-    assert {:some, path} = result
+    assert {:ok, path} = result
     # Should take path 1 -> 2 -> 4 (cost 3) not 1 -> 3 -> 4 (cost 5)
-    assert Utils.total_weight(path) == 3
+    assert path.weight == 3
   end
 
   # ============= Cycle Tests =============
@@ -165,9 +164,9 @@ defmodule Yog.Pathfinding.DijkstraTest do
 
     result = Dijkstra.shortest_path(graph, 1, 3, 0, &add/2, &compare/2)
 
-    assert {:some, path} = result
-    assert Utils.nodes(path) == [1, 2, 3]
-    assert Utils.total_weight(path) == 15
+    assert {:ok, path} = result
+    assert path.nodes == [1, 2, 3]
+    assert path.weight == 15
   end
 
   # ============= Undirected Graph Tests =============
@@ -183,8 +182,8 @@ defmodule Yog.Pathfinding.DijkstraTest do
 
     result = Dijkstra.shortest_path(graph, 1, 3, 0, &add/2, &compare/2)
 
-    assert {:some, path} = result
-    assert Utils.total_weight(path) == 15
+    assert {:ok, path} = result
+    assert path.weight == 15
   end
 
   # ============= Weight Variation Tests =============
@@ -200,9 +199,9 @@ defmodule Yog.Pathfinding.DijkstraTest do
 
     result = Dijkstra.shortest_path_int(graph, 1, 3)
 
-    assert {:some, path} = result
-    assert Utils.nodes(path) == [1, 2, 3]
-    assert Utils.total_weight(path) == 15
+    assert {:ok, path} = result
+    assert path.nodes == [1, 2, 3]
+    assert path.weight == 15
   end
 
   test "shortest_path_float_test" do
@@ -216,9 +215,9 @@ defmodule Yog.Pathfinding.DijkstraTest do
 
     result = Dijkstra.shortest_path_float(graph, 1, 3)
 
-    assert {:some, path} = result
-    assert Utils.nodes(path) == [1, 2, 3]
-    assert Utils.total_weight(path) == 16.0
+    assert {:ok, path} = result
+    assert path.nodes == [1, 2, 3]
+    assert path.weight == 16.0
   end
 
   test "shortest_path_zero_weights_test" do
@@ -232,8 +231,8 @@ defmodule Yog.Pathfinding.DijkstraTest do
 
     result = Dijkstra.shortest_path(graph, 1, 3, 0, &add/2, &compare/2)
 
-    assert {:some, path} = result
-    assert Utils.total_weight(path) == 0
+    assert {:ok, path} = result
+    assert path.weight == 0
   end
 
   # ============= Single Source Distance Tests =============
@@ -399,7 +398,7 @@ defmodule Yog.Pathfinding.DijkstraTest do
         &compare/2
       )
 
-    assert {:some, 6} = result
+    assert {:ok, 6} = result
   end
 
   test "implicit_dijkstra_multiple_paths_test" do
@@ -422,7 +421,7 @@ defmodule Yog.Pathfinding.DijkstraTest do
         &compare/2
       )
 
-    assert {:some, 15} = result
+    assert {:ok, 15} = result
   end
 
   test "implicit_dijkstra_grid_test" do
@@ -448,7 +447,7 @@ defmodule Yog.Pathfinding.DijkstraTest do
       )
 
     # Manhattan distance from (0,0) to (2,2) is 4
-    assert {:some, 4} = result
+    assert {:ok, 4} = result
   end
 
   test "implicit_dijkstra_unreachable_test" do
@@ -468,7 +467,7 @@ defmodule Yog.Pathfinding.DijkstraTest do
         &compare/2
       )
 
-    assert result == :none
+    assert result == :error
   end
 
   test "implicit_dijkstra_weighted_edges_test" do
@@ -489,7 +488,7 @@ defmodule Yog.Pathfinding.DijkstraTest do
       )
 
     # Should take path 1 -> 2 -> 3 (cost 15) not 1 -> 3 (cost 100)
-    assert {:some, 15} = result
+    assert {:ok, 15} = result
   end
 
   test "implicit_dijkstra_by_test" do
@@ -517,7 +516,7 @@ defmodule Yog.Pathfinding.DijkstraTest do
         &compare/2
       )
 
-    assert {:some, 2} = result
+    assert {:ok, 2} = result
   end
 
   # ============= Keyword API Tests =============
@@ -541,8 +540,8 @@ defmodule Yog.Pathfinding.DijkstraTest do
         compare: &compare/2
       )
 
-    assert {:some, path} = result
-    assert Utils.total_weight(path) == 15
+    assert {:ok, path} = result
+    assert path.weight == 15
   end
 
   test "single_source_distances_keyword_api_test" do
@@ -578,6 +577,6 @@ defmodule Yog.Pathfinding.DijkstraTest do
         compare: &compare/2
       )
 
-    assert {:some, 4} = result
+    assert {:ok, 4} = result
   end
 end

@@ -133,7 +133,7 @@ defmodule Yog.Property.Cyclicity do
   O(V + E)
   """
   @spec acyclic?(Yog.graph()) :: boolean()
-  defdelegate acyclic?(graph), to: Yog.Traversal, as: :is_acyclic
+  defdelegate acyclic?(graph), to: Yog.Traversal, as: :acyclic?
 
   @doc """
   Checks if the graph contains at least one cycle.
@@ -162,5 +162,5 @@ defmodule Yog.Property.Cyclicity do
   O(V + E)
   """
   @spec cyclic?(Yog.graph()) :: boolean()
-  defdelegate cyclic?(graph), to: Yog.Traversal, as: :is_cyclic
+  defdelegate cyclic?(graph), to: Yog.Traversal, as: :cyclic?
 end

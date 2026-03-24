@@ -34,6 +34,9 @@ defmodule Yog.DisjointSet do
 
   - [Wikipedia: Disjoint-set data structure](https://en.wikipedia.org/wiki/Disjoint-set_data_structure)
   - [CP-Algorithms: Disjoint Set Union](https://cp-algorithms.com/data_structures/disjoint_set_union.html)
+
+  > **Migration Note:** This module was ported from Gleam to pure Elixir in v0.53.0.
+  > The API remains unchanged.
   """
 
   @typedoc """
@@ -44,7 +47,7 @@ defmodule Yog.DisjointSet do
 
   **Time Complexity:** O(α(n)) amortized per operation, where α is the inverse Ackermann function
   """
-  @type t :: term()
+  @type t :: {:disjoint_set, map(), map()}
 
   @doc """
   Creates a new empty disjoint set structure.
@@ -56,7 +59,9 @@ defmodule Yog.DisjointSet do
       0
   """
   @spec new() :: t()
-  defdelegate new(), to: :yog@disjoint_set
+  def new do
+    {:disjoint_set, %{}, %{}}
+  end
 
   @doc """
   Adds a new element to the disjoint set.
@@ -74,7 +79,15 @@ defmodule Yog.DisjointSet do
       2
   """
   @spec add(t(), term()) :: t()
-  defdelegate add(dsu, element), to: :yog@disjoint_set
+  def add({:disjoint_set, parents, ranks}, element) do
+    if Map.has_key?(parents, element) do
+      {:disjoint_set, parents, ranks}
+    else
+      new_parents = Map.put(parents, element, element)
+      new_ranks = Map.put(ranks, element, 0)
+      {:disjoint_set, new_parents, new_ranks}
+    end
+  end
 
   @doc """
   Finds the representative (root) of the set containing the element.
@@ -97,7 +110,25 @@ defmodule Yog.DisjointSet do
       true
   """
   @spec find(t(), term()) :: {t(), term()}
-  defdelegate find(dsu, element), to: :yog@disjoint_set
+  def find({:disjoint_set, parents, ranks} = dsu, element) do
+    case Map.fetch(parents, element) do
+      :error ->
+        # Element not found, add it and return as its own root
+        new_dsu = add(dsu, element)
+        {new_dsu, element}
+
+      {:ok, parent} when parent == element ->
+        # Element is its own parent (root)
+        {dsu, element}
+
+      {:ok, parent} ->
+        # Recursively find root with path compression
+        {updated_dsu, root} = find({:disjoint_set, parents, ranks}, parent)
+        # Compress path: point element directly to root
+        new_parents = Map.put(updated_dsu |> elem(1), element, root)
+        {{:disjoint_set, new_parents, updated_dsu |> elem(2)}, root}
+    end
+  end
 
   @doc """
   Merges the sets containing the two elements.
@@ -119,7 +150,16 @@ defmodule Yog.DisjointSet do
       true
   """
   @spec union(t(), term(), term()) :: t()
-  defdelegate union(dsu, element_1, element_2), to: :yog@disjoint_set
+  def union(dsu, x, y) do
+    {dsu1, root_x} = find(dsu, x)
+    {dsu2, root_y} = find(dsu1, y)
+
+    if root_x == root_y do
+      dsu2
+    else
+      do_union_by_rank(dsu2, root_x, root_y)
+    end
+  end
 
   @doc """
   Creates a disjoint set from a list of pairs to union.
@@ -137,7 +177,11 @@ defmodule Yog.DisjointSet do
       true
   """
   @spec from_pairs([{term(), term()}]) :: t()
-  defdelegate from_pairs(pairs), to: :yog@disjoint_set
+  def from_pairs(pairs) do
+    Enum.reduce(pairs, new(), fn {x, y}, acc ->
+      union(acc, x, y)
+    end)
+  end
 
   @doc """
   Checks if two elements are in the same set (connected).
@@ -155,8 +199,10 @@ defmodule Yog.DisjointSet do
       false
   """
   @spec connected?(t(), term(), term()) :: {t(), boolean()}
-  def connected?(dsu, element_1, element_2) do
-    :yog@disjoint_set.connected(dsu, element_1, element_2)
+  def connected?(dsu, x, y) do
+    {dsu1, root_x} = find(dsu, x)
+    {dsu2, root_y} = find(dsu1, y)
+    {dsu2, root_x == root_y}
   end
 
   @doc """
@@ -172,7 +218,9 @@ defmodule Yog.DisjointSet do
       2
   """
   @spec size(t()) :: non_neg_integer()
-  defdelegate size(dsu), to: :yog@disjoint_set
+  def size({:disjoint_set, parents, _ranks}) do
+    map_size(parents)
+  end
 
   @doc """
   Returns the number of disjoint sets.
@@ -187,7 +235,13 @@ defmodule Yog.DisjointSet do
       2
   """
   @spec count_sets(t()) :: non_neg_integer()
-  defdelegate count_sets(dsu), to: :yog@disjoint_set
+  def count_sets({:disjoint_set, parents, _ranks} = dsu) do
+    parents
+    |> Map.keys()
+    |> Enum.map(fn element -> find_root_readonly(dsu, element) end)
+    |> Enum.uniq()
+    |> length()
+  end
 
   @doc """
   Returns all disjoint sets as a list of lists.
@@ -206,5 +260,63 @@ defmodule Yog.DisjointSet do
       3
   """
   @spec to_lists(t()) :: [[term()]]
-  defdelegate to_lists(dsu), to: :yog@disjoint_set
+  def to_lists({:disjoint_set, parents, _ranks} = dsu) do
+    parents
+    |> Map.keys()
+    |> Enum.reduce(%{}, fn element, acc ->
+      root = find_root_readonly(dsu, element)
+
+      Map.update(acc, root, [element], fn members ->
+        [element | members]
+      end)
+    end)
+    |> Map.values()
+  end
+
+  # =============================================================================
+  # Private Helper Functions
+  # =============================================================================
+
+  # Unions two sets by their ranks (internal helper).
+  # Precondition: root_x and root_y are different roots.
+  defp do_union_by_rank({:disjoint_set, parents, ranks}, root_x, root_y) do
+    rank_x = Map.get(ranks, root_x, 0)
+    rank_y = Map.get(ranks, root_y, 0)
+
+    cond do
+      rank_x < rank_y ->
+        # Attach x's tree under y's tree
+        new_parents = Map.put(parents, root_x, root_y)
+        {:disjoint_set, new_parents, ranks}
+
+      rank_x >= rank_y ->
+        # Attach y's tree under x's tree
+        new_parents = Map.put(parents, root_y, root_x)
+
+        # If ranks are equal, increment x's rank
+        new_ranks =
+          if rank_x == rank_y do
+            Map.put(ranks, root_x, rank_x + 1)
+          else
+            ranks
+          end
+
+        {:disjoint_set, new_parents, new_ranks}
+    end
+  end
+
+  # Finds root without path compression (read-only operation).
+  # Used by count_sets and to_lists to avoid modifying structure.
+  defp find_root_readonly({:disjoint_set, parents, _ranks}, element) do
+    case Map.fetch(parents, element) do
+      :error ->
+        element
+
+      {:ok, parent} when parent == element ->
+        element
+
+      {:ok, parent} ->
+        find_root_readonly({:disjoint_set, parents, %{}}, parent)
+    end
+  end
 end

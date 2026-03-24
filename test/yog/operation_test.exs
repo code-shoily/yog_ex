@@ -109,7 +109,7 @@ defmodule Yog.OperationTest do
 
       # Edge 1-2 is in both, so it should be removed
       # Nodes without edges may be removed
-      assert is_tuple(result)
+      assert is_struct(result, Yog.Graph)
     end
 
     test "keeps unique structure" do
@@ -130,7 +130,7 @@ defmodule Yog.OperationTest do
       result = Operation.difference(g1, g2)
 
       # Edge 2-3 is unique to g1
-      assert is_tuple(result)
+      assert is_struct(result, Yog.Graph)
     end
   end
 
@@ -152,7 +152,7 @@ defmodule Yog.OperationTest do
       result = Operation.symmetric_difference(g1, g2)
 
       # Both edges are unique to their respective graphs
-      assert is_tuple(result)
+      assert is_struct(result, Yog.Graph)
     end
   end
 

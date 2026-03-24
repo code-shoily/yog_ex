@@ -11,7 +11,7 @@ defmodule Yog.Pathfinding.BidirectionalTest do
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
 
-    assert :none ==
+    assert :error ==
              Bidirectional.shortest_path_int(
                in: graph,
                from: 1,

@@ -28,7 +28,7 @@ defmodule RenderMermaid do
     # 2. Mermaid with path visualization
     IO.puts("\n--- Finding Shortest Path ---")
 
-    result = Yog.Pathfinding.shortest_path(
+    result = Yog.Pathfinding.Dijkstra.shortest_path(
       in: graph,
       from: 1,
       to: 3,

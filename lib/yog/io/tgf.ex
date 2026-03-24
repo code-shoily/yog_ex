@@ -35,6 +35,8 @@ defmodule Yog.IO.TGF do
     as warnings in the `TgfResult`.
   """
 
+  alias Yog.Model
+
   @doc """
   Default TGF serialization options.
   """
@@ -71,7 +73,7 @@ defmodule Yog.IO.TGF do
   """
   def serialize_with(options, graph) do
     {:tgf_options, node_label_fn, edge_label_fn} = options
-    {:graph, _type, nodes_map, _, _} = graph
+    %Yog.Graph{nodes: nodes_map} = graph
 
     # Serialize nodes
     node_lines =
@@ -83,7 +85,7 @@ defmodule Yog.IO.TGF do
       end)
 
     # Serialize edges
-    edges = get_all_edges(graph)
+    edges = Model.all_edges(graph)
 
     edge_lines =
       edges
@@ -178,21 +180,6 @@ defmodule Yog.IO.TGF do
 
   # Private functions
 
-  defp get_all_edges({:graph, type, _, out_edges, _}) do
-    if type == :directed do
-      for {from, dests} <- out_edges,
-          {to, weight} <- dests do
-        {from, to, weight}
-      end
-    else
-      for {from, dests} <- out_edges,
-          {to, weight} <- dests,
-          from <= to do
-        {from, to, weight}
-      end
-    end
-  end
-
   defp parse_lines(lines, graph_type, node_parser, edge_parser) do
     # Find separator
     case Enum.find_index(lines, &(&1 == "#" || String.trim(&1) == "#")) do
@@ -250,7 +237,7 @@ defmodule Yog.IO.TGF do
   end
 
   defp add_node_if_unique(graph, id, data, rest, node_parser, warnings, line_num) do
-    {:graph, _, nodes_map, _, _} = graph
+    %Yog.Graph{nodes: nodes_map} = graph
 
     if Map.has_key?(nodes_map, id) do
       {:error, {:duplicate_node, line_num, id}}
@@ -383,7 +370,7 @@ defmodule Yog.IO.TGF do
   end
 
   defp ensure_node(graph, id) do
-    {:graph, _, nodes_map, _, _} = graph
+    %Yog.Graph{nodes: nodes_map} = graph
 
     if Map.has_key?(nodes_map, id) do
       graph

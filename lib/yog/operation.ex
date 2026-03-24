@@ -20,7 +20,7 @@ defmodule Yog.Operation do
   | Function | Description | Use Case |
   |----------|-------------|----------|
   | `disjoint_union/2` | Combine with automatic ID re-indexing | Safe graph combination |
-  | `cartesian_product/2` | Multiply graphs (grids, hypercubes) | Generate complex structures |
+  | `cartesian_product/4` | Multiply graphs (grids, hypercubes) | Generate complex structures |
   | `compose/2` | Merge overlapping graphs with combined edges | Layered systems |
   | `power/2` | k-th power (connect nodes within distance k) | Reachability analysis |
 
@@ -66,7 +66,12 @@ defmodule Yog.Operation do
       iex> common = Yog.Operation.intersection(graph_a, graph_b)
       iex> Yog.Model.order(common)
       2
+
+  > **Migration Note:** This module was ported from Gleam to pure Elixir in v0.53.0.
+  > The API remains unchanged.
   """
+
+  alias Yog.Model
 
   # ============= Set-Theoretic Operations =============
 
@@ -88,7 +93,9 @@ defmodule Yog.Operation do
       3
   """
   @spec union(Yog.graph(), Yog.graph()) :: Yog.graph()
-  defdelegate union(base, other), to: :yog@operation
+  def union(base, other) do
+    Yog.Transform.merge(base, other)
+  end
 
   @doc """
   Returns a graph containing only nodes and edges that exist in both input graphs.
@@ -108,7 +115,35 @@ defmodule Yog.Operation do
       2
   """
   @spec intersection(Yog.graph(), Yog.graph()) :: Yog.graph()
-  defdelegate intersection(first, second), to: :yog@operation
+  def intersection(first, second) do
+    first_nodes = MapSet.new(Model.all_nodes(first))
+    second_nodes = MapSet.new(Model.all_nodes(second))
+    common_nodes = MapSet.intersection(first_nodes, second_nodes)
+
+    # Keep only nodes in both graphs
+    filtered =
+      Model.all_nodes(first)
+      |> Enum.reduce(first, fn node, g ->
+        if MapSet.member?(common_nodes, node) do
+          g
+        else
+          Model.remove_node(g, node)
+        end
+      end)
+
+    # Keep only edges that exist in both graphs
+    Enum.reduce(Model.all_nodes(filtered), filtered, fn src, g ->
+      successors = Model.successors(g, src)
+
+      Enum.reduce(successors, g, fn {dst, _weight}, acc_g ->
+        if edge_exists_in(second, src, dst) do
+          acc_g
+        else
+          Model.remove_edge(acc_g, src, dst)
+        end
+      end)
+    end)
+  end
 
   @doc """
   Returns a graph containing nodes and edges that exist in the first graph
@@ -127,7 +162,42 @@ defmodule Yog.Operation do
       true
   """
   @spec difference(Yog.graph(), Yog.graph()) :: Yog.graph()
-  defdelegate difference(first, second), to: :yog@operation
+  def difference(first, second) do
+    first_nodes = MapSet.new(Model.all_nodes(first))
+    second_nodes = MapSet.new(Model.all_nodes(second))
+    _nodes_only_in_first = MapSet.difference(first_nodes, second_nodes)
+
+    # Remove edges that exist in second
+    without_common_edges =
+      Model.all_nodes(first)
+      |> Enum.reduce(first, fn src, g ->
+        successors = Model.successors(g, src)
+
+        Enum.reduce(successors, g, fn {dst, _weight}, acc_g ->
+          if edge_exists_in(second, src, dst) do
+            Model.remove_edge(acc_g, src, dst)
+          else
+            acc_g
+          end
+        end)
+      end)
+
+    # Remove nodes that have no edges (unless they were unique to first)
+    nodes_common = MapSet.intersection(first_nodes, second_nodes)
+
+    Enum.reduce(MapSet.to_list(nodes_common), without_common_edges, fn node, g ->
+      has_edges =
+        Model.successor_ids(g, node) != [] or
+          Model.predecessors(g, node) != []
+
+      if has_edges do
+        g
+      else
+        # Node has no edges, remove it
+        Model.remove_node(g, node)
+      end
+    end)
+  end
 
   @doc """
   Returns a graph containing edges that exist in exactly one of the input graphs.
@@ -142,11 +212,15 @@ defmodule Yog.Operation do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       iex> sym_diff = Yog.Operation.symmetric_difference(g1, g2)
-      iex> is_tuple(sym_diff)
+      iex> is_struct(sym_diff, Yog.Graph)
       true
   """
   @spec symmetric_difference(Yog.graph(), Yog.graph()) :: Yog.graph()
-  defdelegate symmetric_difference(first, second), to: :yog@operation
+  def symmetric_difference(first, second) do
+    first_only = difference(first, second)
+    second_only = difference(second, first)
+    union(first_only, second_only)
+  end
 
   # ============= Composition & Joins =============
 
@@ -172,7 +246,11 @@ defmodule Yog.Operation do
       4
   """
   @spec disjoint_union(Yog.graph(), Yog.graph()) :: Yog.graph()
-  defdelegate disjoint_union(base, other), to: :yog@operation
+  def disjoint_union(base, other) do
+    offset = Model.order(base)
+    reindexed_other = shift_node_ids(other, offset)
+    union(base, reindexed_other)
+  end
 
   @doc """
   Returns the Cartesian product of two graphs.
@@ -204,8 +282,67 @@ defmodule Yog.Operation do
       4
   """
   @spec cartesian_product(Yog.graph(), Yog.graph(), any(), any()) :: Yog.graph()
-  defdelegate cartesian_product(first, second, default_first, default_second),
-    to: :yog@operation
+  def cartesian_product(first, second, default_first, default_second) do
+    first_nodes = Model.all_nodes(first)
+    second_nodes = Model.all_nodes(second)
+    second_order = Model.order(second)
+
+    # Get the kind and nodes from the graphs
+    %Yog.Graph{kind: kind, nodes: first_nodes_data} = first
+    %Yog.Graph{nodes: second_nodes_data} = second
+
+    # Create empty graph with same kind
+    init_graph = Yog.Graph.new(kind)
+
+    # Add nodes: new_id = u * second_order + v
+    graph_with_nodes =
+      Enum.reduce(first_nodes, init_graph, fn u, g_acc ->
+        u_data = Map.fetch!(first_nodes_data, u)
+
+        Enum.reduce(second_nodes, g_acc, fn v, g ->
+          new_id = u * second_order + v
+          v_data = Map.fetch!(second_nodes_data, v)
+          Model.add_node(g, new_id, {u_data, v_data})
+        end)
+      end)
+
+    # Add edges from second graph (vertical edges in grid)
+    graph_with_second_edges =
+      Enum.reduce(first_nodes, graph_with_nodes, fn u, g_acc ->
+        Enum.reduce(second_nodes, g_acc, fn v, g ->
+          v_successors = Model.successors(second, v)
+
+          Enum.reduce(v_successors, g, fn {v_succ, edge_weight}, g_inner ->
+            src_id = u * second_order + v
+            dst_id = u * second_order + v_succ
+            edge_data = {default_second, edge_weight}
+
+            case Model.add_edge(g_inner, src_id, dst_id, edge_data) do
+              {:ok, new_g} -> new_g
+              {:error, _} -> g_inner
+            end
+          end)
+        end)
+      end)
+
+    # Add edges from first graph (horizontal edges in grid)
+    Enum.reduce(second_nodes, graph_with_second_edges, fn v, g_acc ->
+      Enum.reduce(first_nodes, g_acc, fn u, g ->
+        u_successors = Model.successors(first, u)
+
+        Enum.reduce(u_successors, g, fn {u_succ, edge_weight}, g_inner ->
+          src_id = u * second_order + v
+          dst_id = u_succ * second_order + v
+          edge_data = {edge_weight, default_first}
+
+          case Model.add_edge(g_inner, src_id, dst_id, edge_data) do
+            {:ok, new_g} -> new_g
+            {:error, _} -> g_inner
+          end
+        end)
+      end)
+    end)
+  end
 
   @doc """
   Composes two graphs by merging overlapping nodes and combining their edges.
@@ -227,7 +364,9 @@ defmodule Yog.Operation do
       3
   """
   @spec compose(Yog.graph(), Yog.graph()) :: Yog.graph()
-  defdelegate compose(first, second), to: :yog@operation
+  def compose(first, second) do
+    union(first, second)
+  end
 
   @doc """
   Returns the k-th power of a graph.
@@ -256,7 +395,33 @@ defmodule Yog.Operation do
       3
   """
   @spec power(Yog.graph(), integer(), any()) :: Yog.graph()
-  defdelegate power(graph, k, default_weight), to: :yog@operation
+  def power(graph, k, default_weight) do
+    if k <= 1 do
+      graph
+    else
+      nodes = Model.all_nodes(graph)
+
+      Enum.reduce(nodes, graph, fn src, acc_graph ->
+        reachable = nodes_within_distance(acc_graph, src, k)
+
+        Enum.reduce(reachable, acc_graph, fn dst, g ->
+          cond do
+            src == dst ->
+              g
+
+            edge_exists_in(g, src, dst) ->
+              g
+
+            true ->
+              case Model.add_edge(g, src, dst, default_weight) do
+                {:ok, new_g} -> new_g
+                {:error, _} -> g
+              end
+          end
+        end)
+      end)
+    end
+  end
 
   # ============= Structural Comparison =============
 
@@ -288,7 +453,25 @@ defmodule Yog.Operation do
   """
   @spec subgraph?(Yog.graph(), Yog.graph()) :: boolean()
   def subgraph?(potential, container) do
-    :yog@operation.is_subgraph(potential, container)
+    potential_nodes = Model.all_nodes(potential)
+    container_nodes = MapSet.new(Model.all_nodes(container))
+
+    all_nodes_exist =
+      Enum.all?(potential_nodes, fn node ->
+        MapSet.member?(container_nodes, node)
+      end)
+
+    if all_nodes_exist do
+      Enum.all?(potential_nodes, fn src ->
+        potential_successors = Model.successors(potential, src)
+
+        Enum.all?(potential_successors, fn {dst, _weight} ->
+          edge_exists_in(container, src, dst)
+        end)
+      end)
+    else
+      false
+    end
   end
 
   @doc """
@@ -329,6 +512,209 @@ defmodule Yog.Operation do
   """
   @spec isomorphic?(Yog.graph(), Yog.graph()) :: boolean()
   def isomorphic?(first, second) do
-    :yog@operation.is_isomorphic(first, second)
+    first_order = Model.order(first)
+    second_order = Model.order(second)
+
+    if first_order != second_order do
+      false
+    else
+      first_edges = Model.edge_count(first)
+      second_edges = Model.edge_count(second)
+
+      if first_edges != second_edges do
+        false
+      else
+        first_degrees = degree_sequence(first) |> Enum.sort()
+        second_degrees = degree_sequence(second) |> Enum.sort()
+
+        if first_degrees != second_degrees do
+          false
+        else
+          attempt_isomorphism(first, second)
+        end
+      end
+    end
+  end
+
+  # ============= Helper Functions =============
+
+  # Shifts all node IDs in a graph by a given offset
+  defp shift_node_ids(%Yog.Graph{} = graph, offset) do
+    # Create ID mapping
+    id_mapping =
+      Map.keys(graph.nodes)
+      |> Enum.reduce(%{}, fn node, acc ->
+        Map.put(acc, node, node + offset)
+      end)
+
+    # Map nodes to new IDs
+    new_nodes =
+      Enum.reduce(graph.nodes, %{}, fn {id, data}, acc ->
+        new_id = Map.get(id_mapping, id, id)
+        Map.put(acc, new_id, data)
+      end)
+
+    # Map out_edges
+    new_out_edges =
+      Enum.reduce(graph.out_edges, %{}, fn {src, targets}, acc ->
+        new_src = Map.get(id_mapping, src, src)
+
+        new_targets =
+          Enum.reduce(targets, %{}, fn {dst, weight}, inner_acc ->
+            new_dst = Map.get(id_mapping, dst, dst)
+            Map.put(inner_acc, new_dst, weight)
+          end)
+
+        Map.put(acc, new_src, new_targets)
+      end)
+
+    # Map in_edges
+    new_in_edges =
+      Enum.reduce(graph.in_edges, %{}, fn {dst, sources}, acc ->
+        new_dst = Map.get(id_mapping, dst, dst)
+
+        new_sources =
+          Enum.reduce(sources, %{}, fn {src, weight}, inner_acc ->
+            new_src = Map.get(id_mapping, src, src)
+            Map.put(inner_acc, new_src, weight)
+          end)
+
+        Map.put(acc, new_dst, new_sources)
+      end)
+
+    %{graph | nodes: new_nodes, out_edges: new_out_edges, in_edges: new_in_edges}
+  end
+
+  # Finds all nodes within distance k from a source node using BFS
+  defp nodes_within_distance(graph, src, max_dist) do
+    bfs_distances(graph, [src], %{src => 0}, max_dist)
+  end
+
+  defp bfs_distances(_graph, [], distances, _max_dist) do
+    Map.keys(distances)
+  end
+
+  defp bfs_distances(graph, [current | rest], distances, max_dist) do
+    current_dist = Map.get(distances, current, max_dist + 1)
+
+    if current_dist >= max_dist do
+      bfs_distances(graph, rest, distances, max_dist)
+    else
+      neighbors = Model.successor_ids(graph, current)
+
+      {new_queue, new_distances} =
+        Enum.reduce(neighbors, {rest, distances}, fn neighbor, {q, dists} ->
+          if Map.has_key?(dists, neighbor) do
+            {q, dists}
+          else
+            new_dist = current_dist + 1
+
+            if new_dist <= max_dist do
+              {[neighbor | q], Map.put(dists, neighbor, new_dist)}
+            else
+              {q, dists}
+            end
+          end
+        end)
+
+      bfs_distances(graph, new_queue, new_distances, max_dist)
+    end
+  end
+
+  # Computes the degree sequence of a graph
+  defp degree_sequence(graph) do
+    Model.all_nodes(graph)
+    |> Enum.map(fn node ->
+      out_deg = length(Model.successor_ids(graph, node))
+      in_deg = length(Model.predecessors(graph, node))
+      {in_deg, out_deg}
+    end)
+  end
+
+  # Attempts to find an isomorphism between two graphs using backtracking
+  defp attempt_isomorphism(first, second) do
+    # Sort nodes by degree (descending) for better pruning
+    first_nodes =
+      Model.all_nodes(first)
+      |> Enum.sort(fn a, b ->
+        deg_a = length(Model.predecessors(first, a)) + length(Model.successor_ids(first, a))
+        deg_b = length(Model.predecessors(first, b)) + length(Model.successor_ids(first, b))
+        deg_b <= deg_a
+      end)
+
+    second_nodes = Model.all_nodes(second)
+
+    try_mapping(first, second, first_nodes, second_nodes, %{})
+  end
+
+  defp try_mapping(_first, _second, [], _available, _mapping) do
+    true
+  end
+
+  defp try_mapping(first, second, [src | rest], available, mapping) do
+    src_in = length(Model.predecessors(first, src))
+    src_out = length(Model.successor_ids(first, src))
+
+    valid_candidates =
+      Enum.filter(available, fn candidate ->
+        cand_in = length(Model.predecessors(second, candidate))
+        cand_out = length(Model.successor_ids(second, candidate))
+        src_in == cand_in && src_out == cand_out
+      end)
+
+    Enum.any?(valid_candidates, fn candidate ->
+      if mapping_valid?(first, second, src, candidate, mapping) do
+        new_mapping = Map.put(mapping, src, candidate)
+        new_available = Enum.filter(available, fn n -> n != candidate end)
+        try_mapping(first, second, rest, new_available, new_mapping)
+      else
+        false
+      end
+    end)
+  end
+
+  # Checks if mapping src -> candidate is consistent with current mapping
+  defp mapping_valid?(first, second, src, candidate, mapping) do
+    src_successors = Model.successor_ids(first, src)
+    candidate_successors = Model.successor_ids(second, candidate)
+
+    inconsistent_edges =
+      Enum.reduce(mapping, 0, fn {src_neighbor, candidate_neighbor}, count ->
+        if src_neighbor in src_successors do
+          if candidate_neighbor in candidate_successors do
+            count
+          else
+            count + 1
+          end
+        else
+          count
+        end
+      end)
+
+    src_predecessors = Model.predecessors(first, src) |> Enum.map(fn {id, _} -> id end)
+
+    candidate_predecessors =
+      Model.predecessors(second, candidate) |> Enum.map(fn {id, _} -> id end)
+
+    inconsistent_incoming =
+      Enum.reduce(mapping, 0, fn {src_neighbor, candidate_neighbor}, count ->
+        if src_neighbor in src_predecessors do
+          if candidate_neighbor in candidate_predecessors do
+            count
+          else
+            count + 1
+          end
+        else
+          count
+        end
+      end)
+
+    inconsistent_edges == 0 && inconsistent_incoming == 0
+  end
+
+  # Checks if an edge exists in the graph
+  defp edge_exists_in(graph, src, dst) do
+    Model.successors(graph, src)
+    |> Enum.any?(fn {edge_dst, _weight} -> edge_dst == dst end)
   end
 end

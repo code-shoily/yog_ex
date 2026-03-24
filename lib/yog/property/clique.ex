@@ -77,6 +77,8 @@ defmodule Yog.Property.Clique do
   - [CP-Algorithms: Finding Cliques](https://cp-algorithms.com/graph/search_for_connected_components.html)
   """
 
+  alias Yog.Model
+
   @doc """
   Finds the maximum clique in an undirected graph.
 
@@ -116,7 +118,19 @@ defmodule Yog.Property.Clique do
   """
   @spec max_clique(Yog.graph()) :: MapSet.t(Yog.node_id())
   def max_clique(graph) do
-    :yog@property@clique.max_clique(graph) |> :gleam@set.to_list() |> MapSet.new()
+    nodes = Model.all_nodes(graph)
+
+    if nodes == [] do
+      MapSet.new()
+    else
+      all_cliques = all_maximal_cliques(graph)
+
+      if all_cliques == [] do
+        MapSet.new()
+      else
+        Enum.max_by(all_cliques, &MapSet.size/1)
+      end
+    end
   end
 
   @doc """
@@ -157,8 +171,92 @@ defmodule Yog.Property.Clique do
   """
   @spec all_maximal_cliques(Yog.graph()) :: [MapSet.t(Yog.node_id())]
   def all_maximal_cliques(graph) do
-    :yog@property@clique.all_maximal_cliques(graph)
-    |> Enum.map(fn cl -> cl |> :gleam@set.to_list() |> MapSet.new() end)
+    nodes = Model.all_nodes(graph)
+
+    if nodes == [] do
+      []
+    else
+      # Build adjacency map for fast lookup
+      adj =
+        Map.new(nodes, fn u ->
+          neighbors = Model.neighbor_ids(graph, u) |> MapSet.new()
+          {u, neighbors}
+        end)
+
+      # Bron-Kerbosch with pivot
+      p = MapSet.new(nodes)
+      r = MapSet.new()
+      x = MapSet.new()
+
+      bron_kerbosch_pivot(r, p, x, adj, [])
+    end
+  end
+
+  # Bron-Kerbosch with pivot optimization
+  # R = current clique, P = candidates, X = excluded
+  # When P and X are empty, R is a maximal clique
+  defp bron_kerbosch_pivot(r, p, x, _adj, acc)
+       when map_size(p) == 0 and map_size(x) == 0 do
+    if MapSet.size(r) > 0 do
+      [r | acc]
+    else
+      acc
+    end
+  end
+
+  defp bron_kerbosch_pivot(_r, p, _x, _adj, acc) when map_size(p) == 0 do
+    # P empty but X not empty - no maximal clique here
+    acc
+  end
+
+  defp bron_kerbosch_pivot(r, p, x, adj, acc) do
+    # Choose pivot from P union X with maximum degree to P
+    pivot = choose_pivot(p, x, adj)
+
+    # Get candidates: P \ N(pivot)
+    pivot_neighbors = Map.get(adj, pivot, MapSet.new())
+    candidates = MapSet.difference(p, pivot_neighbors)
+
+    if MapSet.size(candidates) == 0 do
+      # No candidates to process - check if R is maximal
+      if MapSet.size(p) == 0 and MapSet.size(x) == 0 and MapSet.size(r) > 0 do
+        [r | acc]
+      else
+        acc
+      end
+    else
+      Enum.reduce(MapSet.to_list(candidates), {p, x, acc}, fn v, {p_acc, x_acc, acc_cliques} ->
+        v_neighbors = Map.get(adj, v, MapSet.new())
+
+        new_r = MapSet.put(r, v)
+        new_p = MapSet.intersection(p_acc, v_neighbors)
+        new_x = MapSet.intersection(x_acc, v_neighbors)
+
+        new_cliques = bron_kerbosch_pivot(new_r, new_p, new_x, adj, acc_cliques)
+
+        new_p_acc = MapSet.delete(p_acc, v)
+        new_x_acc = MapSet.put(x_acc, v)
+
+        {new_p_acc, new_x_acc, new_cliques}
+      end)
+      |> elem(2)
+    end
+  end
+
+  # Choose pivot with maximum degree to P
+  defp choose_pivot(p, x, adj) do
+    candidates = MapSet.union(p, x)
+
+    if MapSet.size(candidates) == 0 do
+      nil
+    else
+      candidates
+      |> MapSet.to_list()
+      |> Enum.max_by(fn u ->
+        neighbors = Map.get(adj, u, MapSet.new())
+        MapSet.intersection(neighbors, p) |> MapSet.size()
+      end)
+    end
   end
 
   @doc """
@@ -194,9 +292,36 @@ defmodule Yog.Property.Clique do
   O(3^(n/3)) worst case
   """
   @spec k_cliques(Yog.graph(), integer()) :: [MapSet.t(Yog.node_id())]
+  def k_cliques(_graph, k) when k <= 0, do: []
+
   def k_cliques(graph, k) do
-    :yog@property@clique.k_cliques(graph, k)
-    |> Enum.map(fn cl -> cl |> :gleam@set.to_list() |> MapSet.new() end)
+    all_cliques = all_maximal_cliques(graph)
+
+    # Generate all k-cliques from maximal cliques
+    all_cliques
+    |> Enum.flat_map(fn clique ->
+      size = MapSet.size(clique)
+
+      if size >= k do
+        clique
+        |> MapSet.to_list()
+        |> combinations(k)
+        |> Enum.map(&MapSet.new/1)
+      else
+        []
+      end
+    end)
+    |> Enum.uniq()
+  end
+
+  # Generate all k-combinations from a list
+  defp combinations(_list, 0), do: [[]]
+  defp combinations([], _k), do: []
+
+  defp combinations([h | t], k) do
+    with_h = for(l <- combinations(t, k - 1), do: [h | l])
+    without_h = combinations(t, k)
+    with_h ++ without_h
   end
 end
 

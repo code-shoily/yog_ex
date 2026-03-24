@@ -89,11 +89,11 @@ defmodule Yog.Multi.Eulerian do
     end
   end
 
-  defp check_eulerian_circuit(graph = %{kind: :undirected}) do
+  defp check_eulerian_circuit(%{kind: :undirected} = graph) do
     all_even_degree?(graph) and connected?(graph)
   end
 
-  defp check_eulerian_circuit(graph = %{kind: :directed}) do
+  defp check_eulerian_circuit(%{kind: :directed} = graph) do
     all_balanced_degree?(graph) and connected?(graph)
   end
 
@@ -147,12 +147,12 @@ defmodule Yog.Multi.Eulerian do
     end
   end
 
-  defp check_eulerian_path(graph = %{kind: :undirected}) do
+  defp check_eulerian_path(%{kind: :undirected} = graph) do
     odd_count = count_odd_degree_nodes(graph)
     (odd_count == 0 or odd_count == 2) and connected?(graph)
   end
 
-  defp check_eulerian_path(graph = %{kind: :directed}) do
+  defp check_eulerian_path(%{kind: :directed} = graph) do
     {starts, ends, balanced} = analyze_directed_degrees(graph)
 
     balanced and

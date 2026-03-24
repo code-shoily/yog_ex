@@ -30,6 +30,8 @@ defmodule Yog.IO.Pajek do
   To handle visual parameters like shapes, pass options via `options_with`.
   """
 
+  alias Yog.Model
+
   @doc """
   Default node attributes (no special visualization).
   """
@@ -60,7 +62,7 @@ defmodule Yog.IO.Pajek do
     {:pajek_options, node_label_fn, edge_weight_fn, _node_attr_fn, _include_coords,
      _include_visuals} = options
 
-    {:graph, type, nodes_map, _, _} = graph
+    %Yog.Graph{kind: type, nodes: nodes_map} = graph
 
     # Vertices section
     node_count = map_size(nodes_map)
@@ -75,7 +77,7 @@ defmodule Yog.IO.Pajek do
       end)
 
     # Edges section
-    edges = get_all_edges(graph)
+    edges = Model.all_edges(graph)
 
     edge_header = if type == :directed, do: "*Arcs\n", else: "*Edges\n"
 
@@ -170,21 +172,6 @@ defmodule Yog.IO.Pajek do
   end
 
   # Private functions
-
-  defp get_all_edges({:graph, type, _, out_edges, _}) do
-    if type == :directed do
-      for {from, dests} <- out_edges,
-          {to, weight} <- dests do
-        {from, to, weight}
-      end
-    else
-      for {from, dests} <- out_edges,
-          {to, weight} <- dests,
-          from <= to do
-        {from, to, weight}
-      end
-    end
-  end
 
   defp parse_pajek(input, node_parser, edge_parser) do
     if String.trim(input) == "" do
@@ -415,7 +402,7 @@ defmodule Yog.IO.Pajek do
   end
 
   defp add_edge_to_graph(graph, from, to, weight) do
-    {:graph, _, nodes_map, _, _} = graph
+    %Yog.Graph{nodes: nodes_map} = graph
 
     if Map.has_key?(nodes_map, from) and Map.has_key?(nodes_map, to) do
       case Yog.Model.add_edge(graph, from, to, weight) do
