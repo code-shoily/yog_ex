@@ -102,7 +102,7 @@ defmodule Yog.Property.Structure do
   def arborescence_root(graph) do
     if arborescence?(graph) do
       nodes = Model.all_nodes(graph)
-      Enum.find(nodes, fn node -> length(Model.predecessors(graph, node)) == 0 end)
+      Enum.find(nodes, fn node -> Enum.empty?(Model.predecessors(graph, node)) end)
     else
       nil
     end

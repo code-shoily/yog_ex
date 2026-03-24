@@ -25,9 +25,9 @@ defmodule Yog.Connectivity do
   """
 
   alias Yog.Connectivity.Analysis
-  alias Yog.Connectivity.SCC
   alias Yog.Connectivity.Components
   alias Yog.Connectivity.KCore
+  alias Yog.Connectivity.SCC
 
   @type bridge :: Analysis.bridge()
   @type component :: Components.component()

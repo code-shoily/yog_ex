@@ -108,11 +108,11 @@ defmodule Yog do
   - **Efficient**: Optimal data structures (pairing heaps, union-find)
   - **Documented**: Every function has examples
   """
+  alias Yog.Connectivity
   alias Yog.Graph
   alias Yog.Model
   alias Yog.Transform
   alias Yog.Traversal
-  alias Yog.Connectivity
 
   # Re-exporting core types
   @type t() :: Graph.t()

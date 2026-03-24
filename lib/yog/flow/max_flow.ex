@@ -186,10 +186,11 @@ defmodule Yog.Flow.MaxFlow do
 
   # Convert internal residual map back to a Yog.Graph structure
   defp residual_to_graph(original_graph, residual_map) do
-    # Start with a graph that has the same kind and all original nodes
+    # A residual graph is ALWAYS directed, even if the original was undirected,
+    # because residual capacities are asymmetric.
     empty_graph =
       Model.all_nodes(original_graph)
-      |> Enum.reduce(Yog.Graph.new(original_graph.kind), fn node, g ->
+      |> Enum.reduce(Yog.Graph.new(:directed), fn node, g ->
         Model.add_node(g, node, Map.get(original_graph.nodes, node))
       end)
 
