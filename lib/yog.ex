@@ -112,6 +112,7 @@ defmodule Yog do
   alias Yog.Model
   alias Yog.Transform
   alias Yog.Traversal
+  alias Yog.Connectivity
 
   # Re-exporting core types
   @type t() :: Graph.t()
@@ -684,6 +685,12 @@ defmodule Yog do
   defdelegate successor_ids(graph, id), to: Model
 
   @doc """
+  Returns all neighbor node IDs (without weights).
+  """
+  @spec neighbor_ids(graph(), node_id()) :: [node_id()]
+  defdelegate neighbor_ids(graph, id), to: Model
+
+  @doc """
   Gets all nodes connected to the given node, regardless of direction.
   For undirected graphs, this is equivalent to successors.
   For directed graphs, this combines successors and predecessors.
@@ -719,6 +726,42 @@ defmodule Yog do
   @spec all_nodes(graph()) :: [node_id()]
   defdelegate all_nodes(graph), to: Model
 
+  @doc """
+  Returns all node IDs in the graph.
+  """
+  @spec node_ids(graph()) :: [node_id()]
+  defdelegate node_ids(graph), to: Model, as: :all_nodes
+
+  @doc """
+  Returns all edges in the graph as triplets `{from, to, weight}`.
+  """
+  @spec all_edges(graph()) :: [{node_id(), node_id(), any()}]
+  defdelegate all_edges(graph), to: Model
+
+  @doc """
+  Returns the number of nodes in the graph.
+  """
+  @spec node_count(graph()) :: integer()
+  defdelegate node_count(graph), to: Model
+
+  @doc """
+  Returns the number of edges in the graph.
+  """
+  @spec edge_count(graph()) :: integer()
+  defdelegate edge_count(graph), to: Model
+
+  @doc """
+  Checks if the graph contains a node with the given ID.
+  """
+  @spec has_node?(graph(), node_id()) :: boolean()
+  defdelegate has_node?(graph, id), to: Model
+
+  @doc """
+  Checks if the graph contains an edge between `src` and `dst`.
+  """
+  @spec has_edge?(graph(), node_id(), node_id()) :: boolean()
+  defdelegate has_edge?(graph, src, dst), to: Model
+
   # ============= Analysis =============
 
   @doc """
@@ -743,6 +786,42 @@ defmodule Yog do
   """
   @spec cyclic?(graph()) :: boolean()
   defdelegate cyclic?(graph), to: Traversal
+
+  @doc """
+  Returns true if the graph is a tree (undirected, connected, and acyclic).
+  """
+  @spec tree?(graph()) :: boolean()
+  defdelegate tree?(graph), to: Yog.Property.Structure
+
+  @doc """
+  Returns true if the graph is an arborescence (directed tree with a unique root).
+  """
+  @spec arborescence?(graph()) :: boolean()
+  defdelegate arborescence?(graph), to: Yog.Property.Structure
+
+  @doc """
+  Returns the root of an arborescence, or nil if it's not an arborescence.
+  """
+  @spec arborescence_root(graph()) :: node_id() | nil
+  defdelegate arborescence_root(graph), to: Yog.Property.Structure
+
+  @doc """
+  Returns true if the graph is complete (every pair of distinct nodes is connected).
+  """
+  @spec complete?(graph()) :: boolean()
+  defdelegate complete?(graph), to: Yog.Property.Structure
+
+  @doc """
+  Returns true if the graph is k-regular (every node has degree exactly k).
+  """
+  @spec regular?(graph(), integer()) :: boolean()
+  defdelegate regular?(graph, k), to: Yog.Property.Structure
+
+  @doc """
+  Extracts the k-core of a graph (maximal subgraph with minimum degree k).
+  """
+  @spec k_core(graph(), integer()) :: graph()
+  defdelegate k_core(graph, k), to: Connectivity
 
   @doc """
   Determines if a graph is acyclic (contains no cycles).
