@@ -1,5 +1,10 @@
 # YogEx 🌳
 
+> **যোগ** • (*jōg*)
+> *noun*
+> 1. connection, link, union
+> 2. addition, sum
+
 ```text
                     ★
                    /|\
