@@ -33,7 +33,12 @@ defmodule Yog.Model do
   The dual-map representation enables O(1) edge existence checks and O(1) transpose
   operations, at the cost of increased memory usage and slightly more complex edge
   updates.
+
+  > **Migration Note:** This module was ported from Gleam to pure Elixir in v0.53.0.
+  > The API remains unchanged.
   """
+
+  alias Yog.Graph
 
   @typedoc """
   Unique identifier for a node in the graph.
@@ -48,12 +53,9 @@ defmodule Yog.Model do
   @typedoc """
   A simple graph data structure that can be directed or undirected.
 
-  - `kind`: The graph type (`:directed` or `:undirected`)
-  - `nodes`: A map of node IDs to node data
-  - `out_edges`: A map of source node IDs to maps of destination node IDs to edge data
-  - `in_edges`: A map of destination node IDs to maps of source node IDs to edge data
+  This is an alias for `Yog.Graph.t()`.
   """
-  @type graph :: {:graph, graph_type(), map(), map(), map()}
+  @type graph :: Graph.t()
 
   @doc """
   Creates a new empty graph of the specified type.
@@ -66,12 +68,7 @@ defmodule Yog.Model do
   """
   @spec new(graph_type()) :: graph()
   def new(graph_type) do
-    :yog@model.new(
-      case graph_type do
-        :directed -> :directed
-        :undirected -> :undirected
-      end
-    )
+    Graph.new(graph_type)
   end
 
   @doc """
@@ -88,7 +85,9 @@ defmodule Yog.Model do
       2
   """
   @spec add_node(graph(), node_id(), term()) :: graph()
-  defdelegate add_node(graph, id, data), to: :yog@model
+  def add_node(%Graph{} = graph, id, data) do
+    %{graph | nodes: Map.put(graph.nodes, id, data)}
+  end
 
   @doc """
   Adds an edge to the graph with the given weight.
@@ -115,10 +114,22 @@ defmodule Yog.Model do
       {:error, "Nodes 1 and 2 do not exist"}
   """
   @spec add_edge(graph(), node_id(), node_id(), term()) :: {:ok, graph()} | {:error, String.t()}
-  def add_edge(graph, from, to, weight) do
-    case :yog@model.add_edge(graph, from, to, weight) do
-      {:ok, g} -> {:ok, g}
-      {:error, reason} -> {:error, reason}
+  def add_edge(%Graph{nodes: nodes} = graph, src, dst, weight) do
+    has_src = Map.has_key?(nodes, src)
+    has_dst = Map.has_key?(nodes, dst)
+
+    cond do
+      has_src and has_dst ->
+        {:ok, add_edge_unchecked(graph, src, dst, weight)}
+
+      not has_src and not has_dst ->
+        {:error, "Nodes #{src} and #{dst} do not exist"}
+
+      not has_src ->
+        {:error, "Node #{src} does not exist"}
+
+      true ->
+        {:error, "Node #{dst} does not exist"}
     end
   end
 
@@ -171,15 +182,20 @@ defmodule Yog.Model do
       {"Alice", "anon"}
   """
   @spec add_edge_ensure(graph(), node_id(), node_id(), term(), term()) :: graph()
-  defdelegate add_edge_ensure(graph, from, to, weight, default), to: :yog@model
+  def add_edge_ensure(graph, src, dst, weight, default) do
+    graph
+    |> ensure_node(src, default)
+    |> ensure_node(dst, default)
+    |> add_edge_unchecked(src, dst, weight)
+  end
 
   @doc """
   Deprecated compatibility alias for `add_edge_ensure/5`.
   """
   @deprecated "Use add_edge_ensure/5 instead"
-  defdelegate add_edge_ensured(graph, from, to, weight, default),
-    to: __MODULE__,
-    as: :add_edge_ensure
+  def add_edge_ensured(graph, from, to, weight, default) do
+    add_edge_ensure(graph, from, to, weight, default)
+  end
 
   @doc """
   Ensures both endpoint nodes exist using a callback, then adds an edge.
@@ -209,7 +225,12 @@ defmodule Yog.Model do
       {"1", "2:new"}
   """
   @spec add_edge_with(graph(), node_id(), node_id(), term(), (node_id() -> term())) :: graph()
-  defdelegate add_edge_with(graph, from, to, weight, by), to: :yog@model
+  def add_edge_with(graph, src, dst, weight, make_fn) do
+    graph
+    |> ensure_node_with(src, make_fn)
+    |> ensure_node_with(dst, make_fn)
+    |> add_edge_unchecked(src, dst, weight)
+  end
 
   @doc """
   Adds multiple edges to the graph in a single operation.
@@ -233,7 +254,14 @@ defmodule Yog.Model do
   """
   @spec add_edges(graph(), [{node_id(), node_id(), term()}]) ::
           {:ok, graph()} | {:error, String.t()}
-  defdelegate add_edges(graph, edges), to: :yog@model
+  def add_edges(graph, edges) do
+    Enum.reduce_while(edges, {:ok, graph}, fn {src, dst, weight}, {:ok, g} ->
+      case add_edge(g, src, dst, weight) do
+        {:ok, new_g} -> {:cont, {:ok, new_g}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
 
   @doc """
   Adds multiple simple edges (weight = 1) to the graph.
@@ -254,7 +282,14 @@ defmodule Yog.Model do
   """
   @spec add_simple_edges(graph(), [{node_id(), node_id()}]) ::
           {:ok, graph()} | {:error, String.t()}
-  defdelegate add_simple_edges(graph, edges), to: :yog@model
+  def add_simple_edges(graph, edges) do
+    Enum.reduce_while(edges, {:ok, graph}, fn {src, dst}, {:ok, g} ->
+      case add_edge(g, src, dst, 1) do
+        {:ok, new_g} -> {:cont, {:ok, new_g}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
 
   @doc """
   Adds multiple unweighted edges (weight = nil) to the graph.
@@ -275,7 +310,14 @@ defmodule Yog.Model do
   """
   @spec add_unweighted_edges(graph(), [{node_id(), node_id()}]) ::
           {:ok, graph()} | {:error, String.t()}
-  defdelegate add_unweighted_edges(graph, edges), to: :yog@model
+  def add_unweighted_edges(graph, edges) do
+    Enum.reduce_while(edges, {:ok, graph}, fn {src, dst}, {:ok, g} ->
+      case add_edge(g, src, dst, nil) do
+        {:ok, new_g} -> {:cont, {:ok, new_g}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
 
   @doc """
   Gets nodes you can travel TO from the given node (successors).
@@ -292,7 +334,12 @@ defmodule Yog.Model do
       [{2, 10}]
   """
   @spec successors(graph(), node_id()) :: [{node_id(), term()}]
-  defdelegate successors(graph, id), to: :yog@model
+  def successors(%Graph{out_edges: out_edges}, id) do
+    case Map.fetch(out_edges, id) do
+      {:ok, inner} -> Map.to_list(inner)
+      :error -> []
+    end
+  end
 
   @doc """
   Gets nodes you came FROM to reach the given node (predecessors).
@@ -309,7 +356,12 @@ defmodule Yog.Model do
       [{1, 10}]
   """
   @spec predecessors(graph(), node_id()) :: [{node_id(), term()}]
-  defdelegate predecessors(graph, id), to: :yog@model
+  def predecessors(%Graph{in_edges: in_edges}, id) do
+    case Map.fetch(in_edges, id) do
+      {:ok, inner} -> Map.to_list(inner)
+      :error -> []
+    end
+  end
 
   @doc """
   Gets all nodes connected to the given node, regardless of direction.
@@ -330,7 +382,59 @@ defmodule Yog.Model do
       2
   """
   @spec neighbors(graph(), node_id()) :: [{node_id(), term()}]
-  defdelegate neighbors(graph, id), to: :yog@model
+  def neighbors(%Graph{kind: :undirected} = graph, id) do
+    successors(graph, id)
+  end
+
+  def neighbors(%Graph{kind: :directed} = graph, id) do
+    outgoing = successors(graph, id)
+    incoming = predecessors(graph, id)
+    out_ids = MapSet.new(outgoing, fn {node_id, _} -> node_id end)
+
+    Enum.reduce(incoming, outgoing, fn {in_id, _} = incoming_edge, acc ->
+      if MapSet.member?(out_ids, in_id) do
+        acc
+      else
+        [incoming_edge | acc]
+      end
+    end)
+  end
+
+  @doc """
+  Returns all neighbor node IDs (without weights).
+
+  ## Example
+
+      iex> graph =
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(1, "A")
+      ...>   |> Yog.add_node(2, "B")
+      ...>   |> Yog.add_node(3, "C")
+      ...>   |> Yog.add_edge!(from: 1, to: 2, with: 10)
+      ...>   |> Yog.add_edge!(from: 1, to: 3, with: 20)
+      iex> Yog.Model.neighbor_ids(graph, 1) |> Enum.sort()
+      [2, 3]
+  """
+  @spec neighbor_ids(graph(), node_id()) :: [node_id()]
+  def neighbor_ids(graph, id) do
+    neighbors(graph, id) |> Enum.map(fn {node_id, _} -> node_id end)
+  end
+
+  @doc """
+  Returns all successor node IDs (without weights).
+  """
+  @spec successor_ids(graph(), node_id()) :: [node_id()]
+  def successor_ids(graph, id) do
+    successors(graph, id) |> Enum.map(fn {node_id, _} -> node_id end)
+  end
+
+  @doc """
+  Returns all predecessor node IDs (without weights).
+  """
+  @spec predecessor_ids(graph(), node_id()) :: [node_id()]
+  def predecessor_ids(graph, id) do
+    predecessors(graph, id) |> Enum.map(fn {node_id, _} -> node_id end)
+  end
 
   @doc """
   Returns all node IDs in the graph.
@@ -346,7 +450,9 @@ defmodule Yog.Model do
       [1, 2]
   """
   @spec all_nodes(graph()) :: [node_id()]
-  defdelegate all_nodes(graph), to: :yog@model
+  def all_nodes(%Graph{nodes: nodes}) do
+    Map.keys(nodes)
+  end
 
   @doc """
   Returns the number of nodes in the graph (graph order).
@@ -363,7 +469,9 @@ defmodule Yog.Model do
       2
   """
   @spec order(graph()) :: integer()
-  defdelegate order(graph), to: :yog@model
+  def order(%Graph{nodes: nodes}) do
+    map_size(nodes)
+  end
 
   @doc """
   Returns the number of nodes in the graph.
@@ -381,7 +489,9 @@ defmodule Yog.Model do
       2
   """
   @spec node_count(graph()) :: integer()
-  defdelegate node_count(graph), to: :yog@model
+  def node_count(graph) do
+    order(graph)
+  end
 
   @doc """
   Returns the number of edges in the graph.
@@ -402,25 +512,17 @@ defmodule Yog.Model do
       1
   """
   @spec edge_count(graph()) :: integer()
-  defdelegate edge_count(graph), to: :yog@model
+  def edge_count(%Graph{kind: kind, out_edges: out_edges}) do
+    count =
+      Enum.reduce(out_edges, 0, fn {_src, targets}, acc ->
+        acc + map_size(targets)
+      end)
 
-  @doc """
-  Returns just the NodeIds of successors (without edge weights).
-  Convenient for traversal algorithms that only need the IDs.
-
-  ## Example
-
-      iex> {:ok, graph} =
-      ...>   Yog.Model.new(:directed)
-      ...>   |> Yog.Model.add_node(1, "A")
-      ...>   |> Yog.Model.add_node(2, "B")
-      ...>   |> Yog.Model.add_node(3, "C")
-      ...>   |> Yog.Model.add_edges([{1, 2, 10}, {1, 3, 20}])
-      iex> Yog.Model.successor_ids(graph, 1) |> Enum.sort()
-      [2, 3]
-  """
-  @spec successor_ids(graph(), node_id()) :: [node_id()]
-  defdelegate successor_ids(graph, id), to: :yog@model
+    case kind do
+      :directed -> count
+      :undirected -> div(count, 2)
+    end
+  end
 
   @doc """
   Removes a node and all its connected edges (incoming and outgoing).
@@ -442,7 +544,27 @@ defmodule Yog.Model do
       2
   """
   @spec remove_node(graph(), node_id()) :: graph()
-  defdelegate remove_node(graph, id), to: :yog@model
+  def remove_node(%Graph{} = graph, id) do
+    targets = successors(graph, id)
+    sources = predecessors(graph, id)
+
+    new_nodes = Map.delete(graph.nodes, id)
+    new_out = Map.delete(graph.out_edges, id)
+
+    new_in_cleaned =
+      Enum.reduce(targets, graph.in_edges, fn {target_id, _}, acc_in ->
+        dict_update_inner(acc_in, target_id, id, &Map.delete/2)
+      end)
+
+    new_in = Map.delete(new_in_cleaned, id)
+
+    new_out_cleaned =
+      Enum.reduce(sources, new_out, fn {source_id, _}, acc_out ->
+        dict_update_inner(acc_out, source_id, id, &Map.delete/2)
+      end)
+
+    %{graph | nodes: new_nodes, out_edges: new_out_cleaned, in_edges: new_in}
+  end
 
   @doc """
   Removes a directed edge from `src` to `dst`.
@@ -478,7 +600,15 @@ defmodule Yog.Model do
       []
   """
   @spec remove_edge(graph(), node_id(), node_id()) :: graph()
-  defdelegate remove_edge(graph, src, dst), to: :yog@model
+  def remove_edge(%Graph{kind: :directed} = graph, src, dst) do
+    do_remove_directed_edge(graph, src, dst)
+  end
+
+  def remove_edge(%Graph{kind: :undirected} = graph, src, dst) do
+    graph
+    |> do_remove_directed_edge(src, dst)
+    |> do_remove_directed_edge(dst, src)
+  end
 
   @doc """
   Adds an edge, but if an edge already exists between `src` and `dst`,
@@ -511,10 +641,33 @@ defmodule Yog.Model do
   """
   @spec add_edge_with_combine(graph(), node_id(), node_id(), term(), (term(), term() -> term())) ::
           {:ok, graph()} | {:error, String.t()}
-  def add_edge_with_combine(graph, src, dst, weight, with_combine) do
-    case :yog@model.add_edge_with_combine(graph, src, dst, weight, with_combine) do
-      {:ok, g} -> {:ok, g}
-      {:error, reason} -> {:error, reason}
+  def add_edge_with_combine(%Graph{nodes: nodes} = graph, src, dst, weight, with_combine) do
+    has_src = Map.has_key?(nodes, src)
+    has_dst = Map.has_key?(nodes, dst)
+
+    cond do
+      has_src and has_dst ->
+        graph = do_add_directed_combine(graph, src, dst, weight, with_combine)
+
+        result =
+          case graph.kind do
+            :directed ->
+              graph
+
+            :undirected ->
+              do_add_directed_combine(graph, dst, src, weight, with_combine)
+          end
+
+        {:ok, result}
+
+      not has_src and not has_dst ->
+        {:error, "Nodes #{src} and #{dst} do not exist"}
+
+      not has_src ->
+        {:error, "Node #{src} does not exist"}
+
+      true ->
+        {:error, "Node #{dst} does not exist"}
     end
   end
 
@@ -551,8 +704,7 @@ defmodule Yog.Model do
       :directed
   """
   @spec type(graph()) :: graph_type()
-  def type(graph) do
-    {:graph, kind, _, _, _} = graph
+  def type(%Graph{kind: kind}) do
     kind
   end
 
@@ -570,8 +722,7 @@ defmodule Yog.Model do
       "A"
   """
   @spec nodes(graph()) :: map()
-  def nodes(graph) do
-    {:graph, _, nodes, _, _} = graph
+  def nodes(%Graph{nodes: nodes}) do
     nodes
   end
 
@@ -590,7 +741,160 @@ defmodule Yog.Model do
   """
   @spec node(graph(), node_id()) :: term() | nil
   def node(graph, id) do
-    nodes = nodes(graph)
-    Map.get(nodes, id)
+    graph |> nodes() |> Map.get(id)
+  end
+
+  @doc """
+  Returns all edges in the graph as triplets `{from, to, weight}`.
+
+  For directed graphs, returns all edges.
+  For undirected graphs, returns each edge only once (where `from <= to`).
+
+  This is particularly useful for graph export formats.
+
+  ## Examples
+
+      iex> graph =
+      ...>   Yog.Model.new(:directed)
+      ...>   |> Yog.Model.add_node(1, nil)
+      ...>   |> Yog.Model.add_node(2, nil)
+      ...>   |> Yog.Model.add_edge!(1, 2, 5)
+      iex> Yog.Model.all_edges(graph)
+      [{1, 2, 5}]
+
+      iex> graph =
+      ...>   Yog.Model.new(:undirected)
+      ...>   |> Yog.Model.add_node(1, nil)
+      ...>   |> Yog.Model.add_node(2, nil)
+      ...>   |> Yog.Model.add_edge!(1, 2, 5)
+      iex> edges = Yog.Model.all_edges(graph)
+      iex> length(edges)
+      1
+  """
+  @spec all_edges(graph()) :: [{node_id(), node_id(), number()}]
+  def all_edges(%Graph{kind: kind, out_edges: out_edges}) do
+    if kind == :directed do
+      for {from, dests} <- out_edges,
+          {to, weight} <- dests do
+        {from, to, weight}
+      end
+    else
+      # For undirected graphs, deduplicate by only taking edges where from <= to
+      for {from, dests} <- out_edges,
+          {to, weight} <- dests,
+          from <= to do
+        {from, to, weight}
+      end
+    end
+  end
+
+  # =============================================================================
+  # Private Helper Functions
+  # =============================================================================
+
+  # Adds an edge without checking if nodes exist (internal use).
+  # For directed graphs, adds a single edge from src to dst.
+  # For undirected graphs, adds edges in both directions.
+  defp add_edge_unchecked(%Graph{kind: :directed} = graph, src, dst, weight) do
+    new_out = do_add_directed_edge_out(graph.out_edges, src, dst, weight)
+    new_in = do_add_directed_edge_in(graph.in_edges, src, dst, weight)
+    %{graph | out_edges: new_out, in_edges: new_in}
+  end
+
+  defp add_edge_unchecked(%Graph{kind: :undirected} = graph, src, dst, weight) do
+    # Add src -> dst
+    new_out = do_add_directed_edge_out(graph.out_edges, src, dst, weight)
+    new_in = do_add_directed_edge_in(graph.in_edges, src, dst, weight)
+    # Add dst -> src (for undirected)
+    new_out2 = do_add_directed_edge_out(new_out, dst, src, weight)
+    new_in2 = do_add_directed_edge_in(new_in, dst, src, weight)
+    %{graph | out_edges: new_out2, in_edges: new_in2}
+  end
+
+  # Helper to add outgoing edge
+  defp do_add_directed_edge_out(out_edges, src, dst, weight) do
+    Map.update(out_edges, src, %{dst => weight}, fn inner ->
+      Map.put(inner, dst, weight)
+    end)
+  end
+
+  # Helper to add incoming edge
+  defp do_add_directed_edge_in(in_edges, src, dst, weight) do
+    Map.update(in_edges, dst, %{src => weight}, fn inner ->
+      Map.put(inner, src, weight)
+    end)
+  end
+
+  # Adds a node only if it doesn't already exist.
+  defp ensure_node(%Graph{} = graph, id, data) do
+    if Map.has_key?(graph.nodes, id) do
+      graph
+    else
+      %{graph | nodes: Map.put(graph.nodes, id, data)}
+    end
+  end
+
+  # Adds a node only if it doesn't already exist, using a function to create the node data.
+  defp ensure_node_with(%Graph{} = graph, id, make_fn) do
+    if Map.has_key?(graph.nodes, id) do
+      graph
+    else
+      %{graph | nodes: Map.put(graph.nodes, id, make_fn.(id))}
+    end
+  end
+
+  # Removes a directed edge from src to dst (internal helper).
+  defp do_remove_directed_edge(%Graph{} = graph, src, dst) do
+    new_out =
+      case Map.fetch(graph.out_edges, src) do
+        {:ok, targets} -> Map.put(graph.out_edges, src, Map.delete(targets, dst))
+        :error -> graph.out_edges
+      end
+
+    new_in =
+      case Map.fetch(graph.in_edges, dst) do
+        {:ok, sources} -> Map.put(graph.in_edges, dst, Map.delete(sources, src))
+        :error -> graph.in_edges
+      end
+
+    %{graph | out_edges: new_out, in_edges: new_in}
+  end
+
+  # Updates an inner dictionary within a nested dictionary structure.
+  # This is the equivalent of yog/internal/utils.dict_update_inner
+  defp dict_update_inner(outer, key1, key2, fun) do
+    case Map.fetch(outer, key1) do
+      {:ok, inner} -> Map.put(outer, key1, fun.(inner, key2))
+      :error -> outer
+    end
+  end
+
+  # Adds a directed edge with weight combination (internal helper).
+  defp do_add_directed_combine(%Graph{} = graph, src, dst, weight, with_combine) do
+    # Update out_edges
+    new_out =
+      Map.update(graph.out_edges, src, %{dst => weight}, fn inner ->
+        new_weight =
+          case Map.fetch(inner, dst) do
+            {:ok, existing} -> with_combine.(existing, weight)
+            :error -> weight
+          end
+
+        Map.put(inner, dst, new_weight)
+      end)
+
+    # Update in_edges
+    new_in =
+      Map.update(graph.in_edges, dst, %{src => weight}, fn inner ->
+        new_weight =
+          case Map.fetch(inner, src) do
+            {:ok, existing} -> with_combine.(existing, weight)
+            :error -> weight
+          end
+
+        Map.put(inner, src, new_weight)
+      end)
+
+    %{graph | out_edges: new_out, in_edges: new_in}
   end
 end

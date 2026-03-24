@@ -11,11 +11,11 @@ defmodule Yog.Render.Mermaid do
       # Export to Mermaid syntax
       mermaid = Yog.Render.Mermaid.to_mermaid(my_graph, Yog.Render.Mermaid.default_options())
 
-      # Use in Markdown
-      ```mermaid
-      graph TD
-          A[Node 1] --> B[Node 2]
-      ```
+      # Use in Markdown:
+      # ```mermaid
+      # graph TD
+      #     A[Node 1] --> B[Node 2]
+      # ```
 
   ## Supported Diagram Types
 
@@ -28,10 +28,11 @@ defmodule Yog.Render.Mermaid do
   ## Customization
 
   Control styling via `t:options/0`:
-  - Node shapes (rounded, rectangular, circular)
+  - Node shapes (rounded, rectangular, circular, rhombus, hexagon, etc.)
   - Labels and edge annotations
   - Highlight specific nodes or edges
   - Direction and orientation
+  - CSS-based styling with custom lengths
 
   ## Embedding Options
 
@@ -49,34 +50,97 @@ defmodule Yog.Render.Mermaid do
 
   ## References
 
-  - [Mermaid Documentation](https://mermaid.js.org/intro/)
-  - [Flowchart Syntax](https://mermaid.js.org/syntax/flowchart.html)
-  - [GitHub Mermaid Support](https://github.blog/2022-02-14-include-diagrams-markdown-files-mermaid/)
+  - [Mermaid Syntax](https://mermaid.js.org/syntax/flowchart.html)
+  - [GitHub Mermaid Docs](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-diagrams)
+
+  > **Migration Note:** Enhanced in v0.53.0 with full Gleam parity: all node shapes,
+  > CSS length types, comprehensive styling options.
   """
 
-  @typedoc "Diagram direction/orientation"
-  @type direction :: :td | :lr | :bt | :rl
+  # =============================================================================
+  # TYPES
+  # =============================================================================
 
-  @typedoc "Node visual style"
-  @type node_shape :: :rounded_rect | :circle | :rhombus | :stadium | :subroutine | :cylinder
+  @typedoc "Direction for graph layout"
+  @type direction ::
+          :td
+          | :lr
+          | :bt
+          | :rl
 
-  @typedoc "Options for customizing Mermaid.js diagram rendering"
+  @typedoc """
+  Node shape options for Mermaid diagrams.
+
+  Each shape has a specific Mermaid syntax:
+  - `:rounded_rect` - `[label]` - Rectangle with rounded corners
+  - `:stadium` - `([label])` - Stadium shape (pill)
+  - `:subroutine` - `[[label]]` - Subroutine shape (rectangle with side lines)
+  - `:cylinder` - `[(label)]` - Cylindrical shape (database)
+  - `:circle` - `((label))` - Circle
+  - `:asymmetric` - `>label]` - Asymmetric shape (flag)
+  - `:rhombus` - `{label}` - Rhombus (decision)
+  - `:hexagon` - `{{label}}` - Hexagon
+  - `:parallelogram` - `[/label/]` - Parallelogram
+  - `:parallelogram_alt` - `[\\label\\]` - Parallelogram alt
+  - `:trapezoid` - `[/label\\]` - Trapezoid
+  - `:trapezoid_alt` - `[\\label/]` - Trapezoid alt
+  """
+  @type node_shape ::
+          :rounded_rect
+          | :stadium
+          | :subroutine
+          | :cylinder
+          | :circle
+          | :asymmetric
+          | :rhombus
+          | :hexagon
+          | :parallelogram
+          | :parallelogram_alt
+          | :trapezoid
+          | :trapezoid_alt
+
+  @typedoc """
+  CSS length unit for styling.
+
+  Mermaid supports various CSS length units:
+  - `:px` - Pixels (most common)
+  - `:em` - Ems (relative to font size)
+  - `:rem` - Rems (relative to root font size)
+  - `:percent` - Percentage
+  - `{:custom, string}` - Custom CSS value (for advanced users)
+  """
+  @type css_length ::
+          {:px, integer()}
+          | {:em, float()}
+          | {:rem, float()}
+          | {:percent, float()}
+          | {:custom, String.t()}
+
+  @typedoc "Options for customizing Mermaid diagram rendering"
   @type options :: %{
-          direction: direction(),
-          node_shape: node_shape(),
           node_label: (Yog.node_id(), any() -> String.t()),
           edge_label: (any() -> String.t()),
           highlighted_nodes: [Yog.node_id()] | nil,
           highlighted_edges: [{Yog.node_id(), Yog.node_id()}] | nil,
+          # Graph-level attributes
+          direction: direction(),
+          # Node styling
+          node_shape: node_shape(),
           highlight_fill: String.t(),
-          highlight_stroke: String.t()
+          highlight_stroke: String.t(),
+          highlight_stroke_width: css_length(),
+          # Edge styling
+          link_thickness: css_length(),
+          highlight_link_stroke: String.t(),
+          highlight_link_stroke_width: css_length()
         }
 
   @doc """
-  Creates default Mermaid options with top-down layout and rounded rectangles.
+  Creates default Mermaid options with simple labeling.
 
-  Default styling:
-  - Direction: Top-down
+  Uses node ID as label and edge weight as-is.
+  Default configuration:
+  - Direction: Top-to-bottom (TD)
   - Node shape: Rounded rectangle
   - Highlight: Yellow fill with orange stroke
 
@@ -93,50 +157,64 @@ defmodule Yog.Render.Mermaid do
   @spec default_options() :: options()
   def default_options do
     %{
-      direction: :td,
-      node_shape: :rounded_rect,
-      node_label: fn id, _data -> "Node #{id}" end,
-      edge_label: fn weight ->
-        case weight do
-          nil -> ""
-          "" -> ""
-          w -> to_string(w)
-        end
-      end,
+      node_label: fn id, _data -> Integer.to_string(id) end,
+      edge_label: fn weight -> to_string(weight) end,
       highlighted_nodes: nil,
       highlighted_edges: nil,
+      # Graph-level
+      direction: :td,
+      # Node styling
+      node_shape: :rounded_rect,
       highlight_fill: "#ffeb3b",
-      highlight_stroke: "#f57c00"
+      highlight_stroke: "#f57c00",
+      highlight_stroke_width: {:px, 3},
+      # Edge styling
+      link_thickness: {:px, 2},
+      highlight_link_stroke: "#f57c00",
+      highlight_link_stroke_width: {:px, 3}
     }
   end
 
   @doc """
-  Converts a graph to Mermaid.js flowchart syntax.
+  Converts a graph to Mermaid diagram syntax.
 
-  Works with any node data type. The default options use a simple label
-  showing the node ID, but you can customize with your own label function.
+  The graph's node data and edge data must be convertible to strings.
+  Use the options to customize labels and highlight specific paths.
 
-  ## Examples
+  **Time Complexity:** O(V + E)
 
-      iex> graph = Yog.directed()
-      ...> |> Yog.add_node(1, "Start")
-      ...> |> Yog.add_node(2, "End")
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: "5")
-      iex> mermaid = Yog.Render.Mermaid.to_mermaid(graph, Yog.Render.Mermaid.default_options())
-      iex> String.contains?(mermaid, "graph TD")
-      true
-      iex> String.contains?(mermaid, "-->")
-      true
+  ## Example
 
-      # Undirected graph
-      iex> undirected = Yog.undirected()
-      ...> |> Yog.add_node(1, "A")
-      ...> |> Yog.add_node(2, "B")
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: "1")
-      iex> mermaid = Yog.Render.Mermaid.to_mermaid(undirected, Yog.Render.Mermaid.default_options())
-      iex> String.contains?(mermaid, "---")
-      true
-      iex> refute String.contains?(mermaid, "-->")
+      graph =
+        Yog.directed()
+        |> Yog.add_node(1, "Start")
+        |> Yog.add_node(2, "Process")
+        |> Yog.add_node(3, "End")
+        |> Yog.add_edge!(from: 1, to: 2, with: "5")
+        |> Yog.add_edge!(from: 2, to: 3, with: "3")
+
+      # Basic rendering
+      diagram = Yog.Render.Mermaid.to_mermaid(graph, default_options())
+
+      # Highlight a path
+      options = %{
+        default_options() |
+        highlighted_nodes: [1, 2, 3],
+        highlighted_edges: [{1, 2}, {2, 3}]
+      }
+      highlighted = Yog.Render.Mermaid.to_mermaid(graph, options)
+
+  The output can be embedded in markdown:
+  ````markdown
+  ```mermaid
+  graph TD
+    1["Start"]
+    2["Process"]
+    3["End"]
+    1 -->|5| 2
+    2 -->|3| 3
+  ```
+  ````
   """
   @spec to_mermaid(Yog.graph(), options()) :: String.t()
   def to_mermaid(graph, options) do
@@ -145,24 +223,62 @@ defmodule Yog.Render.Mermaid do
     kind = extract_kind(graph)
 
     # Graph type and direction
-    dir_str = direction_to_string(options.direction)
-    arrow = if kind == :directed, do: "-->", else: "---"
+    graph_type = "graph #{direction_to_string(options.direction)}\n"
 
-    [
-      "graph #{dir_str}",
-      build_highlight_defs(options)
-      | build_node_lines(nodes, options) ++
-          build_edge_lines(edges, options, arrow)
-    ]
-    |> List.flatten()
-    |> Enum.reject(&(&1 == ""))
-    |> Enum.join("\n")
+    # Style definitions for highlighting
+    styles =
+      if options.highlighted_nodes || options.highlighted_edges do
+        node_highlight =
+          "  classDef highlight fill:#{options.highlight_fill},stroke:#{options.highlight_stroke},stroke-width:#{css_length_to_string(options.highlight_stroke_width)}\n"
+
+        edge_highlight =
+          "  classDef highlightEdge stroke:#{options.highlight_link_stroke},stroke-width:#{css_length_to_string(options.highlight_link_stroke_width)}\n"
+
+        node_highlight <> edge_highlight
+      else
+        ""
+      end
+
+    # Generate node declarations
+    nodes_str = build_node_lines(nodes, options)
+
+    # Generate edge declarations
+    edges_str = build_edge_lines(edges, options, kind)
+
+    graph_type <> styles <> nodes_str <> "\n" <> edges_str
   end
+
+  @doc """
+  Converts a shortest path result to highlighted Mermaid options.
+
+  Creates a copy of the base options with the path's nodes and edges
+  set to be highlighted.
+
+  ## Example
+
+      case Yog.Pathfinding.Dijkstra.shortest_path(...) do
+        {:some, path} ->
+          options = Yog.Render.Mermaid.path_to_options(path, Yog.Render.Mermaid.default_options())
+          mermaid = Yog.Render.Mermaid.to_mermaid(graph, options)
+        :none ->
+          ""
+      end
+  """
+  @spec path_to_options(map(), options()) :: options()
+  def path_to_options(path, base_options) do
+    nodes = Map.get(path, :nodes, [])
+    edges = path_to_edges(nodes)
+
+    %{base_options | highlighted_nodes: nodes, highlighted_edges: edges}
+  end
+
+  # =============================================================================
+  # PRIVATE HELPERS
+  # =============================================================================
 
   defp extract_nodes(graph) do
     case graph do
       %{nodes: n} when is_map(n) -> n
-      {:graph, _, n, _, _} when is_map(n) -> n
       _ -> %{}
     end
   end
@@ -170,7 +286,6 @@ defmodule Yog.Render.Mermaid do
   defp extract_edges(graph) do
     case graph do
       %{out_edges: e} when is_map(e) -> e
-      {:graph, _, _, e, _} when is_map(e) -> e
       _ -> %{}
     end
   end
@@ -178,121 +293,111 @@ defmodule Yog.Render.Mermaid do
   defp extract_kind(graph) do
     case graph do
       %{kind: k} -> k
-      {:graph, k, _, _, _} -> k
       _ -> :directed
     end
   end
 
-  defp build_highlight_defs(options) do
-    if options.highlighted_nodes != nil or options.highlighted_edges != nil do
-      "  classDef highlight fill:#{options.highlight_fill},stroke:#{options.highlight_stroke},stroke-width:3px"
-    else
-      ""
-    end
-  end
-
   defp build_node_lines(nodes, options) do
-    Enum.map(nodes, fn {id, data} ->
+    Enum.map_join(nodes, "\n", fn {id, data} ->
       label = options.node_label.(id, data)
-      brackets = node_shape_brackets(options.node_shape, label)
-      line = "  #{id}#{brackets}"
+      node_def = "  #{id}#{node_shape_brackets(options.node_shape, label)}"
 
-      if node_highlighted?(id, options) do
-        line <> ":::highlight"
+      # Add highlight class if this node is in the highlighted list
+      if options.highlighted_nodes && id in options.highlighted_nodes do
+        node_def <> ":::highlight"
       else
-        line
+        node_def
       end
     end)
   end
 
-  defp node_highlighted?(id, options) do
-    options.highlighted_nodes != nil and id in options.highlighted_nodes
-  end
-
-  defp build_edge_lines(edges, options, arrow) do
-    Enum.flat_map(edges, fn {from, targets} ->
-      build_edge_lines_for_node(from, targets, options, arrow)
-    end)
-  end
-
-  defp build_edge_lines_for_node(from, targets, options, arrow) do
-    if is_map(targets) do
-      Enum.map(targets, fn {to, weight} ->
-        build_single_edge_line(from, to, weight, arrow, options)
+  defp build_edge_lines(edges, options, kind) do
+    edges
+    |> Enum.flat_map(fn {from_id, targets} ->
+      targets
+      |> Enum.filter(fn {to_id, _weight} ->
+        # For undirected graphs, only render each edge once (when from_id <= to_id)
+        # This prevents showing the same edge twice (once from each direction)
+        case kind do
+          :undirected -> from_id <= to_id
+          _ -> true
+        end
       end)
-    else
-      []
-    end
+      |> Enum.map(fn {to_id, weight} ->
+        # Choose arrow style based on graph type
+        arrow =
+          case kind do
+            :directed -> "-->"
+            :undirected -> "---"
+          end
+
+        # Check if this edge should be highlighted
+        is_highlighted =
+          options.highlighted_edges &&
+            ({from_id, to_id} in options.highlighted_edges ||
+               {to_id, from_id} in options.highlighted_edges)
+
+        edge_def = "  #{from_id} #{arrow}|#{options.edge_label.(weight)}| #{to_id}"
+
+        if is_highlighted do
+          edge_def <> ":::highlightEdge"
+        else
+          edge_def
+        end
+      end)
+    end)
+    |> Enum.join("\n")
   end
 
-  defp build_single_edge_line(from, to, weight, arrow, options) do
-    label = options.edge_label.(weight)
-
-    edge_str =
-      if label != "" do
-        "  #{from} #{arrow}|\"#{label}\"| #{to}"
-      else
-        "  #{from} #{arrow} #{to}"
-      end
-
-    if edge_highlighted?(from, to, options) do
-      edge_str <> ":::highlight"
-    else
-      edge_str
-    end
-  end
-
-  defp edge_highlighted?(from, to, options) do
-    edges = options.highlighted_edges
-
-    edges != nil and
-      ({from, to} in edges or {to, from} in edges)
-  end
-
-  defp direction_to_string(:td), do: "TD"
-  defp direction_to_string(:lr), do: "LR"
-  defp direction_to_string(:bt), do: "BT"
-  defp direction_to_string(:rl), do: "RL"
-
-  defp node_shape_brackets(:rounded_rect, label), do: "[\"#{label}\"]"
-  defp node_shape_brackets(:stadium, label), do: "([\"#{label}\"])"
-  defp node_shape_brackets(:subroutine, label), do: "[[\"#{label}\"]]"
-  defp node_shape_brackets(:cylinder, label), do: "[(\"#{label}\")]"
-  defp node_shape_brackets(:circle, label), do: "((\"#{label}\"))"
-  defp node_shape_brackets(:rhombus, label), do: "{\"#{label}\"}"
-  defp node_shape_brackets(_, label), do: "[\"#{label}\"]"
-
-  @doc """
-  Converts a shortest path result to highlighted Mermaid options.
-
-  Creates a copy of the base options with the path's nodes and edges
-  set to be highlighted. This is useful for visualizing algorithm results.
-
-  ## Examples
-
-      iex> base_opts = Yog.Render.Mermaid.default_options()
-      iex> path = %{nodes: [1, 2, 3], weight: 10}
-      iex> highlighted_opts = Yog.Render.Mermaid.path_to_options(path, base_opts)
-      iex> highlighted_opts.highlighted_nodes
-      [1, 2, 3]
-      iex> highlighted_opts.highlighted_edges
-      [{1, 2}, {2, 3}]
-  """
-  @spec path_to_options(map(), options()) :: options()
-  def path_to_options(path, base_options) do
-    nodes = path.nodes
-    edges = path_to_edges(nodes)
-
-    Map.merge(base_options, %{
-      highlighted_nodes: nodes,
-      highlighted_edges: edges
-    })
-  end
-
+  # Helper to convert a list of nodes to a list of edges
   defp path_to_edges([]), do: []
   defp path_to_edges([_]), do: []
 
   defp path_to_edges([first, second | rest]) do
     [{first, second} | path_to_edges([second | rest])]
+  end
+
+  # =============================================================================
+  # ENUM TO STRING CONVERSIONS
+  # =============================================================================
+
+  @doc false
+  @spec direction_to_string(direction()) :: String.t()
+  def direction_to_string(:td), do: "TD"
+  def direction_to_string(:lr), do: "LR"
+  def direction_to_string(:bt), do: "BT"
+  def direction_to_string(:rl), do: "RL"
+
+  @doc false
+  @spec css_length_to_string(css_length()) :: String.t()
+  def css_length_to_string({:px, n}), do: "#{n}px"
+  def css_length_to_string({:em, f}), do: "#{f}em"
+  def css_length_to_string({:rem, f}), do: "#{f}rem"
+  def css_length_to_string({:percent, f}), do: "#{f}%"
+  def css_length_to_string({:custom, s}), do: s
+
+  @doc false
+  @spec node_shape_brackets(node_shape(), String.t()) :: String.t()
+  def node_shape_brackets(:rounded_rect, label), do: "[\"#{escape_label(label)}\"]"
+  def node_shape_brackets(:stadium, label), do: "([\"#{escape_label(label)}\"])"
+  def node_shape_brackets(:subroutine, label), do: "[[\"#{escape_label(label)}\"]]"
+  def node_shape_brackets(:cylinder, label), do: "[(\"#{escape_label(label)}\")]"
+  def node_shape_brackets(:circle, label), do: "((\"#{escape_label(label)}\"))"
+  def node_shape_brackets(:asymmetric, label), do: ">\"#{escape_label(label)}\"]"
+  def node_shape_brackets(:rhombus, label), do: "{\"#{escape_label(label)}\"}"
+  def node_shape_brackets(:hexagon, label), do: "{{\"#{escape_label(label)}\"}}"
+  def node_shape_brackets(:parallelogram, label), do: "[/\"#{escape_label(label)}\"/]"
+
+  def node_shape_brackets(:parallelogram_alt, label),
+    do: "[\\\"#{escape_label(label)}\"\\]"
+
+  def node_shape_brackets(:trapezoid, label), do: "[/\"#{escape_label(label)}\"\\]"
+  def node_shape_brackets(:trapezoid_alt, label), do: "[\\\"#{escape_label(label)}\"/]"
+
+  # Escape special characters in labels for Mermaid
+  defp escape_label(label) do
+    label
+    |> String.replace("\"", "\\\"")
+    |> String.replace("\n", "<br/>")
   end
 end

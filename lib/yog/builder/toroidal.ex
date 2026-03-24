@@ -20,31 +20,39 @@ defmodule Yog.Builder.Toroidal do
   - **Queen (8-way)** → `toroidal_chebyshev_distance/5`
   - **Weighted diagonals** → `toroidal_octile_distance/5`
 
-  ## Example Usage (Not a doctest - delegates to Erlang)
+  ## Example Usage
 
-      # grid_data = [
-      #   [1, 2, 3],
-      #   [4, 5, 6],
-      #   [7, 8, 9]
-      # ]
+      # Create a 3x3 toroidal grid
+      data = [
+        [1, 2, 3],
+        [4, 5, 6],
+        [7, 8, 9]
+      ]
 
       # Create toroidal grid where all moves wrap
-      # grid = Yog.Builder.Toroidal.from_2d_list(
-      #   grid_data,
-      #   :directed,
-      #   Yog.Builder.Toroidal.always()
-      # )
+      grid = Yog.Builder.Toroidal.from_2d_list(
+        data,
+        :directed,
+        Yog.Builder.Toroidal.always()
+      )
 
       # Distance from (0,0) to (2,2) goes "around" the grid
       # On 3x3: direct is 4, but wrapping is 2 (up 1 + left 1)
-      # start = Yog.Builder.Toroidal.coord_to_id(0, 0, 3)
-      # goal = Yog.Builder.Toroidal.coord_to_id(2, 2, 3)
-      # dist = Yog.Builder.Toroidal.toroidal_manhattan_distance(start, goal, 3, 3)
+      start = Yog.Builder.Toroidal.coord_to_id(0, 0, 3)
+      goal = Yog.Builder.Toroidal.coord_to_id(2, 2, 3)
+      dist = Yog.Builder.Toroidal.toroidal_manhattan_distance(start, goal, 3, 3)
       # dist = 2
+
+  > **Migration Note:** This module was ported from Gleam to pure Elixir in v0.53.0.
+  > The API remains unchanged.
   """
 
-  @typedoc "Opaque toroidal grid type"
-  @type toroidal_grid :: term()
+  alias Yog.Builder.Grid
+  alias Yog.Builder.GridGraph
+  alias Yog.Model
+
+  @typedoc "Toroidal grid type: {:toroidal_grid, graph, rows, cols}"
+  @type toroidal_grid :: {:toroidal_grid, Yog.graph(), integer(), integer()}
 
   @typedoc "Topology is a list of {row_delta, col_delta} movement offsets"
   @type topology :: [{integer(), integer()}]
@@ -59,34 +67,38 @@ defmodule Yog.Builder.Toroidal do
 
   ## Examples
 
-      # Create grid from 2D list (delegates to Erlang)
-      # data = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
-      # grid = Yog.Builder.Toroidal.from_2d_list(
-      #   data,
-      #   :directed,
-      #   Yog.Builder.Toroidal.always()
-      # )
+      data = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+      grid = Yog.Builder.Toroidal.from_2d_list(
+        data,
+        :directed,
+        Yog.Builder.Toroidal.always()
+      )
 
   ## Time Complexity
 
   O(rows × cols)
   """
   @spec from_2d_list([[term()]], Yog.graph_type(), (term(), term() -> boolean())) ::
-          toroidal_grid()
-  defdelegate from_2d_list(grid_data, graph_type, can_move_fn), to: :yog@builder@toroidal
+          GridGraph.t()
+  def from_2d_list(grid_data, graph_type, can_move_fn) do
+    from_2d_list_with_topology(grid_data, graph_type, rook(), can_move_fn)
+  end
 
   @doc """
   Creates a toroidal graph from a 2D list using a custom movement topology.
 
+  Like `from_2d_list`, but allows custom movement patterns. All movement
+  wraps at boundaries.
+
   ## Examples
 
-      # 8-way movement on a toroidal grid (delegates to Erlang)
-      # grid = Yog.Builder.Toroidal.from_2d_list_with_topology(
-      #   data,
-      #   :directed,
-      #   Yog.Builder.Toroidal.queen(),
-      #   Yog.Builder.Toroidal.always()
-      # )
+      # 8-way movement on a toroidal grid
+      grid = Yog.Builder.Toroidal.from_2d_list_with_topology(
+        data,
+        :directed,
+        Yog.Builder.Toroidal.queen(),
+        Yog.Builder.Toroidal.always()
+      )
   """
   @spec from_2d_list_with_topology(
           [[term()]],
@@ -94,15 +106,73 @@ defmodule Yog.Builder.Toroidal do
           topology(),
           (term(), term() -> boolean())
         ) ::
-          toroidal_grid()
-  defdelegate from_2d_list_with_topology(grid_data, graph_type, topology, can_move_fn),
-    to: :yog@builder@toroidal
+          GridGraph.t()
+  def from_2d_list_with_topology(grid_data, graph_type, topology, can_move_fn) do
+    rows = length(grid_data)
+
+    cols =
+      case grid_data do
+        [first_row | _] -> length(first_row)
+        [] -> 0
+      end
+
+    # Flatten grid into list of cells with coordinates
+    cells =
+      grid_data
+      |> Enum.with_index()
+      |> Enum.flat_map(fn {row, row_idx} ->
+        row
+        |> Enum.with_index()
+        |> Enum.map(fn {cell, col_idx} ->
+          {row_idx, col_idx, cell}
+        end)
+      end)
+
+    # Add all nodes
+    graph_with_nodes =
+      Enum.reduce(cells, Model.new(graph_type), fn {row, col, data}, g ->
+        id = coord_to_id(row, col, cols)
+        Model.add_node(g, id, data)
+      end)
+
+    # Add edges with wrapping
+    graph_with_edges =
+      Enum.reduce(cells, graph_with_nodes, fn {row, col, from_data}, g ->
+        from_id = coord_to_id(row, col, cols)
+
+        Enum.reduce(topology, g, fn {d_row, d_col}, acc_g ->
+          # Wrap coordinates using modulo
+          n_row = wrap_coordinate(row + d_row, rows)
+          n_col = wrap_coordinate(col + d_col, cols)
+
+          to_id = coord_to_id(n_row, n_col, cols)
+          to_data = Model.node(acc_g, to_id)
+
+          if to_data != nil && can_move_fn.(from_data, to_data) do
+            case Model.add_edge(acc_g, from_id, to_id, 1) do
+              {:ok, new_g} -> new_g
+              {:error, _} -> acc_g
+            end
+          else
+            acc_g
+          end
+        end)
+      end)
+
+    GridGraph.new(graph_with_edges, rows, cols, :rook)
+  end
 
   @doc """
   Converts a toroidal grid into a standard Graph.
   """
-  @spec to_graph(toroidal_grid()) :: Yog.graph()
-  defdelegate to_graph(grid), to: :yog@builder@toroidal
+  @spec to_graph(GridGraph.t() | toroidal_grid()) :: Yog.graph()
+  def to_graph(%GridGraph{} = grid) do
+    GridGraph.to_graph(grid)
+  end
+
+  def to_graph({:toroidal_grid, graph, _rows, _cols}) do
+    graph
+  end
 
   # ============= Cell Access =============
 
@@ -111,30 +181,80 @@ defmodule Yog.Builder.Toroidal do
 
   Returns `{:ok, cell_data}` or `{:error, nil}` if out of bounds.
   """
-  @spec get_cell(toroidal_grid(), integer(), integer()) :: {:ok, term()} | {:error, nil}
-  defdelegate get_cell(grid, row, col), to: :yog@builder@toroidal
+  @spec get_cell(GridGraph.t() | toroidal_grid(), integer(), integer()) ::
+          {:ok, term()} | {:error, nil}
+  def get_cell(%GridGraph{} = grid, row, col) do
+    GridGraph.get_cell(grid, row, col)
+  end
+
+  def get_cell({:toroidal_grid, graph, rows, cols}, row, col) do
+    if row >= 0 && row < rows && col >= 0 && col < cols do
+      id = coord_to_id(row, col, cols)
+      data = Model.node(graph, id)
+
+      if data != nil do
+        {:ok, data}
+      else
+        {:error, nil}
+      end
+    else
+      {:error, nil}
+    end
+  end
 
   @doc """
   Finds a node in the grid where the cell data matches a predicate.
 
   Returns `{:ok, node_id}` or `{:error, nil}`.
   """
-  @spec find_node(toroidal_grid(), (term() -> boolean())) :: {:ok, Yog.node_id()} | {:error, nil}
-  defdelegate find_node(grid, predicate), to: :yog@builder@toroidal
+  @spec find_node(GridGraph.t() | toroidal_grid(), (term() -> boolean())) ::
+          {:ok, Yog.node_id()} | {:error, nil}
+  def find_node(%GridGraph{graph: graph, rows: rows, cols: cols}, predicate) do
+    do_find_node(graph, rows, cols, predicate)
+  end
+
+  def find_node({:toroidal_grid, graph, rows, cols}, predicate) do
+    do_find_node(graph, rows, cols, predicate)
+  end
+
+  defp do_find_node(graph, rows, cols, predicate) do
+    max_id = rows * cols - 1
+
+    result =
+      Enum.find_value(0..max_id, fn id ->
+        case Model.node(graph, id) do
+          nil -> nil
+          data -> if predicate.(data), do: {:ok, id}, else: nil
+        end
+      end)
+
+    case result do
+      {:ok, id} -> {:ok, id}
+      nil -> {:error, nil}
+    end
+  end
 
   # ============= Coordinate Conversion =============
 
   @doc """
   Converts grid coordinates `{row, col}` to a node ID.
+
+  Delegates to `Yog.Builder.Grid.coord_to_id/3`.
   """
   @spec coord_to_id(integer(), integer(), integer()) :: Yog.node_id()
-  defdelegate coord_to_id(row, col, cols), to: :yog@builder@toroidal
+  def coord_to_id(row, col, cols) do
+    Grid.coord_to_id(row, col, cols)
+  end
 
   @doc """
   Converts a node ID back to grid coordinates `{row, col}`.
+
+  Delegates to `Yog.Builder.Grid.id_to_coord/2`.
   """
   @spec id_to_coord(Yog.node_id(), integer()) :: {integer(), integer()}
-  defdelegate id_to_coord(id, cols), to: :yog@builder@toroidal
+  def id_to_coord(id, cols) do
+    Grid.id_to_coord(id, cols)
+  end
 
   # ============= Toroidal Distance Heuristics =============
 
@@ -153,8 +273,19 @@ defmodule Yog.Builder.Toroidal do
   """
   @spec toroidal_manhattan_distance(Yog.node_id(), Yog.node_id(), integer(), integer()) ::
           integer()
-  defdelegate toroidal_manhattan_distance(from_id, to_id, cols, rows),
-    to: :yog@builder@toroidal
+  def toroidal_manhattan_distance(from_id, to_id, cols, rows) do
+    {from_row, from_col} = id_to_coord(from_id, cols)
+    {to_row, to_col} = id_to_coord(to_id, cols)
+
+    row_diff = abs(from_row - to_row)
+    col_diff = abs(from_col - to_col)
+
+    # Take the shorter path (direct or wrapped)
+    min_row_dist = min(row_diff, rows - row_diff)
+    min_col_dist = min(col_diff, cols - col_diff)
+
+    min_row_dist + min_col_dist
+  end
 
   @doc """
   Calculates the toroidal Chebyshev distance between two grid node IDs.
@@ -169,8 +300,19 @@ defmodule Yog.Builder.Toroidal do
   """
   @spec toroidal_chebyshev_distance(Yog.node_id(), Yog.node_id(), integer(), integer()) ::
           integer()
-  defdelegate toroidal_chebyshev_distance(from_id, to_id, cols, rows),
-    to: :yog@builder@toroidal
+  def toroidal_chebyshev_distance(from_id, to_id, cols, rows) do
+    {from_row, from_col} = id_to_coord(from_id, cols)
+    {to_row, to_col} = id_to_coord(to_id, cols)
+
+    row_diff = abs(from_row - to_row)
+    col_diff = abs(from_col - to_col)
+
+    # Take the shorter path (direct or wrapped)
+    min_row_dist = min(row_diff, rows - row_diff)
+    min_col_dist = min(col_diff, cols - col_diff)
+
+    max(min_row_dist, min_col_dist)
+  end
 
   @doc """
   Calculates the toroidal Octile distance between two grid node IDs.
@@ -185,8 +327,23 @@ defmodule Yog.Builder.Toroidal do
   """
   @spec toroidal_octile_distance(Yog.node_id(), Yog.node_id(), integer(), integer()) ::
           float()
-  defdelegate toroidal_octile_distance(from_id, to_id, cols, rows),
-    to: :yog@builder@toroidal
+  def toroidal_octile_distance(from_id, to_id, cols, rows) do
+    {from_row, from_col} = id_to_coord(from_id, cols)
+    {to_row, to_col} = id_to_coord(to_id, cols)
+
+    row_diff = abs(from_row - to_row)
+    col_diff = abs(from_col - to_col)
+
+    # Take the shorter path (direct or wrapped)
+    min_row_dist = min(row_diff, rows - row_diff)
+    min_col_dist = min(col_diff, cols - col_diff)
+
+    min_d = min(min_row_dist, min_col_dist)
+    max_d = max(min_row_dist, min_col_dist)
+
+    # √2 ≈ 1.414213562373095
+    min_d * 1.414213562373095 + (max_d - min_d)
+  end
 
   # ============= Topology Presets =============
 
@@ -196,7 +353,9 @@ defmodule Yog.Builder.Toroidal do
   Default for `from_2d_list/3`. Movement offsets: `{-1,0}, {1,0}, {0,-1}, {0,1}`
   """
   @spec rook() :: topology()
-  defdelegate rook(), to: :yog@builder@toroidal
+  def rook do
+    Grid.rook()
+  end
 
   @doc """
   4-way diagonal movement with wrapping.
@@ -204,7 +363,9 @@ defmodule Yog.Builder.Toroidal do
   Movement offsets: `{-1,-1}, {-1,1}, {1,-1}, {1,1}`
   """
   @spec bishop() :: topology()
-  defdelegate bishop(), to: :yog@builder@toroidal
+  def bishop do
+    Grid.bishop()
+  end
 
   @doc """
   8-way movement (cardinal + diagonal) with wrapping.
@@ -212,7 +373,9 @@ defmodule Yog.Builder.Toroidal do
   Combines `rook/0` and `bishop/0`.
   """
   @spec queen() :: topology()
-  defdelegate queen(), to: :yog@builder@toroidal
+  def queen do
+    Grid.queen()
+  end
 
   @doc """
   L-shaped knight jumps in all 8 orientations with wrapping.
@@ -220,7 +383,9 @@ defmodule Yog.Builder.Toroidal do
   Chess knight movement: `{-2,-1}, {-2,1}, {-1,-2}, {-1,2}, {1,-2}, {1,2}, {2,-1}, {2,1}`
   """
   @spec knight() :: topology()
-  defdelegate knight(), to: :yog@builder@toroidal
+  def knight do
+    Grid.knight()
+  end
 
   # ============= Movement Predicates =============
 
@@ -228,23 +393,45 @@ defmodule Yog.Builder.Toroidal do
   Creates a predicate that only allows movement into cells matching `valid_value`.
   """
   @spec walkable(term()) :: (term(), term() -> boolean())
-  defdelegate walkable(valid_value), to: :yog@builder@toroidal
+  def walkable(valid_value) do
+    Grid.walkable(valid_value)
+  end
 
   @doc """
   Creates a predicate that allows movement into any cell except `wall_value`.
   """
   @spec avoiding(term()) :: (term(), term() -> boolean())
-  defdelegate avoiding(wall_value), to: :yog@builder@toroidal
+  def avoiding(wall_value) do
+    Grid.avoiding(wall_value)
+  end
 
   @doc """
   Creates a predicate that allows movement into any of the specified values.
   """
   @spec including([term()]) :: (term(), term() -> boolean())
-  defdelegate including(valid_values), to: :yog@builder@toroidal
+  def including(valid_values) do
+    Grid.including(valid_values)
+  end
 
   @doc """
   Always allows movement between adjacent cells.
   """
   @spec always() :: (term(), term() -> boolean())
-  defdelegate always(), to: :yog@builder@toroidal
+  def always do
+    Grid.always()
+  end
+
+  # ============= Private Helpers =============
+
+  # Wraps a coordinate to stay within bounds [0, size)
+  # Handles negative values correctly for wrapping
+  defp wrap_coordinate(coord, size) do
+    rem_result = rem(coord, size)
+
+    if rem_result < 0 do
+      rem_result + size
+    else
+      rem_result
+    end
+  end
 end

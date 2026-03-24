@@ -26,7 +26,7 @@ defmodule RenderDot do
     # 2. Find shortest path and highlight it
     IO.puts("\n--- DOT with Path Highlighting ---")
 
-    result = Yog.Pathfinding.shortest_path(
+    result = Yog.Pathfinding.Dijkstra.shortest_path(
       in: graph,
       from: 1,
       to: 3,

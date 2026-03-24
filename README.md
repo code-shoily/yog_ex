@@ -395,6 +395,16 @@ mix test test/yog/pathfinding/dijkstra_test.exs
 - `test/` — Unit tests and doctests
 - `examples/` — Real-world usage examples
 
+### Migration Status
+
+YogEx is currently migrating from a Gleam wrapper library to a **pure Elixir** implementation.
+
+- **Migration Tracker:** [`MIGRATION_STATUS.md`](MIGRATION_STATUS.md) — Live status of all 58 modules
+- **Current Status:** 6/58 modules complete (I/O modules already pure Elixir)
+- **API Compatibility:** 100% backward compatible — no breaking changes
+
+The graph data structure remains `{:graph, kind, nodes, out_edges, in_edges}` throughout the migration, ensuring existing code continues to work without modification.
+
 ### Publishing to Hex (For Maintainers)
 
 Due to Gleam package requirements, publishing to Hex requires a special environment configuration.

@@ -67,27 +67,19 @@ defmodule Yog.Community do
   """
 
   alias Yog.Community.Metrics
+  alias Yog.Community.{Result, Dendrogram, Overlapping}
 
   @typedoc "Community identifier"
   @type community_id :: integer()
 
   @typedoc "Community assignment for nodes"
-  @type communities :: %{
-          assignments: %{Yog.node_id() => community_id()},
-          num_communities: integer()
-        }
+  @type communities :: Result.t()
 
   @typedoc "Hierarchical community structure"
-  @type dendrogram :: %{
-          levels: [communities()],
-          merge_order: [{community_id(), community_id()}]
-        }
+  @type dendrogram :: Dendrogram.t()
 
   @typedoc "Overlapping communities (nodes can belong to multiple)"
-  @type overlapping_communities :: %{
-          memberships: %{Yog.node_id() => [community_id()]},
-          num_communities: integer()
-        }
+  @type overlapping_communities :: Overlapping.t()
 
   # ============================================================
   # Utility Functions
@@ -101,15 +93,12 @@ defmodule Yog.Community do
 
   ## Examples
 
-      iex> communities = %{
-      ...>   assignments: %{1 => 0, 2 => 0, 3 => 1},
-      ...>   num_communities: 2
-      ...> }
+      iex> communities = Yog.Community.Result.new(%{1 => 0, 2 => 0, 3 => 1})
       iex> Yog.Community.to_dict(communities)
       %{0 => MapSet.new([1, 2]), 1 => MapSet.new([3])}
   """
   @spec to_dict(communities()) :: %{community_id() => MapSet.t(Yog.node_id())}
-  def to_dict(communities) do
+  def to_dict(%Result{} = communities) do
     Enum.reduce(communities.assignments, %{}, fn {node, community}, acc ->
       current_set = Map.get(acc, community, MapSet.new())
       Map.put(acc, community, MapSet.put(current_set, node))
@@ -123,15 +112,12 @@ defmodule Yog.Community do
 
   ## Examples
 
-      iex> communities = %{
-      ...>   assignments: %{1 => 0, 2 => 0, 3 => 0, 4 => 1},
-      ...>   num_communities: 2
-      ...> }
+      iex> communities = Yog.Community.Result.new(%{1 => 0, 2 => 0, 3 => 0, 4 => 1})
       iex> Yog.Community.largest(communities)
       {:some, 0}
   """
   @spec largest(communities()) :: {:some, community_id()} | :none
-  def largest(communities) do
+  def largest(%Result{} = communities) do
     communities
     |> sizes()
     |> Enum.to_list()
@@ -148,15 +134,12 @@ defmodule Yog.Community do
 
   ## Examples
 
-      iex> communities = %{
-      ...>   assignments: %{1 => 0, 2 => 0, 3 => 1, 4 => 1, 5 => 1},
-      ...>   num_communities: 2
-      ...> }
+      iex> communities = Yog.Community.Result.new(%{1 => 0, 2 => 0, 3 => 1, 4 => 1, 5 => 1})
       iex> Yog.Community.sizes(communities)
       %{0 => 2, 1 => 3}
   """
   @spec sizes(communities()) :: %{community_id() => integer()}
-  def sizes(communities) do
+  def sizes(%Result{} = communities) do
     Enum.reduce(communities.assignments, %{}, fn {_node, community}, acc ->
       current_size = Map.get(acc, community, 0)
       Map.put(acc, community, current_size + 1)
@@ -171,25 +154,47 @@ defmodule Yog.Community do
 
   ## Parameters
 
-    * `communities` - The current community partition
+    * `communities` - The current community partition (can be Result struct or legacy map)
     * `source` - The community ID to merge from (will be removed)
     * `target` - The community ID to merge into (will be kept)
 
   ## Examples
 
-      iex> communities = %{
-      ...>   assignments: %{1 => 0, 2 => 0, 3 => 1, 4 => 1},
-      ...>   num_communities: 2
-      ...> }
+      iex> communities = Yog.Community.Result.new(%{1 => 0, 2 => 0, 3 => 1, 4 => 1})
       iex> merged = Yog.Community.merge(communities, source: 1, target: 0)
       iex> merged.assignments
       %{1 => 0, 2 => 0, 3 => 0, 4 => 0}
       iex> merged.num_communities
       1
   """
-  @spec merge(communities(), source: community_id(), target: community_id()) ::
-          communities()
-  def merge(communities, source: source, target: target) do
+  @spec merge(communities() | map(), source: community_id(), target: community_id()) ::
+          communities() | map()
+  def merge(%Result{} = communities, source: source, target: target) do
+    new_assignments =
+      Enum.reduce(communities.assignments, communities.assignments, fn
+        {node, ^source}, acc ->
+          Map.put(acc, node, target)
+
+        _, acc ->
+          acc
+      end)
+
+    num_communities =
+      if source == target do
+        communities.num_communities
+      else
+        communities.num_communities - 1
+      end
+
+    %Result{
+      assignments: new_assignments,
+      num_communities: num_communities,
+      metadata: communities.metadata
+    }
+  end
+
+  # Legacy map support
+  def merge(%{assignments: _, num_communities: _} = communities, source: source, target: target) do
     new_assignments =
       Enum.reduce(communities.assignments, communities.assignments, fn
         {node, ^source}, acc ->
@@ -217,15 +222,12 @@ defmodule Yog.Community do
 
   ## Examples
 
-      iex> communities = %{
-      ...>   assignments: %{1 => 0, 2 => 0, 3 => 0, 4 => 1},
-      ...>   num_communities: 2
-      ...> }
+      iex> communities = Yog.Community.Result.new(%{1 => 0, 2 => 0, 3 => 0, 4 => 1})
       iex> Yog.Community.nodes_in(communities, 0)
       MapSet.new([1, 2, 3])
   """
   @spec nodes_in(communities(), community_id()) :: MapSet.t(Yog.node_id())
-  def nodes_in(communities, community_id) do
+  def nodes_in(%Result{} = communities, community_id) do
     communities.assignments
     |> Enum.filter(fn {_, c} -> c == community_id end)
     |> Enum.map(fn {node, _} -> node end)
@@ -239,17 +241,14 @@ defmodule Yog.Community do
 
   ## Examples
 
-      iex> communities = %{
-      ...>   assignments: %{1 => 0, 2 => 0, 3 => 1},
-      ...>   num_communities: 2
-      ...> }
+      iex> communities = Yog.Community.Result.new(%{1 => 0, 2 => 0, 3 => 1})
       iex> Yog.Community.for_node(communities, 1)
       {:some, 0}
       iex> Yog.Community.for_node(communities, 999)
       :none
   """
   @spec for_node(communities(), Yog.node_id()) :: {:some, community_id()} | :none
-  def for_node(communities, node) do
+  def for_node(%Result{} = communities, node) do
     case Map.fetch(communities.assignments, node) do
       {:ok, community} -> {:some, community}
       :error -> :none
@@ -277,14 +276,14 @@ defmodule Yog.Community do
       ...> |> Yog.add_node(3, nil)
       ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
       ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      iex> communities = %{assignments: %{1 => 0, 2 => 0, 3 => 0}, num_communities: 1}
+      iex> communities = Yog.Community.Result.new(%{1 => 0, 2 => 0, 3 => 0})
       iex> q = Yog.Community.modularity(graph, communities)
       iex> is_float(q)
       true
   """
   @spec modularity(Yog.graph(), communities()) :: float()
-  def modularity(graph, communities) do
-    Metrics.modularity(graph, communities)
+  def modularity(graph, %Result{} = communities) do
+    Metrics.modularity(graph, Result.to_map(communities))
   end
 
   @doc """
@@ -404,13 +403,13 @@ defmodule Yog.Community do
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
       ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      iex> communities = %{assignments: %{1 => 0, 2 => 0, 3 => 0}, num_communities: 1}
+      iex> communities = Yog.Community.Result.new(%{1 => 0, 2 => 0, 3 => 0})
       iex> cd = Yog.Community.community_density(graph, communities, 0)
       iex> is_float(cd)
       true
   """
   @spec community_density(Yog.graph(), communities(), community_id()) :: float()
-  def community_density(graph, communities, community_id) do
+  def community_density(graph, %Result{} = communities, community_id) do
     nodes = nodes_in(communities, community_id)
     Metrics.community_density(graph, nodes)
   end
@@ -425,13 +424,13 @@ defmodule Yog.Community do
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
       ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      iex> communities = %{assignments: %{1 => 0, 2 => 0, 3 => 0}, num_communities: 1}
+      iex> communities = Yog.Community.Result.new(%{1 => 0, 2 => 0, 3 => 0})
       iex> avg_cd = Yog.Community.average_community_density(graph, communities)
       iex> is_float(avg_cd)
       true
   """
   @spec average_community_density(Yog.graph(), communities()) :: float()
-  def average_community_density(graph, communities) do
-    Metrics.average_community_density(graph, communities)
+  def average_community_density(graph, %Result{} = communities) do
+    Metrics.average_community_density(graph, Result.to_map(communities))
   end
 end

@@ -99,7 +99,7 @@ defmodule Yog.DAG.Algorithm do
     {distances, predecessors} =
       Enum.reduce(sorted_nodes, {%{}, %{}}, fn node, {dist_acc, pred_acc} ->
         node_dist = Map.get(dist_acc, node, 0)
-        out_edges = :yog@model.successors(graph, node) |> Map.new()
+        out_edges = Yog.Model.successors(graph, node) |> Map.new()
 
         update_longest_distances(out_edges, node, node_dist, dist_acc, pred_acc)
       end)
@@ -180,7 +180,7 @@ defmodule Yog.DAG.Algorithm do
 
   defp solve_transitive_reachability(graph, sorted_nodes) do
     Enum.reduce(sorted_nodes, %{}, fn node, acc ->
-      successors = :yog@model.successors(graph, node) |> Enum.map(fn {n, _} -> n end)
+      successors = Yog.Model.successors(graph, node) |> Enum.map(fn {n, _} -> n end)
 
       all_reachable =
         Enum.reduce(successors, MapSet.new(successors), fn child, set_acc ->
@@ -194,7 +194,7 @@ defmodule Yog.DAG.Algorithm do
 
   defp add_closure_edges(graph, node, targets) do
     Enum.reduce(MapSet.to_list(targets), graph, fn target, g_acc ->
-      existing_targets = :yog@model.successors(g_acc, node) |> Enum.map(fn {n, _} -> n end)
+      existing_targets = Yog.Model.successors(g_acc, node) |> Enum.map(fn {n, _} -> n end)
 
       if target in existing_targets do
         g_acc
@@ -236,14 +236,14 @@ defmodule Yog.DAG.Algorithm do
     # For each edge, check if it's implied by transitivity
     edges_to_remove =
       for node <- nodes,
-          {target, _weight} <- :yog@model.successors(graph, node),
+          {target, _weight} <- Yog.Model.successors(graph, node),
           has_indirect_path?(graph, node, target, exclude: target),
           do: {node, target}
 
     # Remove redundant edges
     new_graph =
       Enum.reduce(edges_to_remove, graph, fn {from, to}, g ->
-        :yog@model.remove_edge(g, from, to)
+        Yog.Model.remove_edge(g, from, to)
       end)
 
     # Unwrap and re-wrap as DAG
@@ -305,7 +305,7 @@ defmodule Yog.DAG.Algorithm do
       if node_dist == nil do
         acc
       else
-        out_edges = :yog@model.successors(graph, node) |> Map.new()
+        out_edges = Yog.Model.successors(graph, node) |> Map.new()
         relax_edges(out_edges, node, node_dist, dist_acc, pred_acc)
       end
     end)
@@ -399,14 +399,14 @@ defmodule Yog.DAG.Algorithm do
 
   defp build_related_fn(graph, :descendants) do
     fn node ->
-      :yog@model.successors(graph, node)
+      Yog.Model.successors(graph, node)
       |> Enum.map(fn {n, _} -> n end)
     end
   end
 
   defp build_related_fn(graph, :ancestors) do
     fn node ->
-      :yog@model.predecessors(graph, node)
+      Yog.Model.predecessors(graph, node)
       |> Enum.map(fn {n, _} -> n end)
     end
   end
@@ -509,7 +509,7 @@ defmodule Yog.DAG.Algorithm do
   end
 
   defp get_filtered_neighbors(graph, current, target, exclude) do
-    :yog@model.successors(graph, current)
+    Yog.Model.successors(graph, current)
     |> Enum.map(fn {n, _} -> n end)
     |> Enum.reject(fn n ->
       # Skip the excluded edge

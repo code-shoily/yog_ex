@@ -204,6 +204,7 @@ defmodule Yog.IO.PajekTest do
     # shape is the 4th element (1-based), because record fields start at index 2 (+name) in Erlang
     # We can just verify it is :none since Gleam None compiles to :none
     # The tuple is {:node_attributes, x, y, shape, size, color}
+    # NOTE: This elem() accesses a node_attributes tuple, NOT a graph, so keep it as-is
     shape = elem(default_attrs, 3)
     assert shape == :none
   end

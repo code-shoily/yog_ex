@@ -96,13 +96,38 @@ defmodule Yog.Generator.Random do
   - Average-case algorithm analysis
   """
   @spec erdos_renyi_gnp(integer(), float()) :: Yog.graph()
-  defdelegate erdos_renyi_gnp(n, p), to: :yog@generator@random
+  def erdos_renyi_gnp(n, p), do: erdos_renyi_gnp_with_type(n, p, :undirected)
 
   @doc """
   Generates an Erdős-Rényi G(n, p) graph with specified graph type.
   """
   @spec erdos_renyi_gnp_with_type(integer(), float(), Yog.graph_type()) :: Yog.graph()
-  defdelegate erdos_renyi_gnp_with_type(n, p, graph_type), to: :yog@generator@random
+  def erdos_renyi_gnp_with_type(n, p, graph_type) when n > 0 and p >= 0.0 and p <= 1.0 do
+    base = Yog.new(graph_type)
+
+    graph =
+      Enum.reduce(0..(n - 1), base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # Generate all possible edges and filter by probability
+    all_pairs =
+      case graph_type do
+        :undirected ->
+          for i <- 0..(n - 1), j <- (i + 1)..(n - 1)//1, i < j, do: {i, j}
+
+        :directed ->
+          for i <- 0..(n - 1), j <- 0..(n - 1)//1, i != j, do: {i, j}
+      end
+
+    edges = Enum.filter(all_pairs, fn _ -> :rand.uniform() <= p end)
+
+    Enum.reduce(edges, graph, fn {from, to}, g ->
+      Yog.add_edge!(g, from, to, 1)
+    end)
+  end
+
+  def erdos_renyi_gnp_with_type(_n, _p, _graph_type), do: Yog.new(:undirected)
 
   # ============= Erdős-Rényi G(n, m) =============
 
@@ -131,13 +156,46 @@ defmodule Yog.Generator.Random do
   - Comparative studies
   """
   @spec erdos_renyi_gnm(integer(), integer()) :: Yog.graph()
-  defdelegate erdos_renyi_gnm(n, m), to: :yog@generator@random
+  def erdos_renyi_gnm(n, m), do: erdos_renyi_gnm_with_type(n, m, :undirected)
 
   @doc """
   Generates an Erdős-Rényi G(n, m) graph with specified graph type.
   """
   @spec erdos_renyi_gnm_with_type(integer(), integer(), Yog.graph_type()) :: Yog.graph()
-  defdelegate erdos_renyi_gnm_with_type(n, m, graph_type), to: :yog@generator@random
+  def erdos_renyi_gnm_with_type(n, m, graph_type) when n > 0 and m >= 0 do
+    base = Yog.new(graph_type)
+
+    graph =
+      Enum.reduce(0..(n - 1), base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # Generate all possible edges
+    all_pairs =
+      case graph_type do
+        :undirected ->
+          for i <- 0..(n - 1), j <- (i + 1)..(n - 1)//1, i < j, do: {i, j}
+
+        :directed ->
+          for i <- 0..(n - 1), j <- 0..(n - 1)//1, i != j, do: {i, j}
+      end
+
+    # Clamp m to max possible edges
+    max_edges = length(all_pairs)
+    actual_m = min(m, max_edges)
+
+    # Shuffle and take first m
+    selected_edges =
+      all_pairs
+      |> Enum.shuffle()
+      |> Enum.take(actual_m)
+
+    Enum.reduce(selected_edges, graph, fn {from, to}, g ->
+      Yog.add_edge!(g, from, to, 1)
+    end)
+  end
+
+  def erdos_renyi_gnm_with_type(_n, _m, _graph_type), do: Yog.new(:undirected)
 
   # ============= Barabási-Albert =============
 
@@ -169,13 +227,93 @@ defmodule Yog.Generator.Random do
   - Biological networks
   """
   @spec barabasi_albert(integer(), integer()) :: Yog.graph()
-  defdelegate barabasi_albert(n, m), to: :yog@generator@random
+  def barabasi_albert(n, m), do: barabasi_albert_with_type(n, m, :undirected)
 
   @doc """
   Generates a Barabási-Albert graph with specified graph type.
   """
   @spec barabasi_albert_with_type(integer(), integer(), Yog.graph_type()) :: Yog.graph()
-  defdelegate barabasi_albert_with_type(n, m, graph_type), to: :yog@generator@random
+  def barabasi_albert_with_type(n, m, graph_type) when n >= 1 and m >= 1 and m < n do
+    base = Yog.new(graph_type)
+
+    # Start with a small complete graph of m nodes
+    initial_nodes = min(m, n)
+
+    graph =
+      Enum.reduce(0..(initial_nodes - 1), base, fn i, g ->
+        g = Yog.add_node(g, i, nil)
+        # Connect to all previous nodes
+        Enum.reduce(0..(i - 1)//1, g, fn j, acc ->
+          acc = Yog.add_edge!(acc, i, j, 1)
+          if graph_type == :directed, do: Yog.add_edge!(acc, j, i, 1), else: acc
+        end)
+      end)
+
+    # Add remaining nodes with preferential attachment
+    Enum.reduce(initial_nodes..(n - 1), graph, fn new_node, g ->
+      g = Yog.add_node(g, new_node, nil)
+
+      # Get current nodes and their degrees
+      existing_nodes = 0..(new_node - 1)
+
+      if Enum.empty?(existing_nodes) do
+        g
+      else
+        # Calculate degrees (for undirected, count all connections)
+        degrees =
+          Enum.map(existing_nodes, fn node ->
+            neighbors = length(Yog.neighbors(g, node))
+            {node, max(neighbors, 1)}
+          end)
+
+        total_degree = Enum.sum(Enum.map(degrees, &elem(&1, 1)))
+
+        # Preferential attachment: select m nodes
+        targets = select_preferential(degrees, total_degree, m, [])
+
+        Enum.reduce(targets, g, fn target, acc ->
+          acc = Yog.add_edge!(acc, new_node, target, 1)
+          if graph_type == :directed, do: Yog.add_edge!(acc, target, new_node, 1), else: acc
+        end)
+      end
+    end)
+  end
+
+  def barabasi_albert_with_type(n, _m, _graph_type) when n >= 1 do
+    # m >= n case: just return n isolated nodes
+    base = Yog.new(:undirected)
+
+    Enum.reduce(0..(n - 1), base, fn i, g ->
+      Yog.add_node(g, i, nil)
+    end)
+  end
+
+  def barabasi_albert_with_type(_n, _m, _graph_type), do: Yog.new(:undirected)
+
+  # Select m nodes with probability proportional to their degree
+  defp select_preferential(_degrees, _total, 0, acc), do: Enum.uniq(acc)
+
+  defp select_preferential(degrees, total, remaining, acc) when remaining > 0 do
+    pick = :rand.uniform() * total
+
+    {node, _} =
+      Enum.reduce_while(degrees, {nil, 0.0}, fn {n, deg}, {_, cum} ->
+        new_cum = cum + deg
+
+        if new_cum >= pick do
+          {:halt, {n, new_cum}}
+        else
+          {:cont, {n, new_cum}}
+        end
+      end)
+
+    # Retry if we picked a duplicate (simple approach)
+    if node in acc do
+      select_preferential(degrees, total, remaining, acc)
+    else
+      select_preferential(degrees, total, remaining - 1, [node | acc])
+    end
+  end
 
   # ============= Watts-Strogatz =============
 
@@ -207,13 +345,87 @@ defmodule Yog.Generator.Random do
   - Power grids
   """
   @spec watts_strogatz(integer(), integer(), float()) :: Yog.graph()
-  defdelegate watts_strogatz(n, k, p), to: :yog@generator@random
+  def watts_strogatz(n, k, p), do: watts_strogatz_with_type(n, k, p, :undirected)
 
   @doc """
   Generates a Watts-Strogatz graph with specified graph type.
   """
   @spec watts_strogatz_with_type(integer(), integer(), float(), Yog.graph_type()) :: Yog.graph()
-  defdelegate watts_strogatz_with_type(n, k, p, graph_type), to: :yog@generator@random
+  def watts_strogatz_with_type(n, k, p, graph_type)
+      when n > k and k >= 2 and p >= 0.0 and p <= 1.0 do
+    base = Yog.new(graph_type)
+
+    # Add all nodes
+    graph =
+      Enum.reduce(0..(n - 1)//1, base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # k must be even for the ring lattice construction
+    k_half = div(k, 2)
+
+    # Build ring lattice: each node connects to k/2 neighbors on each side
+    # For undirected graphs, we create edges in both directions (each node connects forward)
+    # For directed graphs, we create edges in one direction only
+    lattice_edges =
+      for i <- 0..(n - 1)//1,
+          offset <- 1..k_half//1,
+          do: {i, rem(i + offset, n)}
+
+    # For undirected, also add the reverse edges to ensure each node has k neighbors
+    all_lattice_edges =
+      case graph_type do
+        :undirected ->
+          reverse_edges = Enum.map(lattice_edges, fn {i, j} -> {j, i} end)
+          lattice_edges ++ reverse_edges
+
+        :directed ->
+          lattice_edges
+      end
+
+    # Rewire edges with probability p
+    {final_edges, _} =
+      Enum.reduce(all_lattice_edges, {[], MapSet.new()}, fn {from, to}, {edges, used} ->
+        edge_key =
+          case graph_type do
+            :undirected -> {min(from, to), max(from, to)}
+            :directed -> {from, to}
+          end
+
+        if MapSet.member?(used, edge_key) do
+          # Skip duplicate edges
+          {edges, used}
+        else
+          new_used = MapSet.put(used, edge_key)
+
+          if :rand.uniform() <= p do
+            # Rewire: connect to a random node
+            candidates =
+              0..(n - 1)
+              |> Enum.filter(fn x ->
+                x != from and
+                  not MapSet.member?(used, {min(from, x), max(from, x)})
+              end)
+
+            if candidates == [] do
+              {[{from, to} | edges], new_used}
+            else
+              new_to = Enum.random(candidates)
+              new_edge_key = {min(from, new_to), max(from, new_to)}
+              {[{from, new_to} | edges], MapSet.put(new_used, new_edge_key)}
+            end
+          else
+            {[{from, to} | edges], new_used}
+          end
+        end
+      end)
+
+    Enum.reduce(final_edges, graph, fn {from, to}, g ->
+      Yog.add_edge!(g, from, to, 1)
+    end)
+  end
+
+  def watts_strogatz_with_type(_n, _k, _p, _graph_type), do: Yog.new(:undirected)
 
   # ============= Random Tree =============
 
@@ -246,11 +458,27 @@ defmodule Yog.Generator.Random do
   - Network design
   """
   @spec random_tree(integer()) :: Yog.graph()
-  defdelegate random_tree(n), to: :yog@generator@random
+  def random_tree(n), do: random_tree_with_type(n, :undirected)
 
   @doc """
   Generates a random tree with specified graph type.
   """
   @spec random_tree_with_type(integer(), Yog.graph_type()) :: Yog.graph()
-  defdelegate random_tree_with_type(n, graph_type), to: :yog@generator@random
+  def random_tree_with_type(n, _graph_type) when n <= 0, do: Yog.new(:undirected)
+  def random_tree_with_type(1, graph_type), do: Yog.new(graph_type) |> Yog.add_node(0, nil)
+
+  def random_tree_with_type(n, graph_type) do
+    base = Yog.new(graph_type)
+
+    # Start with node 0
+    graph = Yog.add_node(base, 0, nil)
+
+    # Add remaining nodes, each connecting to a random existing node
+    Enum.reduce(1..(n - 1), graph, fn new_node, g ->
+      g = Yog.add_node(g, new_node, nil)
+      parent = :rand.uniform(new_node) - 1
+      g = Yog.add_edge!(g, new_node, parent, 1)
+      if graph_type == :directed, do: Yog.add_edge!(g, parent, new_node, 1), else: g
+    end)
+  end
 end

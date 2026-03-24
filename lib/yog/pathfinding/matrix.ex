@@ -53,7 +53,7 @@ defmodule Yog.Pathfinding.Matrix do
       ...> |> Yog.add_edge!(from: 3, to: 4, with: 2)
       iex> pois = [1, 2, 4]  # Only care about these 3 nodes
       iex> {:ok, distances} = Yog.Pathfinding.Matrix.distance_matrix(
-      ...>   graph, pois, 0, &(&1 + &2), &Integer.compare/2
+      ...>   graph, pois, 0, &(&1 + &2), &Yog.Utils.compare/2
       ...> )
       iex> # Distance from 1 to 4 should be 1->2->3->4 = 7
       ...> distances[{1, 4}]
@@ -68,6 +68,11 @@ defmodule Yog.Pathfinding.Matrix do
   - See `Yog.Pathfinding.Johnson` for sparse all-pairs with negative weights (O(V² log V + VE))
   - See `Yog.Pathfinding.Dijkstra` for single-source algorithm details (O((V+E) log V))
   """
+
+  alias Yog.Model
+  alias Yog.Pathfinding.Dijkstra
+  alias Yog.Pathfinding.FloydWarshall
+  alias Yog.Pathfinding.Johnson
 
   @typedoc """
   Distance matrix: map from `{from, to}` tuple to distance.
@@ -105,7 +110,7 @@ defmodule Yog.Pathfinding.Matrix do
       ...> |> Yog.add_edge!(from: 1, to: 2, with: 4)
       ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
       iex> {:ok, distances} = Yog.Pathfinding.Matrix.distance_matrix(
-      ...>   graph, [1, 3], 0, &(&1 + &2), &Integer.compare/2
+      ...>   graph, [1, 3], 0, &(&1 + &2), &Yog.Utils.compare/2
       ...> )
       iex> distances[{1, 3}]
       5
@@ -118,7 +123,7 @@ defmodule Yog.Pathfinding.Matrix do
       ...> |> Yog.add_edge!(from: 1, to: 2, with: 4)
       ...> |> Yog.add_edge!(from: 2, to: 3, with: -2)
       iex> {:ok, distances} = Yog.Pathfinding.Matrix.distance_matrix(
-      ...>   neg_graph, [1, 3], 0, &(&1 + &2), &Integer.compare/2, &(&1 - &2)
+      ...>   neg_graph, [1, 3], 0, &(&1 + &2), &Yog.Utils.compare/2, &(&1 - &2)
       ...> )
       iex> distances[{1, 3}]
       2
@@ -132,30 +137,95 @@ defmodule Yog.Pathfinding.Matrix do
           (any(), any() -> any()) | nil
         ) :: {:ok, distance_matrix()} | {:error, :negative_cycle}
   def distance_matrix(graph, points_of_interest, zero, add, compare, subtract \\ nil) do
-    subtract_opt =
-      if subtract do
-        {:some, subtract}
-      else
-        :none
+    poi_set = MapSet.new(points_of_interest)
+    node_count = Model.node_count(graph)
+    edge_count = Model.edge_count(graph)
+
+    # Check if any POI is not in the graph
+    all_nodes = Model.all_nodes(graph)
+    all_node_set = MapSet.new(all_nodes)
+
+    _check_pois =
+      if not all_in_set?(poi_set, all_node_set) do
+        # Some POIs don't exist in graph - still compute for valid ones
+        :ok
       end
 
-    case :yog@pathfinding@matrix.distance_matrix(
-           graph,
-           points_of_interest,
-           zero,
-           add,
-           subtract_opt,
-           compare
-         ) do
-      {:ok, gleam_dict} -> {:ok, wrap_distance_matrix(gleam_dict)}
-      {:error, _} -> {:error, :negative_cycle}
+    if subtract != nil do
+      # Negative weight support needed: choose between Johnson's and Floyd-Warshall
+      # Johnson's is better for sparse graphs (E < V²/4)
+      if edge_count < div(node_count * node_count, 4) do
+        run_johnson(graph, points_of_interest, poi_set, zero, add, subtract, compare)
+      else
+        run_floyd_warshall(graph, points_of_interest, poi_set, zero, add, compare)
+      end
+    else
+      # Non-negative weights: choose between Dijkstra × P and Floyd-Warshall
+      # Dijkstra is better when few POIs (P ≤ V/3)
+      poi_count = length(points_of_interest)
+
+      if poi_count <= div(node_count, 3) do
+        run_dijkstra_multi(graph, points_of_interest, poi_set, zero, add, compare)
+      else
+        run_floyd_warshall(graph, points_of_interest, poi_set, zero, add, compare)
+      end
     end
   end
 
-  # Private helper to wrap Gleam distance matrix
-  defp wrap_distance_matrix(gleam_dict) do
-    gleam_dict
-    |> :gleam@dict.to_list()
-    |> Map.new()
+  # Run Johnson's algorithm and filter to POIs
+  defp run_johnson(graph, _points_of_interest, poi_set, zero, add, subtract, compare) do
+    case Johnson.johnson(graph, zero, add, subtract, compare) do
+      {:ok, all_distances} ->
+        {:ok, filter_to_pois(all_distances, poi_set)}
+
+      {:error, :negative_cycle} ->
+        {:error, :negative_cycle}
+    end
+  end
+
+  # Run Floyd-Warshall algorithm and filter to POIs
+  defp run_floyd_warshall(graph, _points_of_interest, poi_set, zero, add, compare) do
+    case FloydWarshall.floyd_warshall(graph, zero, add, compare) do
+      {:ok, all_distances} ->
+        {:ok, filter_to_pois(all_distances, poi_set)}
+
+      {:error, :negative_cycle} ->
+        {:error, :negative_cycle}
+    end
+  end
+
+  # Run Dijkstra from each POI and collect results
+  defp run_dijkstra_multi(graph, points_of_interest, _poi_set, zero, add, compare) do
+    # Run Dijkstra from each POI
+    results =
+      Enum.reduce(points_of_interest, %{}, fn from, acc ->
+        distances = Dijkstra.single_source_distances(graph, from, zero, add, compare)
+
+        # Add entries for this source to all reachable POIs
+        Enum.reduce(points_of_interest, acc, fn to, inner_acc ->
+          case Map.fetch(distances, to) do
+            {:ok, dist} -> Map.put(inner_acc, {from, to}, dist)
+            :error -> inner_acc
+          end
+        end)
+      end)
+
+    {:ok, results}
+  end
+
+  # Filter a full distance matrix to only include POI pairs
+  defp filter_to_pois(all_distances, poi_set) do
+    Enum.reduce(all_distances, %{}, fn {{from, to}, dist}, acc ->
+      if MapSet.member?(poi_set, from) and MapSet.member?(poi_set, to) do
+        Map.put(acc, {from, to}, dist)
+      else
+        acc
+      end
+    end)
+  end
+
+  # Check if all elements of set1 are in set2
+  defp all_in_set?(set1, set2) do
+    MapSet.subset?(set1, set2)
   end
 end

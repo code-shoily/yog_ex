@@ -37,10 +37,16 @@ defmodule Yog.Builder.Grid do
   - `avoiding/1` - Allow movement except into specific cell values
   - `always/0` - Always allow movement
   - `including/1` - Allow movement into any of the specified values
+
+  > **Migration Note:** This module was ported from Gleam to pure Elixir in v0.53.0.
+  > The API remains unchanged.
   """
 
-  @typedoc "A Grid builder containing the graph structure and grid metadata."
-  @type grid :: term()
+  alias Yog.Model
+  alias Yog.Builder.GridGraph
+
+  @typedoc "Grid builder type: {:grid_builder, graph, rows, cols}"
+  @type grid :: {:grid_builder, Yog.graph(), integer(), integer()}
 
   @typedoc "Topology is a list of {row_delta, col_delta} movement offsets."
   @type topology :: [{integer(), integer()}]
@@ -64,11 +70,13 @@ defmodule Yog.Builder.Grid do
 
       iex> maze = [[".", ".", "#"], [".", "#", "."], [".", ".", "."]]
       iex> grid = Yog.Builder.Grid.from_2d_list(maze, :undirected, Yog.Builder.Grid.walkable("."))
-      iex> is_tuple(grid)
+      iex> is_struct(grid, Yog.Builder.GridGraph)
       true
   """
-  @spec from_2d_list([[term()]], Yog.graph_type(), (term(), term() -> boolean())) :: grid()
-  defdelegate from_2d_list(grid_data, graph_type, can_move_fn), to: :yog@builder@grid
+  @spec from_2d_list([[term()]], Yog.graph_type(), (term(), term() -> boolean())) :: GridGraph.t()
+  def from_2d_list(grid_data, graph_type, can_move_fn) do
+    from_2d_list_with_topology(grid_data, graph_type, rook(), can_move_fn)
+  end
 
   @doc """
   Creates a grid graph using a custom movement topology.
@@ -86,20 +94,87 @@ defmodule Yog.Builder.Grid do
       ...>   Yog.Builder.Grid.queen(),
       ...>   Yog.Builder.Grid.always()
       ...> )
-      iex> is_tuple(grid)
+      iex> is_struct(grid, Yog.Builder.GridGraph)
       true
   """
   @spec from_2d_list_with_topology([[term()]], Yog.graph_type(), topology(), (term(), term() ->
                                                                                 boolean())) ::
-          grid()
-  defdelegate from_2d_list_with_topology(grid_data, graph_type, topology, can_move_fn),
-    to: :yog@builder@grid
+          GridGraph.t()
+  def from_2d_list_with_topology(grid_data, graph_type, topology, can_move_fn) do
+    rows = length(grid_data)
+
+    cols =
+      case grid_data do
+        [first_row | _] -> length(first_row)
+        [] -> 0
+      end
+
+    # Flatten grid data into a list of {row, col, cell} tuples
+    cells =
+      grid_data
+      |> Enum.with_index()
+      |> Enum.flat_map(fn {row, row_idx} ->
+        row
+        |> Enum.with_index()
+        |> Enum.map(fn {cell, col_idx} ->
+          {row_idx, col_idx, cell}
+        end)
+      end)
+
+    # Create graph with all nodes
+    graph_with_nodes =
+      Enum.reduce(cells, Model.new(graph_type), fn {row, col, data}, g ->
+        id = coord_to_id(row, col, cols)
+        Model.add_node(g, id, data)
+      end)
+
+    # Add edges based on topology
+    graph_with_edges =
+      Enum.reduce(cells, graph_with_nodes, fn {row, col, from_data}, g ->
+        from_id = coord_to_id(row, col, cols)
+
+        Enum.reduce(topology, g, fn {d_row, d_col}, acc_g ->
+          n_row = row + d_row
+          n_col = col + d_col
+
+          if n_row >= 0 && n_row < rows && n_col >= 0 && n_col < cols do
+            to_id = coord_to_id(n_row, n_col, cols)
+            to_data = Model.node(acc_g, to_id)
+
+            if to_data != nil && can_move_fn.(from_data, to_data) do
+              case Model.add_edge(acc_g, from_id, to_id, 1) do
+                {:ok, new_g} -> new_g
+                {:error, _} -> acc_g
+              end
+            else
+              acc_g
+            end
+          else
+            acc_g
+          end
+        end)
+      end)
+
+    GridGraph.new(graph_with_edges, rows, cols, :rook)
+  end
 
   @doc """
   Converts a grid builder into a usable Graph for algorithms.
   """
-  @spec to_graph(grid()) :: Yog.graph()
-  defdelegate to_graph(grid), to: :yog@builder@grid
+  @spec to_graph(GridGraph.t() | grid() | {:grid, Yog.graph(), integer(), integer()}) ::
+          Yog.graph()
+  def to_graph(%GridGraph{} = grid) do
+    GridGraph.to_graph(grid)
+  end
+
+  def to_graph({:grid_builder, graph, _rows, _cols}) do
+    graph
+  end
+
+  # Support legacy Gleam format
+  def to_graph({:grid, graph, _rows, _cols}) do
+    graph
+  end
 
   # ============= Cell Access =============
 
@@ -108,8 +183,39 @@ defmodule Yog.Builder.Grid do
 
   Returns `{:ok, cell_data}` or `{:error, nil}` if out of bounds.
   """
-  @spec get_cell(grid(), integer(), integer()) :: {:ok, term()} | {:error, nil}
-  defdelegate get_cell(grid, row, col), to: :yog@builder@grid
+  @spec get_cell(
+          GridGraph.t() | grid() | {:grid, Yog.graph(), integer(), integer()},
+          integer(),
+          integer()
+        ) ::
+          {:ok, term()} | {:error, nil}
+  def get_cell(%GridGraph{} = grid, row, col) do
+    GridGraph.get_cell(grid, row, col)
+  end
+
+  def get_cell({:grid_builder, graph, rows, cols}, row, col) do
+    do_get_cell(graph, rows, cols, row, col)
+  end
+
+  # Support legacy Gleam format
+  def get_cell({:grid, graph, rows, cols}, row, col) do
+    do_get_cell(graph, rows, cols, row, col)
+  end
+
+  defp do_get_cell(graph, rows, cols, row, col) do
+    if row >= 0 && row < rows && col >= 0 && col < cols do
+      id = coord_to_id(row, col, cols)
+      data = Model.node(graph, id)
+
+      if data != nil do
+        {:ok, data}
+      else
+        {:error, nil}
+      end
+    else
+      {:error, nil}
+    end
+  end
 
   @doc """
   Finds a node in the grid where the cell data matches a predicate.
@@ -123,8 +229,38 @@ defmodule Yog.Builder.Grid do
       iex> is_integer(start_id)
       true
   """
-  @spec find_node(grid(), (term() -> boolean())) :: {:ok, Yog.node_id()} | {:error, nil}
-  defdelegate find_node(grid, predicate), to: :yog@builder@grid
+  @spec find_node(GridGraph.t() | grid() | {:grid, Yog.graph(), integer(), integer()}, (term() ->
+                                                                                          boolean())) ::
+          {:ok, Yog.node_id()} | {:error, nil}
+  def find_node(%GridGraph{graph: graph, rows: rows, cols: cols}, predicate) do
+    do_find_node(graph, rows, cols, predicate)
+  end
+
+  def find_node({:grid_builder, graph, rows, cols}, predicate) do
+    do_find_node(graph, rows, cols, predicate)
+  end
+
+  # Support legacy Gleam format
+  def find_node({:grid, graph, rows, cols}, predicate) do
+    do_find_node(graph, rows, cols, predicate)
+  end
+
+  defp do_find_node(graph, rows, cols, predicate) do
+    max_id = rows * cols - 1
+
+    result =
+      Enum.find_value(0..max_id, fn id ->
+        case Model.node(graph, id) do
+          nil -> nil
+          data -> if predicate.(data), do: {:ok, id}, else: nil
+        end
+      end)
+
+    case result do
+      {:ok, id} -> {:ok, id}
+      nil -> {:error, nil}
+    end
+  end
 
   # ============= Coordinate Conversion =============
 
@@ -137,7 +273,9 @@ defmodule Yog.Builder.Grid do
       23
   """
   @spec coord_to_id(integer(), integer(), integer()) :: Yog.node_id()
-  defdelegate coord_to_id(row, col, cols), to: :yog@builder@grid
+  def coord_to_id(row, col, cols) do
+    row * cols + col
+  end
 
   @doc """
   Converts a node ID back to grid coordinates `{row, col}`.
@@ -148,7 +286,9 @@ defmodule Yog.Builder.Grid do
       {2, 3}
   """
   @spec id_to_coord(Yog.node_id(), integer()) :: {integer(), integer()}
-  defdelegate id_to_coord(id, cols), to: :yog@builder@grid
+  def id_to_coord(id, cols) do
+    {div(id, cols), rem(id, cols)}
+  end
 
   # ============= Distance Heuristics =============
 
@@ -162,7 +302,15 @@ defmodule Yog.Builder.Grid do
       distance = |row1 - row2| + |col1 - col2|
   """
   @spec manhattan_distance(Yog.node_id(), Yog.node_id(), integer()) :: integer()
-  defdelegate manhattan_distance(from_id, to_id, cols), to: :yog@builder@grid
+  def manhattan_distance(from_id, to_id, cols) do
+    {from_row, from_col} = id_to_coord(from_id, cols)
+    {to_row, to_col} = id_to_coord(to_id, cols)
+
+    row_diff = abs(from_row - to_row)
+    col_diff = abs(from_col - to_col)
+
+    row_diff + col_diff
+  end
 
   @doc """
   Calculates the Chebyshev distance between two grid node IDs.
@@ -174,7 +322,15 @@ defmodule Yog.Builder.Grid do
       distance = max(|row1 - row2|, |col1 - col2|)
   """
   @spec chebyshev_distance(Yog.node_id(), Yog.node_id(), integer()) :: integer()
-  defdelegate chebyshev_distance(from_id, to_id, cols), to: :yog@builder@grid
+  def chebyshev_distance(from_id, to_id, cols) do
+    {from_row, from_col} = id_to_coord(from_id, cols)
+    {to_row, to_col} = id_to_coord(to_id, cols)
+
+    row_diff = abs(from_row - to_row)
+    col_diff = abs(from_col - to_col)
+
+    max(row_diff, col_diff)
+  end
 
   @doc """
   Calculates the Octile distance between two grid node IDs.
@@ -189,7 +345,19 @@ defmodule Yog.Builder.Grid do
       distance = max(dx, dy) + (sqrt(2) - 1) * min(dx, dy)
   """
   @spec octile_distance(Yog.node_id(), Yog.node_id(), integer()) :: float()
-  defdelegate octile_distance(from_id, to_id, cols), to: :yog@builder@grid
+  def octile_distance(from_id, to_id, cols) do
+    {from_row, from_col} = id_to_coord(from_id, cols)
+    {to_row, to_col} = id_to_coord(to_id, cols)
+
+    row_diff = abs(from_row - to_row)
+    col_diff = abs(from_col - to_col)
+
+    min_d = min(row_diff, col_diff)
+    max_d = max(row_diff, col_diff)
+
+    # √2 ≈ 1.414213562373095
+    min_d * 1.414213562373095 + (max_d - min_d)
+  end
 
   # ============= Topology Presets =============
 
@@ -199,7 +367,9 @@ defmodule Yog.Builder.Grid do
   Default for `from_2d_list/3`. Movement offsets: `{-1,0}, {1,0}, {0,-1}, {0,1}`
   """
   @spec rook() :: topology()
-  defdelegate rook(), to: :yog@builder@grid
+  def rook do
+    [{-1, 0}, {1, 0}, {0, -1}, {0, 1}]
+  end
 
   @doc """
   4-way diagonal movement.
@@ -207,7 +377,9 @@ defmodule Yog.Builder.Grid do
   Movement offsets: `{-1,-1}, {-1,1}, {1,-1}, {1,1}`
   """
   @spec bishop() :: topology()
-  defdelegate bishop(), to: :yog@builder@grid
+  def bishop do
+    [{-1, -1}, {-1, 1}, {1, -1}, {1, 1}]
+  end
 
   @doc """
   8-way movement (cardinal + diagonal).
@@ -215,7 +387,18 @@ defmodule Yog.Builder.Grid do
   Combines `rook/0` and `bishop/0`. Use with appropriate distance heuristic.
   """
   @spec queen() :: topology()
-  defdelegate queen(), to: :yog@builder@grid
+  def queen do
+    [
+      {-1, -1},
+      {-1, 0},
+      {-1, 1},
+      {0, -1},
+      {0, 1},
+      {1, -1},
+      {1, 0},
+      {1, 1}
+    ]
+  end
 
   @doc """
   L-shaped knight jumps in all 8 orientations.
@@ -223,7 +406,18 @@ defmodule Yog.Builder.Grid do
   Chess knight movement: `{-2,-1}, {-2,1}, {-1,-2}, {-1,2}, {1,-2}, {1,2}, {2,-1}, {2,1}`
   """
   @spec knight() :: topology()
-  defdelegate knight(), to: :yog@builder@grid
+  def knight do
+    [
+      {-2, -1},
+      {-2, 1},
+      {-1, -2},
+      {-1, 2},
+      {1, -2},
+      {1, 2},
+      {2, -1},
+      {2, 1}
+    ]
+  end
 
   # ============= Movement Predicates =============
 
@@ -239,7 +433,9 @@ defmodule Yog.Builder.Grid do
       false
   """
   @spec walkable(term()) :: (term(), term() -> boolean())
-  defdelegate walkable(valid_value), to: :yog@builder@grid
+  def walkable(valid_value) do
+    fn from, to -> from == valid_value && to == valid_value end
+  end
 
   @doc """
   Creates a predicate that allows movement into any cell except `wall_value`.
@@ -253,7 +449,9 @@ defmodule Yog.Builder.Grid do
       false
   """
   @spec avoiding(term()) :: (term(), term() -> boolean())
-  defdelegate avoiding(wall_value), to: :yog@builder@grid
+  def avoiding(wall_value) do
+    fn from, to -> from != wall_value && to != wall_value end
+  end
 
   @doc """
   Creates a predicate that allows movement into any of the specified values.
@@ -267,7 +465,9 @@ defmodule Yog.Builder.Grid do
       false
   """
   @spec including([term()]) :: (term(), term() -> boolean())
-  defdelegate including(valid_values), to: :yog@builder@grid
+  def including(valid_values) do
+    fn from, to -> from in valid_values && to in valid_values end
+  end
 
   @doc """
   Always allows movement between adjacent cells.
@@ -279,5 +479,7 @@ defmodule Yog.Builder.Grid do
       true
   """
   @spec always() :: (term(), term() -> boolean())
-  defdelegate always(), to: :yog@builder@grid
+  def always do
+    fn _from, _to -> true end
+  end
 end

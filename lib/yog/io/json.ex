@@ -31,6 +31,8 @@ defmodule Yog.IO.JSON do
       true
   """
 
+  alias Yog.Model
+
   @doc """
   Creates default export options for String node and edge data.
   """
@@ -187,9 +189,9 @@ defmodule Yog.IO.JSON do
   end
 
   defp to_generic_format(graph, node_ser, edge_ser, include_metadata?) do
-    {:graph, type, nodes_map, _, _} = graph
+    %Yog.Graph{kind: type, nodes: nodes_map} = graph
     graph_type = if type == :directed, do: "directed", else: "undirected"
-    edges = get_all_edges(graph)
+    edges = Model.all_edges(graph)
 
     nodes_json =
       Enum.map(nodes_map, fn {id, data} ->
@@ -224,9 +226,9 @@ defmodule Yog.IO.JSON do
   end
 
   defp to_networkx_format(graph, node_ser, edge_ser, include_metadata?) do
-    {:graph, type, nodes_map, _, _} = graph
+    %Yog.Graph{kind: type, nodes: nodes_map} = graph
     directed = type == :directed
-    edges = get_all_edges(graph)
+    edges = Model.all_edges(graph)
 
     nodes_json =
       Enum.map(nodes_map, fn {id, data} ->
@@ -261,8 +263,8 @@ defmodule Yog.IO.JSON do
   end
 
   defp to_d3_format(graph, node_ser, edge_ser) do
-    {:graph, _, nodes_map, _, _} = graph
-    edges = get_all_edges(graph)
+    %Yog.Graph{nodes: nodes_map} = graph
+    edges = Model.all_edges(graph)
 
     nodes_json =
       Enum.map(nodes_map, fn {id, data} ->
@@ -288,8 +290,8 @@ defmodule Yog.IO.JSON do
   end
 
   defp to_cytoscape_format(graph, node_ser, edge_ser) do
-    {:graph, _, nodes_map, _, _} = graph
-    edges = get_all_edges(graph)
+    %Yog.Graph{nodes: nodes_map} = graph
+    edges = Model.all_edges(graph)
 
     nodes_elements =
       Enum.map(nodes_map, fn {id, data} ->
@@ -318,8 +320,8 @@ defmodule Yog.IO.JSON do
   end
 
   defp to_visjs_format(graph, node_ser, edge_ser) do
-    {:graph, _, nodes_map, _, _} = graph
-    edges = get_all_edges(graph)
+    %Yog.Graph{nodes: nodes_map} = graph
+    edges = Model.all_edges(graph)
 
     nodes_json =
       Enum.map(nodes_map, fn {id, data} ->
@@ -392,32 +394,13 @@ defmodule Yog.IO.JSON do
   end
 
   defp build_metadata(graph) do
-    {:graph, type, _, _, _} = graph
+    %Yog.Graph{kind: type} = graph
 
     %{
       node_count: Yog.Model.order(graph),
-      edge_count: length(get_all_edges(graph)),
+      edge_count: length(Model.all_edges(graph)),
       directed: type == :directed
     }
-  end
-
-  # Extract all edges from the graph
-  defp get_all_edges({:graph, type, _, out_edges, _}) do
-    if type == :directed do
-      # For directed graphs, just collect from out_edges
-      for {from, dests} <- out_edges,
-          {to, weight} <- dests do
-        {from, to, weight}
-      end
-    else
-      # For undirected graphs, edges appear in both directions
-      # We need to deduplicate by only taking edges where from <= to
-      for {from, dests} <- out_edges,
-          {to, weight} <- dests,
-          from <= to do
-        {from, to, weight}
-      end
-    end
   end
 
   defp build_multi_metadata(graph) do

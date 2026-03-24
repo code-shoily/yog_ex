@@ -30,7 +30,7 @@ defmodule GpsNavigation do
       end
     end
 
-    result = Yog.Pathfinding.astar(
+    result = Yog.Pathfinding.AStar.astar(
       in: road_network,
       from: 1,
       to: 3,

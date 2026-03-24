@@ -8,7 +8,7 @@ defmodule Yog.Generator.RandomTest do
 
   # Helper to count edges in an undirected graph
   defp edge_count(graph) do
-    {:graph, _type, _nodes, out_edges, _in_edges} = graph
+    %Yog.Graph{out_edges: out_edges} = graph
 
     # For undirected graphs, each edge appears twice (once in each direction)
     # So we count all entries and divide by 2

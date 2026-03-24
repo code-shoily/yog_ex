@@ -25,7 +25,7 @@ defmodule CityDistanceMatrix do
 
     IO.puts("--- All-Pairs Shortest Paths (Floyd-Warshall) ---")
 
-    case Yog.Pathfinding.floyd_warshall(
+    case Yog.Pathfinding.FloydWarshall.floyd_warshall(
       in: graph,
       zero: 0,
       add: &(&1 + &2),

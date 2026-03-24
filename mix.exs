@@ -1,7 +1,7 @@
 defmodule YogEx.MixProject do
   use Mix.Project
 
-  @version "0.52.4"
+  @version "1.0.0"
   @source_url "https://github.com/code-shoily/yog_ex"
 
   def project do
@@ -13,7 +13,7 @@ defmodule YogEx.MixProject do
       deps: deps(),
 
       # Hex
-      description: "Elixir wrapper for Yog - A comprehensive graph algorithm library",
+      description: "A comprehensive pure Elixir graph algorithm library",
       package: package(),
 
       # Docs
@@ -23,15 +23,12 @@ defmodule YogEx.MixProject do
 
       # Test Coverage
       test_coverage: [tool: ExCoveralls],
-      # Suppress warnings for Erlang and Gleam modules
+      # Suppress warnings for Erlang modules
       xref: [
         exclude: [
           # Erlang stdlib modules (xmerl)
           :xmerl_scan,
-          :xmerl_xpath,
-
-          # Gleam yog modules - use regex pattern
-          ~r/^:yog@.*/
+          :xmerl_xpath
         ]
       ]
     ]
@@ -59,16 +56,12 @@ defmodule YogEx.MixProject do
 
   defp deps(:publish) do
     [
-      {:yog, "~> 5.1"},
-      {:gleam_stdlib, "~> 0.69"},
       {:ex_doc, "~> 0.40", only: :dev, runtime: false}
     ]
   end
 
   defp deps(_) do
     [
-      {:yog, "~> 5.1", manager: :rebar3},
-      {:gleam_stdlib, "~> 0.69", manager: :rebar3, override: true},
       {:ex_doc, "~> 0.40", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.18", only: :test}
@@ -82,8 +75,7 @@ defmodule YogEx.MixProject do
       licenses: ["Apache-2.0"],
       links: %{
         "GitHub" => @source_url,
-        "Changelog" => @source_url <> "/blob/main/CHANGELOG.md",
-        "Yog (Gleam)" => "https://hexdocs.pm/yog"
+        "Changelog" => @source_url <> "/blob/main/CHANGELOG.md"
       }
     ]
   end

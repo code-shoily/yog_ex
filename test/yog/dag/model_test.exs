@@ -46,7 +46,7 @@ defmodule Yog.DAG.ModelTest do
     test "to_graph/1 unwraps DAG to graph" do
       dag = Model.new(:directed)
       graph = Model.to_graph(dag)
-      assert is_tuple(graph)
+      assert is_struct(graph, Yog.Graph)
     end
   end
 
