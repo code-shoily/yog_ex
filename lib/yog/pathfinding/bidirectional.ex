@@ -319,9 +319,9 @@ defmodule Yog.Pathfinding.Bidirectional do
     queue_fwd = [{from, [from]}]
     # Queue from goal: {node, path_from_goal}
     queue_bwd = [{to, [to]}]
-    # Visited from start: node => path
+    # Visited from start: node => path (reversed: [node...from])
     visited_fwd = %{from => [from]}
-    # Visited from goal: node => path
+    # Visited from goal: node => path (reversed: [node...to])
     visited_bwd = %{to => [to]}
 
     do_bfs_step(graph, queue_fwd, queue_bwd, visited_fwd, visited_bwd)
@@ -351,10 +351,10 @@ defmodule Yog.Pathfinding.Bidirectional do
 
     if intersection do
       {_node, path_fwd, path_bwd} = intersection
-      # path_fwd goes from start to meeting point
-      # path_bwd goes from goal to meeting point
-      # Combine: path_fwd + reverse(path_bwd without first element)
-      full_path = path_fwd ++ tl(Enum.reverse(path_bwd))
+      # path_fwd goes from meeting point back to start [node...from]
+      # path_bwd goes from meeting point back to goal [node...to]
+      # Combined: reverse(path_fwd) + (path_bwd without first element)
+      full_path = Enum.reverse(path_fwd) ++ tl(path_bwd)
       total_dist = length(full_path) - 1
       {:ok, Path.new(full_path, total_dist, :bidirectional_bfs)}
     else
@@ -372,18 +372,21 @@ defmodule Yog.Pathfinding.Bidirectional do
   end
 
   defp expand_bfs_level(graph, queue, visited) do
-    Enum.reduce(queue, {[], visited}, fn {node, path}, {new_queue, new_visited} ->
-      successors = Model.successor_ids(graph, node)
+    {new_queue_rev, new_visited} =
+      Enum.reduce(queue, {[], visited}, fn {node, path}, {nq, nv} ->
+        successors = Model.successor_ids(graph, node)
 
-      Enum.reduce(successors, {new_queue, new_visited}, fn neighbor, {nq, nv} ->
-        if Map.has_key?(nv, neighbor) do
-          {nq, nv}
-        else
-          new_path = path ++ [neighbor]
-          {nq ++ [{neighbor, new_path}], Map.put(nv, neighbor, new_path)}
-        end
+        Enum.reduce(successors, {nq, nv}, fn neighbor, {nq_acc, nv_acc} ->
+          if Map.has_key?(nv_acc, neighbor) do
+            {nq_acc, nv_acc}
+          else
+            new_path = [neighbor | path]
+            {[{neighbor, new_path} | nq_acc], Map.put(nv_acc, neighbor, new_path)}
+          end
+        end)
       end)
-    end)
+
+    {Enum.reverse(new_queue_rev), new_visited}
   end
 
   # Bidirectional Dijkstra implementation - simplified version

@@ -37,7 +37,7 @@ defmodule Yog.MST do
   """
 
   alias Yog.DisjointSet
-  alias Yog.PQ
+  alias Yog.PriorityQueue, as: PQ
 
   @typedoc """
   Represents an edge in the minimum spanning tree.

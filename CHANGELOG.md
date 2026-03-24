@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `Yog.MinCut` → `Yog.Flow.MinCut`
   - `Yog.Render` modules → `Yog.Render.DOT`, `Yog.Render.Mermaid`, `Yog.Render.ASCII`
   - `Yog.Generators` → `Yog.Generator.Classic`, `Yog.Generator.Random`
+  - `Yog.PQ` → `Yog.PriorityQueue` (filename also changed from `pq.ex` to `priority_queue.ex`)
 - **API Updates**:
   - Pathfinding functions now return `%Yog.Pathfinding.Path{}` struct with `weight` field (was `total_weight`)
   - `edmonds_karp/8` compare function now expects boolean return (`<=` instead of `:lt/:eq/:gt`)

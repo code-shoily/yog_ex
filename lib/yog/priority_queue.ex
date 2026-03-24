@@ -1,4 +1,4 @@
-defmodule Yog.PQ do
+defmodule Yog.PriorityQueue do
   @moduledoc """
   A Priority Queue implementation based on Pairing Heap.
 
@@ -16,25 +16,25 @@ defmodule Yog.PQ do
   ## Examples
 
       # Min-priority queue (default)
-      pq = Yog.PQ.new()
-      |> Yog.PQ.push(5)
-      |> Yog.PQ.push(3)
-      |> Yog.PQ.push(7)
+      pq = Yog.PriorityQueue.new()
+      |> Yog.PriorityQueue.push(5)
+      |> Yog.PriorityQueue.push(3)
+      |> Yog.PriorityQueue.push(7)
 
-      {3, pq} = Yog.PQ.pop(pq)
+      {:ok, 3, pq} = Yog.PriorityQueue.pop(pq)
 
       # Max-priority queue with custom comparator
-      pq = Yog.PQ.new(fn a, b -> a >= b end)
-      |> Yog.PQ.push({:node, 5})
-      |> Yog.PQ.push({:node, 10})
+      pq = Yog.PriorityQueue.new(fn a, b -> a >= b end)
+      |> Yog.PriorityQueue.push({:node, 5})
+      |> Yog.PriorityQueue.push({:node, 10})
 
-      {{:node, 10}, pq} = Yog.PQ.pop(pq)
+      {:ok, {:node, 10}, _} = Yog.PriorityQueue.pop(pq)
 
       # Priority queue for Dijkstra's algorithm
-      pq = Yog.PQ.new(fn {dist1, _}, {dist2, _} -> dist1 <= dist2 end)
-      |> Yog.PQ.push({0, :start})
-      |> Yog.PQ.push({5, :a})
-      |> Yog.PQ.push({3, :b})
+      pq = Yog.PriorityQueue.new(fn {dist1, _}, {dist2, _} -> dist1 <= dist2 end)
+      |> Yog.PriorityQueue.push({0, :start})
+      |> Yog.PriorityQueue.push({5, :a})
+      |> Yog.PriorityQueue.push({3, :b})
   """
 
   defmodule Node do
@@ -57,12 +57,12 @@ defmodule Yog.PQ do
 
   ## Examples
 
-      iex> pq = Yog.PQ.new()
-      iex> Yog.PQ.empty?(pq)
+      iex> pq = Yog.PriorityQueue.new()
+      iex> Yog.PriorityQueue.empty?(pq)
       true
 
-      iex> pq = Yog.PQ.new(fn a, b -> a >= b end)  # max-heap
-      iex> Yog.PQ.empty?(pq)
+      iex> pq = Yog.PriorityQueue.new(fn a, b -> a >= b end)  # max-heap
+      iex> Yog.PriorityQueue.empty?(pq)
       true
   """
   @spec new() :: t()
@@ -76,10 +76,10 @@ defmodule Yog.PQ do
 
   ## Examples
 
-      iex> Yog.PQ.empty?(Yog.PQ.new())
+      iex> Yog.PriorityQueue.empty?(Yog.PriorityQueue.new())
       true
 
-      iex> Yog.PQ.empty?(Yog.PQ.new() |> Yog.PQ.push(1))
+      iex> Yog.PriorityQueue.empty?(Yog.PriorityQueue.new() |> Yog.PriorityQueue.push(1))
       false
   """
   @spec empty?(t()) :: boolean()
@@ -91,8 +91,8 @@ defmodule Yog.PQ do
 
   ## Examples
 
-      iex> pq = Yog.PQ.new() |> Yog.PQ.push(5) |> Yog.PQ.push(3)
-      iex> Yog.PQ.peek(pq)
+      iex> pq = Yog.PriorityQueue.new() |> Yog.PriorityQueue.push(5) |> Yog.PriorityQueue.push(3)
+      iex> Yog.PriorityQueue.peek(pq)
       {:ok, 3}
   """
   @spec push(t(), any()) :: t()
@@ -109,11 +109,11 @@ defmodule Yog.PQ do
 
   ## Examples
 
-      iex> pq = Yog.PQ.new() |> Yog.PQ.push(5) |> Yog.PQ.push(3)
-      iex> Yog.PQ.peek(pq)
+      iex> pq = Yog.PriorityQueue.new() |> Yog.PriorityQueue.push(5) |> Yog.PriorityQueue.push(3)
+      iex> Yog.PriorityQueue.peek(pq)
       {:ok, 3}
 
-      iex> Yog.PQ.peek(Yog.PQ.new())
+      iex> Yog.PriorityQueue.peek(Yog.PriorityQueue.new())
       :error
   """
   @spec peek(t()) :: {:ok, any()} | :error
@@ -127,11 +127,11 @@ defmodule Yog.PQ do
 
   ## Examples
 
-      iex> pq = Yog.PQ.new() |> Yog.PQ.push(5) |> Yog.PQ.push(3) |> Yog.PQ.push(7)
-      iex> {:ok, min, pq} = Yog.PQ.pop(pq)
+      iex> pq = Yog.PriorityQueue.new() |> Yog.PriorityQueue.push(5) |> Yog.PriorityQueue.push(3) |> Yog.PriorityQueue.push(7)
+      iex> {:ok, min, pq} = Yog.PriorityQueue.pop(pq)
       iex> min
       3
-      iex> {:ok, next_min, _} = Yog.PQ.pop(pq)
+      iex> {:ok, next_min, _} = Yog.PriorityQueue.pop(pq)
       iex> next_min
       5
   """
@@ -147,8 +147,8 @@ defmodule Yog.PQ do
 
   ## Examples
 
-      iex> pq = Yog.PQ.from_list([3, 1, 4, 1, 5])
-      iex> {:ok, min, _} = Yog.PQ.pop(pq)
+      iex> pq = Yog.PriorityQueue.from_list([3, 1, 4, 1, 5])
+      iex> {:ok, min, _} = Yog.PriorityQueue.pop(pq)
       iex> min
       1
   """
@@ -165,7 +165,7 @@ defmodule Yog.PQ do
 
   ## Examples
 
-      iex> Yog.PQ.new() |> Yog.PQ.push(3) |> Yog.PQ.push(1) |> Yog.PQ.push(2) |> Yog.PQ.to_list()
+      iex> Yog.PriorityQueue.new() |> Yog.PriorityQueue.push(3) |> Yog.PriorityQueue.push(1) |> Yog.PriorityQueue.push(2) |> Yog.PriorityQueue.to_list()
       [1, 2, 3]
   """
   @spec to_list(t()) :: [any()]
@@ -185,7 +185,7 @@ defmodule Yog.PQ do
 
   ## Examples
 
-      iex> Yog.PQ.new() |> Yog.PQ.push(1) |> Yog.PQ.push(2) |> Yog.PQ.size()
+      iex> Yog.PriorityQueue.new() |> Yog.PriorityQueue.push(1) |> Yog.PriorityQueue.push(2) |> Yog.PriorityQueue.size()
       2
   """
   @spec size(t()) :: non_neg_integer()

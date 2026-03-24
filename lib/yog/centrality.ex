@@ -23,7 +23,7 @@ defmodule Yog.Centrality do
   """
 
   alias Yog.Model
-  alias Yog.PQ
+  alias Yog.PriorityQueue, as: PQ
 
   @typedoc """
   A mapping of Node IDs to their calculated centrality scores.

@@ -119,7 +119,7 @@ defimpl Enumerable, for: Yog.Graph do
   end
 
   def reduce(%Yog.Graph{nodes: nodes}, acc, fun) do
-    Enumerable.List.reduce(:maps.to_list(nodes), acc, fun)
+    Enumerable.reduce(nodes, acc, fun)
   end
 
   def slice(%Yog.Graph{nodes: nodes}) do

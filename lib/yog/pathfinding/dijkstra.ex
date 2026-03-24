@@ -40,6 +40,7 @@ defmodule Yog.Pathfinding.Dijkstra do
 
   alias Yog.Model
   alias Yog.Pathfinding.Path
+  alias Yog.PriorityQueue, as: PQ
 
   @typedoc "Result type for shortest path queries"
   @type path_result :: {:ok, Path.t()} | :error
@@ -441,7 +442,10 @@ defmodule Yog.Pathfinding.Dijkstra do
         ) :: {:ok, cost} | :error
         when state: var, cost: var
   def implicit_dijkstra_by(from, successors, key_fn, is_goal, zero, add, compare) do
-    initial_queue = [{zero, from}]
+    initial_queue =
+      PQ.new(fn {d1, _}, {d2, _} -> compare.(d1, d2) != :gt end)
+      |> PQ.push({zero, from})
+
     initial_visited = %{key_fn.(from) => zero}
 
     do_implicit_dijkstra(
@@ -459,87 +463,82 @@ defmodule Yog.Pathfinding.Dijkstra do
   # Returns :error | {path, weight} if return_path=true
   # Returns :error | {path, weight, distances} if return_path=false
   defp do_dijkstra(graph, from, to, zero, add, compare, return_path) do
-    initial_queue = [{zero, from, [from]}]
+    initial_queue =
+      PQ.new(fn {d1, _, _}, {d2, _, _} -> compare.(d1, d2) != :gt end)
+      |> PQ.push({zero, from, [from]})
+
     initial_distances = %{from => zero}
 
     do_dijkstra_loop(graph, initial_queue, to, add, compare, return_path, initial_distances)
   end
 
-  defp do_dijkstra_loop(_graph, [], to, _add, _compare, _return_path, distances) do
-    if to == nil do
-      # Single-source case: return all distances
-      {[], 0, distances}
-    else
-      :error
+  defp do_dijkstra_loop(graph, queue, to, add, compare, return_path, distances) do
+    case PQ.pop(queue) do
+      :error ->
+        if to == nil do
+          # Single-source case: return all distances
+          {[], zero_from_somewhere(distances, add), distances}
+        else
+          :error
+        end
+
+      {:ok, {dist, node, path}, rest} ->
+        # Check if we've found a better path already
+        current_best = Map.get(distances, node)
+
+        if current_best != nil and compare.(dist, current_best) == :gt do
+          # Skip this outdated entry
+          do_dijkstra_loop(graph, rest, to, add, compare, return_path, distances)
+        else
+          # Check if we reached the target (only if to is specified)
+          if to != nil and node == to do
+            if return_path do
+              {Enum.reverse(path), dist}
+            else
+              {Enum.reverse(path), dist, distances}
+            end
+          else
+            # Expand neighbors
+            successors = Model.successors(graph, node)
+
+            {new_queue, new_distances} =
+              Enum.reduce(successors, {rest, distances}, fn {neighbor, weight}, {q, d} ->
+                new_dist = add.(dist, weight)
+
+                case Map.fetch(d, neighbor) do
+                  {:ok, current} ->
+                    if compare.(new_dist, current) == :lt do
+                      new_q = PQ.push(q, {new_dist, neighbor, [neighbor | path]})
+                      new_d = Map.put(d, neighbor, new_dist)
+                      {new_q, new_d}
+                    else
+                      {q, d}
+                    end
+
+                  :error ->
+                    new_q = PQ.push(q, {new_dist, neighbor, [neighbor | path]})
+                    new_d = Map.put(d, neighbor, new_dist)
+                    {new_q, new_d}
+                end
+              end)
+
+            do_dijkstra_loop(graph, new_queue, to, add, compare, return_path, new_distances)
+          end
+        end
     end
   end
 
-  defp do_dijkstra_loop(
-         graph,
-         [{dist, node, path} | rest],
-         to,
-         add,
-         compare,
-         return_path,
-         distances
-       ) do
-    # Check if we've found a better path already
-    current_best = Map.get(distances, node)
-
-    if current_best != nil and compare.(dist, current_best) == :gt do
-      # Skip this outdated entry
-      do_dijkstra_loop(graph, rest, to, add, compare, return_path, distances)
-    else
-      # Check if we reached the target (only if to is specified)
-      if to != nil and node == to do
-        if return_path do
-          {Enum.reverse(path), dist}
-        else
-          {Enum.reverse(path), dist, distances}
-        end
-      else
-        # Expand neighbors
-        successors = Model.successors(graph, node)
-
-        {new_queue, new_distances} =
-          Enum.reduce(successors, {rest, distances}, fn {neighbor, weight}, {q, d} ->
-            new_dist = add.(dist, weight)
-
-            case Map.fetch(d, neighbor) do
-              {:ok, current} ->
-                if compare.(new_dist, current) == :lt do
-                  new_q = insert_sorted(q, {new_dist, neighbor, [neighbor | path]}, compare)
-                  new_d = Map.put(d, neighbor, new_dist)
-                  {new_q, new_d}
-                else
-                  {q, d}
-                end
-
-              :error ->
-                new_q = insert_sorted(q, {new_dist, neighbor, [neighbor | path]}, compare)
-                new_d = Map.put(d, neighbor, new_dist)
-                {new_q, new_d}
-            end
-          end)
-
-        if to == nil do
-          # Single-source: continue until queue is empty
-          do_dijkstra_loop(graph, new_queue, to, add, compare, return_path, new_distances)
-        else
-          # Shortest path: continue searching
-          do_dijkstra_loop(graph, new_queue, to, add, compare, return_path, new_distances)
-        end
-      end
+  defp zero_from_somewhere(distances, _add) do
+    # Try to get zero from the distances map
+    case Map.values(distances) do
+      [z | _] -> z
+      [] -> 0
     end
   end
 
   # Implicit Dijkstra implementation
-  defp do_implicit_dijkstra([], _successors, _key_fn, _is_goal, _add, _compare, _visited) do
-    :error
-  end
-
   defp do_implicit_dijkstra(
-         [{dist, state} | rest],
+         queue,
          successors,
          key_fn,
          is_goal,
@@ -547,58 +546,57 @@ defmodule Yog.Pathfinding.Dijkstra do
          compare,
          visited
        ) do
-    key = key_fn.(state)
-    current_best = Map.get(visited, key)
+    case PQ.pop(queue) do
+      :error ->
+        :error
 
-    if current_best != nil and compare.(dist, current_best) == :gt do
-      # Skip outdated entry
-      do_implicit_dijkstra(rest, successors, key_fn, is_goal, add, compare, visited)
-    else
-      if is_goal.(state) do
-        {:ok, dist}
-      else
-        # Expand successors
-        next_states = successors.(state)
+      {:ok, {dist, state}, rest} ->
+        key = key_fn.(state)
+        current_best = Map.get(visited, key)
 
-        {new_queue, new_visited} =
-          Enum.reduce(next_states, {rest, visited}, fn {next_state, cost}, {q, v} ->
-            next_key = key_fn.(next_state)
-            new_dist = add.(dist, cost)
+        if current_best != nil and compare.(dist, current_best) == :gt do
+          # Skip outdated entry
+          do_implicit_dijkstra(rest, successors, key_fn, is_goal, add, compare, visited)
+        else
+          if is_goal.(state) do
+            {:ok, dist}
+          else
+            # Expand successors
+            next_states = successors.(state)
 
-            case Map.fetch(v, next_key) do
-              {:ok, current} ->
-                if compare.(new_dist, current) == :lt do
-                  new_q = insert_sorted(q, {new_dist, next_state}, compare)
-                  new_v = Map.put(v, next_key, new_dist)
-                  {new_q, new_v}
-                else
-                  {q, v}
+            {new_queue, new_visited} =
+              Enum.reduce(next_states, {rest, visited}, fn {next_state, cost}, {q, v} ->
+                next_key = key_fn.(next_state)
+                new_dist = add.(dist, cost)
+
+                case Map.fetch(v, next_key) do
+                  {:ok, current} ->
+                    if compare.(new_dist, current) == :lt do
+                      new_q = PQ.push(q, {new_dist, next_state})
+                      new_v = Map.put(v, next_key, new_dist)
+                      {new_q, new_v}
+                    else
+                      {q, v}
+                    end
+
+                  :error ->
+                    new_q = PQ.push(q, {new_dist, next_state})
+                    new_v = Map.put(v, next_key, new_dist)
+                    {new_q, new_v}
                 end
+              end)
 
-              :error ->
-                new_q = insert_sorted(q, {new_dist, next_state}, compare)
-                new_v = Map.put(v, next_key, new_dist)
-                {new_q, new_v}
-            end
-          end)
-
-        do_implicit_dijkstra(new_queue, successors, key_fn, is_goal, add, compare, new_visited)
-      end
-    end
-  end
-
-  # Insert into sorted list (priority queue)
-  defp insert_sorted([], item, _compare), do: [item]
-
-  defp insert_sorted([head | tail], item, compare) do
-    # Handle both 2-tuples {dist, node} and 3-tuples {dist, node, path}
-    dist_item = elem(item, 0)
-    dist_head = elem(head, 0)
-
-    if compare.(dist_item, dist_head) == :lt do
-      [item, head | tail]
-    else
-      [head | insert_sorted(tail, item, compare)]
+            do_implicit_dijkstra(
+              new_queue,
+              successors,
+              key_fn,
+              is_goal,
+              add,
+              compare,
+              new_visited
+            )
+          end
+        end
     end
   end
 end

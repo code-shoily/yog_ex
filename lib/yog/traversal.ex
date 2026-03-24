@@ -43,7 +43,7 @@ defmodule Yog.Traversal do
   """
 
   alias Yog.Model
-  alias Yog.PQ
+  alias Yog.PriorityQueue, as: PQ
 
   @typedoc """
   Traversal order for graph walking algorithms.

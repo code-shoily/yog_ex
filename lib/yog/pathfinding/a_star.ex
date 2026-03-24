@@ -35,6 +35,7 @@ defmodule Yog.Pathfinding.AStar do
 
   alias Yog.Model
   alias Yog.Pathfinding.Path
+  alias Yog.PriorityQueue, as: PQ
 
   @typedoc "Result type for shortest path queries"
   @type path_result :: {:ok, Path.t()} | :error
@@ -212,7 +213,11 @@ defmodule Yog.Pathfinding.AStar do
     # Priority queue: {f_score, g_score, node, path}
     # f(n) = g(n) + h(n)
     h0 = heuristic.(from, to)
-    initial_queue = [{add.(zero, h0), zero, from, [from]}]
+
+    initial_queue =
+      PQ.new(fn {f1, _, _, _}, {f2, _, _, _} -> compare.(f1, f2) != :gt end)
+      |> PQ.push({add.(zero, h0), zero, from, [from]})
+
     initial_g_scores = %{from => zero}
 
     do_a_star(graph, initial_queue, to, add, compare, heuristic, initial_g_scores)
@@ -368,7 +373,10 @@ defmodule Yog.Pathfinding.AStar do
   def implicit_a_star_by(from, successors, key_fn, is_goal, zero, add, compare, heuristic) do
     h0 = heuristic.(from)
     # Queue: {f_score, g_score, state}
-    initial_queue = [{add.(zero, h0), zero, from}]
+    initial_queue =
+      PQ.new(fn {f1, _, _}, {f2, _, _} -> compare.(f1, f2) != :gt end)
+      |> PQ.push({add.(zero, h0), zero, from})
+
     initial_g_scores = %{key_fn.(from) => zero}
 
     do_implicit_a_star(
@@ -384,76 +392,65 @@ defmodule Yog.Pathfinding.AStar do
   end
 
   # Main A* implementation for materialized graphs
-  defp do_a_star(_graph, [], _to, _add, _compare, _heuristic, _g_scores) do
-    :error
-  end
-
-  defp do_a_star(graph, [{_f, g, node, path} | rest], to, add, compare, heuristic, g_scores) do
-    key = node
-
-    # Check if this entry is outdated
-    case Map.fetch(g_scores, key) do
-      {:ok, best_g} ->
-        if compare.(g, best_g) == :gt do
-          do_a_star(graph, rest, to, add, compare, heuristic, g_scores)
-        else
-          if node == to do
-            {:ok, Path.new(Enum.reverse(path), g, :a_star)}
-          else
-            # Expand neighbors
-            successors = Model.successors(graph, node)
-
-            {new_queue, new_g_scores} =
-              Enum.reduce(successors, {rest, g_scores}, fn {neighbor, cost}, {q, gs} ->
-                new_g = add.(g, cost)
-                neighbor_key = neighbor
-
-                case Map.fetch(gs, neighbor_key) do
-                  {:ok, existing_g} ->
-                    if compare.(new_g, existing_g) == :lt do
-                      h = heuristic.(neighbor, to)
-                      f = add.(new_g, h)
-                      new_q = insert_sorted(q, {f, new_g, neighbor, [neighbor | path]}, compare)
-                      new_gs = Map.put(gs, neighbor_key, new_g)
-                      {new_q, new_gs}
-                    else
-                      {q, gs}
-                    end
-
-                  :error ->
-                    h = heuristic.(neighbor, to)
-                    f = add.(new_g, h)
-                    new_q = insert_sorted(q, {f, new_g, neighbor, [neighbor | path]}, compare)
-                    new_gs = Map.put(gs, neighbor_key, new_g)
-                    {new_q, new_gs}
-                end
-              end)
-
-            do_a_star(graph, new_queue, to, add, compare, heuristic, new_g_scores)
-          end
-        end
-
+  defp do_a_star(graph, queue, to, add, compare, heuristic, g_scores) do
+    case PQ.pop(queue) do
       :error ->
-        do_a_star(graph, rest, to, add, compare, heuristic, g_scores)
+        :error
+
+      {:ok, {_f, g, node, path}, rest} ->
+        key = node
+
+        # Check if this entry is outdated
+        case Map.fetch(g_scores, key) do
+          {:ok, best_g} ->
+            if compare.(g, best_g) == :gt do
+              do_a_star(graph, rest, to, add, compare, heuristic, g_scores)
+            else
+              if node == to do
+                {:ok, Path.new(Enum.reverse(path), g, :a_star)}
+              else
+                # Expand neighbors
+                successors = Model.successors(graph, node)
+
+                {new_queue, new_g_scores} =
+                  Enum.reduce(successors, {rest, g_scores}, fn {neighbor, cost}, {q, gs} ->
+                    new_g = add.(g, cost)
+                    neighbor_key = neighbor
+
+                    case Map.fetch(gs, neighbor_key) do
+                      {:ok, existing_g} ->
+                        if compare.(new_g, existing_g) == :lt do
+                          h = heuristic.(neighbor, to)
+                          f = add.(new_g, h)
+                          new_q = PQ.push(q, {f, new_g, neighbor, [neighbor | path]})
+                          new_gs = Map.put(gs, neighbor_key, new_g)
+                          {new_q, new_gs}
+                        else
+                          {q, gs}
+                        end
+
+                      :error ->
+                        h = heuristic.(neighbor, to)
+                        f = add.(new_g, h)
+                        new_q = PQ.push(q, {f, new_g, neighbor, [neighbor | path]})
+                        new_gs = Map.put(gs, neighbor_key, new_g)
+                        {new_q, new_gs}
+                    end
+                  end)
+
+                do_a_star(graph, new_queue, to, add, compare, heuristic, new_g_scores)
+              end
+            end
+
+          :error ->
+            do_a_star(graph, rest, to, add, compare, heuristic, g_scores)
+        end
     end
   end
 
   # Implicit A* implementation
   defp do_implicit_a_star(
-         [],
-         _successors,
-         _key_fn,
-         _is_goal,
-         _add,
-         _compare,
-         _heuristic,
-         _g_scores
-       ) do
-    :error
-  end
-
-  defp do_implicit_a_star(
-         [{_f, g, state} | rest],
+         queue,
          successors,
          key_fn,
          is_goal,
@@ -462,88 +459,85 @@ defmodule Yog.Pathfinding.AStar do
          heuristic,
          g_scores
        ) do
-    key = key_fn.(state)
+    case PQ.pop(queue) do
+      :error ->
+        :error
 
-    # Check if this entry is outdated
-    case Map.fetch(g_scores, key) do
-      {:ok, best_g} ->
-        if compare.(g, best_g) == :gt do
-          do_implicit_a_star(rest, successors, key_fn, is_goal, add, compare, heuristic, g_scores)
-        else
-          if is_goal.(state) do
-            {:ok, g}
-          else
-            # Expand successors
-            next_states = successors.(state)
+      {:ok, {_f, g, state}, rest} ->
+        key = key_fn.(state)
 
-            {new_queue, new_g_scores} =
-              Enum.reduce(next_states, {rest, g_scores}, fn {next_state, cost}, {q, gs} ->
-                new_g = add.(g, cost)
-                next_key = key_fn.(next_state)
+        # Check if this entry is outdated
+        case Map.fetch(g_scores, key) do
+          {:ok, best_g} ->
+            if compare.(g, best_g) == :gt do
+              do_implicit_a_star(
+                rest,
+                successors,
+                key_fn,
+                is_goal,
+                add,
+                compare,
+                heuristic,
+                g_scores
+              )
+            else
+              if is_goal.(state) do
+                {:ok, g}
+              else
+                # Expand successors
+                next_states = successors.(state)
 
-                case Map.fetch(gs, next_key) do
-                  {:ok, existing_g} ->
-                    if compare.(new_g, existing_g) == :lt do
-                      h = heuristic.(next_state)
-                      f = add.(new_g, h)
-                      new_q = insert_sorted(q, {f, new_g, next_state}, compare)
-                      new_gs = Map.put(gs, next_key, new_g)
-                      {new_q, new_gs}
-                    else
-                      {q, gs}
+                {new_queue, new_g_scores} =
+                  Enum.reduce(next_states, {rest, g_scores}, fn {next_state, cost}, {q, gs} ->
+                    new_g = add.(g, cost)
+                    next_key = key_fn.(next_state)
+
+                    case Map.fetch(gs, next_key) do
+                      {:ok, existing_g} ->
+                        if compare.(new_g, existing_g) == :lt do
+                          h = heuristic.(next_state)
+                          f = add.(new_g, h)
+                          new_q = PQ.push(q, {f, new_g, next_state})
+                          new_gs = Map.put(gs, next_key, new_g)
+                          {new_q, new_gs}
+                        else
+                          {q, gs}
+                        end
+
+                      :error ->
+                        h = heuristic.(next_state)
+                        f = add.(new_g, h)
+                        new_q = PQ.push(q, {f, new_g, next_state})
+                        new_gs = Map.put(gs, next_key, new_g)
+                        {new_q, new_gs}
                     end
+                  end)
 
-                  :error ->
-                    h = heuristic.(next_state)
-                    f = add.(new_g, h)
-                    new_q = insert_sorted(q, {f, new_g, next_state}, compare)
-                    new_gs = Map.put(gs, next_key, new_g)
-                    {new_q, new_gs}
-                end
-              end)
+                do_implicit_a_star(
+                  new_queue,
+                  successors,
+                  key_fn,
+                  is_goal,
+                  add,
+                  compare,
+                  heuristic,
+                  new_g_scores
+                )
+              end
+            end
 
+          :error ->
             do_implicit_a_star(
-              new_queue,
+              rest,
               successors,
               key_fn,
               is_goal,
               add,
               compare,
               heuristic,
-              new_g_scores
+              g_scores
             )
-          end
         end
-
-      :error ->
-        do_implicit_a_star(rest, successors, key_fn, is_goal, add, compare, heuristic, g_scores)
-    end
-  end
-
-  # Insert into sorted list by f-score (priority queue)
-  defp insert_sorted([], item, _compare), do: [item]
-
-  defp insert_sorted([head | tail], item, compare) do
-    if tuple_size(item) == 3 do
-      # For implicit A* (3-tuple items): {f, g, state}
-      {f_item, _, _} = item
-      {f_head, _, _} = head
-
-      if compare.(f_item, f_head) == :lt do
-        [item, head | tail]
-      else
-        [head | insert_sorted(tail, item, compare)]
-      end
-    else
-      # For regular A* (4-tuple items): {f, g, node, path}
-      {f_item, _, _, _} = item
-      {f_head, _, _, _} = head
-
-      if compare.(f_item, f_head) == :lt do
-        [item, head | tail]
-      else
-        [head | insert_sorted(tail, item, compare)]
-      end
     end
   end
 end
