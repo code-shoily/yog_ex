@@ -324,10 +324,3 @@ defmodule Yog.Property.Clique do
     with_h ++ without_h
   end
 end
-
-defmodule Yog.Clique do
-  @moduledoc "Deprecated. Use `Yog.Property.Clique` instead."
-  defdelegate max_clique(graph), to: Yog.Property.Clique
-  defdelegate all_maximal_cliques(graph), to: Yog.Property.Clique
-  defdelegate k_cliques(graph, k), to: Yog.Property.Clique
-end

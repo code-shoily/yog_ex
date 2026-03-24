@@ -544,14 +544,3 @@ defmodule Yog.Property.Bipartite do
     Map.get(matches, person)
   end
 end
-
-defmodule Yog.Bipartite do
-  @moduledoc "Deprecated. Use `Yog.Property.Bipartite` instead."
-  defdelegate bipartite?(graph), to: Yog.Property.Bipartite
-  defdelegate coloring(graph), to: Yog.Property.Bipartite
-  defdelegate partition(graph), to: Yog.Property.Bipartite
-  defdelegate maximum_matching(graph, partition), to: Yog.Property.Bipartite
-  defdelegate stable_marriage(opts), to: Yog.Property.Bipartite
-  defdelegate stable_marriage(l, r), to: Yog.Property.Bipartite
-  defdelegate get_partner(marriage, person), to: Yog.Property.Bipartite
-end

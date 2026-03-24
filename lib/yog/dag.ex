@@ -62,6 +62,43 @@ defmodule Yog.DAG do
   """
   @spec to_graph(t()) :: Yog.Graph.t()
   def to_graph(%__MODULE__{graph: graph}), do: graph
+
+  # ============= Modification =============
+
+  @doc "Adds a node to the DAG."
+  defdelegate add_node(dag, id, data), to: Yog.DAG.Model
+
+  @doc "Removes a node and all its connected edges from the DAG."
+  defdelegate remove_node(dag, id), to: Yog.DAG.Model
+
+  @doc "Adds an edge to the DAG, validating for cycles."
+  defdelegate add_edge(dag, from, to, weight), to: Yog.DAG.Model
+
+  @doc "Removes an edge from the DAG."
+  defdelegate remove_edge(dag, from, to), to: Yog.DAG.Model
+
+  # ============= Algorithms =============
+
+  @doc "Returns a topological ordering of all nodes in the DAG."
+  defdelegate topological_sort(dag), to: Yog.DAG.Algorithm
+
+  @doc "Finds the longest path (critical path) in a weighted DAG."
+  defdelegate longest_path(dag), to: Yog.DAG.Algorithm
+
+  @doc "Computes the transitive closure of the DAG."
+  defdelegate transitive_closure(dag), to: Yog.DAG.Algorithm
+
+  @doc "Computes the transitive reduction of the DAG."
+  defdelegate transitive_reduction(dag), to: Yog.DAG.Algorithm
+
+  @doc "Finds the shortest path between two nodes in a weighted DAG."
+  defdelegate shortest_path(dag, from, to), to: Yog.DAG.Algorithm
+
+  @doc "Counts the number of ancestors or descendants for every node."
+  defdelegate count_reachability(dag, direction), to: Yog.DAG.Algorithm
+
+  @doc "Finds the lowest common ancestors (LCAs) of two nodes."
+  defdelegate lowest_common_ancestors(dag, node_a, node_b), to: Yog.DAG.Algorithm
 end
 
 defimpl Enumerable, for: Yog.DAG do

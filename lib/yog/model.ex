@@ -277,7 +277,7 @@ defmodule Yog.Model do
       ...>   |> Yog.Model.add_node(2, "B")
       ...>   |> Yog.Model.add_node(3, "C")
       ...>   |> Yog.Model.add_simple_edges([{1, 2}, {2, 3}, {1, 3}])
-      iex> Yog.Model.successors(graph, 1)
+      iex> Yog.Model.successors(graph, 1) |> Enum.sort()
       [{2, 1}, {3, 1}]
   """
   @spec add_simple_edges(graph(), [{node_id(), node_id()}]) ::
@@ -305,7 +305,7 @@ defmodule Yog.Model do
       ...>   |> Yog.Model.add_node(2, "B")
       ...>   |> Yog.Model.add_node(3, "C")
       ...>   |> Yog.Model.add_unweighted_edges([{1, 2}, {2, 3}, {1, 3}])
-      iex> Yog.Model.successors(graph, 1)
+      iex> Yog.Model.successors(graph, 1) |> Enum.sort()
       [{2, nil}, {3, nil}]
   """
   @spec add_unweighted_edges(graph(), [{node_id(), node_id()}]) ::
@@ -378,8 +378,8 @@ defmodule Yog.Model do
       ...>   |> Yog.Model.add_node(2, "B")
       ...>   |> Yog.Model.add_node(3, "C")
       ...>   |> Yog.Model.add_edges([{1, 2, 10}, {3, 1, 20}])
-      iex> length(Yog.Model.neighbors(graph, 1))
-      2
+      iex> Yog.Model.neighbors(graph, 1) |> Enum.sort()
+      [{2, 10}, {3, 20}]
   """
   @spec neighbors(graph(), node_id()) :: [{node_id(), term()}]
   def neighbors(%Graph{kind: :undirected} = graph, id) do
@@ -388,16 +388,16 @@ defmodule Yog.Model do
 
   def neighbors(%Graph{kind: :directed} = graph, id) do
     outgoing = successors(graph, id)
-    incoming = predecessors(graph, id)
-    out_ids = MapSet.new(outgoing, fn {node_id, _} -> node_id end)
 
-    Enum.reduce(incoming, outgoing, fn {in_id, _} = incoming_edge, acc ->
-      if MapSet.member?(out_ids, in_id) do
-        acc
-      else
-        [incoming_edge | acc]
-      end
-    end)
+    case Map.fetch(graph.in_edges, id) do
+      {:ok, inner} ->
+        out_ids = successor_ids(graph, id)
+        incoming_to_add = inner |> Map.drop(out_ids) |> Map.to_list()
+        outgoing ++ incoming_to_add
+
+      :error ->
+        outgoing
+    end
   end
 
   @doc """
@@ -416,24 +416,56 @@ defmodule Yog.Model do
       [2, 3]
   """
   @spec neighbor_ids(graph(), node_id()) :: [node_id()]
-  def neighbor_ids(graph, id) do
-    neighbors(graph, id) |> Enum.map(fn {node_id, _} -> node_id end)
+  def neighbor_ids(%Graph{kind: :undirected} = graph, id) do
+    successor_ids(graph, id)
+  end
+
+  def neighbor_ids(%Graph{kind: :directed} = graph, id) do
+    out_ids = successor_ids(graph, id)
+    in_ids = predecessor_ids(graph, id)
+    Enum.uniq(out_ids ++ in_ids)
   end
 
   @doc """
   Returns all successor node IDs (without weights).
+
+  ## Example
+
+      iex> {:ok, graph} =
+      ...>   Yog.Model.new(:directed)
+      ...>   |> Yog.Model.add_node(1, "A")
+      ...>   |> Yog.Model.add_node(2, "B")
+      ...>   |> Yog.Model.add_edge(1, 2, 10)
+      iex> Yog.Model.successor_ids(graph, 1)
+      [2]
   """
   @spec successor_ids(graph(), node_id()) :: [node_id()]
-  def successor_ids(graph, id) do
-    successors(graph, id) |> Enum.map(fn {node_id, _} -> node_id end)
+  def successor_ids(%Graph{out_edges: out_edges}, id) do
+    case Map.fetch(out_edges, id) do
+      {:ok, inner} -> Map.keys(inner)
+      :error -> []
+    end
   end
 
   @doc """
   Returns all predecessor node IDs (without weights).
+
+  ## Example
+
+      iex> {:ok, graph} =
+      ...>   Yog.Model.new(:directed)
+      ...>   |> Yog.Model.add_node(1, "A")
+      ...>   |> Yog.Model.add_node(2, "B")
+      ...>   |> Yog.Model.add_edge(1, 2, 10)
+      iex> Yog.Model.predecessor_ids(graph, 2)
+      [1]
   """
   @spec predecessor_ids(graph(), node_id()) :: [node_id()]
-  def predecessor_ids(graph, id) do
-    predecessors(graph, id) |> Enum.map(fn {node_id, _} -> node_id end)
+  def predecessor_ids(%Graph{in_edges: in_edges}, id) do
+    case Map.fetch(in_edges, id) do
+      {:ok, inner} -> Map.keys(inner)
+      :error -> []
+    end
   end
 
   @doc """
@@ -550,21 +582,21 @@ defmodule Yog.Model do
   """
   @spec remove_node(graph(), node_id()) :: graph()
   def remove_node(%Graph{} = graph, id) do
-    targets = successors(graph, id)
-    sources = predecessors(graph, id)
+    target_ids = successor_ids(graph, id)
+    source_ids = predecessor_ids(graph, id)
 
     new_nodes = Map.delete(graph.nodes, id)
     new_out = Map.delete(graph.out_edges, id)
 
     new_in_cleaned =
-      Enum.reduce(targets, graph.in_edges, fn {target_id, _}, acc_in ->
+      Enum.reduce(target_ids, graph.in_edges, fn target_id, acc_in ->
         dict_update_inner(acc_in, target_id, id, &Map.delete/2)
       end)
 
     new_in = Map.delete(new_in_cleaned, id)
 
     new_out_cleaned =
-      Enum.reduce(sources, new_out, fn {source_id, _}, acc_out ->
+      Enum.reduce(source_ids, new_out, fn source_id, acc_out ->
         dict_update_inner(acc_out, source_id, id, &Map.delete/2)
       end)
 

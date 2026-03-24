@@ -389,7 +389,11 @@ defmodule Yog.Multi.Eulerian do
     if path == [] do
       :none
     else
-      {:some, path}
+      # Hierholzer builds the path in post-order, so it's naturally reversed but we want the sequence
+      # Wait, [eid | built] in post-order actually prepends, so it builds [e1, e2, ...] in forward order?
+      # Let's check: in post-order, the LAST edge visited is the FIRST one returned.
+      # So we need to reverse it to get the correct traversal order.
+      {:some, Enum.reverse(path)}
     end
   end
 
@@ -399,9 +403,12 @@ defmodule Yog.Multi.Eulerian do
         {available, path}
 
       {next_node, eid} ->
-        available2 = MapSet.delete(available, eid)
-        {av3, built} = do_hierholzer(graph, next_node, available2, path)
-        {av3, [eid | built]}
+        # 1. Consume one edge and explore deeply
+        {av2, p2} = do_hierholzer(graph, next_node, MapSet.delete(available, eid), path)
+
+        # 2. When we return to 'current', check for more edges (detours)
+        # Prepend the edge we just used to the post-order path
+        do_hierholzer(graph, current, av2, [eid | p2])
     end
   end
 

@@ -11,27 +11,25 @@ defmodule Yog.Multi.Model do
   - `in_edge_ids`: NodeId → [EdgeId] — incoming edges per node
   """
 
-  @typedoc "Unique identifier for an edge in a multigraph"
+  defmodule Graph do
+    @moduledoc """
+    A multigraph that can hold multiple (parallel) edges between nodes.
+    """
+    @enforce_keys [:kind, :nodes, :edges, :out_edge_ids, :in_edge_ids, :next_edge_id]
+    defstruct [:kind, :nodes, :edges, :out_edge_ids, :in_edge_ids, :next_edge_id]
+
+    @type t :: %__MODULE__{
+            kind: Yog.graph_type(),
+            nodes: %{Yog.node_id() => any()},
+            edges: %{integer() => {Yog.node_id(), Yog.node_id(), any()}},
+            out_edge_ids: %{Yog.node_id() => MapSet.t(integer())},
+            in_edge_ids: %{Yog.node_id() => MapSet.t(integer())},
+            next_edge_id: integer()
+          }
+  end
+
+  @type t :: Graph.t()
   @type edge_id :: integer()
-
-  @typedoc """
-  A multigraph that can hold multiple (parallel) edges between nodes.
-
-  - `kind`: Graph type (:directed or :undirected)
-  - `nodes`: Map of node_id => node_data
-  - `edges`: Map of edge_id => {from, to, edge_data}
-  - `out_edge_ids`: Map of node_id => [edge_id]
-  - `in_edge_ids`: Map of node_id => [edge_id]
-  - `next_edge_id`: Next edge ID to assign
-  """
-  @type t :: %{
-          kind: Yog.graph_type(),
-          nodes: %{Yog.node_id() => any()},
-          edges: %{edge_id() => {Yog.node_id(), Yog.node_id(), any()}},
-          out_edge_ids: %{Yog.node_id() => [edge_id()]},
-          in_edge_ids: %{Yog.node_id() => [edge_id()]},
-          next_edge_id: edge_id()
-        }
 
   # ============================================================
   # Construction
@@ -42,7 +40,7 @@ defmodule Yog.Multi.Model do
   """
   @spec new(Yog.graph_type()) :: t()
   def new(graph_type) do
-    %{
+    %Graph{
       kind: graph_type,
       nodes: %{},
       edges: %{},
@@ -82,9 +80,9 @@ defmodule Yog.Multi.Model do
   """
   @spec remove_node(t(), Yog.node_id()) :: t()
   def remove_node(graph, id) do
-    out_ids = Map.get(graph.out_edge_ids, id, [])
-    in_ids = Map.get(graph.in_edge_ids, id, [])
-    ids_to_remove = Enum.uniq(out_ids ++ in_ids)
+    out_ids = Map.get(graph.out_edge_ids, id, MapSet.new())
+    in_ids = Map.get(graph.in_edge_ids, id, MapSet.new())
+    ids_to_remove = MapSet.union(out_ids, in_ids)
 
     # Use proper accumulator ordering for reduce
     graph = Enum.reduce(ids_to_remove, graph, fn eid, g -> do_remove_edge(g, eid) end)
@@ -127,10 +125,10 @@ defmodule Yog.Multi.Model do
     new_edges = Map.put(graph.edges, eid, {from, to, data})
 
     new_out =
-      Map.update(graph.out_edge_ids, from, [eid], fn ids -> [eid | ids] end)
+      Map.update(graph.out_edge_ids, from, MapSet.new([eid]), fn ids -> MapSet.put(ids, eid) end)
 
     new_in =
-      Map.update(graph.in_edge_ids, to, [eid], fn ids -> [eid | ids] end)
+      Map.update(graph.in_edge_ids, to, MapSet.new([eid]), fn ids -> MapSet.put(ids, eid) end)
 
     # For undirected graphs, also index the reverse direction
     {new_out2, new_in2} =
@@ -140,10 +138,10 @@ defmodule Yog.Multi.Model do
 
         :undirected ->
           rev_out =
-            Map.update(new_out, to, [eid], fn ids -> [eid | ids] end)
+            Map.update(new_out, to, MapSet.new([eid]), fn ids -> MapSet.put(ids, eid) end)
 
           rev_in =
-            Map.update(new_in, from, [eid], fn ids -> [eid | ids] end)
+            Map.update(new_in, from, MapSet.new([eid]), fn ids -> MapSet.put(ids, eid) end)
 
           {rev_out, rev_in}
       end
@@ -195,7 +193,7 @@ defmodule Yog.Multi.Model do
   """
   @spec edges_between(t(), Yog.node_id(), Yog.node_id()) :: [{edge_id(), any()}]
   def edges_between(graph, from, to) do
-    edge_ids = Map.get(Map.get(graph, :out_edge_ids, %{}), from, [])
+    edge_ids = Map.get(graph.out_edge_ids, from, MapSet.new())
 
     for eid <- edge_ids,
         {:ok, {_, ^to, data}} <- [Map.fetch(graph.edges, eid)],
@@ -207,7 +205,7 @@ defmodule Yog.Multi.Model do
   """
   @spec successors(t(), Yog.node_id()) :: [{Yog.node_id(), edge_id(), any()}]
   def successors(graph, id) do
-    edge_ids = Map.get(Map.get(graph, :out_edge_ids, %{}), id, [])
+    edge_ids = Map.get(graph.out_edge_ids, id, MapSet.new())
 
     Enum.reduce(edge_ids, [], fn eid, acc ->
       case Map.fetch(graph.edges, eid) do
@@ -224,7 +222,7 @@ defmodule Yog.Multi.Model do
   """
   @spec predecessors(t(), Yog.node_id()) :: [{Yog.node_id(), edge_id(), any()}]
   def predecessors(graph, id) do
-    edge_ids = Map.get(Map.get(graph, :in_edge_ids, %{}), id, [])
+    edge_ids = Map.get(graph.in_edge_ids, id, MapSet.new())
 
     Enum.reduce(edge_ids, [], fn eid, acc ->
       case Map.fetch(graph.edges, eid) do
@@ -242,7 +240,7 @@ defmodule Yog.Multi.Model do
   """
   @spec out_degree(t(), Yog.node_id()) :: integer()
   def out_degree(graph, id) do
-    length(successors(graph, id))
+    MapSet.size(Map.get(graph.out_edge_ids, id, MapSet.new()))
   end
 
   @doc """
@@ -250,7 +248,7 @@ defmodule Yog.Multi.Model do
   """
   @spec in_degree(t(), Yog.node_id()) :: integer()
   def in_degree(graph, id) do
-    length(predecessors(graph, id))
+    MapSet.size(Map.get(graph.in_edge_ids, id, MapSet.new()))
   end
 
   # ============================================================
@@ -341,11 +339,11 @@ defmodule Yog.Multi.Model do
         new_edges = Map.delete(graph.edges, eid)
 
         remove_id = fn maybe_ids ->
-          List.delete(maybe_ids || [], eid)
+          MapSet.delete(maybe_ids || MapSet.new(), eid)
         end
 
-        new_out = Map.update(graph.out_edge_ids, src, [], remove_id)
-        new_in = Map.update(graph.in_edge_ids, dst, [], remove_id)
+        new_out = Map.update(graph.out_edge_ids, src, MapSet.new(), remove_id)
+        new_in = Map.update(graph.in_edge_ids, dst, MapSet.new(), remove_id)
 
         {new_out2, new_in2} =
           case graph.kind do
@@ -353,8 +351,8 @@ defmodule Yog.Multi.Model do
               {new_out, new_in}
 
             :undirected ->
-              rev_out = Map.update(new_out, dst, [], remove_id)
-              rev_in = Map.update(new_in, src, [], remove_id)
+              rev_out = Map.update(new_out, dst, MapSet.new(), remove_id)
+              rev_in = Map.update(new_in, src, MapSet.new(), remove_id)
               {rev_out, rev_in}
           end
 

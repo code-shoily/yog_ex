@@ -26,9 +26,6 @@ defmodule Yog.Multi.Graph do
       :undirected
       iex> multi.next_edge_id
       0
-
-      # Converting to simple graph keeps only first edge
-      iex> simple = Yog.Multi.Graph.to_simple_graph(multi)
   """
 
   @enforce_keys [:kind, :nodes, :edges, :next_edge_id]
@@ -101,7 +98,7 @@ defmodule Yog.Multi.Graph do
       iex> multi = Yog.Multi.Graph.new(:undirected)
       iex> multi = Yog.Multi.Graph.add_node(multi, 1, nil)
       iex> multi = Yog.Multi.Graph.add_node(multi, 2, nil)
-      iex> {:ok, multi, edge_id} = Yog.Multi.Graph.add_edge(multi, 1, 2, 10)
+      iex> {:ok, _multi, edge_id} = Yog.Multi.Graph.add_edge(multi, 1, 2, 10)
       iex> is_integer(edge_id)
       true
   """
@@ -114,7 +111,7 @@ defmodule Yog.Multi.Graph do
         weight
       ) do
     # Verify both nodes exist
-    if Map.has_key?(nodes, from) and Map.has_key?(to, to) do
+    if Map.has_key?(nodes, from) and Map.has_key?(nodes, to) do
       edge_id = next_id
       edge_key = {from, to}
       new_edge = {edge_id, weight}
@@ -147,8 +144,13 @@ defmodule Yog.Multi.Graph do
 
   ## Examples
 
+      iex> multi = Yog.Multi.Graph.new(:undirected)
+      iex> multi = Yog.Multi.Graph.add_node(multi, 1, nil)
+      iex> multi = Yog.Multi.Graph.add_node(multi, 2, nil)
       iex> {:ok, multi, edge_id} = Yog.Multi.Graph.add_edge(multi, 1, 2, 10)
       iex> multi = Yog.Multi.Graph.remove_edge(multi, 1, 2, edge_id)
+      iex> Yog.Multi.Graph.edge_count(multi, 1, 2)
+      0
   """
   @spec remove_edge(t(), Yog.Model.node_id(), Yog.Model.node_id(), edge_id()) :: t()
   def remove_edge(%__MODULE__{edges: edges, kind: kind} = multi, from, to, edge_id) do
@@ -184,8 +186,12 @@ defmodule Yog.Multi.Graph do
 
   ## Examples
 
+      iex> multi = Yog.Multi.Graph.new(:undirected)
+      iex> multi = Yog.Multi.Graph.add_node(multi, 1, nil)
+      iex> multi = Yog.Multi.Graph.add_node(multi, 2, nil)
+      iex> {:ok, multi, _} = Yog.Multi.Graph.add_edge(multi, 1, 2, 10)
       iex> edges = Yog.Multi.Graph.get_edges(multi, 1, 2)
-      iex> is_list(edges)
+      iex> length(edges) >= 1
       true
   """
   @spec get_edges(t(), Yog.Model.node_id(), Yog.Model.node_id()) :: [edge_data()]
@@ -198,8 +204,12 @@ defmodule Yog.Multi.Graph do
 
   ## Examples
 
+      iex> multi = Yog.Multi.Graph.new(:undirected)
+      iex> multi = Yog.Multi.Graph.add_node(multi, 1, nil)
+      iex> multi = Yog.Multi.Graph.add_node(multi, 2, nil)
+      iex> {:ok, multi, _} = Yog.Multi.Graph.add_edge(multi, 1, 2, 10)
       iex> count = Yog.Multi.Graph.edge_count(multi, 1, 2)
-      iex> is_integer(count)
+      iex> count >= 1
       true
   """
   @spec edge_count(t(), Yog.Model.node_id(), Yog.Model.node_id()) :: non_neg_integer()
@@ -223,7 +233,7 @@ defmodule Yog.Multi.Graph do
       iex> multi = Yog.Multi.Graph.add_node(multi, 2, nil)
       iex> {:ok, multi, _} = Yog.Multi.Graph.add_edge(multi, 1, 2, 10)
       iex> {:ok, multi, _} = Yog.Multi.Graph.add_edge(multi, 1, 2, 20)
-      iex> simple = Yog.Multi.Graph.to_simple_graph(multi)
+      iex> _simple = Yog.Multi.Graph.to_simple_graph(multi)
       iex> # simple graph will have only one edge between 1 and 2
   """
   @spec to_simple_graph(t()) :: Yog.graph()
@@ -266,10 +276,14 @@ defmodule Yog.Multi.Graph do
 
   ## Examples
 
-      iex> # Sum weights of parallel edges
+      iex> multi = Yog.Multi.Graph.new(:undirected)
+      iex> multi = Yog.Multi.Graph.add_node(multi, 1, nil)
+      iex> multi = Yog.Multi.Graph.add_node(multi, 2, nil)
+      iex> {:ok, multi, _} = Yog.Multi.Graph.add_edge(multi, 1, 2, 10)
+      iex> {:ok, multi, _} = Yog.Multi.Graph.add_edge(multi, 1, 2, 20)
       iex> simple = Yog.Multi.Graph.to_simple_graph_with(multi, &Kernel.+/2)
-      iex> # Take maximum weight
-      iex> simple = Yog.Multi.Graph.to_simple_graph_with(multi, &max/2)
+      iex> Yog.Model.has_edge?(simple, 1, 2)
+      true
   """
   @spec to_simple_graph_with(t(), (number(), number() -> number())) :: Yog.graph()
   def to_simple_graph_with(%__MODULE__{kind: kind, nodes: nodes, edges: edges}, combine_fn)
@@ -311,8 +325,12 @@ defmodule Yog.Multi.Graph do
 
   ## Examples
 
+      iex> multi = Yog.Multi.Graph.new(:undirected)
+      iex> multi = Yog.Multi.Graph.add_node(multi, 1, nil)
+      iex> multi = Yog.Multi.Graph.add_node(multi, 2, nil)
+      iex> {:ok, multi, _} = Yog.Multi.Graph.add_edge(multi, 1, 2, 10)
       iex> total = Yog.Multi.Graph.total_edge_count(multi)
-      iex> is_integer(total)
+      iex> total >= 1
       true
   """
   @spec total_edge_count(t()) :: non_neg_integer()
@@ -333,9 +351,12 @@ defmodule Yog.Multi.Graph do
 
   ## Examples
 
+      iex> multi = Yog.Multi.Graph.new(:undirected)
+      iex> multi = Yog.Multi.Graph.add_node(multi, 1, nil)
+      iex> multi = Yog.Multi.Graph.add_node(multi, 2, nil)
       iex> count = Yog.Multi.Graph.node_count(multi)
-      iex> is_integer(count)
-      true
+      iex> count
+      2
   """
   @spec node_count(t()) :: non_neg_integer()
   def node_count(%__MODULE__{nodes: nodes}) do

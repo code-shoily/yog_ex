@@ -1,7 +1,7 @@
 defmodule Yog.Property.StableMarriageTest do
   use ExUnit.Case
 
-  alias Yog.Bipartite
+  alias Yog.Property.Bipartite
 
   # Classic stable marriage problem - 3 men, 3 women
   test "classic_three_couples_test" do
