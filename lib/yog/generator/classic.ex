@@ -19,6 +19,9 @@ defmodule Yog.Generator.Classic do
   | `binary_tree/1` | Tree | O(2^d) | 2^(d+1) - 2 |
   | `petersen/0` | Petersen | O(1) | 15 |
   | `empty/1` | Isolated | O(n) | 0 |
+  | `hypercube/1` | Q_n | O(n × 2^n) | n × 2^(n-1) |
+  | `ladder/1` | Ladder | O(n) | 3n - 2 |
+  | `turan/2` | T(n,r) | O(n²) | Complete r-partite |
 
   ## Examples
 
@@ -633,6 +636,260 @@ defmodule Yog.Generator.Classic do
 
     Enum.reduce(0..(n - 1), base, fn i, g ->
       Yog.add_node(g, i, nil)
+    end)
+  end
+
+  # ============= Hypercube Graph =============
+
+  @doc """
+  Generates an n-dimensional hypercube graph Q_n.
+
+  The hypercube is a classic topology where each node represents a binary
+  string of length n, and edges connect nodes that differ in exactly one bit.
+
+  **Properties:**
+  - Nodes: 2^n
+  - Edges: n × 2^(n-1)
+  - Regular degree: n
+  - Diameter: n
+  - Bipartite: yes
+
+  **Time Complexity:** O(n × 2^n)
+
+  ## Examples
+
+      iex> cube = Yog.Generator.Classic.hypercube(3)
+      iex> # 3-cube has 8 nodes
+      ...> Yog.Model.order(cube)
+      8
+      iex> # Each node has degree 3
+      ...> length(Yog.neighbors(cube, 0))
+      3
+      iex> # 3-cube has 12 edges
+      ...> Yog.Model.edge_count(cube)
+      12
+
+  ## Use Cases
+
+  - Distributed systems and parallel computing topologies
+  - Error-correcting codes
+  - Testing algorithms on regular, bipartite structures
+  - Gray code applications
+
+  ## References
+
+  - [Wikipedia: Hypercube Graph](https://en.wikipedia.org/wiki/Hypercube_graph)
+  """
+  @spec hypercube(integer()) :: Yog.graph()
+  def hypercube(n) when n >= 0 do
+    hypercube_with_type(n, :undirected)
+  end
+
+  def hypercube(_n), do: Yog.new(:undirected)
+
+  @doc """
+  Generates a hypercube graph with specified graph type.
+  """
+  @spec hypercube_with_type(integer(), Yog.graph_type()) :: Yog.graph()
+  def hypercube_with_type(n, _graph_type) when n < 0, do: Yog.new(:undirected)
+  def hypercube_with_type(0, graph_type), do: Yog.new(graph_type) |> Yog.add_node(0, nil)
+
+  def hypercube_with_type(n, graph_type) do
+    base = Yog.new(graph_type)
+    num_nodes = Integer.pow(2, n)
+
+    # Add all nodes (0 to 2^n - 1)
+    graph =
+      Enum.reduce(0..(num_nodes - 1), base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # Add edges: connect nodes that differ by exactly one bit
+    edges =
+      for i <- 0..(num_nodes - 1),
+          bit <- 0..(n - 1),
+          j = Bitwise.bxor(i, Bitwise.bsl(1, bit)),
+          # Avoid duplicates for undirected
+          i < j,
+          do: {i, j, 1}
+
+    Enum.reduce(edges, graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
+
+  # ============= Ladder Graph =============
+
+  @doc """
+  Generates a ladder graph with n rungs.
+
+  A ladder graph consists of two parallel paths (rails) connected by n rungs.
+  It is the Cartesian product of a path P_n and an edge K_2.
+
+  **Properties:**
+  - Nodes: 2n
+  - Edges: 3n - 2
+  - Planar: yes
+  - Equivalent to grid_2d(2, n)
+
+  **Time Complexity:** O(n)
+
+  ## Examples
+
+      iex> ladder = Yog.Generator.Classic.ladder(4)
+      iex> # 4-rung ladder has 8 nodes
+      ...> Yog.Model.order(ladder)
+      8
+      iex> # End nodes have degree 2
+      ...> length(Yog.neighbors(ladder, 0))
+      2
+      iex> # Interior nodes have degree 3
+      ...> length(Yog.neighbors(ladder, 2))
+      3
+
+  ## Use Cases
+
+  - Basic network topologies
+  - DNA and molecular structure modeling
+  - Pathfinding benchmarks
+  """
+  @spec ladder(integer()) :: Yog.graph()
+  def ladder(n) when n > 0 do
+    ladder_with_type(n, :undirected)
+  end
+
+  def ladder(_n), do: Yog.new(:undirected)
+
+  @doc """
+  Generates a ladder graph with specified graph type.
+  """
+  @spec ladder_with_type(integer(), Yog.graph_type()) :: Yog.graph()
+  def ladder_with_type(n, _graph_type) when n <= 0, do: Yog.new(:undirected)
+
+  def ladder_with_type(n, graph_type) do
+    base = Yog.new(graph_type)
+
+    # Nodes 0..n-1 are the bottom rail, n..2n-1 are the top rail
+    graph =
+      Enum.reduce(0..(2 * n - 1), base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # Bottom rail edges: (i, i+1) for i in 0..n-2
+    bottom_edges = if n >= 2, do: for(i <- 0..(n - 2), do: {i, i + 1, 1}), else: []
+
+    # Top rail edges: (i, i+1) for i in n..2n-2
+    top_edges = if n >= 2, do: for(i <- n..(2 * n - 2), do: {i, i + 1, 1}), else: []
+
+    # Rung edges: (i, i+n) for i in 0..n-1
+    rung_edges = for(i <- 0..(n - 1), do: {i, i + n, 1})
+
+    Enum.reduce(bottom_edges ++ top_edges ++ rung_edges, graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
+
+  # ============= Turan Graph =============
+
+  @doc """
+  Generates the Turán graph T(n, r).
+
+  The Turán graph is a complete r-partite graph with n vertices where
+  partitions are as equal as possible. It maximizes the number of edges
+  among all n-vertex graphs that do not contain K_{r+1} as a subgraph.
+
+  **Properties:**
+  - Complete r-partite with balanced partitions
+  - Maximum edge count without containing K_{r+1}
+  - Chromatic number: r (for n >= r)
+  - Turán's theorem: extremal graph for forbidden cliques
+
+  **Time Complexity:** O(n²)
+
+  ## Examples
+
+      iex> turan = Yog.Generator.Classic.turan(10, 3)
+      iex> # T(10, 3) has 10 nodes
+      ...> Yog.Model.order(turan)
+      10
+      iex> # Partition sizes are balanced: 4, 3, 3
+      iex> # No edges within partitions, all edges between
+
+      iex> # T(n, 2) is the complete bipartite graph
+      ...> k33 = Yog.Generator.Classic.turan(6, 2)
+      ...> Yog.Model.order(k33)
+      6
+
+  ## Use Cases
+
+  - Extremal graph theory testing
+  - Chromatic number benchmarks
+  - Anti-clique (independence number) studies
+  - Balanced multi-partite networks
+
+  ## References
+
+  - [Wikipedia: Turán Graph](https://en.wikipedia.org/wiki/Tur%C3%A1n_graph)
+  - [Turán's Theorem](https://en.wikipedia.org/wiki/Tur%C3%A1n%27s_theorem)
+  """
+  @spec turan(integer(), integer()) :: Yog.graph()
+  def turan(n, r) when n > 0 and r > 0 do
+    turan_with_type(n, r, :undirected)
+  end
+
+  def turan(_n, _r), do: Yog.new(:undirected)
+
+  @doc """
+  Generates a Turán graph with specified graph type.
+  """
+  @spec turan_with_type(integer(), integer(), Yog.graph_type()) :: Yog.graph()
+  def turan_with_type(n, _r, _graph_type) when n <= 0, do: Yog.new(:undirected)
+  def turan_with_type(_n, r, _graph_type) when r <= 0, do: Yog.new(:undirected)
+
+  def turan_with_type(n, r, graph_type) do
+    base = Yog.new(graph_type)
+
+    # Add all nodes
+    graph =
+      Enum.reduce(0..(n - 1), base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # Handle case where r >= n (each node in its own partition = complete graph)
+    # Handle case where n <= r: each node gets its own partition, complete graph
+    partition_of = fn node ->
+      if r >= n do
+        # Each node in its own partition
+        node
+      else
+        # r partitions, each of size either floor(n/r) or ceil(n/r)
+        base_size = div(n, r)
+        remainder = rem(n, r)
+
+        # First 'remainder' partitions have base_size + 1 nodes
+        # Remaining partitions have base_size nodes
+        if node < remainder * (base_size + 1) do
+          div(node, base_size + 1)
+        else
+          # Handle case where base_size could be 0
+          if base_size == 0 do
+            remainder - 1
+          else
+            remainder + div(node - remainder * (base_size + 1), base_size)
+          end
+        end
+      end
+    end
+
+    # Add edges between nodes in different partitions
+    edges =
+      for i <- 0..(n - 1),
+          j <- (i + 1)..(n - 1)//1,
+          partition_of.(i) != partition_of.(j),
+          do: {i, j, 1}
+
+    Enum.reduce(edges, graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
     end)
   end
 end
