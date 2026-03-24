@@ -52,6 +52,7 @@ A comprehensive **pure Elixir** graph algorithm library providing implementation
 - **Graph Builders**: Grid builders (regular & toroidal), labeled builders, live/incremental builders
 - **Disjoint Set (Union-Find)**: With path compression and union by rank
 - **Efficient Data Structures**: Pairing heap for priority queues, two-list queue for BFS
+- **Functional Graphs (Experimental)**: Elegant port of Erwig's Inductive Graph Library (FGL) for purely functional recursive traversal
 
 ## Installation
 
@@ -253,6 +254,29 @@ pajek_string = Yog.IO.Pajek.serialize(graph)
 # {:ok, loaded} = Yog.IO.Pajek.read("network.net")
 ```
 
+### Functional Inductive Graphs (Experimental)
+
+YogEx now includes an experimental implementation of Martin Erwig's Functional Graph Library (FGL) natively in Elixir under the `Yog.Functional` namespace. This provides an elegant, purely functional approach to graph algorithms using inductive decomposition (`match/2`) instead of mutable references or explicit "visited" sets.
+
+```elixir
+# Create an inductive functional graph
+graph =
+  Yog.Functional.Model.empty()
+  |> Yog.Functional.Model.put_node(1, "A")
+  |> Yog.Functional.Model.put_node(2, "B")
+  |> Yog.Functional.Model.put_node(3, "C")
+  |> Yog.Functional.Model.add_edge!(1, 2, "Weight 1")
+  |> Yog.Functional.Model.add_edge!(2, 3, "Weight 2")
+
+# Inductive Top-Sort - consumes the graph naturally, no mutable visited sets!
+{:ok, order} = Yog.Functional.Algorithms.topsort(graph)
+# => [1, 2, 3]
+
+# Inductive Dijkstra
+{:ok, path, dist} = Yog.Functional.Algorithms.shortest_path(graph, 1, 3)
+# => [1, 2, 3] and 2
+```
+
 ## Examples
 
 Detailed examples are located in the [examples/](https://github.com/code-shoily/yog_ex/tree/main/examples) directory:
@@ -364,6 +388,7 @@ Detailed documentation for each algorithm can be found on [HexDocs](https://hexd
 | `Yog.Render.*` | ASCII, DOT, Mermaid visualization |
 | `Yog.IO.*` | Serialization to/from GraphML, GDF, JSON, LEDA, Pajek, and TGF |
 | `Yog.DisjointSet` | Union-Find with path compression and union by rank |
+| `Yog.Functional.*` | Experimental pure inductive graphs (FGL) |
 
 ## Performance Characteristics
 

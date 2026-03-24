@@ -1,0 +1,239 @@
+defmodule Yog.Functional.Algorithms do
+  @moduledoc """
+  Classic graph algorithms using purely functional inductive decomposition.
+
+  Each algorithm leverages `Yog.Functional.Model.match/2` as its core operation.
+  By extracting a node and working with the resulting *shrunken* graph, these
+  implementations avoid mutable state and explicit "visited" sets. Correctness
+  and termination follow naturally from the inductive structure.
+
+  ## Available Algorithms
+
+  | Algorithm | Function | Time Complexity |
+  |-----------|----------|-----------------|
+  | [Topological Sort](https://en.wikipedia.org/wiki/Topological_sorting) | `topsort/1` | O(V + E) |
+  | [Dijkstra's Shortest Path](https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm) | `shortest_path/3` | O((V + E) log V) |
+  | [Prim's MST](https://en.wikipedia.org/wiki/Prim%27s_algorithm) | `mst_prim/1` | O(E log V) |
+  | [Kosaraju's SCC](https://en.wikipedia.org/wiki/Kosaraju%27s_algorithm) | `scc/1` | O(V + E) |
+
+  ## Key Principle
+
+  Every algorithm consumes the graph structurally: `match/2` removes a node and
+  all its incident edges, so already-processed nodes simply won't be found in the
+  remaining graph. No external "visited" bookkeeping is needed.
+
+  ## References
+
+  - [Original FGL Paper (Erwig, 2001)](https://web.engr.oregonstate.edu/~erwig/papers/InductiveGraphs_JFP01.pdf)
+  - [Wikipedia: Graph Algorithms](https://en.wikipedia.org/wiki/Graph_algorithm)
+  """
+  alias Yog.Functional.Model
+  alias Yog.Functional.Transform
+  alias Yog.PriorityQueue, as: PQ
+
+  @doc """
+  Performs a Topological Sort by repeatedly extracting nodes with 0 in-degree.
+  Returns `{:ok, [node_ids]}` or `{:error, :cycle_detected}`.
+
+  Inductive approach: each round, we scan for a node whose `in_edges` map is
+  empty in the current (shrunken) graph, extract it with `match/2`, and recurse.
+  When an edge is removed by `match/2`, affected neighbours' `in_edges` are
+  automatically updated by the inductive model, so the in-degree invariant is
+  always up to date without a separate tracking structure.
+  """
+  def topsort(graph), do: do_topsort(graph, [])
+
+  defp do_topsort(graph, acc) do
+    if Model.empty?(graph) do
+      {:ok, Enum.reverse(acc)}
+    else
+      find_and_match_next(graph, acc)
+    end
+  end
+
+  defp find_and_match_next(graph, acc) do
+    case Enum.find(Model.nodes(graph), fn ctx -> map_size(ctx.in_edges) == 0 end) do
+      nil ->
+        {:error, :cycle_detected}
+
+      ctx ->
+        {:ok, _ctx, remaining_graph} = Model.match(graph, ctx.id)
+        do_topsort(remaining_graph, [ctx.id | acc])
+    end
+  end
+
+  @doc """
+  Finds the shortest path between two nodes using Dijkstra's algorithm.
+  Returns `{:ok, [node_ids], total_distance}` or `{:error, :no_path}`.
+
+  Edge labels are used as weights (defaults to 1 if `nil`).
+
+  Inductive approach: we maintain a sorted priority queue of `{dist, node, path}`
+  entries. Each step extracts the minimum-distance frontier node using `match/2`.
+  Because `match/2` removes the node from the graph, we naturally skip
+  already-settled nodes — they simply won't be found anymore.
+  """
+  def shortest_path(graph, start_id, target_id) do
+    if start_id == target_id do
+      if Model.has_node?(graph, start_id),
+        do: {:ok, [start_id], 0},
+        else: {:error, :no_path}
+    else
+      do_dijkstra(
+        graph,
+        PQ.new(fn {a, _, _}, {b, _, _} -> a <= b end) |> PQ.push({0, start_id, []}),
+        target_id
+      )
+    end
+  end
+
+  defp do_dijkstra(graph, pq, target_id) do
+    if PQ.empty?(pq) do
+      {:error, :no_path}
+    else
+      {:ok, {dist, current, path}, rest_pq} = PQ.pop(pq)
+
+      case Model.match(graph, current) do
+        {:error, :not_found} ->
+          do_dijkstra(graph, rest_pq, target_id)
+
+        {:ok, ctx, remaining_graph} ->
+          process_dijkstra_node(ctx, remaining_graph, dist, path, rest_pq, target_id)
+      end
+    end
+  end
+
+  defp process_dijkstra_node(ctx, _remaining_graph, dist, path, _pq, target_id)
+       when ctx.id == target_id do
+    {:ok, Enum.reverse([ctx.id | path]), dist}
+  end
+
+  defp process_dijkstra_node(ctx, remaining_graph, dist, path, pq, target_id) do
+    new_pq =
+      Enum.reduce(ctx.out_edges, pq, fn {neighbor_id, weight}, acc_pq ->
+        w = weight || 1
+        PQ.push(acc_pq, {dist + w, neighbor_id, [ctx.id | path]})
+      end)
+
+    do_dijkstra(remaining_graph, new_pq, target_id)
+  end
+
+  @doc """
+  Finds the Minimum Spanning Tree of the connected component containing the first node.
+  Returns `{:ok, [{from, to, weight}]}` or `{:ok, []}` for empty graphs.
+
+  Treats the graph as undirected by extracting both in and out edges from each context.
+
+  Inductive approach (Prim's): start from any node (extracted via `match/2`),
+  insert its adjacent edges into a sorted priority queue, then repeatedly
+  dequeue the minimum-weight edge whose target is still in the unvisited graph.
+  `match/2` is used to extract the target: if it's already been visited,
+  `match/2` returns `{:error, :not_found}` and we skip to the next candidate.
+  """
+  def mst_prim(graph) do
+    case Model.node_ids(graph) do
+      [] ->
+        {:ok, []}
+
+      [start | _] ->
+        {:ok, ctx, remaining_graph} = Model.match(graph, start)
+        edges = extract_undirected_edges(ctx)
+        do_mst_prim(remaining_graph, Enum.sort(edges), [])
+    end
+  end
+
+  defp do_mst_prim(_graph, [], acc), do: {:ok, Enum.reverse(acc)}
+
+  defp do_mst_prim(graph, [{weight, from, to} | pq], acc) do
+    case Model.match(graph, to) do
+      {:error, :not_found} ->
+        do_mst_prim(graph, pq, acc)
+
+      {:ok, ctx, remaining_graph} ->
+        new_acc = [{from, to, weight} | acc]
+
+        new_edges = extract_undirected_edges(ctx)
+        new_pq = merge_sorted_lists(pq, Enum.sort(new_edges))
+
+        do_mst_prim(remaining_graph, new_pq, new_acc)
+    end
+  end
+
+  @doc """
+  Finds the Strongly Connected Components (SCCs) of a directed graph.
+  Returns a list of lists, where each inner list contains the node IDs of one SCC.
+
+  Uses Kosaraju's two-pass algorithm, adapted for functional inductive graphs:
+  1. Pass 1: compute the DFS finishing order of all nodes.
+  2. Reverse the graph's edges.
+  3. Pass 2: extract components by running DFS on the reversed graph in the compute order.
+
+  Due to the inductive `match/2` operations, nodes visited in one component
+  are naturally removed from the graph, preventing them from bleeding into
+  subsequent components.
+  """
+  def scc(%Model{direction: :undirected}) do
+    raise ArgumentError, "Strongly Connected Components requires a directed graph"
+  end
+
+  def scc(%Model{} = graph) do
+    {finishing_order, _shrunken_completely} =
+      dfs_finishing_order(graph, Model.node_ids(graph), [])
+
+    reversed_graph = Transform.reverse(graph)
+    extract_sccs(reversed_graph, finishing_order, [])
+  end
+
+  defp dfs_finishing_order(graph, queue, acc)
+  defp dfs_finishing_order(graph, [], acc), do: {acc, graph}
+
+  defp dfs_finishing_order(graph, [current | queue], acc) do
+    case Model.match(graph, current) do
+      {:error, :not_found} ->
+        dfs_finishing_order(graph, queue, acc)
+
+      {:ok, ctx, remaining_graph} ->
+        children = Map.keys(ctx.out_edges)
+
+        {new_acc, graph_after_children} =
+          dfs_finishing_order(remaining_graph, children, acc)
+
+        dfs_finishing_order(graph_after_children, queue, [current | new_acc])
+    end
+  end
+
+  defp extract_sccs(_graph, [], acc), do: Enum.reverse(acc)
+
+  defp extract_sccs(graph, [current | rest], acc) do
+    case Model.match(graph, current) do
+      {:error, :not_found} ->
+        extract_sccs(graph, rest, acc)
+
+      {:ok, _ctx, _remaining} ->
+        {component_ids, remainder} = extract_component(graph, [current], [])
+        extract_sccs(remainder, rest, [component_ids | acc])
+    end
+  end
+
+  defp extract_component(graph, [], acc), do: {Enum.reverse(acc), graph}
+
+  defp extract_component(graph, [current | stack], acc) do
+    case Model.match(graph, current) do
+      {:error, :not_found} ->
+        extract_component(graph, stack, acc)
+
+      {:ok, ctx, remaining_graph} ->
+        neighbors = Map.keys(ctx.out_edges)
+        new_stack = neighbors ++ stack
+        extract_component(remaining_graph, new_stack, [current | acc])
+    end
+  end
+
+  defp extract_undirected_edges(ctx) do
+    out_e = Enum.map(ctx.out_edges, fn {to, w} -> {w || 1, ctx.id, to} end)
+    in_e = Enum.map(ctx.in_edges, fn {from, w} -> {w || 1, ctx.id, from} end)
+    out_e ++ in_e
+  end
+
+  defp merge_sorted_lists(list1, list2), do: :lists.merge(list1, list2)
+end
