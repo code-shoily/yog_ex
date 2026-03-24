@@ -296,22 +296,26 @@ defmodule Yog.Community.GirvanNewman do
     else
       ebc = edge_betweenness(graph)
 
-      max_val =
-        ebc
-        |> Map.values()
-        |> Enum.max(fn -> 0.0 end)
+      if map_size(ebc) == 0 do
+        Dendrogram.new(Enum.reverse(new_levels), [])
+      else
+        max_val =
+          ebc
+          |> Map.values()
+          |> Enum.max(fn -> 0.0 end)
 
-      edge_to_remove =
-        Enum.find(ebc, fn {_edge, score} -> score == max_val end)
-        |> case do
-          nil -> {0, 0}
-          {{u, v}, _score} -> {u, v}
-        end
+        edge_to_remove =
+          Enum.find(ebc, fn {_edge, score} -> score == max_val end)
+          |> case do
+            nil -> {0, 0}
+            {{u, v}, _score} -> {u, v}
+          end
 
-      {u, v} = edge_to_remove
-      new_graph = Model.remove_edge(graph, u, v)
+        {u, v} = edge_to_remove
+        new_graph = Model.remove_edge(graph, u, v)
 
-      do_gn_split(new_graph, new_levels)
+        do_gn_split(new_graph, new_levels)
+      end
     end
   end
 

@@ -512,16 +512,21 @@ defmodule Yog.Model do
       1
   """
   @spec edge_count(graph()) :: integer()
-  def edge_count(%Graph{kind: kind, out_edges: out_edges}) do
-    count =
-      Enum.reduce(out_edges, 0, fn {_src, targets}, acc ->
-        acc + map_size(targets)
+  def edge_count(%Graph{kind: :directed, out_edges: out_edges}) do
+    Enum.reduce(out_edges, 0, fn {_src, targets}, acc ->
+      acc + map_size(targets)
+    end)
+  end
+
+  def edge_count(%Graph{kind: :undirected, out_edges: out_edges}) do
+    {total, self_loops} =
+      Enum.reduce(out_edges, {0, 0}, fn {src, targets}, {acc_total, acc_self} ->
+        new_total = acc_total + map_size(targets)
+        new_self = if Map.has_key?(targets, src), do: acc_self + 1, else: acc_self
+        {new_total, new_self}
       end)
 
-    case kind do
-      :directed -> count
-      :undirected -> div(count, 2)
-    end
+    div(total - self_loops, 2) + self_loops
   end
 
   @doc """
@@ -742,6 +747,31 @@ defmodule Yog.Model do
   @spec node(graph(), node_id()) :: term() | nil
   def node(graph, id) do
     graph |> nodes() |> Map.get(id)
+  end
+
+  @doc """
+  Checks if the graph contains a node with the given ID.
+
+  **Time Complexity:** O(1)
+  """
+  @spec has_node?(graph(), node_id()) :: boolean()
+  def has_node?(%Graph{nodes: nodes}, id) do
+    Map.has_key?(nodes, id)
+  end
+
+  @doc """
+  Checks if the graph contains an edge between `src` and `dst`.
+
+  Returns `true` if an edge exists, `false` otherwise.
+
+  **Time Complexity:** O(1)
+  """
+  @spec has_edge?(graph(), node_id(), node_id()) :: boolean()
+  def has_edge?(%Graph{out_edges: out}, src, dst) do
+    case Map.fetch(out, src) do
+      {:ok, inner} -> Map.has_key?(inner, dst)
+      :error -> false
+    end
   end
 
   @doc """

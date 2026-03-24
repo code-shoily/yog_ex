@@ -209,7 +209,7 @@ defmodule Yog.Community.CliquePercolation do
   defp find_clique_components(adj, n) do
     # DFS to find connected components
     {_visited, components} =
-      Enum.reduce(0..(n - 1), {MapSet.new(), []}, fn i, {visited, comps} ->
+      Enum.reduce(Enum.to_list(0..(n - 1)//1), {MapSet.new(), []}, fn i, {visited, comps} ->
         if MapSet.member?(visited, i) do
           {visited, comps}
         else

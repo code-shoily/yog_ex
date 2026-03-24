@@ -124,7 +124,7 @@ defmodule Yog.Community.LocalCommunity do
     # Start with empty degrees cache
     degrees_cache = %{}
 
-    do_detect(graph, initial_s, k_in, k_out, degrees_cache, options, 0, weight_fn)
+    do_detect(graph, initial_s, k_in, k_out, degrees_cache, options, 0, weight_fn, seeds)
   end
 
   # ============================================================
@@ -199,7 +199,7 @@ defmodule Yog.Community.LocalCommunity do
     end
   end
 
-  defp do_detect(graph, s, k_in, k_out, cache, opts, iters, weight_fn) do
+  defp do_detect(graph, s, k_in, k_out, cache, opts, iters, weight_fn, seeds) do
     bound = boundary_of(graph, s)
     current_f = fitness(k_in, k_out, opts.alpha)
 
@@ -239,7 +239,10 @@ defmodule Yog.Community.LocalCommunity do
             new_k_out = k_out - d + 2.0 * w_in
             f = fitness(new_k_in, new_k_out, opts.alpha)
 
-            if f > best_f_acc do
+            # Never remove a seed node
+            is_seed = node in seeds
+
+            if f > best_f_acc and not is_seed do
               {{:remove, node, new_k_in, new_k_out}, f, next_cache}
             else
               {best_op_acc, best_f_acc, next_cache}
@@ -259,7 +262,7 @@ defmodule Yog.Community.LocalCommunity do
         if iters >= opts.max_iterations do
           new_s
         else
-          do_detect(graph, new_s, nk_in, nk_out, final_cache, opts, iters + 1, weight_fn)
+          do_detect(graph, new_s, nk_in, nk_out, final_cache, opts, iters + 1, weight_fn, seeds)
         end
 
       {:remove, node, nk_in, nk_out} ->
@@ -268,7 +271,7 @@ defmodule Yog.Community.LocalCommunity do
         if iters >= opts.max_iterations do
           new_s
         else
-          do_detect(graph, new_s, nk_in, nk_out, final_cache, opts, iters + 1, weight_fn)
+          do_detect(graph, new_s, nk_in, nk_out, final_cache, opts, iters + 1, weight_fn, seeds)
         end
     end
   end

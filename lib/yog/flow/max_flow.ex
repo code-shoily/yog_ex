@@ -126,7 +126,8 @@ defmodule Yog.Flow.MaxFlow do
     {max_flow, final_residual} =
       do_edmonds_karp(residual, source, sink, zero, add, subtract, compare, min_fn)
 
-    MaxFlowResult.new(max_flow, final_residual, source, sink)
+    final_residual_graph = residual_to_graph(graph, final_residual)
+    MaxFlowResult.new(max_flow, final_residual_graph, source, sink)
   end
 
   @doc """
@@ -169,7 +170,6 @@ defmodule Yog.Flow.MaxFlow do
     edmonds_karp(graph, source, sink, 0, &+/2, &-/2, fn a, b -> a <= b end, &min/2)
   end
 
-  # Build residual graph structure: {from, to} -> capacity
   defp build_residual_graph(graph, _zero) do
     # Extract all edges and their capacities from the graph
     nodes = Model.all_nodes(graph)
@@ -181,6 +181,24 @@ defmodule Yog.Flow.MaxFlow do
         key = {from, to}
         Map.put(acc2, key, capacity)
       end)
+    end)
+  end
+
+  # Convert internal residual map back to a Yog.Graph structure
+  defp residual_to_graph(original_graph, residual_map) do
+    # Start with a graph that has the same kind and all original nodes
+    empty_graph =
+      Model.all_nodes(original_graph)
+      |> Enum.reduce(Yog.Graph.new(original_graph.kind), fn node, g ->
+        Model.add_node(g, node, Map.get(original_graph.nodes, node))
+      end)
+
+    # Add all residual edges (including backward edges)
+    Enum.reduce(residual_map, empty_graph, fn {{u, v}, cap}, g ->
+      case Model.add_edge(g, u, v, cap) do
+        {:ok, new_g} -> new_g
+        {:error, _} -> g
+      end
     end)
   end
 
@@ -298,7 +316,7 @@ defmodule Yog.Flow.MaxFlow do
   @spec extract_min_cut(max_flow_result()) :: min_cut()
   def extract_min_cut(%MaxFlowResult{residual_graph: residual, source: source}) do
     # Find all nodes reachable from source in residual graph
-    nodes = get_all_nodes_from_residual(residual)
+    nodes = Model.all_nodes(residual) |> MapSet.new()
     source_side = bfs_reachable(residual, source, nodes)
     sink_side = MapSet.difference(nodes, source_side)
 
@@ -333,25 +351,16 @@ defmodule Yog.Flow.MaxFlow do
   """
   @spec min_cut(max_flow_result(), any(), (any(), any() -> boolean())) :: min_cut()
   def min_cut(%MaxFlowResult{residual_graph: residual, source: source}, zero, compare) do
-    nodes = get_all_nodes_from_residual(residual)
+    nodes = Model.all_nodes(residual) |> MapSet.new()
     source_side = bfs_reachable_with_compare(residual, source, nodes, zero, compare)
     sink_side = MapSet.difference(nodes, source_side)
 
     MinCutResult.new(source_side, sink_side)
   end
 
-  # Get all nodes from residual graph
-  defp get_all_nodes_from_residual(residual) do
-    residual
-    |> Map.keys()
-    |> Enum.flat_map(fn {from, to} -> [from, to] end)
-    |> Enum.uniq()
-    |> MapSet.new()
-  end
-
   # BFS to find reachable nodes from source
-  defp bfs_reachable(residual, source, all_nodes) do
-    bfs_reachable_with_compare(residual, source, all_nodes, 0, fn a, b -> a <= b end)
+  defp bfs_reachable(residual, source, _all_nodes) do
+    bfs_reachable_with_compare(residual, source, nil, 0, fn a, b -> a <= b end)
   end
 
   defp bfs_reachable_with_compare(residual, source, _all_nodes, zero, compare) do
@@ -362,12 +371,13 @@ defmodule Yog.Flow.MaxFlow do
 
   defp do_bfs_reachable(residual, [current | rest], visited, zero, compare) do
     # Find all neighbors with positive residual capacity
+    # Since 'residual' is now a Yog.Graph, we use Model.successors
     neighbors =
-      residual
-      |> Enum.filter(fn {{from, _}, cap} ->
-        from == current and not (compare.(cap, zero) and compare.(zero, cap))
+      Model.successors(residual, current)
+      |> Enum.filter(fn {_, cap} ->
+        not (compare.(cap, zero) and compare.(zero, cap))
       end)
-      |> Enum.map(fn {{_, to}, _} -> to end)
+      |> Enum.map(fn {to, _} -> to end)
       |> Enum.filter(fn n -> not MapSet.member?(visited, n) end)
 
     new_visited = Enum.reduce(neighbors, visited, fn n, acc -> MapSet.put(acc, n) end)

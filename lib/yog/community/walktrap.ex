@@ -158,7 +158,9 @@ defmodule Yog.Community.Walktrap do
     # 2. Compute degrees for normalization
     degrees =
       Map.new(nodes, fn u ->
-        {u, length(Model.successors(graph, u)) * 1.0}
+        d = length(Model.successors(graph, u)) * 1.0
+        # Use 1.0 as floor to avoid division by zero in distance calculation
+        {u, max(d, 1.0)}
       end)
 
     # 3. Initial communities: each node in its own community

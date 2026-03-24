@@ -341,22 +341,32 @@ defmodule Yog.Pathfinding.Bidirectional do
 
   defp do_bfs_step(graph, queue_fwd, queue_bwd, visited_fwd, visited_bwd) do
     # Check for intersection first
-    intersection =
-      Enum.find_value(visited_fwd, fn {node, path_fwd} ->
+    # Find all intersections and pick the one with shortest total path
+    shortest_intersection =
+      visited_fwd
+      |> Enum.reduce(nil, fn {node, path_fwd}, best ->
         case Map.fetch(visited_bwd, node) do
-          {:ok, path_bwd} -> {node, path_fwd, path_bwd}
-          :error -> nil
+          {:ok, path_bwd} ->
+            len = length(path_fwd) + length(path_bwd) - 1
+
+            if best == nil or len < elem(best, 3) do
+              {node, path_fwd, path_bwd, len}
+            else
+              best
+            end
+
+          :error ->
+            best
         end
       end)
 
-    if intersection do
-      {_node, path_fwd, path_bwd} = intersection
+    if shortest_intersection do
+      {_node, path_fwd, path_bwd, total_dist} = shortest_intersection
       # path_fwd goes from meeting point back to start [node...from]
       # path_bwd goes from meeting point back to goal [node...to]
       # Combined: reverse(path_fwd) + (path_bwd without first element)
       full_path = Enum.reverse(path_fwd) ++ tl(path_bwd)
-      total_dist = length(full_path) - 1
-      {:ok, Path.new(full_path, total_dist, :bidirectional_bfs)}
+      {:ok, Path.new(full_path, total_dist - 1, :bidirectional_bfs)}
     else
       # Expand frontiers one level
       {new_queue_fwd, new_visited_fwd} = expand_bfs_level(graph, queue_fwd, visited_fwd)

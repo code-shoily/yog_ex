@@ -267,8 +267,8 @@ defmodule Yog.Transform do
   @spec filter_edges(Yog.graph(), (Yog.node_id(), Yog.node_id(), term() -> boolean())) ::
           Yog.graph()
   def filter_edges(%Yog.Graph{} = graph, predicate) do
-    filter_outer = fn outer_map ->
-      outer_map
+    new_out =
+      graph.out_edges
       |> Map.new(fn {src, inner_map} ->
         filtered_inner =
           Map.filter(inner_map, fn {dst, weight} -> predicate.(src, dst, weight) end)
@@ -276,9 +276,18 @@ defmodule Yog.Transform do
         {src, filtered_inner}
       end)
       |> Map.filter(fn {_src, inner_map} -> map_size(inner_map) > 0 end)
-    end
 
-    %{graph | out_edges: filter_outer.(graph.out_edges), in_edges: filter_outer.(graph.in_edges)}
+    new_in =
+      graph.in_edges
+      |> Map.new(fn {dst, inner_map} ->
+        filtered_inner =
+          Map.filter(inner_map, fn {src, weight} -> predicate.(src, dst, weight) end)
+
+        {dst, filtered_inner}
+      end)
+      |> Map.filter(fn {_dst, inner_map} -> map_size(inner_map) > 0 end)
+
+    %{graph | out_edges: new_out, in_edges: new_in}
   end
 
   @doc """

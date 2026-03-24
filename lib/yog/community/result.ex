@@ -39,12 +39,7 @@ defmodule Yog.Community.Result do
   """
   @spec new(%{node_id() => community_id()}) :: t()
   def new(assignments) when is_map(assignments) do
-    num =
-      if map_size(assignments) == 0 do
-        0
-      else
-        assignments |> Map.values() |> Enum.max() |> Kernel.+(1)
-      end
+    num = assignments |> Map.values() |> Enum.uniq() |> length()
 
     %__MODULE__{assignments: assignments, num_communities: num}
   end

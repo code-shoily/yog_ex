@@ -146,10 +146,12 @@ defmodule Yog.Property.Eulerian do
   end
 
   defp has_eulerian_circuit_undirected?(graph, nodes) do
-    # All nodes must have even degree
+    # All nodes must have even parity (self loops count as 2, so they don't affect parity)
     all_even =
       Enum.all?(nodes, fn node ->
-        degree = length(Model.neighbor_ids(graph, node))
+        degree =
+          Model.neighbor_ids(graph, node) |> Enum.count(&(&1 != node))
+
         rem(degree, 2) == 0
       end)
 
@@ -224,10 +226,12 @@ defmodule Yog.Property.Eulerian do
   end
 
   defp has_eulerian_path_undirected?(graph, nodes) do
-    # 0 or 2 odd degree nodes
+    # 0 or 2 odd degree nodes (excluding self loops which don't affect parity)
     odd_count =
       Enum.count(nodes, fn node ->
-        degree = length(Model.neighbor_ids(graph, node))
+        degree =
+          Model.neighbor_ids(graph, node) |> Enum.count(&(&1 != node))
+
         rem(degree, 2) == 1
       end)
 
@@ -466,16 +470,10 @@ defmodule Yog.Property.Eulerian do
 
         # For undirected, also remove reverse edge
         new_map =
-          if graph.kind == :undirected do
+          if graph.kind == :undirected and current != next do
             rev_key = {next, current}
-            Map.update!(new_map, rev_key, &(&1 - 1))
-          else
-            new_map
-          end
 
-        new_map =
-          if graph.kind == :undirected do
-            rev_key = {next, current}
+            new_map = Map.update!(new_map, rev_key, &(&1 - 1))
 
             if new_map[rev_key] == 0 do
               Map.delete(new_map, rev_key)
