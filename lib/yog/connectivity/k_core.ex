@@ -78,42 +78,45 @@ defmodule Yog.Connectivity.KCore do
 
     # Initial queue of nodes to prune
     to_prune = Enum.filter(nodes, fn u -> Map.get(degrees, u) < k end)
+    queue_set = MapSet.new(to_prune)
 
     # Run pruning
-    pruned_nodes = do_prune(graph, to_prune, degrees, k, MapSet.new())
+    pruned_nodes = do_prune(graph, to_prune, queue_set, degrees, k, MapSet.new())
 
     # Keep only nodes NOT in the pruned set
     remaining = MapSet.difference(MapSet.new(nodes), pruned_nodes)
     Yog.subgraph(graph, MapSet.to_list(remaining))
   end
 
-  defp do_prune(_, [], _, _, pruned), do: pruned
+  defp do_prune(_, [], _, _, _, pruned), do: pruned
 
-  defp do_prune(graph, [u | rest], degrees, k, pruned) do
+  defp do_prune(graph, [u | rest], queue_set, degrees, k, pruned) do
+    queue_set = MapSet.delete(queue_set, u)
+
     if MapSet.member?(pruned, u) do
-      do_prune(graph, rest, degrees, k, pruned)
+      do_prune(graph, rest, queue_set, degrees, k, pruned)
     else
       new_pruned = MapSet.put(pruned, u)
       neighbors = Model.neighbor_ids(graph, u)
 
       # Update neighbors degrees
-      {new_rest, new_degrees} =
-        Enum.reduce(neighbors, {rest, degrees}, fn v, {acc_rest, acc_deg} ->
+      {new_rest, new_queue_set, new_degrees} =
+        Enum.reduce(neighbors, {rest, queue_set, degrees}, fn v, {acc_rest, acc_qs, acc_deg} ->
           if MapSet.member?(new_pruned, v) do
-            {acc_rest, acc_deg}
+            {acc_rest, acc_qs, acc_deg}
           else
             new_deg = Map.get(acc_deg, v) - 1
             acc_deg = Map.put(acc_deg, v, new_deg)
 
-            if new_deg < k and v not in acc_rest do
-              {[v | acc_rest], acc_deg}
+            if new_deg < k and not MapSet.member?(acc_qs, v) do
+              {[v | acc_rest], MapSet.put(acc_qs, v), acc_deg}
             else
-              {acc_rest, acc_deg}
+              {acc_rest, acc_qs, acc_deg}
             end
           end
         end)
 
-      do_prune(graph, new_rest, new_degrees, k, new_pruned)
+      do_prune(graph, new_rest, new_queue_set, new_degrees, k, new_pruned)
     end
   end
 
