@@ -45,8 +45,19 @@ defmodule Yog.Builder.Labeled do
 
   alias Yog.Model
 
-  @typedoc "Builder type: {:labeled_builder, kind, graph, label_to_id, next_id}"
-  @type builder :: {:labeled_builder, Model.graph_type(), Yog.graph(), map(), integer()}
+  @enforce_keys [:graph]
+  defstruct [:kind, :graph, label_to_id: %{}, next_id: 0]
+
+  @typedoc "Labeled builder struct"
+  @type t :: %__MODULE__{
+          kind: Model.graph_type(),
+          graph: Yog.graph(),
+          label_to_id: %{label() => Yog.node_id()},
+          next_id: integer()
+        }
+
+  @typedoc "Legacy builder type (deprecated)"
+  @type builder :: {:labeled_builder, Model.graph_type(), Yog.graph(), map(), integer()} | t()
 
   @typedoc "Any type can be used as a label"
   @type label :: term()
@@ -59,10 +70,10 @@ defmodule Yog.Builder.Labeled do
   ## Examples
 
       iex> builder = Yog.Builder.Labeled.directed()
-      iex> is_tuple(builder)
+      iex> is_struct(builder, Yog.Builder.Labeled)
       true
   """
-  @spec directed() :: builder()
+  @spec directed() :: t()
   def directed, do: new(:directed)
 
   @doc """
@@ -71,10 +82,10 @@ defmodule Yog.Builder.Labeled do
   ## Examples
 
       iex> builder = Yog.Builder.Labeled.undirected()
-      iex> is_tuple(builder)
+      iex> is_struct(builder, Yog.Builder.Labeled)
       true
   """
-  @spec undirected() :: builder()
+  @spec undirected() :: t()
   def undirected, do: new(:undirected)
 
   @doc """
@@ -83,12 +94,17 @@ defmodule Yog.Builder.Labeled do
   ## Examples
 
       iex> builder = Yog.Builder.Labeled.new(:directed)
-      iex> is_tuple(builder)
+      iex> is_struct(builder, Yog.Builder.Labeled)
       true
   """
-  @spec new(Model.graph_type()) :: builder()
+  @spec new(Model.graph_type()) :: t()
   def new(graph_type) do
-    {:labeled_builder, graph_type, Model.new(graph_type), %{}, 0}
+    %__MODULE__{
+      kind: graph_type,
+      graph: Model.new(graph_type),
+      label_to_id: %{},
+      next_id: 0
+    }
   end
 
   # ============= Node Operations =============
@@ -103,7 +119,7 @@ defmodule Yog.Builder.Labeled do
       iex> Yog.Builder.Labeled.all_labels(builder)
       ["Node A"]
   """
-  @spec add_node(builder(), label()) :: builder()
+  @spec add_node(t(), label()) :: t()
   def add_node(builder, label) do
     {new_builder, _id} = ensure_node(builder, label)
     new_builder
@@ -122,8 +138,11 @@ defmodule Yog.Builder.Labeled do
       iex> is_integer(id)
       true
   """
-  @spec ensure_node(builder(), label()) :: {builder(), Yog.node_id()}
-  def ensure_node({:labeled_builder, kind, graph, label_to_id, next_id} = builder, label) do
+  @spec ensure_node(t(), label()) :: {t(), Yog.node_id()}
+  def ensure_node(
+        %__MODULE__{graph: graph, label_to_id: label_to_id, next_id: next_id} = builder,
+        label
+      ) do
     case Map.fetch(label_to_id, label) do
       {:ok, id} ->
         {builder, id}
@@ -132,7 +151,7 @@ defmodule Yog.Builder.Labeled do
         id = next_id
         new_graph = Model.add_node(graph, id, label)
         new_mapping = Map.put(label_to_id, label, id)
-        new_builder = {:labeled_builder, kind, new_graph, new_mapping, id + 1}
+        new_builder = %{builder | graph: new_graph, label_to_id: new_mapping, next_id: id + 1}
         {new_builder, id}
     end
   end
@@ -152,15 +171,15 @@ defmodule Yog.Builder.Labeled do
       iex> successors
       [{"B", 10}]
   """
-  @spec add_edge(builder(), label(), label(), term()) :: builder()
+  @spec add_edge(t(), label(), label(), term()) :: t()
   def add_edge(builder, from, to, weight) do
     {builder_with_src, src_id} = ensure_node(builder, from)
     {builder_with_both, dst_id} = ensure_node(builder_with_src, to)
 
-    {:labeled_builder, kind, graph, label_to_id, next_id} = builder_with_both
+    %__MODULE__{graph: graph} = builder_with_both
     {:ok, new_graph} = Model.add_edge(graph, src_id, dst_id, weight)
 
-    {:labeled_builder, kind, new_graph, label_to_id, next_id}
+    %{builder_with_both | graph: new_graph}
   end
 
   @doc """
@@ -172,7 +191,7 @@ defmodule Yog.Builder.Labeled do
       ...> |> Yog.Builder.Labeled.add_unweighted_edge("A", "B")
       iex> {:ok, [{"B", nil}]} = Yog.Builder.Labeled.successors(builder, "A")
   """
-  @spec add_unweighted_edge(builder(), label(), label()) :: builder()
+  @spec add_unweighted_edge(t(), label(), label()) :: t()
   def add_unweighted_edge(builder, from, to) do
     add_edge(builder, from, to, nil)
   end
@@ -184,12 +203,12 @@ defmodule Yog.Builder.Labeled do
 
   ## Examples
 
-      iex> Yog.Builder.Labeled.directed()
+      iex> builder = Yog.Builder.Labeled.directed()
       ...> |> Yog.Builder.Labeled.add_simple_edge("A", "B")
-      ...> |> is_tuple()
+      iex> is_struct(builder, Yog.Builder.Labeled)
       true
   """
-  @spec add_simple_edge(builder(), label(), label()) :: builder()
+  @spec add_simple_edge(t(), label(), label()) :: t()
   def add_simple_edge(builder, from, to) do
     add_edge(builder, from, to, 1)
   end
@@ -205,7 +224,7 @@ defmodule Yog.Builder.Labeled do
       iex> builder = Yog.Builder.Labeled.from_list(:directed, edges)
       iex> {:ok, [{"B", 5}]} = Yog.Builder.Labeled.successors(builder, "A")
   """
-  @spec from_list(Model.graph_type(), [{label(), label(), term()}]) :: builder()
+  @spec from_list(Model.graph_type(), [{label(), label(), term()}]) :: t()
   def from_list(graph_type, edges) do
     Enum.reduce(edges, new(graph_type), fn {src, dst, weight}, builder ->
       add_edge(builder, src, dst, weight)
@@ -221,7 +240,7 @@ defmodule Yog.Builder.Labeled do
       iex> builder = Yog.Builder.Labeled.from_unweighted_list(:directed, edges)
       iex> {:ok, [{"B", nil}]} = Yog.Builder.Labeled.successors(builder, "A")
   """
-  @spec from_unweighted_list(Model.graph_type(), [{label(), label()}]) :: builder()
+  @spec from_unweighted_list(Model.graph_type(), [{label(), label()}]) :: t()
   def from_unweighted_list(graph_type, edges) do
     Enum.reduce(edges, new(graph_type), fn {src, dst}, builder ->
       add_unweighted_edge(builder, src, dst)
@@ -243,10 +262,10 @@ defmodule Yog.Builder.Labeled do
       iex> Yog.graph?(graph)
       true
   """
-  @spec to_graph(builder()) :: Yog.graph()
-  def to_graph({:labeled_builder, _kind, graph, _label_to_id, _next_id}) do
-    graph
-  end
+  @spec to_graph(t() | builder()) :: Yog.graph()
+  def to_graph(%__MODULE__{graph: graph}), do: graph
+
+  def to_graph({:labeled_builder, _kind, graph, _label_to_id, _next_id}), do: graph
 
   @doc """
   Gets the label-to-ID registry as a map.
@@ -261,7 +280,9 @@ defmodule Yog.Builder.Labeled do
       iex> Map.get(registry, "A")
       0
   """
-  @spec to_registry(builder()) :: %{label() => Yog.node_id()}
+  @spec to_registry(t() | builder()) :: %{label() => Yog.node_id()}
+  def to_registry(%__MODULE__{label_to_id: label_to_id}), do: label_to_id
+
   def to_registry({:labeled_builder, _kind, _graph, label_to_id, _next_id}) do
     label_to_id
   end
@@ -284,8 +305,16 @@ defmodule Yog.Builder.Labeled do
       iex> Yog.Builder.Labeled.get_id(builder, "NonExistent")
       {:error, nil}
   """
-  @spec get_id(builder(), label()) :: {:ok, Yog.node_id()} | {:error, nil}
-  def get_id({:labeled_builder, _kind, _graph, label_to_id, _next_id}, label) do
+  @spec get_id(t() | builder(), label()) :: {:ok, Yog.node_id()} | {:error, nil}
+  def get_id(%__MODULE__{label_to_id: label_to_id}, label) do
+    do_get_id(label_to_id, label)
+  end
+
+  def get_id({:labeled_builder, _, _, label_to_id, _}, label) do
+    do_get_id(label_to_id, label)
+  end
+
+  defp do_get_id(label_to_id, label) do
     case Map.fetch(label_to_id, label) do
       {:ok, id} -> {:ok, id}
       :error -> {:error, nil}
@@ -303,7 +332,9 @@ defmodule Yog.Builder.Labeled do
       iex> Yog.Builder.Labeled.all_labels(builder)
       ["A", "B"]
   """
-  @spec all_labels(builder()) :: [label()]
+  @spec all_labels(t() | builder()) :: [label()]
+  def all_labels(%__MODULE__{label_to_id: label_to_id}), do: Map.keys(label_to_id)
+
   def all_labels({:labeled_builder, _kind, _graph, label_to_id, _next_id}) do
     Map.keys(label_to_id)
   end
@@ -322,7 +353,9 @@ defmodule Yog.Builder.Labeled do
       iex> Yog.Builder.Labeled.next_id(builder)
       1
   """
-  @spec next_id(builder()) :: Yog.node_id()
+  @spec next_id(t() | builder()) :: Yog.node_id()
+  def next_id(%__MODULE__{next_id: next_id}), do: next_id
+
   def next_id({:labeled_builder, _kind, _graph, _label_to_id, next_id}) do
     next_id
   end
@@ -340,8 +373,16 @@ defmodule Yog.Builder.Labeled do
       iex> Yog.Builder.Labeled.successors(builder, "A")
       {:ok, [{"B", 10}]}
   """
-  @spec successors(builder(), label()) :: {:ok, [{label(), term()}]} | {:error, nil}
-  def successors({:labeled_builder, _kind, graph, label_to_id, _next_id}, label) do
+  @spec successors(t() | builder(), label()) :: {:ok, [{label(), term()}]} | {:error, nil}
+  def successors(%__MODULE__{graph: graph, label_to_id: label_to_id}, label) do
+    do_successors(graph, label_to_id, label)
+  end
+
+  def successors({:labeled_builder, _, graph, label_to_id, _}, label) do
+    do_successors(graph, label_to_id, label)
+  end
+
+  defp do_successors(graph, label_to_id, label) do
     case Map.fetch(label_to_id, label) do
       {:ok, id} ->
         successor_edges = Model.successors(graph, id)
@@ -366,8 +407,16 @@ defmodule Yog.Builder.Labeled do
       iex> Yog.Builder.Labeled.predecessors(builder, "B")
       {:ok, [{"A", 5}]}
   """
-  @spec predecessors(builder(), label()) :: {:ok, [{label(), term()}]} | {:error, nil}
-  def predecessors({:labeled_builder, _kind, graph, label_to_id, _next_id}, label) do
+  @spec predecessors(t() | builder(), label()) :: {:ok, [{label(), term()}]} | {:error, nil}
+  def predecessors(%__MODULE__{graph: graph, label_to_id: label_to_id}, label) do
+    do_predecessors(graph, label_to_id, label)
+  end
+
+  def predecessors({:labeled_builder, _, graph, label_to_id, _}, label) do
+    do_predecessors(graph, label_to_id, label)
+  end
+
+  defp do_predecessors(graph, label_to_id, label) do
     case Map.fetch(label_to_id, label) do
       {:ok, id} ->
         predecessor_edges = Model.predecessors(graph, id)

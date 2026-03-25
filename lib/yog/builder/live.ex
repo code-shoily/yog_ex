@@ -77,8 +77,17 @@ defmodule Yog.Builder.Live do
   alias Yog.Builder.Labeled
   alias Yog.Model
 
-  @typedoc "Live builder type: {:live_builder, registry, next_id, pending}"
-  @type builder :: {:live_builder, map(), integer(), [transition()]}
+  defstruct registry: %{}, next_id: 0, pending: []
+
+  @typedoc "Live builder struct"
+  @type t :: %__MODULE__{
+          registry: %{label() => Yog.node_id()},
+          next_id: integer(),
+          pending: [transition()]
+        }
+
+  @typedoc "Legacy builder type (deprecated)"
+  @type builder :: {:live_builder, map(), integer(), [transition()]} | t()
 
   @typedoc "Any type can be used as a label"
   @type label :: term()
@@ -98,10 +107,10 @@ defmodule Yog.Builder.Live do
   ## Examples
 
       iex> builder = Yog.Builder.Live.directed()
-      iex> is_tuple(builder)
+      iex> is_struct(builder, Yog.Builder.Live)
       true
   """
-  @spec directed() :: builder()
+  @spec directed() :: t()
   def directed, do: new()
 
   @doc """
@@ -110,10 +119,10 @@ defmodule Yog.Builder.Live do
   ## Examples
 
       iex> builder = Yog.Builder.Live.undirected()
-      iex> is_tuple(builder)
+      iex> is_struct(builder, Yog.Builder.Live)
       true
   """
-  @spec undirected() :: builder()
+  @spec undirected() :: t()
   def undirected, do: new()
 
   @doc """
@@ -122,12 +131,12 @@ defmodule Yog.Builder.Live do
   ## Examples
 
       iex> builder = Yog.Builder.Live.new()
-      iex> is_tuple(builder)
+      iex> is_struct(builder, Yog.Builder.Live)
       true
   """
-  @spec new() :: builder()
+  @spec new() :: t()
   def new do
-    {:live_builder, %{}, 0, []}
+    %__MODULE__{}
   end
 
   @doc """
@@ -139,15 +148,15 @@ defmodule Yog.Builder.Live do
 
       iex> labeled = Yog.Builder.Labeled.directed()
       ...> |> Yog.Builder.Labeled.add_edge("A", "B", 5)
-      iex> Yog.Builder.Live.from_labeled(labeled)
-      ...> |> is_tuple()
+      iex> builder = Yog.Builder.Live.from_labeled(labeled)
+      iex> is_struct(builder, Yog.Builder.Live)
       true
   """
-  @spec from_labeled(Labeled.builder()) :: builder()
+  @spec from_labeled(Labeled.t() | Labeled.builder()) :: t()
   def from_labeled(labeled_builder) do
     registry = Labeled.to_registry(labeled_builder)
     next_id = Labeled.next_id(labeled_builder)
-    {:live_builder, registry, next_id, []}
+    %__MODULE__{registry: registry, next_id: next_id, pending: []}
   end
 
   # ============= Edge Operations =============
@@ -164,14 +173,14 @@ defmodule Yog.Builder.Live do
       iex> Yog.Builder.Live.pending_count(builder) > 0
       true
   """
-  @spec add_edge(builder(), label(), label(), term()) :: builder()
+  @spec add_edge(t(), label(), label(), term()) :: t()
   def add_edge(builder, from, to, weight) do
     {builder_with_src, src_id} = ensure_node(builder, from)
     {builder_with_both, dst_id} = ensure_node(builder_with_src, to)
 
-    {:live_builder, registry, next_id, pending} = builder_with_both
+    %__MODULE__{pending: pending} = builder_with_both
     transition = {:add_edge, src_id, dst_id, weight}
-    {:live_builder, registry, next_id, [transition | pending]}
+    %{builder_with_both | pending: [transition | pending]}
   end
 
   @doc """
@@ -179,12 +188,12 @@ defmodule Yog.Builder.Live do
 
   ## Examples
 
-      iex> Yog.Builder.Live.new()
+      iex> builder = Yog.Builder.Live.new()
       ...> |> Yog.Builder.Live.add_unweighted_edge("A", "B")
-      ...> |> is_tuple()
+      iex> is_struct(builder, Yog.Builder.Live)
       true
   """
-  @spec add_unweighted_edge(builder(), label(), label()) :: builder()
+  @spec add_unweighted_edge(t(), label(), label()) :: t()
   def add_unweighted_edge(builder, from, to) do
     add_edge(builder, from, to, nil)
   end
@@ -194,12 +203,12 @@ defmodule Yog.Builder.Live do
 
   ## Examples
 
-      iex> Yog.Builder.Live.new()
+      iex> builder = Yog.Builder.Live.new()
       ...> |> Yog.Builder.Live.add_simple_edge("A", "B")
-      ...> |> is_tuple()
+      iex> is_struct(builder, Yog.Builder.Live)
       true
   """
-  @spec add_simple_edge(builder(), label(), label()) :: builder()
+  @spec add_simple_edge(t(), label(), label()) :: t()
   def add_simple_edge(builder, from, to) do
     add_edge(builder, from, to, 1)
   end
@@ -211,18 +220,32 @@ defmodule Yog.Builder.Live do
 
   ## Examples
 
-      iex> Yog.Builder.Live.new()
+      iex> builder = Yog.Builder.Live.new()
       ...> |> Yog.Builder.Live.add_edge("A", "B", 10)
       ...> |> Yog.Builder.Live.remove_edge("A", "B")
-      ...> |> is_tuple()
+      iex> is_struct(builder, Yog.Builder.Live)
       true
   """
-  @spec remove_edge(builder(), label(), label()) :: builder()
-  def remove_edge({:live_builder, registry, next_id, pending} = builder, from, to) do
+  @spec remove_edge(t() | builder(), label(), label()) :: t()
+  def remove_edge(%__MODULE__{registry: registry, pending: pending} = builder, from, to) do
+    do_remove_edge(builder, registry, pending, from, to)
+  end
+
+  def remove_edge({:live_builder, registry, next_id, pending}, from, to) do
+    do_remove_edge(
+      %__MODULE__{registry: registry, next_id: next_id, pending: pending},
+      registry,
+      pending,
+      from,
+      to
+    )
+  end
+
+  defp do_remove_edge(builder, registry, pending, from, to) do
     case {Map.fetch(registry, from), Map.fetch(registry, to)} do
       {{:ok, src_id}, {:ok, dst_id}} ->
         transition = {:remove_edge, src_id, dst_id}
-        {:live_builder, registry, next_id, [transition | pending]}
+        %{builder | pending: [transition | pending]}
 
       _ ->
         # One or both nodes don't exist, nothing to remove
@@ -238,23 +261,36 @@ defmodule Yog.Builder.Live do
 
   ## Examples
 
-      iex> Yog.Builder.Live.new()
+      iex> builder = Yog.Builder.Live.new()
       ...> |> Yog.Builder.Live.add_edge("A", "B", 10)
       ...> |> Yog.Builder.Live.remove_node("A")
-      ...> |> is_tuple()
+      iex> is_struct(builder, Yog.Builder.Live)
       true
   """
-  @spec remove_node(builder(), label()) :: builder()
+  @spec remove_node(t() | builder(), label()) :: t()
+  def remove_node(%__MODULE__{registry: registry, pending: pending} = builder, label) do
+    do_remove_node(builder, registry, pending, label)
+  end
+
   def remove_node({:live_builder, registry, next_id, pending}, label) do
+    do_remove_node(
+      %__MODULE__{registry: registry, next_id: next_id, pending: pending},
+      registry,
+      pending,
+      label
+    )
+  end
+
+  defp do_remove_node(builder, registry, pending, label) do
     case Map.fetch(registry, label) do
       {:ok, id} ->
         new_registry = Map.delete(registry, label)
         transition = {:remove_node, id}
-        {:live_builder, new_registry, next_id, [transition | pending]}
+        %{builder | registry: new_registry, pending: [transition | pending]}
 
       :error ->
         # Node doesn't exist, nothing to remove
-        {:live_builder, registry, next_id, pending}
+        builder
     end
   end
 
@@ -274,23 +310,24 @@ defmodule Yog.Builder.Live do
       iex> length(Yog.all_nodes(graph))
       2
   """
-  @spec sync(builder(), Yog.graph()) :: {builder(), Yog.graph()}
+  @spec sync(t() | builder(), Yog.graph()) :: {t(), Yog.graph()}
+  def sync(%__MODULE__{pending: []} = builder, graph) do
+    {builder, graph}
+  end
+
+  def sync(%__MODULE__{pending: pending} = builder, graph) do
+    # Reverse to apply in insertion order (we prepended)
+    transitions = Enum.reverse(pending)
+
+    # Apply all transitions
+    new_graph = apply_transitions(graph, transitions)
+
+    # Return builder with empty pending
+    {%{builder | pending: []}, new_graph}
+  end
+
   def sync({:live_builder, registry, next_id, pending}, graph) do
-    case pending do
-      [] ->
-        # No pending changes - fast path
-        {{:live_builder, registry, next_id, []}, graph}
-
-      _ ->
-        # Reverse to apply in insertion order (we prepended)
-        transitions = Enum.reverse(pending)
-
-        # Apply all transitions
-        new_graph = apply_transitions(graph, transitions)
-
-        # Return builder with empty pending
-        {{:live_builder, registry, next_id, []}, new_graph}
-    end
+    sync(%__MODULE__{registry: registry, next_id: next_id, pending: pending}, graph)
   end
 
   @doc """
@@ -306,9 +343,11 @@ defmodule Yog.Builder.Live do
       iex> Yog.Builder.Live.pending_count(builder)
       0
   """
-  @spec purge_pending(builder()) :: builder()
+  @spec purge_pending(t() | builder()) :: t()
+  def purge_pending(%__MODULE__{} = builder), do: %{builder | pending: []}
+
   def purge_pending({:live_builder, registry, next_id, _pending}) do
-    {:live_builder, registry, next_id, []}
+    %__MODULE__{registry: registry, next_id: next_id, pending: []}
   end
 
   @doc """
@@ -324,9 +363,11 @@ defmodule Yog.Builder.Live do
       iex> Yog.Builder.Live.pending_count(builder)
       0
   """
-  @spec checkpoint(builder()) :: builder()
+  @spec checkpoint(t() | builder()) :: t()
+  def checkpoint(%__MODULE__{} = builder), do: %{builder | pending: []}
+
   def checkpoint({:live_builder, registry, next_id, _pending}) do
-    {:live_builder, registry, next_id, []}
+    %__MODULE__{registry: registry, next_id: next_id, pending: []}
   end
 
   # ============= Queries =============
@@ -346,8 +387,16 @@ defmodule Yog.Builder.Live do
       iex> Yog.Builder.Live.get_id(builder, "A")
       {:ok, 0}
   """
-  @spec get_id(builder(), label()) :: {:ok, Yog.node_id()} | {:error, nil}
-  def get_id({:live_builder, registry, _next_id, _pending}, label) do
+  @spec get_id(t() | builder(), label()) :: {:ok, Yog.node_id()} | {:error, nil}
+  def get_id(%__MODULE__{registry: registry}, label) do
+    do_get_id(registry, label)
+  end
+
+  def get_id({:live_builder, registry, _, _}, label) do
+    do_get_id(registry, label)
+  end
+
+  defp do_get_id(registry, label) do
     case Map.fetch(registry, label) do
       {:ok, id} -> {:ok, id}
       :error -> {:error, nil}
@@ -365,10 +414,10 @@ defmodule Yog.Builder.Live do
       iex> Enum.sort(labels)
       ["A", "B"]
   """
-  @spec all_labels(builder()) :: [label()]
-  def all_labels({:live_builder, registry, _next_id, _pending}) do
-    Map.keys(registry)
-  end
+  @spec all_labels(t() | builder()) :: [label()]
+  def all_labels(%__MODULE__{registry: registry}), do: Map.keys(registry)
+
+  def all_labels({:live_builder, registry, _, _}), do: Map.keys(registry)
 
   @doc """
   Returns the number of registered nodes.
@@ -380,10 +429,10 @@ defmodule Yog.Builder.Live do
       iex> Yog.Builder.Live.node_count(builder)
       2
   """
-  @spec node_count(builder()) :: integer()
-  def node_count({:live_builder, registry, _next_id, _pending}) do
-    map_size(registry)
-  end
+  @spec node_count(t() | builder()) :: integer()
+  def node_count(%__MODULE__{registry: registry}), do: map_size(registry)
+
+  def node_count({:live_builder, registry, _, _}), do: map_size(registry)
 
   @doc """
   Returns the number of pending changes.
@@ -397,23 +446,33 @@ defmodule Yog.Builder.Live do
       iex> Yog.Builder.Live.pending_count(builder) > 0
       true
   """
-  @spec pending_count(builder()) :: integer()
-  def pending_count({:live_builder, _registry, _next_id, pending}) do
-    length(pending)
-  end
+  @spec pending_count(t() | builder()) :: integer()
+  def pending_count(%__MODULE__{pending: pending}), do: length(pending)
+
+  def pending_count({:live_builder, _, _, pending}), do: length(pending)
 
   # ============= Private Helpers =============
 
-  defp ensure_node({:live_builder, registry, next_id, pending}, label) do
+  defp ensure_node(
+         %__MODULE__{registry: registry, next_id: next_id, pending: pending} = builder,
+         label
+       ) do
     case Map.fetch(registry, label) do
       {:ok, id} ->
-        {{:live_builder, registry, next_id, pending}, id}
+        {builder, id}
 
       :error ->
         id = next_id
         new_registry = Map.put(registry, label, id)
         transition = {:add_node, id, label}
-        new_builder = {:live_builder, new_registry, id + 1, [transition | pending]}
+
+        new_builder = %{
+          builder
+          | registry: new_registry,
+            next_id: id + 1,
+            pending: [transition | pending]
+        }
+
         {new_builder, id}
     end
   end

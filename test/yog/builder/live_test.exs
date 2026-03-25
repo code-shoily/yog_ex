@@ -23,10 +23,10 @@ defmodule Yog.Builder.LiveTest do
 
   test "live_builder_directed_undirected_test" do
     directed = Live.directed()
-    assert is_tuple(directed)
+    assert is_struct(directed, Live)
 
     undirected = Live.undirected()
-    assert is_tuple(undirected)
+    assert is_struct(undirected, Live)
   end
 
   test "live_builder_from_labeled_test" do
@@ -35,7 +35,7 @@ defmodule Yog.Builder.LiveTest do
       |> Labeled.add_edge("X", "Y", 7)
 
     builder = Live.from_labeled(labeled)
-    assert is_tuple(builder)
+    assert is_struct(builder, Live)
     assert {:ok, _} = Live.get_id(builder, "X")
   end
 
@@ -70,7 +70,7 @@ defmodule Yog.Builder.LiveTest do
       |> Live.add_edge("A", "B", 10)
       |> Live.remove_node("A")
 
-    assert is_tuple(builder)
+    assert is_struct(builder, Live)
   end
 
   test "live_builder_purge_pending_test" do

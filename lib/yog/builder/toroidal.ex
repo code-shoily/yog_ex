@@ -49,10 +49,11 @@ defmodule Yog.Builder.Toroidal do
 
   alias Yog.Builder.Grid
   alias Yog.Builder.GridGraph
+  alias Yog.Builder.ToroidalGraph
   alias Yog.Model
 
-  @typedoc "Toroidal grid type: {:toroidal_grid, graph, rows, cols}"
-  @type toroidal_grid :: {:toroidal_grid, Yog.graph(), integer(), integer()}
+  @typedoc "Toroidal grid type (now using ToroidalGraph)"
+  @type toroidal_grid :: ToroidalGraph.t()
 
   @typedoc "Topology is a list of {row_delta, col_delta} movement offsets"
   @type topology :: [{integer(), integer()}]
@@ -79,7 +80,7 @@ defmodule Yog.Builder.Toroidal do
   O(rows × cols)
   """
   @spec from_2d_list([[term()]], Model.graph_type(), (term(), term() -> boolean())) ::
-          GridGraph.t()
+          ToroidalGraph.t()
   def from_2d_list(grid_data, graph_type, can_move_fn) do
     from_2d_list_with_topology(grid_data, graph_type, rook(), can_move_fn)
   end
@@ -106,7 +107,7 @@ defmodule Yog.Builder.Toroidal do
           topology(),
           (term(), term() -> boolean())
         ) ::
-          GridGraph.t()
+          ToroidalGraph.t()
   def from_2d_list_with_topology(grid_data, graph_type, topology, can_move_fn) do
     rows = length(grid_data)
 
@@ -159,16 +160,20 @@ defmodule Yog.Builder.Toroidal do
         end)
       end)
 
-    GridGraph.new(graph_with_edges, rows, cols, :rook)
+    ToroidalGraph.new(graph_with_edges, rows, cols, :rook)
   end
 
   @doc """
   Converts a toroidal grid into a standard Graph.
   """
-  @spec to_graph(GridGraph.t() | toroidal_grid()) :: Yog.graph()
-  def to_graph(%GridGraph{} = grid) do
-    GridGraph.to_graph(grid)
-  end
+  @spec to_graph(
+          toroidal_grid()
+          | GridGraph.t()
+          | {:toroidal_grid, Yog.graph(), integer(), integer()}
+        ) :: Yog.graph()
+  def to_graph(%ToroidalGraph{graph: graph}), do: graph
+
+  def to_graph(%GridGraph{graph: graph}), do: graph
 
   def to_graph({:toroidal_grid, graph, _rows, _cols}) do
     graph
@@ -181,8 +186,16 @@ defmodule Yog.Builder.Toroidal do
 
   Returns `{:ok, cell_data}` or `{:error, nil}` if out of bounds.
   """
-  @spec get_cell(GridGraph.t() | toroidal_grid(), integer(), integer()) ::
+  @spec get_cell(
+          toroidal_grid() | GridGraph.t() | {:toroidal_grid, Yog.graph(), integer(), integer()},
+          integer(),
+          integer()
+        ) ::
           {:ok, term()} | {:error, nil}
+  def get_cell(%ToroidalGraph{} = grid, row, col) do
+    ToroidalGraph.to_grid_graph(grid) |> GridGraph.get_cell(row, col)
+  end
+
   def get_cell(%GridGraph{} = grid, row, col) do
     GridGraph.get_cell(grid, row, col)
   end
@@ -207,8 +220,15 @@ defmodule Yog.Builder.Toroidal do
 
   Returns `{:ok, node_id}` or `{:error, nil}`.
   """
-  @spec find_node(GridGraph.t() | toroidal_grid(), (term() -> boolean())) ::
+  @spec find_node(
+          toroidal_grid() | GridGraph.t() | {:toroidal_grid, Yog.graph(), integer(), integer()},
+          (term() -> boolean())
+        ) ::
           {:ok, Yog.node_id()} | {:error, nil}
+  def find_node(%ToroidalGraph{graph: graph, rows: rows, cols: cols}, predicate) do
+    do_find_node(graph, rows, cols, predicate)
+  end
+
   def find_node(%GridGraph{graph: graph, rows: rows, cols: cols}, predicate) do
     do_find_node(graph, rows, cols, predicate)
   end

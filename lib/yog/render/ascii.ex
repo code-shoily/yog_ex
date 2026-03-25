@@ -72,6 +72,7 @@ defmodule Yog.Render.ASCII do
 
   alias Yog.Builder.Grid
   alias Yog.Builder.GridGraph
+  alias Yog.Builder.ToroidalGraph
 
   @typedoc "Grid type from Yog.Builder.Grid"
   @type grid :: GridGraph.t()
@@ -97,12 +98,20 @@ defmodule Yog.Render.ASCII do
       iex> Yog.Render.ASCII.grid_to_string(grid)
       ""
   """
-  @spec grid_to_string(grid(), map()) :: String.t()
+  @spec grid_to_string(grid() | ToroidalGraph.t(), map()) :: String.t()
   def grid_to_string(grid, occupants \\ %{})
-  def grid_to_string(%Yog.Builder.GridGraph{rows: 0}, _), do: ""
-  def grid_to_string(%Yog.Builder.GridGraph{cols: 0}, _), do: ""
+  def grid_to_string(%GridGraph{rows: 0}, _), do: ""
+  def grid_to_string(%GridGraph{cols: 0}, _), do: ""
+  def grid_to_string(%ToroidalGraph{rows: 0}, _), do: ""
+  def grid_to_string(%ToroidalGraph{cols: 0}, _), do: ""
 
-  def grid_to_string(%Yog.Builder.GridGraph{graph: graph, rows: rows, cols: cols}, occupants) do
+  def grid_to_string(%ToroidalGraph{} = toroidal, occupants) do
+    grid = ToroidalGraph.to_grid_graph(toroidal)
+    base_ascii = grid_to_string(grid, occupants)
+    add_toroidal_hints(base_ascii, toroidal.rows, toroidal.cols)
+  end
+
+  def grid_to_string(%GridGraph{graph: graph, rows: rows, cols: cols}, occupants) do
     top_line = draw_top_border(cols)
 
     body_lines =
@@ -145,13 +154,21 @@ defmodule Yog.Render.ASCII do
   ## Time Complexity
   O(rows * cols)
   """
-  @spec grid_to_string_unicode(grid(), map()) :: String.t()
+  @spec grid_to_string_unicode(grid() | ToroidalGraph.t(), map()) :: String.t()
   def grid_to_string_unicode(grid, occupants \\ %{})
-  def grid_to_string_unicode(%Yog.Builder.GridGraph{rows: 0}, _), do: ""
-  def grid_to_string_unicode(%Yog.Builder.GridGraph{cols: 0}, _), do: ""
+  def grid_to_string_unicode(%GridGraph{rows: 0}, _), do: ""
+  def grid_to_string_unicode(%GridGraph{cols: 0}, _), do: ""
+  def grid_to_string_unicode(%ToroidalGraph{rows: 0}, _), do: ""
+  def grid_to_string_unicode(%ToroidalGraph{cols: 0}, _), do: ""
+
+  def grid_to_string_unicode(%ToroidalGraph{} = toroidal, occupants) do
+    grid = ToroidalGraph.to_grid_graph(toroidal)
+    base_unicode = grid_to_string_unicode(grid, occupants)
+    add_toroidal_hints_unicode(base_unicode, toroidal.rows, toroidal.cols)
+  end
 
   def grid_to_string_unicode(
-        %Yog.Builder.GridGraph{graph: graph, rows: rows, cols: cols},
+        %GridGraph{graph: graph, rows: rows, cols: cols},
         occupants
       ) do
     # Render line by line
@@ -322,6 +339,66 @@ defmodule Yog.Render.ASCII do
   end
 
   # =============================================================================
+  # TOROIDAL HINTS
+  # =============================================================================
+
+  defp add_toroidal_hints(ascii, _rows, cols) do
+    lines = String.split(ascii, "\n")
+
+    # Top arrow line
+    top_arrows = "  " <> Enum.map_join(0..(cols - 1), "   ", fn _ -> "v" end)
+
+    # Middle side arrows
+    body_with_sides =
+      lines
+      |> Enum.with_index()
+      |> Enum.map(fn {line, idx} ->
+        # Cell rows are at odd indices (1, 3, 5...)
+        if rem(idx, 2) == 1 do
+          "> " <> line <> " <"
+        else
+          "  " <> line
+        end
+      end)
+
+    # Bottom arrow line
+    bottom_arrows = "  " <> Enum.map_join(0..(cols - 1), "   ", fn _ -> "^" end)
+
+    # credo:disable-for-next-line Credo.Check.Refactor.AppendSingleItem
+    ([top_arrows] ++ body_with_sides ++ [bottom_arrows])
+    |> Enum.join("\n")
+  end
+
+  defp add_toroidal_hints_unicode(unicode, _rows, cols) do
+    lines = String.split(unicode, "\n")
+
+    # Top arrow line (v)
+    top_arrows = "  " <> Enum.map_join(0..(cols - 1), "   ", fn _ -> "v" end)
+
+    # Middle side arrows
+    body_with_sides =
+      lines
+      |> Enum.with_index()
+      |> Enum.map(fn {line, idx} ->
+        # Intersection rows are 0, 2, 4...
+        # Cell rows are 1, 3, 5...
+        if rem(idx, 2) == 1 do
+          "> " <> line <> " <"
+        else
+          "  " <> line
+        end
+      end)
+
+    # Bottom arrow line (ʌ) - using small letter lambda or a chevron
+    # Using ʌ (U+028C) or ^
+    bottom_arrows = "  " <> Enum.map_join(0..(cols - 1), "   ", fn _ -> "ʌ" end)
+
+    # credo:disable-for-next-line Credo.Check.Refactor.AppendSingleItem
+    ([top_arrows] ++ body_with_sides ++ [bottom_arrows])
+    |> Enum.join("\n")
+  end
+
+  # =============================================================================
   # HELPER FUNCTIONS
   # =============================================================================
 
@@ -336,10 +413,13 @@ defmodule Yog.Render.ASCII do
 
   # Checks if an edge exists from one node to another.
   @spec has_edge?(Yog.graph(), Yog.node_id(), Yog.node_id()) :: boolean()
-  defp has_edge?(%Yog.Graph{out_edges: out_edges}, from, to) do
-    case Map.get(out_edges, from) do
-      nil -> false
-      neighbors -> Map.has_key?(neighbors, to)
+  defp has_edge?(graph, from, to) do
+    case Yog.Model.successors(graph, from) do
+      nil ->
+        false
+
+      neighbors ->
+        Enum.any?(neighbors, fn {id, _weight} -> id == to end)
     end
   end
 end

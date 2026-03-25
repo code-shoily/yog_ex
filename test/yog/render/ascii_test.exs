@@ -2,6 +2,7 @@ defmodule Yog.Render.ASCIITest do
   use ExUnit.Case
 
   alias Yog.Builder.Grid
+  alias Yog.Builder.Toroidal
   alias Yog.Render.ASCII
 
   doctest ASCII
@@ -123,6 +124,30 @@ defmodule Yog.Render.ASCIITest do
 
       assert String.contains?(result, " M ")
       assert String.contains?(result, " R ")
+    end
+  end
+
+  describe "toroidal rendering" do
+    test "renders ASCII toroidal hints" do
+      grid = Toroidal.from_2d_list([[".", "."]], :undirected, Toroidal.always())
+      result = ASCII.grid_to_string(grid)
+
+      # Should contain wrapping arrows
+      assert String.contains?(result, "v   v")
+      assert String.contains?(result, "^   ^")
+      assert String.contains?(result, "> |")
+      assert String.contains?(result, "| <")
+    end
+
+    test "renders Unicode toroidal hints" do
+      grid = Toroidal.from_2d_list([[".", "."]], :undirected, Toroidal.always())
+      result = ASCII.grid_to_string_unicode(grid)
+
+      # Should contain wrapping arrows
+      assert String.contains?(result, "v   v")
+      assert String.contains?(result, "ʌ   ʌ")
+      assert String.contains?(result, "> │")
+      assert String.contains?(result, "│ <")
     end
   end
 end
