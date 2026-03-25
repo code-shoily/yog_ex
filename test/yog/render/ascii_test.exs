@@ -73,4 +73,38 @@ defmodule Yog.Render.ASCIITest do
       assert String.contains?(result, "|")
     end
   end
+
+  describe "grid_to_string_unicode/1" do
+    test "returns empty string for empty grid" do
+      grid = Grid.from_2d_list([], :undirected, Grid.always())
+      assert ASCII.grid_to_string_unicode(grid) == ""
+    end
+
+    test "renders simple 1x1 grid" do
+      grid = Grid.from_2d_list([[1]], :undirected, Grid.always())
+      result = ASCII.grid_to_string_unicode(grid)
+
+      # Should contain Unicode corners
+      assert String.contains?(result, "┌")
+      assert String.contains?(result, "┐")
+      assert String.contains?(result, "└")
+      assert String.contains?(result, "┘")
+      assert String.contains?(result, "───")
+      assert String.contains?(result, "│")
+    end
+
+    test "renders 2x2 grid with center cross" do
+      grid = Grid.from_2d_list([[1, 2], [3, 4]], :undirected, Grid.always())
+      result = ASCII.grid_to_string_unicode(grid)
+
+      # Should contain T-junctions
+      assert String.contains?(result, "┬")
+      assert String.contains?(result, "┴")
+      assert String.contains?(result, "├")
+      assert String.contains?(result, "┤")
+
+      # Should contain center cross
+      assert String.contains?(result, "┼")
+    end
+  end
 end
