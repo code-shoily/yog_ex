@@ -23,6 +23,7 @@ defmodule Yog.Centrality do
   """
 
   alias Yog.Model
+  alias Yog.Pathfinding.Dijkstra
   alias Yog.PriorityQueue, as: PQ
 
   @typedoc """
@@ -556,53 +557,7 @@ defmodule Yog.Centrality do
 
   # Dijkstra's algorithm for single-source shortest paths
   defp dijkstra_single_source(graph, source, zero, add, compare) do
-    # Priority queue: [{distance, node}], ordered by distance
-    pq = PQ.new(fn {d1, _}, {d2, _} -> compare.(d1, d2) != :gt end)
-    initial_pq = PQ.push(pq, {zero, source})
-    initial_distances = %{source => zero}
-
-    do_dijkstra(graph, initial_pq, initial_distances, add, compare)
-  end
-
-  defp do_dijkstra(graph, pq, distances, add, compare) do
-    if PQ.empty?(pq) do
-      distances
-    else
-      {:ok, {dist, node}, rest_pq} = PQ.pop(pq)
-      current_best = Map.get(distances, node)
-
-      if compare.(dist, current_best) == :gt do
-        # This entry is outdated, skip it
-        do_dijkstra(graph, rest_pq, distances, add, compare)
-      else
-        # Relax neighbors
-        neighbors = Model.successors(graph, node)
-
-        {new_pq, new_distances} =
-          Enum.reduce(neighbors, {rest_pq, distances}, fn {neighbor, weight}, {pq_acc, dists} ->
-            new_dist = add.(dist, weight)
-
-            case Map.fetch(dists, neighbor) do
-              :error ->
-                # First time visiting this node
-                new_dists = Map.put(dists, neighbor, new_dist)
-                new_pq = PQ.push(pq_acc, {new_dist, neighbor})
-                {new_pq, new_dists}
-
-              {:ok, old_dist} ->
-                if compare.(new_dist, old_dist) == :lt do
-                  new_dists = Map.put(dists, neighbor, new_dist)
-                  new_pq = PQ.push(pq_acc, {new_dist, neighbor})
-                  {new_pq, new_dists}
-                else
-                  {pq_acc, dists}
-                end
-            end
-          end)
-
-        do_dijkstra(graph, new_pq, new_distances, add, compare)
-      end
-    end
+    Dijkstra.single_source_distances(graph, source, zero, add, compare)
   end
 
   # Brandes' algorithm for betweenness centrality

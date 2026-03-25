@@ -361,6 +361,34 @@ defmodule Yog.Transform do
   end
 
   @doc """
+  Transforms edge weights using a function that also takes the source and destination IDs.
+
+  ## Example
+
+      iex> {:ok, graph} = Yog.directed()
+      ...>   |> Yog.add_node(1, "A") |> Yog.add_node(2, "B")
+      ...>   |> Yog.add_edge(1, 2, 10)
+      iex> result = Yog.Transform.map_edges_indexed(graph, fn u, v, w -> u + v + w end)
+      iex> Yog.successors(result, 1)
+      [{2, 13}] # 1 + 2 + 10
+  """
+  @spec map_edges_indexed(Yog.graph(), (Yog.node_id(), Yog.node_id(), term() -> term())) ::
+          Yog.graph()
+  def map_edges_indexed(%Yog.Graph{} = graph, fun) do
+    new_out =
+      Map.new(graph.out_edges, fn {src, inner} ->
+        {src, Map.new(inner, fn {dst, weight} -> {dst, fun.(src, dst, weight)} end)}
+      end)
+
+    new_in =
+      Map.new(graph.in_edges, fn {dst, inner} ->
+        {dst, Map.new(inner, fn {src, weight} -> {src, fun.(src, dst, weight)} end)}
+      end)
+
+    %{graph | out_edges: new_out, in_edges: new_in}
+  end
+
+  @doc """
   Filters nodes by a predicate, automatically pruning connected edges.
 
   Returns a new graph containing only nodes whose data satisfies the predicate.

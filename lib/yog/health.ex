@@ -29,8 +29,9 @@ defmodule Yog.Health do
   > The API remains unchanged.
   """
 
-  alias Yog.PriorityQueue, as: PQ
   alias Yog.Model
+  alias Yog.Pathfinding.Dijkstra
+  alias Yog.Transform
 
   @doc """
   The diameter is the maximum eccentricity (longest shortest path).
@@ -72,7 +73,13 @@ defmodule Yog.Health do
     compare = opts[:with_compare] || (&Yog.Utils.compare/2)
     weight_fn = opts[:with] || (&Function.identity/1)
 
-    nodes = Model.all_nodes(graph)
+    # Reweight graph ONCE
+    reweighted_graph =
+      if weight_fn != (&Function.identity/1),
+        do: Transform.map_edges(graph, weight_fn),
+        else: graph
+
+    nodes = Model.all_nodes(reweighted_graph)
 
     if nodes == [] do
       nil
@@ -80,11 +87,11 @@ defmodule Yog.Health do
       eccentricities =
         nodes
         |> Enum.map(fn node ->
-          case eccentricity(graph, node,
+          case eccentricity(reweighted_graph, node,
                  with_zero: zero,
                  with_add: add,
                  with_compare: compare,
-                 with: weight_fn
+                 with: &Function.identity/1
                ) do
             nil -> nil
             ecc -> ecc
@@ -141,7 +148,13 @@ defmodule Yog.Health do
     compare = opts[:with_compare] || (&Yog.Utils.compare/2)
     weight_fn = opts[:with] || (&Function.identity/1)
 
-    nodes = Model.all_nodes(graph)
+    # Reweight graph ONCE
+    reweighted_graph =
+      if weight_fn != (&Function.identity/1),
+        do: Transform.map_edges(graph, weight_fn),
+        else: graph
+
+    nodes = Model.all_nodes(reweighted_graph)
 
     if nodes == [] do
       nil
@@ -149,11 +162,11 @@ defmodule Yog.Health do
       eccentricities =
         nodes
         |> Enum.map(fn node ->
-          case eccentricity(graph, node,
+          case eccentricity(reweighted_graph, node,
                  with_zero: zero,
                  with_add: add,
                  with_compare: compare,
-                 with: weight_fn
+                 with: &Function.identity/1
                ) do
             nil -> nil
             ecc -> ecc
@@ -215,14 +228,19 @@ defmodule Yog.Health do
     compare = opts[:with_compare] || (&Yog.Utils.compare/2)
     weight_fn = opts[:with] || (&Function.identity/1)
 
-    all_nodes = Model.all_nodes(graph)
+    # Reweight graph if needed (usually already reweighted by callers)
+    reweighted_graph =
+      if weight_fn != (&Function.identity/1),
+        do: Transform.map_edges(graph, weight_fn),
+        else: graph
+
+    all_nodes = Model.all_nodes(reweighted_graph)
     num_nodes = length(all_nodes)
 
     if num_nodes <= 1 do
       zero
     else
-      # Apply weight function to all edges and run Dijkstra
-      distances = dijkstra_single_source(graph, node, zero, add, compare, weight_fn)
+      distances = dijkstra_single_source(reweighted_graph, node, zero, add, compare)
 
       # Check if all nodes are reachable
       if map_size(distances) < num_nodes do
@@ -377,7 +395,13 @@ defmodule Yog.Health do
     weight_fn = opts[:with] || (&Function.identity/1)
     to_float = opts[:with_to_float] || fn x -> x * 1.0 end
 
-    nodes = Model.all_nodes(graph)
+    # Reweight graph ONCE
+    reweighted_graph =
+      if weight_fn != (&Function.identity/1),
+        do: Transform.map_edges(graph, weight_fn),
+        else: graph
+
+    nodes = Model.all_nodes(reweighted_graph)
     num_nodes = length(nodes)
 
     if num_nodes <= 1 do
@@ -386,7 +410,7 @@ defmodule Yog.Health do
       # Calculate all-pairs shortest paths
       all_distances =
         Enum.map(nodes, fn source ->
-          dijkstra_single_source(graph, source, zero, add, compare, weight_fn)
+          dijkstra_single_source(reweighted_graph, source, zero, add, compare)
         end)
 
       # Check if graph is fully connected
@@ -422,57 +446,9 @@ defmodule Yog.Health do
   # Internal Dijkstra Implementation
   # =============================================================================
 
-  # Dijkstra's algorithm for single-source shortest paths
+  # Single-source shortest paths using Dijkstra's algorithm
   # Returns a map of node_id => distance
-  defp dijkstra_single_source(graph, source, zero, add, compare, weight_fn) do
-    # Priority queue: {distance, node}
-    pq = PQ.new(fn {d1, _}, {d2, _} -> compare.(d1, d2) != :gt end)
-    initial_pq = PQ.push(pq, {zero, source})
-    initial_distances = %{source => zero}
-
-    do_dijkstra(graph, initial_pq, initial_distances, add, compare, weight_fn)
-  end
-
-  defp do_dijkstra(graph, pq, distances, add, compare, weight_fn) do
-    case PQ.pop(pq) do
-      :error ->
-        distances
-
-      {:ok, {dist, node}, rest_pq} ->
-        current_best = Map.get(distances, node)
-
-        if current_best != nil and compare.(dist, current_best) == :gt do
-          # This entry is outdated, skip it
-          do_dijkstra(graph, rest_pq, distances, add, compare, weight_fn)
-        else
-          # Relax neighbors
-          neighbors = Model.successors(graph, node)
-
-          {new_pq, new_distances} =
-            Enum.reduce(neighbors, {rest_pq, distances}, fn {neighbor, weight},
-                                                            {pq_acc, dists_acc} ->
-              new_dist = add.(dist, weight_fn.(weight))
-
-              case Map.fetch(dists_acc, neighbor) do
-                :error ->
-                  # First time visiting this node
-                  new_dists = Map.put(dists_acc, neighbor, new_dist)
-                  new_q = PQ.push(pq_acc, {new_dist, neighbor})
-                  {new_q, new_dists}
-
-                {:ok, old_dist} ->
-                  if compare.(new_dist, old_dist) == :lt do
-                    new_dists = Map.put(dists_acc, neighbor, new_dist)
-                    new_q = PQ.push(pq_acc, {new_dist, neighbor})
-                    {new_q, new_dists}
-                  else
-                    {pq_acc, dists_acc}
-                  end
-              end
-            end)
-
-          do_dijkstra(graph, new_pq, new_distances, add, compare, weight_fn)
-        end
-    end
+  defp dijkstra_single_source(graph, source, zero, add, compare) do
+    Dijkstra.single_source_distances(graph, source, zero, add, compare)
   end
 end

@@ -76,8 +76,9 @@ defmodule Yog.Pathfinding.Johnson do
   - [Wikipedia: Johnson's Algorithm](https://en.wikipedia.org/wiki/Johnson%27s_algorithm)
   """
 
-  alias Yog.PriorityQueue, as: PQ
   alias Yog.Model
+  alias Yog.Pathfinding.Dijkstra
+  alias Yog.Transform
 
   @typedoc """
   Distance matrix: map from `{from, to}` tuple to distance.
@@ -240,12 +241,21 @@ defmodule Yog.Pathfinding.Johnson do
     end)
   end
 
-  # Steps 3, 4, 5: Run Dijkstra from each node with reweighted edges
+  # Run Dijkstra from each node with reweighted edges
   defp run_dijkstra_from_all(graph, nodes, potentials, zero, add, subtract, compare) do
+    # NEW: Reweight the graph ONCE using map_edges_indexed
+    reweighted_graph =
+      Transform.map_edges_indexed(graph, fn u, v, w ->
+        h_u = Map.get(potentials, u, zero)
+        h_v = Map.get(potentials, v, zero)
+        # w'(u,v) = w(u,v) + h(u) - h(v)
+        add.(w, h_u) |> subtract.(h_v)
+      end)
+
     Enum.reduce(nodes, %{}, fn source, acc ->
-      # Run Dijkstra on reweighted graph
+      # Run Dijkstra on reweighted graph using the standard implementation
       reweighted_distances =
-        dijkstra_reweighted(graph, source, potentials, zero, add, subtract, compare)
+        Dijkstra.single_source_distances(reweighted_graph, source, zero, add, compare)
 
       # Adjust distances back: dist(u,v) = dist'(u,v) - h(u) + h(v)
       h_u = Map.get(potentials, source, zero)
@@ -260,61 +270,5 @@ defmodule Yog.Pathfinding.Johnson do
 
       Map.merge(acc, adjusted)
     end)
-  end
-
-  # Dijkstra on reweighted graph
-  defp dijkstra_reweighted(graph, source, potentials, zero, add, subtract, compare) do
-    # Priority queue: {distance, node}
-    pq = PQ.new(fn {d1, _}, {d2, _} -> compare.(d1, d2) != :gt end)
-    initial_queue = PQ.push(pq, {zero, source})
-    initial_distances = %{source => zero}
-
-    do_dijkstra(graph, initial_queue, initial_distances, potentials, add, subtract, compare)
-  end
-
-  defp do_dijkstra(graph, queue, distances, potentials, add, subtract, compare) do
-    case PQ.pop(queue) do
-      :error ->
-        distances
-
-      {:ok, {dist_u, u}, rest_queue} ->
-        # Check if we've found a better path to u already
-        current_best = Map.get(distances, u)
-
-        if current_best != nil and compare.(dist_u, current_best) == :gt do
-          # This entry is outdated, skip it
-          do_dijkstra(graph, rest_queue, distances, potentials, add, subtract, compare)
-        else
-          # Relax edges from u
-          h_u = Map.get(potentials, u, 0)
-          successors = Model.successors(graph, u)
-
-          {new_queue, new_distances} =
-            Enum.reduce(successors, {rest_queue, distances}, fn {v, weight}, {q_acc, d_acc} ->
-              h_v = Map.get(potentials, v, 0)
-              # Reweighted edge: w'(u,v) = w(u,v) + h(u) - h(v)
-              reweighted = add.(weight, h_u) |> subtract.(h_v)
-              new_dist_v = add.(dist_u, reweighted)
-
-              case Map.fetch(d_acc, v) do
-                {:ok, current} ->
-                  if compare.(new_dist_v, current) == :lt do
-                    new_q = PQ.push(q_acc, {new_dist_v, v})
-                    new_d = Map.put(d_acc, v, new_dist_v)
-                    {new_q, new_d}
-                  else
-                    {q_acc, d_acc}
-                  end
-
-                :error ->
-                  new_q = PQ.push(q_acc, {new_dist_v, v})
-                  new_d = Map.put(d_acc, v, new_dist_v)
-                  {new_q, new_d}
-              end
-            end)
-
-          do_dijkstra(graph, new_queue, new_distances, potentials, add, subtract, compare)
-        end
-    end
   end
 end
