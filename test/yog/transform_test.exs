@@ -246,6 +246,190 @@ defmodule Yog.TransformTest do
     assert Yog.successors(composed, 1) == Yog.successors(direct, 1)
   end
 
+  # ============= Map Nodes Async Tests =============
+
+  test "map_nodes_async_empty_graph_test" do
+    graph = Yog.directed()
+    mapped = Yog.Transform.map_nodes_async(graph, &String.upcase/1)
+
+    assert mapped.nodes == %{}
+  end
+
+  test "map_nodes_async_transforms_all_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "alice")
+      |> Yog.add_node(2, "bob")
+      |> Yog.add_node(3, "carol")
+
+    mapped = Yog.Transform.map_nodes_async(graph, &String.upcase/1)
+    nodes = mapped.nodes
+
+    assert Map.get(nodes, 1) == "ALICE"
+    assert Map.get(nodes, 2) == "BOB"
+    assert Map.get(nodes, 3) == "CAROL"
+  end
+
+  test "map_nodes_async_preserves_structure_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_edge!(from: 1, to: 2, with: 10)
+
+    mapped = Yog.Transform.map_nodes_async(graph, fn s -> s <> "!" end)
+
+    assert Yog.successors(mapped, 1) == [{2, 10}]
+    assert mapped.kind == :directed
+  end
+
+  test "map_nodes_async_with_options_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "test")
+      |> Yog.add_node(2, "data")
+
+    opts = [max_concurrency: 2, timeout: 10_000, ordered: true]
+    mapped = Yog.Transform.map_nodes_async(graph, &String.upcase/1, opts)
+
+    assert mapped.nodes[1] == "TEST"
+    assert mapped.nodes[2] == "DATA"
+  end
+
+  test "map_nodes_async_matches_sync_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, 5)
+      |> Yog.add_node(2, 10)
+      |> Yog.add_node(3, 15)
+
+    transform = fn x -> x * 2 + 1 end
+
+    sync_result = Yog.Transform.map_nodes(graph, transform)
+    async_result = Yog.Transform.map_nodes_async(graph, transform)
+
+    assert sync_result.nodes == async_result.nodes
+  end
+
+  test "map_nodes_async_large_graph_test" do
+    # Build a larger graph to test parallelism
+    graph =
+      Enum.reduce(1..100, Yog.directed(), fn i, g ->
+        Yog.add_node(g, i, i)
+      end)
+
+    mapped = Yog.Transform.map_nodes_async(graph, fn x -> x * 2 end)
+
+    assert map_size(mapped.nodes) == 100
+    assert mapped.nodes[1] == 2
+    assert mapped.nodes[50] == 100
+    assert mapped.nodes[100] == 200
+  end
+
+  # ============= Map Edges Async Tests =============
+
+  test "map_edges_async_empty_graph_test" do
+    graph = Yog.directed()
+    mapped = Yog.Transform.map_edges_async(graph, fn x -> x * 2 end)
+
+    assert mapped.out_edges == %{}
+    assert mapped.in_edges == %{}
+  end
+
+  test "map_edges_async_transforms_all_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_edge!(from: 1, to: 2, with: 10)
+      |> Yog.add_edge!(from: 2, to: 3, with: 20)
+      |> Yog.add_edge!(from: 1, to: 3, with: 30)
+
+    mapped = Yog.Transform.map_edges_async(graph, fn w -> w * 2 end)
+
+    assert Yog.successors(mapped, 1) |> List.keyfind!(2, 0) |> elem(1) == 20
+    assert Yog.successors(mapped, 2) == [{3, 40}]
+    assert Yog.successors(mapped, 1) |> List.keyfind!(3, 0) |> elem(1) == 60
+  end
+
+  test "map_edges_async_preserves_structure_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_edge!(from: 1, to: 2, with: 10)
+
+    mapped = Yog.Transform.map_edges_async(graph, fn w -> w + 5 end)
+
+    assert mapped.nodes == graph.nodes
+    assert mapped.kind == :directed
+    assert Yog.successors(mapped, 1) == [{2, 15}]
+  end
+
+  test "map_edges_async_with_options_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_edge!(from: 1, to: 2, with: 5)
+
+    opts = [max_concurrency: 4, timeout: 10_000, ordered: true]
+    mapped = Yog.Transform.map_edges_async(graph, fn w -> w * 3 end, opts)
+
+    assert Yog.successors(mapped, 1) == [{2, 15}]
+  end
+
+  test "map_edges_async_matches_sync_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_edge!(from: 1, to: 2, with: 10)
+      |> Yog.add_edge!(from: 2, to: 3, with: 20)
+
+    transform = fn w -> w * 2 + 3 end
+
+    sync_result = Yog.Transform.map_edges(graph, transform)
+    async_result = Yog.Transform.map_edges_async(graph, transform)
+
+    assert Yog.successors(sync_result, 1) == Yog.successors(async_result, 1)
+    assert Yog.successors(sync_result, 2) == Yog.successors(async_result, 2)
+  end
+
+  test "map_edges_async_undirected_graph_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_edge!(from: 1, to: 2, with: 5)
+
+    mapped = Yog.Transform.map_edges_async(graph, fn w -> w * 3 end)
+
+    assert Yog.successors(mapped, 1) == [{2, 15}]
+    assert Yog.successors(mapped, 2) == [{1, 15}]
+  end
+
+  test "map_edges_async_large_graph_test" do
+    # Build a larger graph with many edges
+    graph =
+      Enum.reduce(1..100, Yog.directed(), fn i, g ->
+        Yog.add_node(g, i, "node_#{i}")
+      end)
+
+    # Add edges
+    graph =
+      Enum.reduce(1..99, graph, fn i, g ->
+        Yog.add_edge!(g, from: i, to: i + 1, with: i)
+      end)
+
+    mapped = Yog.Transform.map_edges_async(graph, fn w -> w * 2 end)
+
+    assert Yog.successors(mapped, 1) == [{2, 2}]
+    assert Yog.successors(mapped, 50) == [{51, 100}]
+  end
+
   # ============= Filter Nodes Tests =============
 
   test "filter_nodes_empty_graph_test" do

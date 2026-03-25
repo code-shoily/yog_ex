@@ -12,9 +12,21 @@ defmodule Yog.Transform do
   |----------------|----------|------------|----------|
   | Transpose | `transpose/1` | O(1) | Reverse edge directions |
   | Map Nodes | `map_nodes/2` | O(V) | Transform node data |
+  | Map Nodes Async | `map_nodes_async/2` | O(V/cores) | Parallel node transforms |
   | Map Edges | `map_edges/2` | O(E) | Transform edge weights |
+  | Map Edges Async | `map_edges_async/2` | O(E/cores) | Parallel edge transforms |
   | Filter Nodes | `filter_nodes/2` | O(V) | Subgraph extraction |
   | Filter Edges | `filter_edges/2` | O(E) | Remove unwanted edges |
+
+  ## Parallel Transformations
+
+  The `_async` variants use `Task.async_stream/3` for parallel processing on multi-core
+  systems. They're beneficial for:
+  - Large graphs (10K+ nodes, 100K+ edges)
+  - Expensive transformation functions (I/O, complex computations)
+  - Multi-core environments where parallelism outweighs overhead
+
+  For small graphs or trivial transforms, use the sequential versions to avoid task overhead.
 
   ## The O(1) Transpose Operation
 
@@ -34,9 +46,10 @@ defmodule Yog.Transform do
   - **Type Conversion**: Changing node/edge data types for algorithm requirements
   - **Subgraph Extraction**: Working with portions of large graphs
   - **Weight Normalization**: Preprocessing edge weights
+  - **Parallel Processing**: Large-scale data transformations on multi-core systems
 
   > **Migration Note:** This module was ported from Gleam to pure Elixir in v0.53.0.
-  > The API remains unchanged.
+  > The API remains unchanged. Async variants added in v0.60.1.
   """
 
   alias Yog.Model
@@ -117,6 +130,80 @@ defmodule Yog.Transform do
   end
 
   @doc """
+  Transforms node data using a function in parallel, preserving graph structure.
+
+  This is the async version of `map_nodes/2` that uses `Task.async_stream/3` to
+  process node transformations concurrently. For large graphs with expensive
+  transformation functions, this can provide significant speedups on multi-core systems.
+
+  **Time Complexity:** O(V/cores) amortized, where V is the number of nodes
+
+  **When to use:**
+  - Large graphs (10,000+ nodes)
+  - Expensive transformation functions (I/O, complex computations)
+  - Multi-core systems where parallelism benefits outweigh overhead
+
+  **When NOT to use:**
+  - Small graphs (< 1,000 nodes) - overhead dominates
+  - Trivial transformations - spawning tasks costs more than the work
+  - Already in a parallel context - avoid nested parallelism
+
+  ## Options
+
+  - `:max_concurrency` - Maximum concurrent tasks (default: `System.schedulers_online()`)
+  - `:timeout` - Task timeout in milliseconds (default: 5000)
+  - `:ordered` - Preserve order (default: false, faster unordered)
+
+  ## Example
+
+      iex> graph =
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(1, "alice")
+      ...>   |> Yog.add_node(2, "bob")
+      iex> uppercased = Yog.Transform.map_nodes_async(graph, &String.upcase/1)
+      iex> uppercased.nodes[1]
+      "ALICE"
+
+  ## Custom Options
+
+      iex> graph = Yog.directed() |> Yog.add_node(1, "test")
+      iex> opts = [max_concurrency: 4, timeout: 10_000]
+      iex> result = Yog.Transform.map_nodes_async(graph, &String.upcase/1, opts)
+      iex> result.nodes[1]
+      "TEST"
+
+  ## Performance Example
+
+      # Sequential map_nodes on 1M nodes with moderate computation: ~6 seconds
+      graph |> Yog.Transform.map_nodes(fn x -> expensive_function(x) end)
+
+      # Parallel map_nodes_async on 8-core system: ~1 second
+      graph |> Yog.Transform.map_nodes_async(fn x -> expensive_function(x) end)
+  """
+  @spec map_nodes_async(Yog.graph(), (term() -> term()), keyword()) :: Yog.graph()
+  def map_nodes_async(%Yog.Graph{} = graph, fun, opts \\ []) do
+    default_opts = [
+      max_concurrency: System.schedulers_online(),
+      timeout: 5000,
+      ordered: false
+    ]
+
+    stream_opts = Keyword.merge(default_opts, opts)
+
+    new_nodes =
+      graph.nodes
+      |> Task.async_stream(
+        fn {id, data} -> {id, fun.(data)} end,
+        stream_opts
+      )
+      |> Enum.reduce(%{}, fn {:ok, {id, new_data}}, acc ->
+        Map.put(acc, id, new_data)
+      end)
+
+    %{graph | nodes: new_nodes}
+  end
+
+  @doc """
   Transforms edge weights using a function, preserving graph structure.
 
   This is a functor operation - it applies a function to every edge's weight/data
@@ -180,6 +267,96 @@ defmodule Yog.Transform do
       graph
       | out_edges: transform_outer.(graph.out_edges),
         in_edges: transform_outer.(graph.in_edges)
+    }
+  end
+
+  @doc """
+  Transforms edge weights using a function in parallel, preserving graph structure.
+
+  This is the async version of `map_edges/2` that uses `Task.async_stream/3` to
+  process edge transformations concurrently. For large graphs with expensive
+  transformation functions, this can provide significant speedups on multi-core systems.
+
+  The parallelization strategy processes nodes (and their outgoing edges) in parallel,
+  transforming all edges from each node concurrently.
+
+  **Time Complexity:** O(E/cores) amortized, where E is the number of edges
+
+  **When to use:**
+  - Large graphs (100,000+ edges)
+  - Expensive transformation functions (I/O, database lookups, complex calculations)
+  - Multi-core systems where parallelism benefits outweigh overhead
+
+  **When NOT to use:**
+  - Small graphs (< 10,000 edges) - overhead dominates
+  - Trivial transformations (arithmetic) - spawning tasks costs more
+  - Already in a parallel context - avoid nested parallelism
+
+  ## Options
+
+  - `:max_concurrency` - Maximum concurrent tasks (default: `System.schedulers_online()`)
+  - `:timeout` - Task timeout in milliseconds (default: 5000)
+  - `:ordered` - Preserve order (default: false, faster unordered)
+
+  ## Example
+
+      iex> {:ok, graph} =
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(1, "A")
+      ...>   |> Yog.add_node(2, "B")
+      ...>   |> Yog.add_edge(1, 2, 10)
+      iex> doubled = Yog.Transform.map_edges_async(graph, fn w -> w * 2 end)
+      iex> Yog.successors(doubled, 1)
+      [{2, 20}]
+
+  ## Custom Options
+
+      iex> {:ok, graph} =
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(1, "A")
+      ...>   |> Yog.add_node(2, "B")
+      ...>   |> Yog.add_edge(1, 2, 5)
+      iex> opts = [max_concurrency: 8, timeout: 10_000]
+      iex> result = Yog.Transform.map_edges_async(graph, fn w -> w * 3 end, opts)
+      iex> Yog.successors(result, 1)
+      [{2, 15}]
+
+  ## Performance Example
+
+      # Sequential map_edges on 1M edges with moderate computation: ~6 seconds
+      graph |> Yog.Transform.map_edges(fn w -> expensive_transform(w) end)
+
+      # Parallel map_edges_async on 8-core system: ~1 second
+      graph |> Yog.Transform.map_edges_async(fn w -> expensive_transform(w) end)
+  """
+  @spec map_edges_async(Yog.graph(), (term() -> term()), keyword()) :: Yog.graph()
+  def map_edges_async(%Yog.Graph{} = graph, fun, opts \\ []) do
+    default_opts = [
+      max_concurrency: System.schedulers_online(),
+      timeout: 5000,
+      ordered: false
+    ]
+
+    stream_opts = Keyword.merge(default_opts, opts)
+
+    transform_outer_async = fn outer_map ->
+      outer_map
+      |> Task.async_stream(
+        fn {src, inner_map} ->
+          new_inner = Map.new(inner_map, fn {dst, weight} -> {dst, fun.(weight)} end)
+          {src, new_inner}
+        end,
+        stream_opts
+      )
+      |> Enum.reduce(%{}, fn {:ok, {src, new_inner}}, acc ->
+        Map.put(acc, src, new_inner)
+      end)
+    end
+
+    %{
+      graph
+      | out_edges: transform_outer_async.(graph.out_edges),
+        in_edges: transform_outer_async.(graph.in_edges)
     }
   end
 
