@@ -28,8 +28,9 @@ defmodule Yog.Community.Metrics do
       iex> is_float(q)
       true
   """
-  def modularity(graph, communities) do
-    # Modularity formula: Q = (1/2m) * Σ_ij [A_ij - (k_i * k_j / 2m)] * δ(c_i, c_j)
+  def modularity(graph, communities, opts \\ []) do
+    # Modularity formula: Q = (1/2m) * Σ_ij [A_ij - γ(k_i * k_j / 2m)] * δ(c_i, c_j)
+    # where γ is the resolution parameter.
     # where m = number of edges, A = adjacency matrix, k = degree, c = community, δ = kronecker delta
 
     edge_count = Yog.Model.edge_count(graph)
@@ -40,6 +41,7 @@ defmodule Yog.Community.Metrics do
       m = edge_count
       # 2m for undirected
       m2 = 2 * m
+      gamma = Keyword.get(opts, :resolution, 1.0)
 
       nodes = Yog.all_nodes(graph)
 
@@ -74,7 +76,7 @@ defmodule Yog.Community.Metrics do
               a_ij = if edge_exists_fast?(edge_set, i, j), do: 1, else: 0
               k_i = degrees[i] || 0
               k_j = degrees[j] || 0
-              expected = k_i * k_j / m2
+              expected = gamma * k_i * k_j / m2
               sum + (a_ij - expected)
             end)
 

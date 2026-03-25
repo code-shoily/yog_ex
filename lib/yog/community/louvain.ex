@@ -55,6 +55,7 @@ defmodule Yog.Community.Louvain do
   @type louvain_options :: %{
           min_modularity_gain: float(),
           max_iterations: integer(),
+          resolution: float(),
           seed: integer()
         }
 
@@ -73,6 +74,7 @@ defmodule Yog.Community.Louvain do
     %{
       min_modularity_gain: 0.000001,
       max_iterations: 100,
+      resolution: 1.0,
       seed: 42
     }
   end
@@ -92,6 +94,7 @@ defmodule Yog.Community.Louvain do
 
     * `:min_modularity_gain` - Stop when gain < threshold (default: 0.000001)
     * `:max_iterations` - Maximum iterations per phase (default: 100)
+    * `:resolution` - Resolution parameter (gamma) (default: 1.0)
     * `:seed` - Random seed for tie-breaking (default: 42)
   """
   @spec detect_with_options(Yog.graph(), keyword()) :: Result.t()
@@ -105,11 +108,7 @@ defmodule Yog.Community.Louvain do
   """
   @spec detect_with_stats(Yog.graph(), keyword()) :: {Result.t(), louvain_stats()}
   def detect_with_stats(graph, opts) do
-    options = %{
-      min_modularity_gain: Keyword.get(opts, :min_modularity_gain, 0.000001),
-      max_iterations: Keyword.get(opts, :max_iterations, 100),
-      seed: Keyword.get(opts, :seed, 42)
-    }
+    options = Map.merge(default_options(), Map.new(opts))
 
     nodes = Yog.all_nodes(graph)
     total_weight = calculate_total_weight(graph)
@@ -142,11 +141,7 @@ defmodule Yog.Community.Louvain do
   """
   @spec detect_hierarchical_with_options(Yog.graph(), keyword()) :: Dendrogram.t()
   def detect_hierarchical_with_options(graph, opts) do
-    options = %{
-      min_modularity_gain: Keyword.get(opts, :min_modularity_gain, 0.000001),
-      max_iterations: Keyword.get(opts, :max_iterations, 100),
-      seed: Keyword.get(opts, :seed, 42)
-    }
+    options = Map.merge(default_options(), Map.new(opts))
 
     nodes = Yog.all_nodes(graph)
     total_weight = calculate_total_weight(graph)
@@ -304,7 +299,8 @@ defmodule Yog.Community.Louvain do
               current_comm,
               neighbor_comm,
               node_weight,
-              current_state
+              current_state,
+              options.resolution
             )
 
           if gain > best_g do
@@ -334,12 +330,28 @@ defmodule Yog.Community.Louvain do
     |> MapSet.to_list()
   end
 
-  defp calculate_modularity_gain(_graph, _node, current_comm, target_comm, _node_weight, _state)
+  defp calculate_modularity_gain(
+         _graph,
+         _node,
+         current_comm,
+         target_comm,
+         _node_weight,
+         _state,
+         _resolution
+       )
        when current_comm == target_comm do
     0.0
   end
 
-  defp calculate_modularity_gain(graph, node, current_comm, target_comm, node_weight, state) do
+  defp calculate_modularity_gain(
+         graph,
+         node,
+         current_comm,
+         target_comm,
+         node_weight,
+         state,
+         gamma
+       ) do
     ki = node_weight
     m = state.total_weight
 
@@ -351,13 +363,13 @@ defmodule Yog.Community.Louvain do
       # Gain of adding to target community
       ki_in_target = calculate_ki_in(graph, state, node, target_comm)
       sigma_tot_target = Map.get(state.community_totals, target_comm, 0.0)
-      delta_q_add = ki_in_target / m - sigma_tot_target * ki / two_m_sq
+      delta_q_add = ki_in_target / m - gamma * (sigma_tot_target * ki / two_m_sq)
 
       # Gain of leaving current community
       ki_in_current = calculate_ki_in(graph, state, node, current_comm)
       sigma_tot_current = Map.get(state.community_totals, current_comm, 0.0)
       sigma_tot_c_minus_i = sigma_tot_current - ki
-      delta_q_remove = ki_in_current / m - sigma_tot_c_minus_i * ki / two_m_sq
+      delta_q_remove = ki_in_current / m - gamma * (sigma_tot_c_minus_i * ki / two_m_sq)
 
       delta_q_add - delta_q_remove
     end
