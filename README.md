@@ -90,6 +90,21 @@ YogEx includes comprehensive graph I/O modules (`Yog.IO.*`) for popular formats:
 - **TGF** - Trivial Graph Format
 - **JSON** - Adjacency list and matrix formats
 
+### Optional Dependencies
+
+For improved performance with large GraphML files, add the `saxy` dependency:
+
+```elixir
+def deps do
+  [
+    {:yog_ex, "~> 0.60.0"},
+    {:saxy, "~> 1.5"}  # Optional: 3-4x faster GraphML parsing
+  ]
+end
+```
+
+When `saxy` is available, GraphML parsing automatically uses a fast streaming SAX parser instead of the default DOM parser. For example, a 60MB GraphML file with ~500k edges loads in ~6s with `saxy` vs ~20s without it.
+
 ## Quick Start
 
 ### Shortest Path

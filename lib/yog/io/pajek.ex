@@ -33,14 +33,36 @@ defmodule Yog.IO.Pajek do
   alias Yog.Model
 
   @doc """
-  Default node attributes (no special visualization).
+  Returns default node attributes with no special visualization.
+
+  Node attributes control visual properties like shape, color, and coordinates
+  in Pajek visualizations.
+
+  ## Example
+
+      iex> {:node_attributes, _, _, _, _, _} = Yog.IO.Pajek.default_node_attributes()
+      iex> :ok
+      :ok
   """
   def default_node_attributes do
     {:node_attributes, :none, :none, :none, :none, :none}
   end
 
   @doc """
-  Default Pajek options for String node and edge data.
+  Returns default Pajek options for String node and edge data.
+
+  Default behavior:
+  - Node labels: Convert data to string
+  - Edge weights: No weights (returns `:none`)
+  - Node attributes: No special visualization
+  - Coordinates: Not included
+  - Visuals: Not included
+
+  ## Example
+
+      iex> {:pajek_options, _, _, _, _, _} = Yog.IO.Pajek.default_options()
+      iex> :ok
+      :ok
   """
   def default_options do
     {:pajek_options, &Kernel.to_string/1, fn _ -> :none end,
@@ -49,6 +71,33 @@ defmodule Yog.IO.Pajek do
 
   @doc """
   Creates Pajek options with custom configurations for visualizations and labels.
+
+  **Time Complexity:** O(1)
+
+  ## Parameters
+
+  - `node_label` - Function to convert node data to string label
+    `(node_data) -> string`
+  - `edge_weight` - Function to convert edge data to optional weight
+    `(edge_data) -> :none | {:some, number}`
+  - `node_attributes` - Function to generate visual attributes per node
+    `(node_data) -> node_attributes`
+  - `include_coordinates` - Whether to include x, y, z coordinates
+  - `include_visuals` - Whether to include shape, color, etc.
+
+  ## Returns
+
+  Pajek options tuple for use with `serialize_with/2`
+
+  ## Example
+
+      options = Yog.IO.Pajek.options_with(
+        fn data -> data.name end,                    # Node label
+        fn weight -> {:some, weight} end,            # Edge weight
+        fn _ -> Yog.IO.Pajek.default_node_attributes() end,  # No visuals
+        false,                                       # No coordinates
+        false                                        # No visuals
+      )
   """
   def options_with(node_label, edge_weight, node_attributes, include_coordinates, include_visuals) do
     {:pajek_options, node_label, edge_weight, node_attributes, include_coordinates,
@@ -57,6 +106,35 @@ defmodule Yog.IO.Pajek do
 
   @doc """
   Serializes a graph to Pajek format with custom options.
+
+  Allows full control over labels, weights, and visualization attributes.
+
+  **Time Complexity:** O(V + E) where V is nodes and E is edges
+
+  ## Parameters
+
+  - `options` - Pajek options tuple (see `options_with/5`)
+  - `graph` - The graph to serialize
+
+  ## Returns
+
+  Pajek format string
+
+  ## Example
+
+      graph = Yog.directed()
+      |> Yog.add_node(1, %{name: "Alice"})
+      |> Yog.add_node(2, %{name: "Bob"})
+      |> Yog.add_edge!(from: 1, to: 2, with: 5)
+
+      options = Yog.IO.Pajek.options_with(
+        fn data -> data.name end,
+        fn weight -> {:some, weight} end,
+        fn _ -> Yog.IO.Pajek.default_node_attributes() end,
+        false, false
+      )
+
+      pajek = Yog.IO.Pajek.serialize_with(options, graph)
   """
   def serialize_with(options, graph) do
     {:pajek_options, node_label_fn, edge_weight_fn, _node_attr_fn, _include_coords,
@@ -96,7 +174,21 @@ defmodule Yog.IO.Pajek do
   end
 
   @doc """
-  Serializes a graph to Pajek format for `String` data types.
+  Serializes a graph to Pajek format using default string conversion.
+
+  Node data is converted to strings, edge weights are omitted.
+
+  **Time Complexity:** O(V + E)
+
+  ## Example
+
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(1, "Alice")
+      ...> |> Yog.add_node(2, "Bob")
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: "5")
+      iex> pajek = Yog.IO.Pajek.serialize(graph)
+      iex> String.contains?(pajek, "*Vertices 2") and String.contains?(pajek, ~s("Alice"))
+      true
   """
   def serialize(graph) do
     serialize_with(default_options(), graph)
@@ -104,13 +196,39 @@ defmodule Yog.IO.Pajek do
 
   @doc """
   Alias for `serialize/1`.
+
+  Provided for compatibility with other serialization libraries.
+
+  **Time Complexity:** O(V + E)
   """
   def to_string(graph) do
     serialize(graph)
   end
 
   @doc """
-  Writes a graph to a Pajek file.
+  Writes a graph to a Pajek file using default string conversion.
+
+  **Time Complexity:** O(V + E) + file I/O
+
+  ## Parameters
+
+  - `path` - File path to write to (typically `.net` extension)
+  - `graph` - The graph to serialize
+
+  ## Returns
+
+  - `:ok` on success
+  - `{:error, reason}` on file write failure
+
+  ## Example
+
+      graph = Yog.directed()
+      |> Yog.add_node(1, "Alice")
+      |> Yog.add_node(2, "Bob")
+      |> Yog.add_edge!(from: 1, to: 2, with: "follows")
+
+      Yog.IO.Pajek.write("network.net", graph)
+      # => :ok
   """
   def write(path, graph) do
     content = serialize(graph)
@@ -119,6 +237,30 @@ defmodule Yog.IO.Pajek do
 
   @doc """
   Writes a graph to a Pajek file with custom options.
+
+  **Time Complexity:** O(V + E) + file I/O
+
+  ## Parameters
+
+  - `path` - File path to write to (typically `.net` extension)
+  - `options` - Pajek options tuple (see `options_with/5`)
+  - `graph` - The graph to serialize
+
+  ## Returns
+
+  - `:ok` on success
+  - `{:error, reason}` on file write failure
+
+  ## Example
+
+      graph = Yog.directed() |> Yog.add_node(1, %{name: "Alice"})
+      options = Yog.IO.Pajek.options_with(
+        fn d -> d.name end, fn _ -> :none end,
+        fn _ -> Yog.IO.Pajek.default_node_attributes() end,
+        false, false
+      )
+
+      Yog.IO.Pajek.write_with("network.net", options, graph)
   """
   def write_with(path, options, graph) do
     content = serialize_with(options, graph)
@@ -128,7 +270,35 @@ defmodule Yog.IO.Pajek do
   @doc """
   Parses a Pajek string into a graph with custom parser options.
 
-  Returns `{:ok, {:pajek_result, graph, warnings}}` or `{:error, reason}`.
+  This function allows you to transform Pajek data into custom Elixir data
+  structures as the graph is built.
+
+  **Time Complexity:** O(V + E)
+
+  ## Parameters
+
+  - `input` - Pajek format string
+  - `node_parser` - Function to transform node label to node data
+    `(string) -> node_data`
+  - `edge_parser` - Function to transform edge weight to edge data
+    `(number | nil) -> edge_data`
+
+  ## Returns
+
+  - `{:ok, {:pajek_result, graph, warnings}}` on success
+  - `{:error, reason}` on parsing failure
+
+  The warnings list contains any issues encountered during parsing.
+
+  ## Example
+
+      pajek_str = "*Vertices 2\\n1 \\"Alice\\"\\n2 \\"Bob\\"\\n*Arcs\\n1 2 5"
+
+      node_parser = fn label -> String.upcase(label) end
+      edge_parser = fn weight -> weight || 1 end
+
+      {:ok, {:pajek_result, graph, _warnings}} =
+        Yog.IO.Pajek.parse_with(pajek_str, node_parser, edge_parser)
   """
   def parse_with(input, node_parser, edge_parser) do
     case parse_pajek(input, node_parser, edge_parser) do
@@ -139,6 +309,20 @@ defmodule Yog.IO.Pajek do
 
   @doc """
   Parses a Pajek string into a graph with String labels.
+
+  Node labels are stored as strings, edge weights as numbers. For custom data
+  structures, use `parse_with/3`.
+
+  **Time Complexity:** O(V + E)
+
+  ## Parameters
+
+  - `input` - Pajek format string
+
+  ## Returns
+
+  - `{:ok, {:pajek_result, graph, warnings}}` on success
+  - `{:error, reason}` on parsing failure
 
   ## Example
 
@@ -152,7 +336,25 @@ defmodule Yog.IO.Pajek do
   end
 
   @doc """
-  Reads a graph from a Pajek file.
+  Reads a graph from a Pajek file using String labels.
+
+  **Time Complexity:** O(V + E) + file I/O
+
+  ## Parameters
+
+  - `path` - File path to read from (typically `.net` extension)
+
+  ## Returns
+
+  - `{:ok, {:pajek_result, graph, warnings}}` on success
+  - `{:error, reason}` on file read or parse failure
+
+  ## Example
+
+      {:ok, {:pajek_result, graph, warnings}} =
+        Yog.IO.Pajek.read("network.net")
+
+      IO.puts("Loaded \#{Yog.Model.node_count(graph)} nodes")
   """
   def read(path) do
     case File.read(path) do
@@ -163,6 +365,27 @@ defmodule Yog.IO.Pajek do
 
   @doc """
   Reads a graph from a Pajek file with custom parsers.
+
+  **Time Complexity:** O(V + E) + file I/O
+
+  ## Parameters
+
+  - `path` - File path to read from
+  - `node_parser` - Function to transform node label to node data
+  - `edge_parser` - Function to transform edge weight to edge data
+
+  ## Returns
+
+  - `{:ok, {:pajek_result, graph, warnings}}` on success
+  - `{:error, reason}` on file read or parse failure
+
+  ## Example
+
+      node_parser = fn label -> %{name: label} end
+      edge_parser = fn weight -> weight || 1 end
+
+      {:ok, {:pajek_result, graph, _warnings}} =
+        Yog.IO.Pajek.read_with("network.net", node_parser, edge_parser)
   """
   def read_with(path, node_parser, edge_parser) do
     case File.read(path) do

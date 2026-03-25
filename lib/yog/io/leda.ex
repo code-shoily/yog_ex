@@ -40,7 +40,17 @@ defmodule Yog.IO.LEDA do
   alias Yog.Model
 
   @doc """
-  Default LEDA options for String node and edge data.
+  Returns default LEDA options for String node and edge data.
+
+  Default behavior:
+  - Serialization: Convert data to string using `to_string/1`
+  - Deserialization: Keep data as-is (identity function)
+
+  ## Example
+
+      iex> {:leda_options, _ns, _es, _nd, _ed} = Yog.IO.LEDA.default_options()
+      iex> :ok
+      :ok
   """
   def default_options do
     {:leda_options, &Kernel.to_string/1, &Kernel.to_string/1, fn s -> s end, fn s -> s end}
@@ -48,6 +58,32 @@ defmodule Yog.IO.LEDA do
 
   @doc """
   Creates LEDA options with custom serializers and deserializers.
+
+  **Time Complexity:** O(1)
+
+  ## Parameters
+
+  - `node_serializer` - Function to convert node data to string for output
+    `(node_data) -> string`
+  - `edge_serializer` - Function to convert edge data to string for output
+    `(edge_data) -> string`
+  - `node_deserializer` - Function to convert string to node data on input
+    `(string) -> node_data`
+  - `edge_deserializer` - Function to convert string to edge data on input
+    `(string) -> edge_data`
+
+  ## Returns
+
+  LEDA options tuple for use with `serialize_with/2` and `parse_with/2`
+
+  ## Example
+
+      options = Yog.IO.LEDA.options_with(
+        fn %{name: n} -> n end,                    # Serialize node
+        fn weight -> Integer.to_string(weight) end, # Serialize edge
+        fn str -> %{name: str} end,                 # Deserialize node
+        fn str -> String.to_integer(str) end        # Deserialize edge
+      )
   """
   def options_with(node_serializer, edge_serializer, node_deserializer, edge_deserializer) do
     {:leda_options, node_serializer, edge_serializer, node_deserializer, edge_deserializer}
@@ -55,6 +91,34 @@ defmodule Yog.IO.LEDA do
 
   @doc """
   Serializes a graph to LEDA format with custom options.
+
+  Allows full control over how node and edge data are converted to LEDA format.
+
+  **Time Complexity:** O(V + E) where V is nodes and E is edges
+
+  ## Parameters
+
+  - `options` - LEDA options tuple (see `options_with/4`)
+  - `graph` - The graph to serialize
+
+  ## Returns
+
+  LEDA format string
+
+  ## Example
+
+      graph = Yog.directed()
+      |> Yog.add_node(1, %{name: "Alice"})
+      |> Yog.add_node(2, %{name: "Bob"})
+
+      options = Yog.IO.LEDA.options_with(
+        fn data -> data.name end,
+        fn _ -> "1" end,
+        fn _ -> nil end,
+        fn _ -> nil end
+      )
+
+      leda = Yog.IO.LEDA.serialize_with(options, graph)
   """
   def serialize_with(options, graph) do
     {:leda_options, node_ser, edge_ser, _, _} = options
@@ -91,7 +155,21 @@ defmodule Yog.IO.LEDA do
   end
 
   @doc """
-  Serializes a graph to LEDA format for `String` data types.
+  Serializes a graph to LEDA format using default string conversion.
+
+  Node and edge data are converted to strings.
+
+  **Time Complexity:** O(V + E)
+
+  ## Example
+
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(1, "Alice")
+      ...> |> Yog.add_node(2, "Bob")
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: "5")
+      iex> leda = Yog.IO.LEDA.serialize(graph)
+      iex> String.contains?(leda, "LEDA.GRAPH") and String.contains?(leda, "Alice")
+      true
   """
   def serialize(graph) do
     serialize_with(default_options(), graph)
@@ -99,13 +177,38 @@ defmodule Yog.IO.LEDA do
 
   @doc """
   Alias for `serialize/1`.
+
+  Provided for compatibility with other serialization libraries.
+
+  **Time Complexity:** O(V + E)
   """
   def to_string(graph) do
     serialize(graph)
   end
 
   @doc """
-  Writes a graph to a LEDA file.
+  Writes a graph to a LEDA file using default string conversion.
+
+  **Time Complexity:** O(V + E) + file I/O
+
+  ## Parameters
+
+  - `path` - File path to write to
+  - `graph` - The graph to serialize
+
+  ## Returns
+
+  - `:ok` on success
+  - `{:error, reason}` on file write failure
+
+  ## Example
+
+      graph = Yog.directed()
+      |> Yog.add_node(1, "Alice")
+      |> Yog.add_node(2, "Bob")
+
+      Yog.IO.LEDA.write("network.leda", graph)
+      # => :ok
   """
   def write(path, graph) do
     content = serialize(graph)
@@ -113,7 +216,30 @@ defmodule Yog.IO.LEDA do
   end
 
   @doc """
-  Writes a graph to a LEDA file with custom options.
+  Writes a graph to a LEDA file with custom serialization options.
+
+  **Time Complexity:** O(V + E) + file I/O
+
+  ## Parameters
+
+  - `path` - File path to write to
+  - `options` - LEDA options tuple (see `options_with/4`)
+  - `graph` - The graph to serialize
+
+  ## Returns
+
+  - `:ok` on success
+  - `{:error, reason}` on file write failure
+
+  ## Example
+
+      graph = Yog.directed() |> Yog.add_node(1, %{name: "Alice"})
+      options = Yog.IO.LEDA.options_with(
+        fn d -> d.name end, fn _ -> "1" end,
+        fn _ -> nil end, fn _ -> nil end
+      )
+
+      Yog.IO.LEDA.write_with("network.leda", options, graph)
   """
   def write_with(path, options, graph) do
     content = serialize_with(options, graph)
@@ -123,7 +249,35 @@ defmodule Yog.IO.LEDA do
   @doc """
   Parses a LEDA string into a graph with custom parser options.
 
-  Returns `{:ok, {:leda_result, graph, warnings}}` or `{:error, reason}`.
+  This function allows you to transform LEDA data into custom Elixir data
+  structures as the graph is built.
+
+  **Time Complexity:** O(V + E)
+
+  ## Parameters
+
+  - `input` - LEDA format string
+  - `node_parser` - Function to transform node string to node data
+    `(string) -> node_data`
+  - `edge_parser` - Function to transform edge string to edge data
+    `(string) -> edge_data`
+
+  ## Returns
+
+  - `{:ok, {:leda_result, graph, warnings}}` on success
+  - `{:error, reason}` on parsing failure
+
+  The warnings list contains any issues encountered during parsing.
+
+  ## Example
+
+      leda_str = "LEDA.GRAPH\\nstring\\nstring\\n-1\\n2\\n|{Alice}|\\n|{Bob}|\\n1\\n1 2 0 |{5}|"
+
+      node_parser = fn str -> String.upcase(str) end
+      edge_parser = fn str -> String.to_integer(str) end
+
+      {:ok, {:leda_result, graph, _warnings}} =
+        Yog.IO.LEDA.parse_with(leda_str, node_parser, edge_parser)
   """
   def parse_with(input, node_parser, edge_parser) do
     case parse_leda(input, node_parser, edge_parser) do
@@ -134,6 +288,20 @@ defmodule Yog.IO.LEDA do
 
   @doc """
   Parses a LEDA string into a graph with String labels.
+
+  Node and edge data are stored as strings. For custom data structures,
+  use `parse_with/3`.
+
+  **Time Complexity:** O(V + E)
+
+  ## Parameters
+
+  - `input` - LEDA format string
+
+  ## Returns
+
+  - `{:ok, {:leda_result, graph, warnings}}` on success
+  - `{:error, reason}` on parsing failure
 
   ## Example
 
@@ -147,7 +315,25 @@ defmodule Yog.IO.LEDA do
   end
 
   @doc """
-  Reads a graph from a LEDA file.
+  Reads a graph from a LEDA file using String labels.
+
+  **Time Complexity:** O(V + E) + file I/O
+
+  ## Parameters
+
+  - `path` - File path to read from
+
+  ## Returns
+
+  - `{:ok, {:leda_result, graph, warnings}}` on success
+  - `{:error, reason}` on file read or parse failure
+
+  ## Example
+
+      {:ok, {:leda_result, graph, warnings}} =
+        Yog.IO.LEDA.read("network.leda")
+
+      IO.puts("Loaded graph with \#{Yog.Model.node_count(graph)} nodes")
   """
   def read(path) do
     case File.read(path) do

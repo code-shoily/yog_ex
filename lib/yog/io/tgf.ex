@@ -38,7 +38,17 @@ defmodule Yog.IO.TGF do
   alias Yog.Model
 
   @doc """
-  Default TGF serialization options.
+  Returns default TGF serialization options.
+
+  Default behavior:
+  - Node labels: Convert data to string using `to_string/1`
+  - Edge labels: No labels (returns `:none`)
+
+  ## Example
+
+      iex> {:tgf_options, _node_fn, _edge_fn} = Yog.IO.TGF.default_options()
+      iex> :ok
+      :ok
   """
   def default_options do
     {:tgf_options, &to_string/1, fn _ -> :none end}
@@ -46,6 +56,29 @@ defmodule Yog.IO.TGF do
 
   @doc """
   Creates TGF options with custom node and edge label functions.
+
+  **Time Complexity:** O(1)
+
+  ## Parameters
+
+  - `node_label` - Function to convert node data to string label
+    `(node_data) -> string`
+  - `edge_label` - Function to convert edge data to optional label
+    `(edge_data) -> :none | {:some, string}`
+
+  ## Returns
+
+  TGF options tuple for use with `serialize_with/2`
+
+  ## Example
+
+      iex> options = Yog.IO.TGF.options_with(
+      ...>   fn data -> "Node: " <> to_string(data) end,
+      ...>   fn weight -> {:some, "W:" <> to_string(weight)} end
+      ...> )
+      iex> {:tgf_options, _, _} = options
+      iex> :ok
+      :ok
   """
   def options_with(node_label, edge_label) do
     {:tgf_options, node_label, edge_label}
@@ -54,21 +87,31 @@ defmodule Yog.IO.TGF do
   @doc """
   Serializes a graph to TGF format with custom label functions.
 
+  Allows full control over how node and edge data are converted to TGF labels.
+
+  **Time Complexity:** O(V + E) where V is nodes and E is edges
+
+  ## Parameters
+
+  - `options` - TGF options tuple (see `options_with/2`)
+  - `graph` - The graph to serialize
+
+  ## Returns
+
+  TGF format string
+
   ## Example
 
       iex> graph = Yog.directed()
       ...> |> Yog.add_node(1, %{name: "Alice"})
       ...> |> Yog.add_node(2, %{name: "Bob"})
       ...> |> Yog.add_edge!(from: 1, to: 2, with: 10)
-      iex>
       iex> options = Yog.IO.TGF.options_with(
       ...>   fn data -> data.name end,
       ...>   fn weight -> {:some, Integer.to_string(weight)} end
       ...> )
       iex> tgf_string = Yog.IO.TGF.serialize_with(options, graph)
-      iex> String.contains?(tgf_string, "1 Alice")
-      true
-      iex> String.contains?(tgf_string, "1 2 10")
+      iex> String.contains?(tgf_string, "1 Alice") and String.contains?(tgf_string, "1 2 10")
       true
   """
   def serialize_with(options, graph) do
@@ -102,14 +145,50 @@ defmodule Yog.IO.TGF do
   end
 
   @doc """
-  Serializes a graph to TGF format.
+  Serializes a graph to TGF format using default label conversion.
+
+  Node data is converted to strings, edge labels are omitted.
+
+  **Time Complexity:** O(V + E)
+
+  ## Example
+
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(1, "Alice")
+      ...> |> Yog.add_node(2, "Bob")
+      ...> |> Yog.add_edge!(from: 1, to: 2, with: "follows")
+      iex> tgf = Yog.IO.TGF.serialize(graph)
+      iex> String.contains?(tgf, "1 Alice") and String.contains?(tgf, "1 2")
+      true
   """
   def serialize(graph) do
     serialize_with(default_options(), graph)
   end
 
   @doc """
-  Writes a graph to a TGF file.
+  Writes a graph to a TGF file using default label conversion.
+
+  **Time Complexity:** O(V + E) + file I/O
+
+  ## Parameters
+
+  - `path` - File path to write to
+  - `graph` - The graph to serialize
+
+  ## Returns
+
+  - `:ok` on success
+  - `{:error, reason}` on file write failure
+
+  ## Example
+
+      graph = Yog.directed()
+      |> Yog.add_node(1, "Alice")
+      |> Yog.add_node(2, "Bob")
+      |> Yog.add_edge!(from: 1, to: 2, with: "follows")
+
+      Yog.IO.TGF.write("network.tgf", graph)
+      # => :ok
   """
   def write(path, graph) do
     content = serialize(graph)
@@ -117,7 +196,27 @@ defmodule Yog.IO.TGF do
   end
 
   @doc """
-  Writes a graph to a TGF file with custom options.
+  Writes a graph to a TGF file with custom label functions.
+
+  **Time Complexity:** O(V + E) + file I/O
+
+  ## Parameters
+
+  - `path` - File path to write to
+  - `options` - TGF options tuple (see `options_with/2`)
+  - `graph` - The graph to serialize
+
+  ## Returns
+
+  - `:ok` on success
+  - `{:error, reason}` on file write failure
+
+  ## Example
+
+      graph = Yog.directed() |> Yog.add_node(1, %{name: "Alice"})
+      options = Yog.IO.TGF.options_with(fn d -> d.name end, fn _ -> :none end)
+
+      Yog.IO.TGF.write_with("network.tgf", options, graph)
   """
   def write_with(path, options, graph) do
     content = serialize_with(options, graph)
@@ -127,8 +226,39 @@ defmodule Yog.IO.TGF do
   @doc """
   Parses a TGF string into a graph with custom parsers.
 
-  Returns `{:ok, {:tgf_result, graph, warnings}}` on success.
-  Requires passing the graph type as `:directed` or `:undirected`.
+  This function allows you to transform TGF labels into custom Elixir data
+  structures as the graph is built.
+
+  **Time Complexity:** O(V + E)
+
+  ## Parameters
+
+  - `input` - TGF format string
+  - `graph_type` - `:directed` or `:undirected`
+  - `node_parser` - Function to transform node label to node data
+    `(string) -> node_data`
+  - `edge_parser` - Function to transform edge label to edge data
+    `(string | nil) -> edge_data`
+
+  ## Returns
+
+  - `{:ok, {:tgf_result, graph, warnings}}` on success
+  - `{:error, reason}` on parsing failure
+
+  ## Example
+
+      tgf = "1 Alice\\n2 Bob\\n#\\n1 2 5\\n"
+
+      node_parser = fn label -> String.upcase(label) end
+      edge_parser = fn label ->
+        case label do
+          nil -> 1
+          val -> String.to_integer(val)
+        end
+      end
+
+      {:ok, {:tgf_result, graph, _warnings}} =
+        Yog.IO.TGF.parse_with(tgf, :directed, node_parser, edge_parser)
   """
   def parse_with(input, graph_type, node_parser, edge_parser) do
     lines = String.split(input, "\n", trim: false)
@@ -141,6 +271,23 @@ defmodule Yog.IO.TGF do
 
   @doc """
   Parses a TGF string into a graph with String labels.
+
+  Node and edge labels are stored as strings. For custom data structures,
+  use `parse_with/4`.
+
+  **Time Complexity:** O(V + E)
+
+  ## Parameters
+
+  - `input` - TGF format string
+  - `gtype` - `:directed` or `:undirected`
+
+  ## Returns
+
+  - `{:ok, {:tgf_result, graph, warnings}}` on success
+  - `{:error, reason}` on parsing failure
+
+  The warnings list contains any malformed lines that were skipped.
 
   ## Example
 
@@ -159,7 +306,28 @@ defmodule Yog.IO.TGF do
   end
 
   @doc """
-  Reads a graph from a TGF file.
+  Reads a graph from a TGF file using String labels.
+
+  **Time Complexity:** O(V + E) + file I/O
+
+  ## Parameters
+
+  - `path` - File path to read from
+  - `gtype` - `:directed` or `:undirected`
+
+  ## Returns
+
+  - `{:ok, {:tgf_result, graph, warnings}}` on success
+  - `{:error, reason}` on file read or parse failure
+
+  ## Example
+
+      {:ok, {:tgf_result, graph, warnings}} =
+        Yog.IO.TGF.read("network.tgf", :directed)
+
+      if warnings != [] do
+        IO.puts("Warning: Some lines were malformed")
+      end
   """
   def read(path, gtype) do
     case File.read(path) do

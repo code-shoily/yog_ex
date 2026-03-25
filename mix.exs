@@ -52,11 +52,12 @@ defmodule YogEx.MixProject do
   end
 
   def application do
-    [extra_applications: [:logger]]
+    [extra_applications: [:logger, :xmerl]]
   end
 
   defp deps do
     [
+      {:saxy, "~> 1.5", optional: true},
       {:ex_doc, "~> 0.40", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.18", only: :test},
