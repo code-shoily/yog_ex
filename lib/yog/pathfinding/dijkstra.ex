@@ -428,41 +428,37 @@ defmodule Yog.Pathfinding.Dijkstra do
   # Returns :error | {path, weight, distances} if return_path=false
   defp do_dijkstra(graph, from, to, zero, add, compare, return_path) do
     initial_queue =
-      PQ.new(fn {d1, _, _}, {d2, _, _} -> compare.(d1, d2) != :gt end)
-      |> PQ.push({zero, from, [from]})
+      if return_path do
+        PQ.new(fn {d1, _, _}, {d2, _, _} -> compare.(d1, d2) != :gt end)
+        |> PQ.push({zero, from, [from]})
+      else
+        PQ.new(fn {d1, _}, {d2, _} -> compare.(d1, d2) != :gt end)
+        |> PQ.push({zero, from})
+      end
 
     initial_distances = %{from => zero}
 
-    do_dijkstra_loop(graph, initial_queue, to, add, compare, return_path, initial_distances)
+    if return_path do
+      do_dijkstra_loop_with_path(graph, initial_queue, to, add, compare, initial_distances)
+    else
+      do_dijkstra_loop_no_path(graph, initial_queue, add, compare, initial_distances)
+    end
   end
 
-  defp do_dijkstra_loop(graph, queue, to, add, compare, return_path, distances) do
+  defp do_dijkstra_loop_with_path(graph, queue, to, add, compare, distances) do
     case PQ.pop(queue) do
       :error ->
-        if to == nil do
-          # Single-source case: return all distances
-          {[], zero_from_somewhere(distances, add), distances}
-        else
-          :error
-        end
+        :error
 
       {:ok, {dist, node, path}, rest} ->
-        # Check if we've found a better path already
         current_best = Map.get(distances, node)
 
         if current_best != nil and compare.(dist, current_best) == :gt do
-          # Skip this outdated entry
-          do_dijkstra_loop(graph, rest, to, add, compare, return_path, distances)
+          do_dijkstra_loop_with_path(graph, rest, to, add, compare, distances)
         else
-          # Check if we reached the target (only if to is specified)
-          if to != nil and node == to do
-            if return_path do
-              {Enum.reverse(path), dist}
-            else
-              {Enum.reverse(path), dist, distances}
-            end
+          if node == to do
+            {Enum.reverse(path), dist}
           else
-            # Expand neighbors
             successors = Model.successors(graph, node)
 
             {new_queue, new_distances} =
@@ -486,8 +482,49 @@ defmodule Yog.Pathfinding.Dijkstra do
                 end
               end)
 
-            do_dijkstra_loop(graph, new_queue, to, add, compare, return_path, new_distances)
+            do_dijkstra_loop_with_path(graph, new_queue, to, add, compare, new_distances)
           end
+        end
+    end
+  end
+
+  defp do_dijkstra_loop_no_path(graph, queue, add, compare, distances) do
+    case PQ.pop(queue) do
+      :error ->
+        # For single source distances, return empty path and weight info
+        # The distances map is what matters
+        {[], zero_from_somewhere(distances, add), distances}
+
+      {:ok, {dist, node}, rest} ->
+        current_best = Map.get(distances, node)
+
+        if current_best != nil and compare.(dist, current_best) == :gt do
+          do_dijkstra_loop_no_path(graph, rest, add, compare, distances)
+        else
+          successors = Model.successors(graph, node)
+
+          {new_queue, new_distances} =
+            Enum.reduce(successors, {rest, distances}, fn {neighbor, weight}, {q, d} ->
+              new_dist = add.(dist, weight)
+
+              case Map.fetch(d, neighbor) do
+                {:ok, current} ->
+                  if compare.(new_dist, current) == :lt do
+                    new_q = PQ.push(q, {new_dist, neighbor})
+                    new_d = Map.put(d, neighbor, new_dist)
+                    {new_q, new_d}
+                  else
+                    {q, d}
+                  end
+
+                :error ->
+                  new_q = PQ.push(q, {new_dist, neighbor})
+                  new_d = Map.put(d, neighbor, new_dist)
+                  {new_q, new_d}
+              end
+            end)
+
+          do_dijkstra_loop_no_path(graph, new_queue, add, compare, new_distances)
         end
     end
   end

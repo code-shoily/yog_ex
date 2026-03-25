@@ -243,7 +243,7 @@ defmodule Yog.Pathfinding.Johnson do
 
   # Run Dijkstra from each node with reweighted edges
   defp run_dijkstra_from_all(graph, nodes, potentials, zero, add, subtract, compare) do
-    # NEW: Reweight the graph ONCE using map_edges_indexed
+    # Reweight the graph ONCE using map_edges_indexed
     reweighted_graph =
       Transform.map_edges_indexed(graph, fn u, v, w ->
         h_u = Map.get(potentials, u, zero)
@@ -252,23 +252,32 @@ defmodule Yog.Pathfinding.Johnson do
         add.(w, h_u) |> subtract.(h_v)
       end)
 
-    Enum.reduce(nodes, %{}, fn source, acc ->
-      # Run Dijkstra on reweighted graph using the standard implementation
-      reweighted_distances =
-        Dijkstra.single_source_distances(reweighted_graph, source, zero, add, compare)
+    parallel_opts = [
+      max_concurrency: System.schedulers_online(),
+      timeout: :infinity
+    ]
 
-      # Adjust distances back: dist(u,v) = dist'(u,v) - h(u) + h(v)
-      h_u = Map.get(potentials, source, zero)
+    nodes
+    |> Task.async_stream(
+      fn source ->
+        # Run Dijkstra on reweighted graph using the standard implementation
+        reweighted_distances =
+          Dijkstra.single_source_distances(reweighted_graph, source, zero, add, compare)
 
-      adjusted =
+        # Adjust distances back: dist(u,v) = dist'(u,v) - h(u) + h(v)
+        h_source = Map.get(potentials, source, zero)
+
         Enum.reduce(reweighted_distances, %{}, fn {dest, dist_prime}, inner_acc ->
-          h_v = Map.get(potentials, dest, zero)
+          h_dest = Map.get(potentials, dest, zero)
           # dist = dist' - h(u) + h(v)
-          adjusted_dist = add.(subtract.(dist_prime, h_u), h_v)
+          adjusted_dist = add.(subtract.(dist_prime, h_source), h_dest)
           Map.put(inner_acc, {source, dest}, adjusted_dist)
         end)
-
-      Map.merge(acc, adjusted)
+      end,
+      parallel_opts
+    )
+    |> Enum.reduce(%{}, fn {:ok, source_results}, acc ->
+      Map.merge(acc, source_results)
     end)
   end
 end

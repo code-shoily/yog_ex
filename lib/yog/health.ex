@@ -84,26 +84,32 @@ defmodule Yog.Health do
     if nodes == [] do
       nil
     else
+      parallel_opts = [
+        max_concurrency: System.schedulers_online(),
+        timeout: :infinity
+      ]
+
       eccentricities =
         nodes
-        |> Enum.map(fn node ->
-          case eccentricity(reweighted_graph, node,
-                 with_zero: zero,
-                 with_add: add,
-                 with_compare: compare,
-                 with: &Function.identity/1
-               ) do
-            nil -> nil
-            ecc -> ecc
-          end
-        end)
+        |> Task.async_stream(
+          fn node ->
+            eccentricity(reweighted_graph, node,
+              with_zero: zero,
+              with_add: add,
+              with_compare: compare,
+              with: &Function.identity/1
+            )
+          end,
+          parallel_opts
+        )
+        |> Enum.map(fn {:ok, ecc} -> ecc end)
         |> Enum.reject(&is_nil/1)
 
-      if eccentricities == [] do
+      if length(eccentricities) < length(nodes) do
         nil
       else
-        Enum.reduce(eccentricities, fn ecc, max_ecc ->
-          if compare.(ecc, max_ecc) == :gt, do: ecc, else: max_ecc
+        Enum.reduce(eccentricities, fn ecc, max ->
+          if compare.(ecc, max) == :gt, do: ecc, else: max
         end)
       end
     end
@@ -159,26 +165,32 @@ defmodule Yog.Health do
     if nodes == [] do
       nil
     else
+      parallel_opts = [
+        max_concurrency: System.schedulers_online(),
+        timeout: :infinity
+      ]
+
       eccentricities =
         nodes
-        |> Enum.map(fn node ->
-          case eccentricity(reweighted_graph, node,
-                 with_zero: zero,
-                 with_add: add,
-                 with_compare: compare,
-                 with: &Function.identity/1
-               ) do
-            nil -> nil
-            ecc -> ecc
-          end
-        end)
+        |> Task.async_stream(
+          fn node ->
+            eccentricity(reweighted_graph, node,
+              with_zero: zero,
+              with_add: add,
+              with_compare: compare,
+              with: &Function.identity/1
+            )
+          end,
+          parallel_opts
+        )
+        |> Enum.map(fn {:ok, ecc} -> ecc end)
         |> Enum.reject(&is_nil/1)
 
-      if eccentricities == [] do
+      if length(eccentricities) < length(nodes) do
         nil
       else
-        Enum.reduce(eccentricities, fn ecc, min_ecc ->
-          if compare.(ecc, min_ecc) == :lt, do: ecc, else: min_ecc
+        Enum.reduce(eccentricities, fn ecc, min ->
+          if compare.(ecc, min) == :lt, do: ecc, else: min
         end)
       end
     end
@@ -407,11 +419,21 @@ defmodule Yog.Health do
     if num_nodes <= 1 do
       nil
     else
-      # Calculate all-pairs shortest paths
+      parallel_opts = [
+        max_concurrency: System.schedulers_online(),
+        timeout: :infinity
+      ]
+
+      # Calculate all-pairs shortest paths in parallel
       all_distances =
-        Enum.map(nodes, fn source ->
-          dijkstra_single_source(reweighted_graph, source, zero, add, compare)
-        end)
+        nodes
+        |> Task.async_stream(
+          fn source ->
+            dijkstra_single_source(reweighted_graph, source, zero, add, compare)
+          end,
+          parallel_opts
+        )
+        |> Enum.map(fn {:ok, distances} -> distances end)
 
       # Check if graph is fully connected
       all_reachable =

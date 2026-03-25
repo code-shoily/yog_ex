@@ -77,24 +77,25 @@ defmodule Yog.Centrality do
 
     factor = if n > 1, do: (n - 1) * 1.0, else: 1.0
 
-    %Yog.Graph{kind: kind} = graph
+    %Yog.Graph{kind: kind, out_edges: out_edges, in_edges: in_edges} = graph
 
     Enum.reduce(nodes, %{}, fn id, acc ->
       count =
         case kind do
           :undirected ->
-            length(Model.neighbors(graph, id))
+            Map.get(out_edges, id, %{}) |> map_size()
 
           :directed ->
             case mode do
               :in_degree ->
-                length(Model.predecessors(graph, id))
+                Map.get(in_edges, id, %{}) |> map_size()
 
               :out_degree ->
-                length(Model.successors(graph, id))
+                Map.get(out_edges, id, %{}) |> map_size()
 
               :total_degree ->
-                length(Model.successors(graph, id)) + length(Model.predecessors(graph, id))
+                (Map.get(out_edges, id, %{}) |> map_size()) +
+                  (Map.get(in_edges, id, %{}) |> map_size())
             end
         end
 
@@ -158,23 +159,33 @@ defmodule Yog.Centrality do
         Map.put(acc, id, 0.0)
       end)
     else
-      Enum.reduce(nodes, %{}, fn source, acc ->
-        distances = dijkstra_single_source(graph, source, zero, add, compare)
+      # Set parallelism options
+      parallel_opts = [
+        max_concurrency: System.schedulers_online(),
+        timeout: :infinity
+      ]
 
-        if map_size(distances) < n do
-          # Node cannot reach all others
-          Map.put(acc, source, 0.0)
-        else
-          # Sum all distances (including 0 for self)
-          total_distance =
-            Enum.reduce(distances, zero, fn {_node, dist}, sum ->
-              add.(sum, dist)
-            end)
+      nodes
+      |> Task.async_stream(
+        fn source ->
+          distances = dijkstra_single_source(graph, source, zero, add, compare)
 
-          # Calculate closeness: (n-1) / sum_of_distances
-          centrality_score = (n - 1) / to_float.(total_distance)
-          Map.put(acc, source, centrality_score)
-        end
+          if map_size(distances) < n do
+            {source, 0.0}
+          else
+            total_distance =
+              Enum.reduce(distances, zero, fn {_node, dist}, sum ->
+                add.(sum, dist)
+              end)
+
+            centrality_score = (n - 1) / to_float.(total_distance)
+            {source, centrality_score}
+          end
+        end,
+        parallel_opts
+      )
+      |> Enum.reduce(%{}, fn {:ok, {source, score}}, acc ->
+        Map.put(acc, source, score)
       end)
     end
   end
@@ -234,25 +245,37 @@ defmodule Yog.Centrality do
     else
       denominator = (n - 1) * 1.0
 
-      Enum.reduce(nodes, %{}, fn source, acc ->
-        distances = dijkstra_single_source(graph, source, zero, add, compare)
+      parallel_opts = [
+        max_concurrency: System.schedulers_online(),
+        timeout: :infinity
+      ]
 
-        sum_of_reciprocals =
-          Enum.reduce(distances, 0.0, fn {node, dist}, sum ->
-            if node == source do
-              sum
-            else
-              d = to_float.(dist)
+      nodes
+      |> Task.async_stream(
+        fn source ->
+          distances = dijkstra_single_source(graph, source, zero, add, compare)
 
-              if d > 0.0 do
-                sum + 1.0 / d
-              else
+          sum_of_reciprocals =
+            Enum.reduce(distances, 0.0, fn {node, dist}, sum ->
+              if node == source do
                 sum
-              end
-            end
-          end)
+              else
+                d = to_float.(dist)
 
-        Map.put(acc, source, sum_of_reciprocals / denominator)
+                if d > 0.0 do
+                  sum + 1.0 / d
+                else
+                  sum
+                end
+              end
+            end)
+
+          {source, sum_of_reciprocals / denominator}
+        end,
+        parallel_opts
+      )
+      |> Enum.reduce(%{}, fn {:ok, {source, score}}, acc ->
+        Map.put(acc, source, score)
       end)
     end
   end
@@ -306,11 +329,22 @@ defmodule Yog.Centrality do
         Map.put(acc, id, 0.0)
       end)
 
-    scores =
-      Enum.reduce(nodes, initial, fn s, acc ->
-        discovery = brandes_dijkstra(graph, s, zero, add, compare)
-        dependencies = accumulate_dependencies(discovery)
+    parallel_opts = [
+      max_concurrency: System.schedulers_online(),
+      timeout: :infinity
+    ]
 
+    scores =
+      nodes
+      |> Task.async_stream(
+        fn s ->
+          discovery = brandes_dijkstra(graph, s, zero, add, compare)
+          dependencies = accumulate_dependencies(discovery)
+          {s, dependencies}
+        end,
+        parallel_opts
+      )
+      |> Enum.reduce(initial, fn {:ok, {s, dependencies}}, acc ->
         merge_scores(acc, dependencies, s)
       end)
 
@@ -375,6 +409,20 @@ defmodule Yog.Centrality do
     nodes = Model.all_nodes(graph)
     n = length(nodes)
 
+    # Precompute in-neighbors and out-degrees to avoid redundant map/list ops in iteration
+    in_neighbors_map =
+      Enum.reduce(nodes, %{}, fn id, acc ->
+        Map.put(acc, id, get_in_neighbor_ids(graph, id))
+      end)
+
+    out_degrees_map =
+      Enum.reduce(nodes, %{}, fn id, acc ->
+        Map.put(acc, id, get_out_degree(graph, id))
+      end)
+
+    sinks =
+      Enum.filter(nodes, fn id -> out_degrees_map[id] == 0 end)
+
     initial_rank = 1.0 / n
 
     ranks =
@@ -382,7 +430,18 @@ defmodule Yog.Centrality do
         Map.put(acc, id, initial_rank)
       end)
 
-    iterate_pagerank(graph, ranks, nodes, n, damping, max_iterations, tolerance, 0)
+    iterate_pagerank(
+      ranks,
+      nodes,
+      n,
+      damping,
+      max_iterations,
+      tolerance,
+      0,
+      in_neighbors_map,
+      out_degrees_map,
+      sinks
+    )
   end
 
   @doc """
@@ -424,6 +483,12 @@ defmodule Yog.Centrality do
         Map.put(acc, id, 1.0)
       end)
     else
+      # Precompute in-neighbors map
+      in_neighbors_map =
+        Enum.reduce(nodes, %{}, fn id, acc ->
+          Map.put(acc, id, get_in_neighbor_ids(graph, id))
+        end)
+
       # Initialize with small perturbation based on node ID to break symmetry
       initial_scores =
         Enum.reduce(nodes, %{}, fn id, acc ->
@@ -431,7 +496,15 @@ defmodule Yog.Centrality do
           Map.put(acc, id, 1.0 + perturbation)
         end)
 
-      iterate_eigenvector(graph, nodes, initial_scores, %{}, max_iterations, tolerance, 0)
+      iterate_eigenvector(
+        nodes,
+        initial_scores,
+        %{},
+        max_iterations,
+        tolerance,
+        0,
+        in_neighbors_map
+      )
     end
   end
 
@@ -480,12 +553,28 @@ defmodule Yog.Centrality do
     if n <= 0 do
       %{}
     else
+      # Precompute neighbors map
+      in_neighbors_map =
+        Enum.reduce(nodes, %{}, fn id, acc ->
+          # For Katz, we use in-neighbors (predecessors in directed graphs)
+          Map.put(acc, id, get_in_neighbor_ids(graph, id))
+        end)
+
       initial_scores =
         Enum.reduce(nodes, %{}, fn id, acc ->
           Map.put(acc, id, beta)
         end)
 
-      iterate_katz(graph, nodes, initial_scores, alpha, beta, max_iterations, tolerance, 0)
+      iterate_katz(
+        nodes,
+        initial_scores,
+        alpha,
+        beta,
+        max_iterations,
+        tolerance,
+        0,
+        in_neighbors_map
+      )
     end
   end
 
@@ -533,12 +622,18 @@ defmodule Yog.Centrality do
     if n <= 0 do
       %{}
     else
+      # Precompute neighbors map
+      in_neighbors_map =
+        Enum.reduce(nodes, %{}, fn id, acc ->
+          Map.put(acc, id, get_in_neighbor_ids(graph, id))
+        end)
+
       initial_scores =
         Enum.reduce(nodes, %{}, fn id, acc ->
           Map.put(acc, id, initial)
         end)
 
-      iterate_alpha(graph, nodes, initial_scores, alpha, max_iterations, tolerance, 0)
+      iterate_alpha(nodes, initial_scores, alpha, max_iterations, tolerance, 0, in_neighbors_map)
     end
   end
 
@@ -691,25 +786,54 @@ defmodule Yog.Centrality do
     end
   end
 
-  # PageRank iteration
-  defp iterate_pagerank(_graph, ranks, _nodes, _n, _damping, max_iter, _tolerance, iter)
-       when iter >= max_iter do
+  # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity
+  defp iterate_pagerank(
+         ranks,
+         _nodes,
+         _n,
+         _damping,
+         max_iterations,
+         _tolerance,
+         iter,
+         _in_map,
+         _out_map,
+         _sinks
+       )
+       when iter >= max_iterations do
     ranks
   end
 
-  defp iterate_pagerank(graph, ranks, nodes, n, damping, max_iter, tolerance, iter) do
+  # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity
+  defp iterate_pagerank(
+         ranks,
+         nodes,
+         n,
+         damping,
+         max_iterations,
+         tolerance,
+         iter,
+         in_map,
+         out_map,
+         sinks
+       ) do
     n_float = n * 1.0
 
-    sink_sum = calculate_sink_sum(graph, ranks, nodes, n_float)
+    # Calculate sink contribution: distribute among all nodes
+    sink_total =
+      Enum.reduce(sinks, 0.0, fn sink, sum ->
+        sum + Map.get(ranks, sink, 0.0)
+      end)
+
+    sink_sum = sink_total / n_float
 
     new_ranks =
       Enum.reduce(nodes, %{}, fn node, acc ->
-        in_neighbors = get_in_neighbors(graph, node)
+        in_neighbors = Map.get(in_map, node, [])
 
         rank_sum =
           Enum.reduce(in_neighbors, 0.0, fn neighbor, sum ->
             neighbor_rank = Map.get(ranks, neighbor, 0.0)
-            out_degree = get_out_degree(graph, neighbor)
+            out_degree = Map.get(out_map, neighbor, 0)
 
             if out_degree > 0 do
               sum + neighbor_rank / out_degree
@@ -727,46 +851,18 @@ defmodule Yog.Centrality do
     if l1_norm < tolerance do
       new_ranks
     else
-      iterate_pagerank(graph, new_ranks, nodes, n, damping, max_iter, tolerance, iter + 1)
-    end
-  end
-
-  defp calculate_sink_sum(graph, ranks, nodes, n_float) do
-    Enum.reduce(nodes, 0.0, fn node, sum ->
-      out_degree = get_out_degree(graph, node)
-
-      if out_degree == 0 do
-        node_rank = Map.get(ranks, node, 0.0)
-        sum + node_rank / n_float
-      else
-        sum
-      end
-    end)
-  end
-
-  defp get_in_neighbors(graph, node) do
-    %Yog.Graph{kind: kind} = graph
-
-    case kind do
-      :undirected ->
-        Model.successors(graph, node)
-        |> Enum.map(fn {edge, _} -> edge end)
-
-      :directed ->
-        Model.predecessors(graph, node)
-        |> Enum.map(fn {edge, _} -> edge end)
-    end
-  end
-
-  defp get_out_degree(graph, node) do
-    %Yog.Graph{kind: kind} = graph
-
-    case kind do
-      :undirected ->
-        length(Model.neighbors(graph, node))
-
-      :directed ->
-        length(Model.successors(graph, node))
+      iterate_pagerank(
+        new_ranks,
+        nodes,
+        n,
+        damping,
+        max_iterations,
+        tolerance,
+        iter + 1,
+        in_map,
+        out_map,
+        sinks
+      )
     end
   end
 
@@ -780,17 +876,17 @@ defmodule Yog.Centrality do
   end
 
   # Eigenvector centrality iteration
-  defp iterate_eigenvector(_graph, _nodes, scores, _prev_prev, max_iter, _tolerance, iter)
-       when iter >= max_iter do
+  defp iterate_eigenvector(_nodes, scores, _prev_prev, max_iterations, _tolerance, iter, _in_map)
+       when iter >= max_iterations do
     scores
   end
 
-  defp iterate_eigenvector(graph, nodes, scores, prev_prev, max_iter, tolerance, iter) do
+  defp iterate_eigenvector(nodes, scores, prev_prev, max_iterations, tolerance, iter, in_map) do
     # Compute new scores: x_v = Σ A_uv * x_u for neighbors u
     new_scores =
       Enum.reduce(nodes, %{}, fn node, acc ->
         neighbor_sum =
-          get_in_neighbors(graph, node)
+          Map.get(in_map, node, [])
           |> Enum.reduce(0.0, fn neighbor, sum ->
             neighbor_score = Map.get(scores, neighbor, 0.0)
             sum + neighbor_score
@@ -799,152 +895,155 @@ defmodule Yog.Centrality do
         Map.put(acc, node, neighbor_sum)
       end)
 
-    l2_norm = calculate_l2_norm(new_scores, nodes)
+    # Normalize to prevent growth
+    l2_sum =
+      Enum.reduce(new_scores, 0.0, fn {_, s}, acc ->
+        acc + s * s
+      end)
 
-    normalized =
-      if l2_norm > 0.0 do
-        Map.new(new_scores, fn {node, score} ->
-          {node, score / l2_norm}
-        end)
+    l2_norm = :math.sqrt(l2_sum)
+
+    normalized_scores =
+      if l2_norm > 0 do
+        Map.new(new_scores, fn {id, s} -> {id, s / l2_norm} end)
       else
         new_scores
       end
 
-    l2_diff = calculate_l2_difference(scores, normalized, nodes)
+    # Check convergence (L2 distance from previous)
+    diff_sum =
+      Enum.reduce(nodes, 0.0, fn node, acc ->
+        old_val = Map.get(scores, node, 0.0)
+        new_val = Map.get(normalized_scores, node, 0.0)
+        acc + :math.pow(new_val - old_val, 2)
+      end)
 
+    diff_norm = :math.sqrt(diff_sum)
+
+    # Anti-oscillation (check if we are in a 2-cycle)
     is_oscillating =
       if map_size(prev_prev) > 0 do
-        l2_diff_2 = calculate_l2_difference(prev_prev, normalized, nodes)
-        l2_diff_2 < tolerance
+        p_diff_sum =
+          Enum.reduce(nodes, 0.0, fn node, acc ->
+            p_val = Map.get(prev_prev, node, 0.0)
+            n_val = Map.get(normalized_scores, node, 0.0)
+            acc + :math.pow(n_val - p_val, 2)
+          end)
+
+        :math.sqrt(p_diff_sum) < tolerance
       else
         false
       end
 
-    cond do
-      is_oscillating ->
-        # Average the two oscillating states
-        averaged =
-          Enum.reduce(nodes, %{}, fn node, acc ->
-            val1 = Map.get(normalized, node, 0.0)
-            val2 = Map.get(scores, node, 0.0)
-            avg = (val1 + val2) / 2.0
-            Map.put(acc, node, avg)
-          end)
-
-        avg_norm = calculate_l2_norm(averaged, nodes)
-
-        if avg_norm > 0.0 do
-          Map.new(averaged, fn {node, score} ->
-            {node, score / avg_norm}
-          end)
-        else
-          averaged
-        end
-
-      l2_diff < tolerance ->
-        normalized
-
-      true ->
-        iterate_eigenvector(graph, nodes, normalized, scores, max_iter, tolerance, iter + 1)
-    end
-  end
-
-  defp calculate_l2_norm(scores, nodes) do
-    sum_squares =
-      Enum.reduce(nodes, 0.0, fn node, sum ->
-        score = Map.get(scores, node, 0.0)
-        sum + score * score
-      end)
-
-    if sum_squares > 0.0 do
-      :math.sqrt(sum_squares)
+    if diff_norm < tolerance or is_oscillating do
+      normalized_scores
     else
-      0.0
-    end
-  end
-
-  defp calculate_l2_difference(old_scores, new_scores, nodes) do
-    sum_squares =
-      Enum.reduce(nodes, 0.0, fn node, sum ->
-        old_val = Map.get(old_scores, node, 0.0)
-        new_val = Map.get(new_scores, node, 0.0)
-        diff = new_val - old_val
-        sum + diff * diff
-      end)
-
-    if sum_squares > 0.0 do
-      :math.sqrt(sum_squares)
-    else
-      0.0
+      iterate_eigenvector(
+        nodes,
+        normalized_scores,
+        scores,
+        max_iterations,
+        tolerance,
+        iter + 1,
+        in_map
+      )
     end
   end
 
   # Katz centrality iteration
-  defp iterate_katz(_graph, _nodes, scores, _alpha, _beta, max_iter, _tolerance, iter)
-       when iter >= max_iter do
+  defp iterate_katz(_nodes, scores, _alpha, _beta, max_iterations, _tolerance, iter, _in_map)
+       when iter >= max_iterations do
     scores
   end
 
-  defp iterate_katz(graph, nodes, scores, alpha, beta, max_iter, tolerance, iter) do
-    # Compute new scores: x_v = α * Σ x_u + β for neighbors u
+  defp iterate_katz(nodes, scores, alpha, beta, max_iterations, tolerance, iter, in_map) do
     new_scores =
       Enum.reduce(nodes, %{}, fn node, acc ->
         neighbor_sum =
-          get_in_neighbors(graph, node)
+          Map.get(in_map, node, [])
           |> Enum.reduce(0.0, fn neighbor, sum ->
             neighbor_score = Map.get(scores, neighbor, 0.0)
             sum + neighbor_score
           end)
 
-        new_score = alpha * neighbor_sum + beta
-        Map.put(acc, node, new_score)
+        new_val = alpha * neighbor_sum + beta
+        Map.put(acc, node, new_val)
       end)
 
-    l1_diff = calculate_l1_norm_diff(scores, new_scores, nodes)
+    l2_diff = calculate_l2_diff(scores, new_scores, nodes)
 
-    if l1_diff < tolerance do
+    if l2_diff < tolerance do
       new_scores
     else
-      iterate_katz(graph, nodes, new_scores, alpha, beta, max_iter, tolerance, iter + 1)
+      iterate_katz(nodes, new_scores, alpha, beta, max_iterations, tolerance, iter + 1, in_map)
     end
   end
 
-  defp calculate_l1_norm_diff(old_scores, new_scores, nodes) do
-    Enum.reduce(nodes, 0.0, fn node, sum ->
-      old_val = Map.get(old_scores, node, 0.0)
-      new_val = Map.get(new_scores, node, 0.0)
-      diff = abs(new_val - old_val)
-      sum + diff
-    end)
-  end
-
   # Alpha centrality iteration
-  defp iterate_alpha(_graph, _nodes, scores, _alpha, max_iter, _tolerance, iter)
-       when iter >= max_iter do
+  defp iterate_alpha(_nodes, scores, _alpha, max_iterations, _tolerance, iter, _in_map)
+       when iter >= max_iterations do
     scores
   end
 
-  defp iterate_alpha(graph, nodes, scores, alpha, max_iter, tolerance, iter) do
-    # Compute new scores: x_v = α * Σ x_u for neighbors u
+  defp iterate_alpha(nodes, scores, alpha, max_iterations, tolerance, iter, in_map) do
     new_scores =
       Enum.reduce(nodes, %{}, fn node, acc ->
         neighbor_sum =
-          get_in_neighbors(graph, node)
+          Map.get(in_map, node, [])
           |> Enum.reduce(0.0, fn neighbor, sum ->
             neighbor_score = Map.get(scores, neighbor, 0.0)
             sum + neighbor_score
           end)
 
-        new_score = alpha * neighbor_sum
-        Map.put(acc, node, new_score)
+        # Alpha centrality iterative step: c = alpha * A * c + e
+        # where e is the initial values/beta
+        new_val = alpha * neighbor_sum + Map.get(scores, node, 0.0)
+        Map.put(acc, node, new_val)
       end)
 
-    l1_diff = calculate_l1_norm_diff(scores, new_scores, nodes)
+    l2_diff = calculate_l2_diff(scores, new_scores, nodes)
 
-    if l1_diff < tolerance do
+    if l2_diff < tolerance do
       new_scores
     else
-      iterate_alpha(graph, nodes, new_scores, alpha, max_iter, tolerance, iter + 1)
+      iterate_alpha(nodes, new_scores, alpha, max_iterations, tolerance, iter + 1, in_map)
+    end
+  end
+
+  defp calculate_l2_diff(old_scores, new_scores, nodes) do
+    sum =
+      Enum.reduce(nodes, 0.0, fn node, acc ->
+        v1 = Map.get(old_scores, node, 0.0)
+        v2 = Map.get(new_scores, node, 0.0)
+        acc + :math.pow(v2 - v1, 2)
+      end)
+
+    :math.sqrt(sum)
+  end
+
+  defp get_in_neighbor_ids(graph, node) do
+    %Yog.Graph{kind: kind} = graph
+
+    case kind do
+      :undirected ->
+        Model.neighbors(graph, node)
+        |> Enum.map(fn {id, _} -> id end)
+
+      :directed ->
+        Model.predecessors(graph, node)
+        |> Enum.map(fn {id, _} -> id end)
+    end
+  end
+
+  defp get_out_degree(graph, node) do
+    %Yog.Graph{kind: kind} = graph
+
+    case kind do
+      :undirected ->
+        length(Model.neighbors(graph, node))
+
+      :directed ->
+        length(Model.successors(graph, node))
     end
   end
 end
