@@ -8,7 +8,7 @@ defmodule Yog.Builder.ToroidalTest do
     data = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
 
     grid = Toroidal.from_2d_list(data, :directed, Toroidal.always())
-    assert match?(%Yog.Builder.GridGraph{}, grid)
+    assert match?(%Yog.Builder.ToroidalGraph{}, grid)
 
     graph = Toroidal.to_graph(grid)
     assert length(Yog.all_nodes(graph)) == 9
@@ -25,7 +25,7 @@ defmodule Yog.Builder.ToroidalTest do
         Toroidal.always()
       )
 
-    assert match?(%Yog.Builder.GridGraph{}, grid)
+    assert match?(%Yog.Builder.ToroidalGraph{}, grid)
 
     graph = Toroidal.to_graph(grid)
     assert length(Yog.all_nodes(graph)) == 4
