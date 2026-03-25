@@ -72,6 +72,14 @@ defmodule Yog.Render.ASCIITest do
       assert String.contains?(result, "+")
       assert String.contains?(result, "|")
     end
+
+    test "renders with occupants" do
+      grid = Grid.from_2d_list([[".", "."]], :undirected, Grid.always())
+      result = ASCII.grid_to_string(grid, %{0 => "M", 1 => "@"})
+
+      assert String.contains?(result, " M ")
+      assert String.contains?(result, " @ ")
+    end
   end
 
   describe "grid_to_string_unicode/1" do
@@ -107,6 +115,14 @@ defmodule Yog.Render.ASCIITest do
 
       # Should contain center cross
       assert String.contains?(result, "┼")
+    end
+
+    test "renders with occupants" do
+      grid = Grid.from_2d_list([[".", "."]], :undirected, Grid.always())
+      result = ASCII.grid_to_string_unicode(grid, %{0 => "M", 1 => "R"})
+
+      assert String.contains?(result, " M ")
+      assert String.contains?(result, " R ")
     end
   end
 end

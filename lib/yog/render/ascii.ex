@@ -97,18 +97,19 @@ defmodule Yog.Render.ASCII do
       iex> Yog.Render.ASCII.grid_to_string(grid)
       ""
   """
-  @spec grid_to_string(grid()) :: String.t()
-  def grid_to_string(%Yog.Builder.GridGraph{rows: 0}), do: ""
-  def grid_to_string(%Yog.Builder.GridGraph{cols: 0}), do: ""
+  @spec grid_to_string(grid(), map()) :: String.t()
+  def grid_to_string(grid, occupants \\ %{})
+  def grid_to_string(%Yog.Builder.GridGraph{rows: 0}, _), do: ""
+  def grid_to_string(%Yog.Builder.GridGraph{cols: 0}, _), do: ""
 
-  def grid_to_string(%Yog.Builder.GridGraph{graph: graph, rows: rows, cols: cols}) do
+  def grid_to_string(%Yog.Builder.GridGraph{graph: graph, rows: rows, cols: cols}, occupants) do
     top_line = draw_top_border(cols)
 
     body_lines =
       0..(rows - 1)
       |> Enum.flat_map(fn row ->
         [
-          draw_cell_row(graph, rows, cols, row),
+          draw_cell_row(graph, rows, cols, row, occupants),
           draw_horizontal_walls(graph, rows, cols, row)
         ]
       end)
@@ -124,6 +125,10 @@ defmodule Yog.Render.ASCII do
   using characters like ┌, ─, ┬, ┼, etc., to correctly render corners and
   intersections.
 
+  ## Parameters
+  - `grid` - The grid graph structure to render
+  - `occupants` - Optional map of `{node_id, string}` to place in cells
+
   ## Examples
 
       iex> grid = Yog.Builder.Grid.from_2d_list([[".", "."]], :undirected, Yog.Builder.Grid.always())
@@ -131,15 +136,23 @@ defmodule Yog.Render.ASCII do
       iex> String.contains?(unicode, "┌")
       true
 
+      iex> # With occupants
+      iex> grid = Yog.Builder.Grid.from_2d_list([[".", "."]], :undirected, Yog.Builder.Grid.always())
+      iex> unicode = Yog.Render.ASCII.grid_to_string_unicode(grid, %{0 => "@"})
+      iex> String.contains?(unicode, "@")
+      true
+
   ## Time Complexity
   O(rows * cols)
   """
-  @spec grid_to_string_unicode(grid()) :: String.t()
-  def grid_to_string_unicode(%Yog.Builder.GridGraph{rows: 0}), do: ""
-  def grid_to_string_unicode(%Yog.Builder.GridGraph{cols: 0}), do: ""
+  @spec grid_to_string_unicode(grid(), map()) :: String.t()
+  def grid_to_string_unicode(grid, occupants \\ %{})
+  def grid_to_string_unicode(%Yog.Builder.GridGraph{rows: 0}, _), do: ""
+  def grid_to_string_unicode(%Yog.Builder.GridGraph{cols: 0}, _), do: ""
 
   def grid_to_string_unicode(
-        %Yog.Builder.GridGraph{graph: graph, rows: rows, cols: cols} = _grid_graph
+        %Yog.Builder.GridGraph{graph: graph, rows: rows, cols: cols},
+        occupants
       ) do
     # Render line by line
     0..rows
@@ -147,7 +160,7 @@ defmodule Yog.Render.ASCII do
       intersection_row = draw_unicode_intersection_row(graph, rows, cols, i_r)
 
       if i_r < rows do
-        cell_row = draw_unicode_cell_row(graph, rows, cols, i_r)
+        cell_row = draw_unicode_cell_row(graph, rows, cols, i_r, occupants)
         intersection_row <> "\n" <> cell_row
       else
         intersection_row
@@ -166,22 +179,32 @@ defmodule Yog.Render.ASCII do
   end
 
   # Draws a single row of cells (the interior content and right walls)
-  @spec draw_cell_row(Yog.graph(), non_neg_integer(), non_neg_integer(), non_neg_integer()) ::
+  @spec draw_cell_row(
+          Yog.graph(),
+          non_neg_integer(),
+          non_neg_integer(),
+          non_neg_integer(),
+          map()
+        ) ::
           String.t()
-  defp draw_cell_row(graph, _rows, cols, row) do
+  defp draw_cell_row(graph, _rows, cols, row, occupants) do
     0..(cols - 1)
     |> Enum.reduce("|", fn col, acc ->
       cell_id = Grid.coord_to_id(row, col, cols)
       right_id = Grid.coord_to_id(row, col + 1, cols)
 
+      # Get cell content (centered in 3 spaces)
+      content = Map.get(occupants, cell_id, " ")
+      cell_text = " #{content} "
+
       # Check if there's a passage to the right
       wall =
         if has_passage?(graph, cell_id, right_id) do
           # Passage - no wall
-          "    "
+          cell_text <> " "
         else
           # Wall
-          "   |"
+          cell_text <> "|"
         end
 
       acc <> wall
@@ -236,7 +259,7 @@ defmodule Yog.Render.ASCII do
     end)
   end
 
-  defp draw_unicode_cell_row(graph, rows, cols, r) do
+  defp draw_unicode_cell_row(graph, rows, cols, r, occupants) do
     0..cols
     |> Enum.map_join("", fn c ->
       wall =
@@ -247,7 +270,9 @@ defmodule Yog.Render.ASCII do
         end
 
       if c < cols do
-        wall <> "   "
+        cell_id = Grid.coord_to_id(r, c, cols)
+        content = Map.get(occupants, cell_id, " ")
+        wall <> " #{content} "
       else
         wall
       end
