@@ -76,6 +76,7 @@ defmodule Yog.Pathfinding.Johnson do
   - [Wikipedia: Johnson's Algorithm](https://en.wikipedia.org/wiki/Johnson%27s_algorithm)
   """
 
+  alias Yog.PriorityQueue, as: PQ
   alias Yog.Model
 
   @typedoc """
@@ -263,77 +264,57 @@ defmodule Yog.Pathfinding.Johnson do
 
   # Dijkstra on reweighted graph
   defp dijkstra_reweighted(graph, source, potentials, zero, add, subtract, compare) do
-    # Priority queue implemented as sorted list for simplicity
-    # {distance, node}
-    initial_queue = [{zero, source}]
+    # Priority queue: {distance, node}
+    pq = PQ.new(fn {d1, _}, {d2, _} -> compare.(d1, d2) != :gt end)
+    initial_queue = PQ.push(pq, {zero, source})
     initial_distances = %{source => zero}
 
     do_dijkstra(graph, initial_queue, initial_distances, potentials, add, subtract, compare)
   end
 
-  defp do_dijkstra(_graph, [], distances, _potentials, _add, _subtract, _compare) do
-    distances
-  end
+  defp do_dijkstra(graph, queue, distances, potentials, add, subtract, compare) do
+    case PQ.pop(queue) do
+      :error ->
+        distances
 
-  defp do_dijkstra(
-         graph,
-         [{dist_u, u} | rest_queue],
-         distances,
-         potentials,
-         add,
-         subtract,
-         compare
-       ) do
-    # Check if we've found a better path to u already
-    current_best = Map.get(distances, u)
+      {:ok, {dist_u, u}, rest_queue} ->
+        # Check if we've found a better path to u already
+        current_best = Map.get(distances, u)
 
-    if current_best != nil and compare.(dist_u, current_best) == :gt do
-      # This entry is outdated, skip it
-      do_dijkstra(graph, rest_queue, distances, potentials, add, subtract, compare)
-    else
-      # Relax edges from u
-      h_u = Map.get(potentials, u, 0)
-      successors = Model.successors(graph, u)
+        if current_best != nil and compare.(dist_u, current_best) == :gt do
+          # This entry is outdated, skip it
+          do_dijkstra(graph, rest_queue, distances, potentials, add, subtract, compare)
+        else
+          # Relax edges from u
+          h_u = Map.get(potentials, u, 0)
+          successors = Model.successors(graph, u)
 
-      {new_queue, new_distances} =
-        Enum.reduce(successors, {rest_queue, distances}, fn {v, weight}, {q, d} ->
-          h_v = Map.get(potentials, v, 0)
-          # Reweighted edge: w'(u,v) = w(u,v) + h(u) - h(v)
-          reweighted = add.(weight, h_u) |> subtract.(h_v)
-          new_dist_v = add.(dist_u, reweighted)
+          {new_queue, new_distances} =
+            Enum.reduce(successors, {rest_queue, distances}, fn {v, weight}, {q_acc, d_acc} ->
+              h_v = Map.get(potentials, v, 0)
+              # Reweighted edge: w'(u,v) = w(u,v) + h(u) - h(v)
+              reweighted = add.(weight, h_u) |> subtract.(h_v)
+              new_dist_v = add.(dist_u, reweighted)
 
-          case Map.fetch(d, v) do
-            {:ok, current} ->
-              if compare.(new_dist_v, current) == :lt do
-                new_q = insert_sorted(q, {new_dist_v, v}, compare)
-                new_d = Map.put(d, v, new_dist_v)
-                {new_q, new_d}
-              else
-                {q, d}
+              case Map.fetch(d_acc, v) do
+                {:ok, current} ->
+                  if compare.(new_dist_v, current) == :lt do
+                    new_q = PQ.push(q_acc, {new_dist_v, v})
+                    new_d = Map.put(d_acc, v, new_dist_v)
+                    {new_q, new_d}
+                  else
+                    {q_acc, d_acc}
+                  end
+
+                :error ->
+                  new_q = PQ.push(q_acc, {new_dist_v, v})
+                  new_d = Map.put(d_acc, v, new_dist_v)
+                  {new_q, new_d}
               end
+            end)
 
-            :error ->
-              new_q = insert_sorted(q, {new_dist_v, v}, compare)
-              new_d = Map.put(d, v, new_dist_v)
-              {new_q, new_d}
-          end
-        end)
-
-      do_dijkstra(graph, new_queue, new_distances, potentials, add, subtract, compare)
-    end
-  end
-
-  # Insert into sorted list (priority queue)
-  defp insert_sorted([], item, _compare), do: [item]
-
-  defp insert_sorted([head | tail], item, compare) do
-    {dist_item, _} = item
-    {dist_head, _} = head
-
-    if compare.(dist_item, dist_head) == :lt do
-      [item, head | tail]
-    else
-      [head | insert_sorted(tail, item, compare)]
+          do_dijkstra(graph, new_queue, new_distances, potentials, add, subtract, compare)
+        end
     end
   end
 end

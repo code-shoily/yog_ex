@@ -29,6 +29,7 @@ defmodule Yog.Health do
   > The API remains unchanged.
   """
 
+  alias Yog.PriorityQueue, as: PQ
   alias Yog.Model
 
   @doc """
@@ -421,65 +422,57 @@ defmodule Yog.Health do
   # Internal Dijkstra Implementation
   # =============================================================================
 
-  # Single-source shortest paths using Dijkstra's algorithm
+  # Dijkstra's algorithm for single-source shortest paths
   # Returns a map of node_id => distance
   defp dijkstra_single_source(graph, source, zero, add, compare, weight_fn) do
-    # Priority queue as sorted list: [{distance, node_id}]
-    initial_pq = [{zero, source}]
+    # Priority queue: {distance, node}
+    pq = PQ.new(fn {d1, _}, {d2, _} -> compare.(d1, d2) != :gt end)
+    initial_pq = PQ.push(pq, {zero, source})
     initial_distances = %{source => zero}
 
     do_dijkstra(graph, initial_pq, initial_distances, add, compare, weight_fn)
   end
 
-  defp do_dijkstra(_graph, [], distances, _add, _compare, _weight_fn) do
-    distances
-  end
+  defp do_dijkstra(graph, pq, distances, add, compare, weight_fn) do
+    case PQ.pop(pq) do
+      :error ->
+        distances
 
-  defp do_dijkstra(graph, [{dist, node} | rest_pq], distances, add, compare, weight_fn) do
-    # Check if we've already found a better path to this node
-    current_best = Map.get(distances, node)
+      {:ok, {dist, node}, rest_pq} ->
+        current_best = Map.get(distances, node)
 
-    if compare.(dist, current_best) == :gt do
-      # This entry is outdated, skip it
-      do_dijkstra(graph, rest_pq, distances, add, compare, weight_fn)
-    else
-      # Relax neighbors
-      neighbors = Model.successors(graph, node)
+        if current_best != nil and compare.(dist, current_best) == :gt do
+          # This entry is outdated, skip it
+          do_dijkstra(graph, rest_pq, distances, add, compare, weight_fn)
+        else
+          # Relax neighbors
+          neighbors = Model.successors(graph, node)
 
-      {new_pq, new_distances} =
-        Enum.reduce(neighbors, {rest_pq, distances}, fn {neighbor, weight}, {pq, dists} ->
-          new_dist = add.(dist, weight_fn.(weight))
+          {new_pq, new_distances} =
+            Enum.reduce(neighbors, {rest_pq, distances}, fn {neighbor, weight},
+                                                            {pq_acc, dists_acc} ->
+              new_dist = add.(dist, weight_fn.(weight))
 
-          case Map.fetch(dists, neighbor) do
-            :error ->
-              # First time visiting this node
-              new_dists = Map.put(dists, neighbor, new_dist)
-              new_pq = insert_sorted(pq, {new_dist, neighbor}, compare)
-              {new_pq, new_dists}
+              case Map.fetch(dists_acc, neighbor) do
+                :error ->
+                  # First time visiting this node
+                  new_dists = Map.put(dists_acc, neighbor, new_dist)
+                  new_q = PQ.push(pq_acc, {new_dist, neighbor})
+                  {new_q, new_dists}
 
-            {:ok, old_dist} ->
-              if compare.(new_dist, old_dist) == :lt do
-                new_dists = Map.put(dists, neighbor, new_dist)
-                new_pq = insert_sorted(pq, {new_dist, neighbor}, compare)
-                {new_pq, new_dists}
-              else
-                {pq, dists}
+                {:ok, old_dist} ->
+                  if compare.(new_dist, old_dist) == :lt do
+                    new_dists = Map.put(dists_acc, neighbor, new_dist)
+                    new_q = PQ.push(pq_acc, {new_dist, neighbor})
+                    {new_q, new_dists}
+                  else
+                    {pq_acc, dists_acc}
+                  end
               end
-          end
-        end)
+            end)
 
-      do_dijkstra(graph, new_pq, new_distances, add, compare, weight_fn)
-    end
-  end
-
-  # Insert into sorted priority queue (min-heap based on distance)
-  defp insert_sorted([], item, _compare), do: [item]
-
-  defp insert_sorted([{dist, _} | _] = list, {new_dist, _} = item, compare) do
-    if compare.(new_dist, dist) == :lt or compare.(new_dist, dist) == :eq do
-      [item | list]
-    else
-      [hd(list) | insert_sorted(tl(list), item, compare)]
+          do_dijkstra(graph, new_pq, new_distances, add, compare, weight_fn)
+        end
     end
   end
 end
