@@ -94,7 +94,9 @@ defmodule Yog.Render.ASCIITest do
     end
 
     test "renders 2x2 grid with center cross" do
-      grid = Grid.from_2d_list([[1, 2], [3, 4]], :undirected, Grid.always())
+      # 2x2 grid with no internal passages (= all walls)
+      maze = [["#", "#"], ["#", "#"]]
+      grid = Grid.from_2d_list(maze, :undirected, Grid.walkable("."))
       result = ASCII.grid_to_string_unicode(grid)
 
       # Should contain T-junctions

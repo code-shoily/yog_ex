@@ -117,6 +117,44 @@ defmodule Yog.Render.ASCII do
     |> Enum.join("\n")
   end
 
+  @doc """
+  Converts a grid to ASCII art using Unicode box-drawing characters.
+
+  Provides a more "premium" visual representation compared to `grid_to_string/1`,
+  using characters like ┌, ─, ┬, ┼, etc., to correctly render corners and
+  intersections.
+
+  ## Examples
+
+      iex> grid = Yog.Builder.Grid.from_2d_list([[".", "."]], :undirected, Yog.Builder.Grid.always())
+      iex> unicode = Yog.Render.ASCII.grid_to_string_unicode(grid)
+      iex> String.contains?(unicode, "┌")
+      true
+
+  ## Time Complexity
+  O(rows * cols)
+  """
+  @spec grid_to_string_unicode(grid()) :: String.t()
+  def grid_to_string_unicode(%Yog.Builder.GridGraph{rows: 0}), do: ""
+  def grid_to_string_unicode(%Yog.Builder.GridGraph{cols: 0}), do: ""
+
+  def grid_to_string_unicode(
+        %Yog.Builder.GridGraph{graph: graph, rows: rows, cols: cols} = _grid_graph
+      ) do
+    # Render line by line
+    0..rows
+    |> Enum.map_join("\n", fn i_r ->
+      intersection_row = draw_unicode_intersection_row(graph, rows, cols, i_r)
+
+      if i_r < rows do
+        cell_row = draw_unicode_cell_row(graph, rows, cols, i_r)
+        intersection_row <> "\n" <> cell_row
+      else
+        intersection_row
+      end
+    end)
+  end
+
   # =============================================================================
   # ASCII RENDERING (using +, -, |)
   # =============================================================================
@@ -175,6 +213,87 @@ defmodule Yog.Render.ASCII do
 
       acc <> wall
     end)
+  end
+
+  # =============================================================================
+  # UNICODE RENDERING (using ┌, ─, │, ┼, etc.)
+  # =============================================================================
+
+  defp draw_unicode_intersection_row(graph, rows, cols, i_r) do
+    0..cols
+    |> Enum.map_join("", fn i_c ->
+      intersection = get_unicode_intersection(graph, rows, cols, i_r, i_c)
+
+      if i_c < cols do
+        if horizontal_wall?(graph, rows, cols, i_r, i_c) do
+          intersection <> "───"
+        else
+          intersection <> "   "
+        end
+      else
+        intersection
+      end
+    end)
+  end
+
+  defp draw_unicode_cell_row(graph, rows, cols, r) do
+    0..cols
+    |> Enum.map_join("", fn c ->
+      wall =
+        if vertical_wall?(graph, rows, cols, r, c) do
+          "│"
+        else
+          " "
+        end
+
+      if c < cols do
+        wall <> "   "
+      else
+        wall
+      end
+    end)
+  end
+
+  defp get_unicode_intersection(graph, rows, cols, i_r, i_c) do
+    up = i_r > 0 && vertical_wall?(graph, rows, cols, i_r - 1, i_c)
+    down = i_r < rows && vertical_wall?(graph, rows, cols, i_r, i_c)
+    left = i_c > 0 && horizontal_wall?(graph, rows, cols, i_r, i_c - 1)
+    right = i_c < cols && horizontal_wall?(graph, rows, cols, i_r, i_c)
+
+    case {up, down, left, right} do
+      {false, false, false, false} -> " "
+      {false, false, true, true} -> "─"
+      {false, false, true, false} -> "─"
+      {false, false, false, true} -> "─"
+      {true, true, false, false} -> "│"
+      {true, false, false, false} -> "│"
+      {false, true, false, false} -> "│"
+      {false, true, false, true} -> "┌"
+      {false, true, true, false} -> "┐"
+      {true, false, false, true} -> "└"
+      {true, false, true, false} -> "┘"
+      {false, true, true, true} -> "┬"
+      {true, false, true, true} -> "┴"
+      {true, true, false, true} -> "├"
+      {true, true, true, false} -> "┤"
+      {true, true, true, true} -> "┼"
+    end
+  end
+
+  defp vertical_wall?(graph, _rows, cols, r, c) do
+    cond do
+      c == 0 -> true
+      c == cols -> true
+      true -> !has_passage?(graph, Grid.coord_to_id(r, c - 1, cols), Grid.coord_to_id(r, c, cols))
+    end
+  end
+
+  defp horizontal_wall?(graph, rows, cols, r, c) do
+    cond do
+      r == 0 -> true
+      r == rows -> true
+      true -> !has_passage?(graph, Grid.coord_to_id(r - 1, c, cols), Grid.coord_to_id(r, c, cols))
+    end
   end
 
   # =============================================================================
