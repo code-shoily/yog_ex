@@ -37,6 +37,7 @@ defmodule Yog.IO.Matrix do
   - `Yog.IO.JSON` - JSON graph format
   - `Yog.IO.GraphML` - GraphML (XML) format
   - `Yog.IO.GDF` - GUESS GDF format
+  - `Yog.IO.MatrixMarket` - Matrix Market format
   """
 
   alias Yog.Model
