@@ -48,7 +48,7 @@ defmodule Yog.Generators do
     StreamData.member_of([:directed, :undirected])
   end
 
-  def node_list_gen(min_len \\ 1, max_len \\ 15, max_id \\ 100) do
+  def node_list_gen(min_len \\ 1, max_len \\ 15, max_id \\ 1000) do
     # Generate min-max unique nodes with integer IDs
     StreamData.uniq_list_of(StreamData.integer(0..max_id),
       min_length: min_len,
@@ -59,7 +59,7 @@ defmodule Yog.Generators do
   def small_graph_gen do
     gen all(
           kind <- kind_gen(),
-          nodes <- node_list_gen(6, 20),
+          nodes <- node_list_gen(6, 20, 500),
           weights <- weight_list_gen(length(nodes))
         ) do
       build_graph(kind, nodes, weights)
@@ -69,8 +69,7 @@ defmodule Yog.Generators do
   def flow_problem_gen do
     # Generate a graph with at least 2 nodes and distinct source/sink
     gen all(
-          nodes <- node_list_gen(2, 50, 100),
-          length(nodes) >= 2,
+          nodes <- node_list_gen(2, 50, 1000),
           weights <- weight_list_gen(length(nodes), 0..100)
         ) do
       graph = build_graph(:directed, nodes, weights)
