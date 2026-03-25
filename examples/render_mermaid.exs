@@ -29,18 +29,16 @@ defmodule RenderMermaid do
     IO.puts("\n--- Finding Shortest Path ---")
 
     result =
-      Yog.Pathfinding.Dijkstra.shortest_path(
+      Yog.Pathfinding.shortest_path(
         in: graph,
         from: 1,
-        to: 3,
-        zero: 0,
-        add: &(&1 + &2),
-        compare: fn a, b -> if a < b, do: :lt, else: if(a > b, do: :gt, else: :eq) end
+        to: 3
       )
 
     case result do
-      {:ok, %Yog.Pathfinding.Path{weight: weight}} ->
-        IO.puts("Shortest path found with total weight: #{weight} km")
+      {:ok, path} ->
+        IO.puts("Shortest path found with total weight: #{path.weight} km")
+        IO.puts("Path: #{inspect(path.nodes)}")
         IO.puts("(Path highlighting can be added via Mermaid CSS classes)")
 
       :error ->

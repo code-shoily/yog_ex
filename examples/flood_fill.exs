@@ -23,26 +23,28 @@ defmodule LeetCode do
         from_val == start_color and to_val == start_color
       end
 
-      # Step 2: Build the Graph
+      # Step 2: Build the Grid (returns a GridGraph struct, not a raw graph)
       # It will only draw edges between adjacent pixels of the `start_color`
-      graph =
+      grid =
         Yog.Builder.Grid.from_2d_list(image, :undirected, is_same_color?)
-        |> Yog.Builder.Grid.to_graph()
 
-      # Step 3: Find the starting Node ID
+      # Step 3: Convert to graph for traversal
+      graph = Yog.Builder.Grid.to_graph(grid)
+
+      # Step 4: Find the starting Node ID
       start_node_id = Yog.Builder.Grid.coord_to_id(sr, sc, cols)
 
-      # Step 4: Run a Traversal (Breadth-First Search)
+      # Step 5: Run a Traversal (Breadth-First Search)
       # Since our graph only has edges between pixels of the SAME `start_color`,
       # BFS will perfectly return every single pixel we need to paint!
       pixels_to_paint =
         Yog.Traversal.walk(
-          from: start_node_id,
           in: graph,
+          from: start_node_id,
           using: :breadth_first
         )
 
-      # Step 5: Paint the new image
+      # Step 6: Paint the new image
       # Convert the list of node IDs back into coordinates to easily update the grid
       coords_to_paint = Enum.map(pixels_to_paint, &Yog.Builder.Grid.id_to_coord(&1, cols))
 

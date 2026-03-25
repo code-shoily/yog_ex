@@ -2,7 +2,7 @@ defmodule JobAssignment do
   @moduledoc """
   Job Assignment Example
 
-  Demonstrates bipartite maximum matching
+  Demonstrates bipartite maximum matching using Yog.Property.Bipartite
   """
 
   require Yog
@@ -24,9 +24,9 @@ defmodule JobAssignment do
 
     IO.puts("--- Bipartite Job Assignment ---")
 
-    case Yog.Bipartite.partition(graph) do
+    case Yog.Property.Bipartite.partition(graph) do
       {:ok, partition} ->
-        matching = Yog.Bipartite.maximum_matching(graph, partition)
+        matching = Yog.Property.Bipartite.maximum_matching(graph, partition)
         IO.puts("Maximum assignments found: #{length(matching)}")
 
         Enum.each(matching, fn {worker_id, task_id} ->

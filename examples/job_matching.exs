@@ -35,17 +35,8 @@ defmodule JobMatching do
       |> Yog.add_edge!(from: 7, to: 9, with: 1)
       |> Yog.add_edge!(from: 8, to: 9, with: 1)
 
-    result =
-      Yog.Flow.MaxFlow.edmonds_karp(
-        network,
-        0,
-        9,
-        0,
-        &(&1 + &2),
-        fn a, b -> a - b end,
-        fn a, b -> a <= b end,
-        &min/2
-      )
+    # Using simplified API with default integer operations
+    result = Yog.Flow.MaxFlow.edmonds_karp(network, 0, 9)
 
     IO.puts("Maximum matching: #{result.max_flow} people can be assigned to jobs")
 

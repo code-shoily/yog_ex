@@ -110,6 +110,8 @@ When `saxy` is available, GraphML parsing automatically uses a fast streaming SA
 ### Shortest Path
 
 ```elixir
+alias Yog.Pathfinding
+
 # Create a directed graph
 graph =
   Yog.directed()
@@ -120,30 +122,25 @@ graph =
   |> Yog.add_edge!(from: 2, to: 3, with: 3)
   |> Yog.add_edge!(from: 1, to: 3, with: 10)
 
-# Define a comparison function (Gleam-compatible)
-compare = fn a, b when a < b -> :lt; a, b when a > b -> :gt; _, _ -> :eq end
-
-# Find shortest path using Dijkstra
-case Yog.Pathfinding.shortest_path(
+# Find shortest path using Dijkstra (uses :ok/:error tuples and Path struct)
+case Pathfinding.shortest_path(
   in: graph,
   from: 1,
-  to: 3,
-  zero: 0,
-  add: &(&1 + &2),
-  compare: compare
+  to: 3
 ) do
-  {:some, {:path, _nodes, total_weight}} ->
-    IO.puts("Found path with weight: #{total_weight}")
-    # => Found path with weight: 8
-
-  :none ->
+  {:ok, path} ->
+    IO.puts("Found path with weight: #{path.weight}")
+  :error ->
     IO.puts("No path found")
 end
+# => Found path with weight: 8
 ```
 
 ### Community Detection
 
 ```elixir
+alias Yog.Community
+
 # Build a graph with two communities
 graph =
   Yog.undirected()
@@ -157,33 +154,38 @@ graph =
   |> Yog.add_edge!(from: 4, to: 6, with: 1)   # Triangle: 4-5-6
   |> Yog.add_edge!(from: 3, to: 4, with: 1)   # Bridge between communities
 
-# Detect communities with Louvain
-communities = Yog.Community.Louvain.detect(graph)
+communities = Community.Louvain.detect(graph)
 IO.puts("Found #{communities.num_communities} communities")
+# => Found 2 communities
 
-# Analyze community quality
-modularity = Yog.Community.modularity(graph, communities)
+modularity = Community.modularity(graph, communities)
 IO.puts("Modularity: #{modularity}")
+# => Modularity: 0.35714285714285715
 ```
 
 ### Graph Generators
 
 ```elixir
+alias Yog.Generator.{Classic, Random}
 # Classic graph patterns
-complete = Yog.Generator.Classic.complete(10)       # K₁₀ complete graph
-cycle = Yog.Generator.Classic.cycle(20)              # C₂₀ cycle graph
-petersen = Yog.Generator.Classic.petersen()           # The famous Petersen graph
-grid = Yog.Generator.Classic.grid_2d(5, 5)           # 5×5 grid lattice
+complete = Classic.complete(10)       # K₁₀ complete graph
+cycle = Classic.cycle(20)              # C₂₀ cycle graph
+petersen = Classic.petersen()           # The famous Petersen graph
+grid = Classic.grid_2d(5, 5)           # 5×5 grid lattice
 
 # Random graph models
-sparse = Yog.Generator.Random.erdos_renyi_gnp(100, 0.05)    # G(n,p) model
-scale_free = Yog.Generator.Random.barabasi_albert(1000, 3)   # Preferential attachment
-small_world = Yog.Generator.Random.watts_strogatz(100, 6, 0.1)  # Small-world
+sparse = Random.erdos_renyi_gnp(100, 0.05)    # G(n,p) model
+scale_free = Random.barabasi_albert(1000, 3)   # Preferential attachment
+small_world = Random.watts_strogatz(100, 6, 0.1)  # Small-world
 ```
 
 ### Grid Builder (Maze Solving)
 
 ```elixir
+alias Yog.Builderr.Grid
+alias Yog.Pathfinding
+alias Yog.Render.ASCII
+
 # Build a maze from a 2D grid
 maze = [
   [".", ".", "#", "."],
@@ -191,70 +193,78 @@ maze = [
   [".", ".", ".", "."]
 ]
 
-grid = Yog.Builder.Grid.from_2d_list(maze, :undirected, Yog.Builder.Grid.walkable("."))
-graph = Yog.Builder.Grid.to_graph(grid)
+# Create grid with walkable predicate
+grid = Grid.from_2d_list(maze, :undirected, Grid.including(["."]))
 
-# Find start and goal
-{:ok, start} = Yog.Builder.Grid.find_node(grid, fn cell -> cell == "." end)
+IO.puts(ASCII.grid_to_string_unicode(grid, %{0 => "S", 11 => "E"}))
 
-# Use Manhattan distance heuristic with A*
-h = fn from_id, to_id ->
-  Yog.Builder.Grid.manhattan_distance(from_id, to_id, 4)
-end
+# Prints the Maze:
+# ┌───────┬───┬───┐
+# │ S     │   │   │
+# │   ┌───┼───┤   │
+# │   │   │   │   │
+# │   └───┴───┘   │
+# │             E │
+# └───────────────┘
+
 ```
 
 ### Labeled Graph Builder
 
 ```elixir
+alias Yog.Builder.Labeled
+alias Yog.Pathfinding
+
 # Build graphs with meaningful labels instead of integer IDs
 builder =
-  Yog.Builder.Labeled.directed()
-  |> Yog.Builder.Labeled.add_edge("London", "Paris", 450)
-  |> Yog.Builder.Labeled.add_edge("Paris", "Berlin", 878)
-  |> Yog.Builder.Labeled.add_edge("London", "Berlin", 930)
+  Labeled.directed()
+  |> Labeled.add_edge("London", "Paris", 450)
+  |> Labeled.add_edge("Paris", "Berlin", 878)
+  |> Labeled.add_edge("London", "Berlin", 930)
 
 # Convert to graph for algorithms
-graph = Yog.Builder.Labeled.to_graph(builder)
+graph = Labeled.to_graph(builder)
 
-# Look up IDs by label
-{:ok, london_id} = Yog.Builder.Labeled.get_id(builder, "London")
-{:ok, berlin_id} = Yog.Builder.Labeled.get_id(builder, "Berlin")
-```
+# Look up internal IDs by label
+{:ok, london_id} = Labeled.get_id(builder, "London")
+{:ok, berlin_id} = Labeled.get_id(builder, "Berlin")
 
-### Graph Operations
-
-```elixir
-# Set-theoretic operations
-union = Yog.Operation.union(graph_a, graph_b)
-common = Yog.Operation.intersection(graph_a, graph_b)
-diff = Yog.Operation.difference(graph_a, graph_b)
-
-# Structural comparison
-Yog.Operation.isomorphic?(triangle1, triangle2)  # => true
-Yog.Operation.subgraph?(sub, full)                # => true
-
-# Cartesian product (generates grid-like structures)
-product = Yog.Operation.cartesian_product(path3, path4, 0, 0)
+# Find shortest path using integer IDs
+case Pathfinding.shortest_path(in: graph, from: london_id, to: berlin_id) do
+  {:ok, path} ->
+    labeled_path = Enum.map(path.nodes, fn id ->
+      graph.nodes[id]
+    end)
+    IO.puts("Route: #{Enum.join(labeled_path, " -> ")}, Distance: #{path.weight} km")
+end
+# => Route: London -> Berlin, Distance: 930 km
 ```
 
 ### Centrality Analysis
 
 ```elixir
+alias Yog.Centrality
+
 graph =
-  Yog.undirected()
+  Yog.directed()
   |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_node(3, nil)
   |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}, {1, 3, 1}])
 
 # Various centrality measures
-pagerank = Yog.Centrality.pagerank(graph)
-betweenness = Yog.Centrality.betweenness(graph)
-closeness = Yog.Centrality.closeness(graph)
-degree = Yog.Centrality.degree(graph)
+pagerank = Centrality.pagerank(graph)
+# => %{1 => 0.19757597883790196, 2 => 0.2815434776603495, 3 => 0.5208805435017486}
+betweenness = Centrality.betweenness(graph)
+# => %{1 => 0.0, 2 => 0.0, 3 => 0.0}
+closeness = Centrality.closeness(graph)
+# => %{1 => 1.0, 2 => 0.0, 3 => 0.0}
+degree = Centrality.degree(graph, :out_degree)
+# => %{1 => 1.0, 2 => 0.5, 3 => 0.0}
 ```
 
 ### Graph I/O & Interoperability
 
 ```elixir
+alias Yog.IO.{GDF, GraphML, Pajek}
 # Create graph
 graph =
   Yog.directed()
@@ -263,15 +273,15 @@ graph =
   |> Yog.add_edge!(from: 1, to: 2, with: "follows")
 
 # Serialize to popular formats like GraphML, TGF, LEDA, Pajek, JSON, or GDF
-graphml_string = Yog.IO.GraphML.serialize(graph)
-json_string = Yog.IO.JSON.serialize(graph)
-pajek_string = Yog.IO.Pajek.serialize(graph)
+gdf_string = GDF.serialize(graph)
+graphml_string = GraphML.serialize(graph)
+pajek_string = Pajek.serialize(graph)
 
 # Parse from string or read from file
-{:ok, {:graphml_result, loaded_graph, _warnings}} = Yog.IO.GraphML.parse(graphml_string)
+{:ok, graph} = GraphML.deserialize(graphml_string)
 
 # Read directly from file
-# {:ok, loaded} = Yog.IO.Pajek.read("network.net")
+# {:ok, loaded} = GraphML.read("slashdot.xml")
 ```
 
 ### Functional Inductive Graphs (Experimental)
@@ -279,22 +289,24 @@ pajek_string = Yog.IO.Pajek.serialize(graph)
 YogEx now includes an experimental implementation of Martin Erwig's Functional Graph Library (FGL) natively in Elixir under the `Yog.Functional` namespace. This provides an elegant, purely functional approach to graph algorithms using inductive decomposition (`match/2`) instead of mutable references or explicit "visited" sets.
 
 ```elixir
+alias Yog.Functional.{Algorithms, Model}
+
 # Create an inductive functional graph
 graph =
-  Yog.Functional.Model.empty()
-  |> Yog.Functional.Model.put_node(1, "A")
-  |> Yog.Functional.Model.put_node(2, "B")
-  |> Yog.Functional.Model.put_node(3, "C")
-  |> Yog.Functional.Model.add_edge!(1, 2, "Weight 1")
-  |> Yog.Functional.Model.add_edge!(2, 3, "Weight 2")
+  Model.empty()
+  |> Model.put_node(1, "A")
+  |> Model.put_node(2, "B")
+  |> Model.put_node(3, "C")
+  |> Model.add_edge!(1, 2, 1)
+  |> Model.add_edge!(2, 3, 2)
 
 # Inductive Top-Sort - consumes the graph naturally, no mutable visited sets!
-{:ok, order} = Yog.Functional.Algorithms.topsort(graph)
+{:ok, order} = Algorithms.topsort(graph)
 # => [1, 2, 3]
 
 # Inductive Dijkstra
-{:ok, path, dist} = Yog.Functional.Algorithms.shortest_path(graph, 1, 3)
-# => [1, 2, 3] and 2
+Algorithms.shortest_path(graph, 1, 3)
+# => {:ok, [1, 2, 3], 3}
 ```
 
 ## Examples

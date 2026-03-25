@@ -26,17 +26,17 @@ defmodule BridgesOfKonigsberg do
     IO.puts("--- Seven Bridges of Königsberg ---")
 
     # Check if an Eulerian circuit exists (all even degrees)
-    if Yog.Eulerian.has_eulerian_circuit?(graph) do
+    if Yog.Property.Eulerian.has_eulerian_circuit?(graph) do
       IO.puts("Eulerian circuit exists!")
     else
       IO.puts("No Eulerian circuit exists.")
     end
 
     # Check if an Eulerian path exists (0 or 2 odd degrees)
-    if Yog.Eulerian.has_eulerian_path?(graph) do
+    if Yog.Property.Eulerian.has_eulerian_path?(graph) do
       IO.puts("Eulerian path exists!")
 
-      case Yog.Eulerian.find_eulerian_path(graph) do
+      case Yog.Property.Eulerian.eulerian_path(graph) do
         {:ok, path} -> IO.puts("Path: #{inspect(path)}")
         {:error, _} -> nil
       end
@@ -56,7 +56,7 @@ defmodule BridgesOfKonigsberg do
 
     IO.puts("\n--- Simple Triangle ---")
 
-    case Yog.Eulerian.find_eulerian_circuit(circuit_graph) do
+    case Yog.Property.Eulerian.eulerian_circuit(circuit_graph) do
       {:ok, circuit} -> IO.puts("Circuit found: #{inspect(circuit)}")
       {:error, _} -> IO.puts("No circuit found")
     end

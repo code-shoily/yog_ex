@@ -46,27 +46,13 @@ defmodule NetworkBandwidth do
     IO.puts(" RouterD (4) -> Dest (5): 15 Mbps\n")
 
     # Find maximum bandwidth from source to destination
-    result =
-      Yog.Flow.MaxFlow.edmonds_karp(
-        network,
-        0,
-        5,
-        0,
-        &(&1 + &2),
-        fn a, b -> a - b end,
-        fn a, b -> a <= b end,
-        &min/2
-      )
+    # Using the simplified API with default integer operations
+    result = Yog.Flow.MaxFlow.edmonds_karp(network, 0, 5)
 
     IO.puts("Maximum bandwidth from source to destination: #{result.max_flow} Mbps")
 
     # Find the minimum cut (bottleneck in the network)
-    cut =
-      Yog.Flow.MaxFlow.min_cut(
-        result,
-        0,
-        fn a, b -> a <= b end
-      )
+    cut = Yog.Flow.MaxFlow.extract_min_cut(result)
 
     IO.puts("\n=== Minimum Cut Analysis ===")
     IO.puts("This identifies the bottleneck that limits network capacity.\n")

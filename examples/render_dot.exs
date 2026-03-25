@@ -27,22 +27,19 @@ defmodule RenderDot do
     IO.puts("\n--- DOT with Path Highlighting ---")
 
     result =
-      Yog.Pathfinding.Dijkstra.shortest_path(
+      Yog.Pathfinding.shortest_path(
         in: graph,
         from: 1,
-        to: 3,
-        zero: 0,
-        add: &(&1 + &2),
-        compare: fn a, b -> if a < b, do: :lt, else: if(a > b, do: :gt, else: :eq) end
+        to: 3
       )
 
     case result do
-      {:ok, %Yog.Pathfinding.Path{nodes: nodes}} ->
+      {:ok, path} ->
         # Highlight the path
         options = %{
           Yog.Render.DOT.default_options()
-          | highlighted_nodes: nodes,
-            highlighted_edges: path_to_edges(nodes)
+          | highlighted_nodes: path.nodes,
+            highlighted_edges: path_to_edges(path.nodes)
         }
 
         dot_highlighted = Yog.Render.DOT.to_dot(graph, options)

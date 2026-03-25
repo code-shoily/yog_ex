@@ -35,15 +35,13 @@ defmodule GpsNavigation do
         in: road_network,
         from: 1,
         to: 3,
-        zero: 0,
-        add: &(&1 + &2),
-        compare: fn a, b -> if a < b, do: :lt, else: if(a > b, do: :gt, else: :eq) end,
         heuristic: straight_line_distance
       )
 
     case result do
-      {:ok, %Yog.Pathfinding.Path{weight: weight}} ->
-        IO.puts("Fastest route takes #{weight} minutes")
+      {:ok, path} ->
+        IO.puts("Fastest route takes #{path.weight} minutes")
+        IO.puts("Path: #{inspect(path.nodes)}")
 
       :error ->
         IO.puts("No route found")

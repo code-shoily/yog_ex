@@ -43,7 +43,7 @@ defmodule MedicalResidency do
     IO.puts("  Coastal Medical (105): Evans, Brown, Davis, Chen, Anderson")
     IO.puts("")
 
-    matching = Yog.Bipartite.stable_marriage(left_prefs: residents, right_prefs: hospitals)
+    matching = Yog.Property.Bipartite.stable_marriage(residents, hospitals)
 
     IO.puts("=== Stable Matching Results ===")
     IO.puts("")
