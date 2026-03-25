@@ -269,4 +269,60 @@ defmodule Yog.IO.LEDATest do
     assert Yog.Model.edge_count(graph) == 1
     assert warnings != []
   end
+
+  # =============================================================================
+  # FIXTURE FILE TESTS
+  # =============================================================================
+
+  test "read sample fixture file" do
+    fixture_path = "test/fixtures/io/sample.leda"
+    assert File.exists?(fixture_path), "Fixture file does not exist"
+
+    {:ok, {:leda_result, graph, warnings}} = LEDA.read(fixture_path)
+
+    # Verify no warnings
+    assert warnings == []
+
+    # Verify graph structure
+    assert Yog.Model.node_count(graph) == 3
+    assert Yog.Model.edge_count(graph) == 3
+    assert Yog.Model.type(graph) == :directed
+
+    # Verify node data
+    assert Yog.Model.node(graph, 1) == "Alice"
+    assert Yog.Model.node(graph, 2) == "Bob"
+    assert Yog.Model.node(graph, 3) == "Charlie"
+
+    # Verify edges exist
+    assert length(Yog.successors(graph, 1)) == 2
+    assert length(Yog.successors(graph, 2)) == 1
+  end
+
+  test "roundtrip fixture file" do
+    fixture_path = "test/fixtures/io/sample.leda"
+    output_path = "/tmp/test_yog_leda_output.leda"
+
+    # Read original fixture
+    {:ok, {:leda_result, original, _}} = LEDA.read(fixture_path)
+
+    # Write to temp file
+    assert :ok = LEDA.write(output_path, original)
+    assert File.exists?(output_path)
+
+    # Read back the written file
+    {:ok, {:leda_result, reloaded, _}} = LEDA.read(output_path)
+
+    # Verify structure matches
+    assert Yog.Model.node_count(reloaded) == Yog.Model.node_count(original)
+    assert Yog.Model.edge_count(reloaded) == Yog.Model.edge_count(original)
+    assert Yog.Model.type(reloaded) == Yog.Model.type(original)
+
+    # Verify node data matches
+    assert Yog.Model.node(reloaded, 1) == "Alice"
+    assert Yog.Model.node(reloaded, 2) == "Bob"
+    assert Yog.Model.node(reloaded, 3) == "Charlie"
+
+    # Cleanup
+    File.rm(output_path)
+  end
 end

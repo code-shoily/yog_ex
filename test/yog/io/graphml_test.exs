@@ -406,4 +406,61 @@ defmodule Yog.IO.GraphMLTest do
   test "read nonexistent file" do
     assert {:error, _} = GraphML.read("/tmp/nonexistent_file_xyz.graphml")
   end
+
+  # =============================================================================
+  # FIXTURE FILE TESTS
+  # =============================================================================
+
+  test "read sample fixture file" do
+    fixture_path = "test/fixtures/io/sample.graphml"
+    assert File.exists?(fixture_path), "Fixture file does not exist"
+
+    {:ok, graph} = GraphML.read(fixture_path)
+
+    # Verify graph structure
+    assert Yog.Model.node_count(graph) == 3
+    assert Yog.Model.edge_count(graph) == 3
+    assert Yog.Model.type(graph) == :directed
+
+    # Verify node data
+    assert Yog.Model.node(graph, 1)["label"] == "Alice"
+    assert Yog.Model.node(graph, 2)["label"] == "Bob"
+    assert Yog.Model.node(graph, 3)["label"] == "Charlie"
+
+    # Verify edges exist
+    assert length(Yog.successors(graph, 1)) == 2
+    assert length(Yog.successors(graph, 2)) == 1
+  end
+
+  test "roundtrip fixture file" do
+    fixture_path = "test/fixtures/io/sample.graphml"
+    output_path = "/tmp/test_yog_graphml_output.graphml"
+
+    # Read original fixture
+    {:ok, original} = GraphML.read(fixture_path)
+
+    # Custom mappers that handle map data from deserialization
+    node_attr = fn data when is_map(data) -> data end
+    edge_attr = fn data when is_map(data) -> data end
+
+    # Write to temp file with custom mappers
+    assert {:ok, nil} = GraphML.write_with(output_path, node_attr, edge_attr, original)
+    assert File.exists?(output_path)
+
+    # Read back the written file
+    {:ok, reloaded} = GraphML.read(output_path)
+
+    # Verify structure matches
+    assert Yog.Model.node_count(reloaded) == Yog.Model.node_count(original)
+    assert Yog.Model.edge_count(reloaded) == Yog.Model.edge_count(original)
+    assert Yog.Model.type(reloaded) == Yog.Model.type(original)
+
+    # Verify node data matches
+    assert Yog.Model.node(reloaded, 1)["label"] == "Alice"
+    assert Yog.Model.node(reloaded, 2)["label"] == "Bob"
+    assert Yog.Model.node(reloaded, 3)["label"] == "Charlie"
+
+    # Cleanup
+    File.rm(output_path)
+  end
 end
