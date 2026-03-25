@@ -77,27 +77,11 @@ defmodule Yog.Pathfinding.Dijkstra do
     graph = Keyword.fetch!(opts, :in)
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
-    zero = Keyword.fetch!(opts, :zero)
-    add = Keyword.fetch!(opts, :add)
-    compare = Keyword.fetch!(opts, :compare)
+    zero = opts[:zero] || 0
+    add = opts[:add] || (&Kernel.+/2)
+    compare = opts[:compare] || (&Yog.Utils.compare/2)
 
     shortest_path(graph, from, to, zero, add, compare)
-  end
-
-  @doc """
-  Find shortest path using keyword options (alias for `shortest_path/1`).
-  """
-  @spec shortest_path_int(keyword()) :: path_result()
-  def shortest_path_int(opts) do
-    shortest_path(opts)
-  end
-
-  @doc """
-  Find shortest path using keyword options (alias for `shortest_path/1`).
-  """
-  @spec shortest_path_float(keyword()) :: path_result()
-  def shortest_path_float(opts) do
-    shortest_path(opts)
   end
 
   @doc """
@@ -125,9 +109,9 @@ defmodule Yog.Pathfinding.Dijkstra do
   def single_source_distances(opts) do
     graph = Keyword.fetch!(opts, :in)
     from = Keyword.fetch!(opts, :from)
-    zero = Keyword.fetch!(opts, :zero)
-    add = Keyword.fetch!(opts, :add)
-    compare = Keyword.fetch!(opts, :compare)
+    zero = opts[:zero] || 0
+    add = opts[:add] || (&Kernel.+/2)
+    compare = opts[:compare] || (&Yog.Utils.compare/2)
 
     single_source_distances(graph, from, zero, add, compare)
   end
@@ -160,9 +144,9 @@ defmodule Yog.Pathfinding.Dijkstra do
     from = Keyword.fetch!(opts, :from)
     successors = Keyword.fetch!(opts, :successors_with_cost)
     is_goal = Keyword.fetch!(opts, :is_goal)
-    zero = Keyword.fetch!(opts, :zero)
-    add = Keyword.fetch!(opts, :add)
-    compare = Keyword.fetch!(opts, :compare)
+    zero = opts[:zero] || 0
+    add = opts[:add] || (&Kernel.+/2)
+    compare = opts[:compare] || (&Yog.Utils.compare/2)
 
     implicit_dijkstra(from, successors, is_goal, zero, add, compare)
   end
@@ -186,9 +170,9 @@ defmodule Yog.Pathfinding.Dijkstra do
     successors = Keyword.fetch!(opts, :successors_with_cost)
     visited_by = Keyword.fetch!(opts, :visited_by)
     is_goal = Keyword.fetch!(opts, :is_goal)
-    zero = Keyword.fetch!(opts, :zero)
-    add = Keyword.fetch!(opts, :add)
-    compare = Keyword.fetch!(opts, :compare)
+    zero = opts[:zero] || 0
+    add = opts[:add] || (&Kernel.+/2)
+    compare = opts[:compare] || (&Yog.Utils.compare/2)
 
     implicit_dijkstra_by(from, successors, visited_by, is_goal, zero, add, compare)
   end
@@ -248,59 +232,18 @@ defmodule Yog.Pathfinding.Dijkstra do
           (weight, weight -> :lt | :eq | :gt)
         ) :: path_result()
         when weight: var
-  def shortest_path(graph, from, to, zero, add, compare) do
+  def shortest_path(
+        graph,
+        from,
+        to,
+        zero \\ 0,
+        add \\ &Kernel.+/2,
+        compare \\ &Yog.Utils.compare/2
+      ) do
     case do_dijkstra(graph, from, to, zero, add, compare, true) do
       :error -> :error
       {path, weight} -> {:ok, Path.new(path, weight, :dijkstra)}
     end
-  end
-
-  @doc """
-  Find the shortest path using integer weights.
-
-  Uses built-in integer arithmetic for efficient computation.
-
-  ## Examples
-
-      iex> graph = Yog.directed()
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(1, 2, 4)
-      ...> |> Yog.add_edge!(2, 3, 1)
-      iex> {:ok, path} = Dijkstra.shortest_path_int(graph, 1, 3)
-      iex> path.nodes
-      [1, 2, 3]
-      iex> path.weight
-      5
-  """
-  @spec shortest_path_int(Yog.t(), Yog.node_id(), Yog.node_id()) :: path_result()
-  def shortest_path_int(graph, from, to) do
-    shortest_path(graph, from, to, 0, &(&1 + &2), &Yog.Utils.compare/2)
-  end
-
-  @doc """
-  Find the shortest path using float weights.
-
-  Uses built-in float arithmetic for efficient computation.
-
-  ## Examples
-
-      iex> graph = Yog.directed()
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(1, 2, 4.5)
-      ...> |> Yog.add_edge!(2, 3, 1.5)
-      iex> {:ok, path} = Dijkstra.shortest_path_float(graph, 1, 3)
-      iex> path.nodes
-      [1, 2, 3]
-      iex> path.weight
-      6.0
-  """
-  @spec shortest_path_float(Yog.t(), Yog.node_id(), Yog.node_id()) :: path_result()
-  def shortest_path_float(graph, from, to) do
-    shortest_path(graph, from, to, 0.0, &(&1 + &2), &Yog.Utils.compare/2)
   end
 
   @doc """
@@ -337,7 +280,13 @@ defmodule Yog.Pathfinding.Dijkstra do
           (weight, weight -> :lt | :eq | :gt)
         ) :: %{Yog.node_id() => weight}
         when weight: var
-  def single_source_distances(graph, from, zero, add, compare) do
+  def single_source_distances(
+        graph,
+        from,
+        zero \\ 0,
+        add \\ &Kernel.+/2,
+        compare \\ &Yog.Utils.compare/2
+      ) do
     case do_dijkstra(graph, from, nil, zero, add, compare, false) do
       :none -> %{}
       {_path, _weight, distances} -> distances
@@ -393,7 +342,14 @@ defmodule Yog.Pathfinding.Dijkstra do
           (cost, cost -> :lt | :eq | :gt)
         ) :: {:ok, cost} | :error
         when state: var, cost: var
-  def implicit_dijkstra(from, successors, is_goal, zero, add, compare) do
+  def implicit_dijkstra(
+        from,
+        successors,
+        is_goal,
+        zero \\ 0,
+        add \\ &Kernel.+/2,
+        compare \\ &Yog.Utils.compare/2
+      ) do
     implicit_dijkstra_by(from, successors, fn x -> x end, is_goal, zero, add, compare)
   end
 
@@ -441,7 +397,15 @@ defmodule Yog.Pathfinding.Dijkstra do
           (cost, cost -> :lt | :eq | :gt)
         ) :: {:ok, cost} | :error
         when state: var, cost: var
-  def implicit_dijkstra_by(from, successors, key_fn, is_goal, zero, add, compare) do
+  def implicit_dijkstra_by(
+        from,
+        successors,
+        key_fn,
+        is_goal,
+        zero \\ 0,
+        add \\ &Kernel.+/2,
+        compare \\ &Yog.Utils.compare/2
+      ) do
     initial_queue =
       PQ.new(fn {d1, _}, {d2, _} -> compare.(d1, d2) != :gt end)
       |> PQ.push({zero, from})

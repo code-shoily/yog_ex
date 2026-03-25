@@ -270,7 +270,7 @@ defmodule Yog.Pathfinding.FloydWarshallTest do
 
   # ============= Weight Type Tests =============
 
-  test "floyd_warshall_int_test" do
+  test "floyd_warshall_int_weights_test" do
     graph =
       Yog.directed()
       |> Yog.add_node(1, "A")
@@ -279,13 +279,13 @@ defmodule Yog.Pathfinding.FloydWarshallTest do
       |> Yog.add_edge!(from: 1, to: 2, with: 5)
       |> Yog.add_edge!(from: 2, to: 3, with: 10)
 
-    result = FloydWarshall.floyd_warshall_int(graph)
+    result = FloydWarshall.floyd_warshall(graph)
 
     assert {:ok, distances} = result
     assert distances[{1, 3}] == 15
   end
 
-  test "floyd_warshall_float_test" do
+  test "floyd_warshall_float_weights_test" do
     graph =
       Yog.directed()
       |> Yog.add_node(1, "A")
@@ -294,7 +294,7 @@ defmodule Yog.Pathfinding.FloydWarshallTest do
       |> Yog.add_edge!(from: 1, to: 2, with: 5.5)
       |> Yog.add_edge!(from: 2, to: 3, with: 10.5)
 
-    result = FloydWarshall.floyd_warshall_float(graph)
+    result = FloydWarshall.floyd_warshall(graph)
 
     assert {:ok, distances} = result
     assert distances[{1, 3}] == 16.0

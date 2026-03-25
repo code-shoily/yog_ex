@@ -188,7 +188,7 @@ defmodule Yog.Pathfinding.DijkstraTest do
 
   # ============= Weight Variation Tests =============
 
-  test "shortest_path_int_test" do
+  test "shortest_path_int_weights_test" do
     graph =
       Yog.directed()
       |> Yog.add_node(1, "A")
@@ -197,14 +197,14 @@ defmodule Yog.Pathfinding.DijkstraTest do
       |> Yog.add_edge!(from: 1, to: 2, with: 5)
       |> Yog.add_edge!(from: 2, to: 3, with: 10)
 
-    result = Dijkstra.shortest_path_int(graph, 1, 3)
+    result = Dijkstra.shortest_path(graph, 1, 3)
 
     assert {:ok, path} = result
     assert path.nodes == [1, 2, 3]
     assert path.weight == 15
   end
 
-  test "shortest_path_float_test" do
+  test "shortest_path_float_weights_test" do
     graph =
       Yog.directed()
       |> Yog.add_node(1, "A")
@@ -213,7 +213,7 @@ defmodule Yog.Pathfinding.DijkstraTest do
       |> Yog.add_edge!(from: 1, to: 2, with: 5.5)
       |> Yog.add_edge!(from: 2, to: 3, with: 10.5)
 
-    result = Dijkstra.shortest_path_float(graph, 1, 3)
+    result = Dijkstra.shortest_path(graph, 1, 3)
 
     assert {:ok, path} = result
     assert path.nodes == [1, 2, 3]

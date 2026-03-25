@@ -74,12 +74,12 @@ defmodule Yog.Pathfinding.AStar do
     graph = Keyword.fetch!(opts, :in)
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
-    zero = Keyword.fetch!(opts, :zero)
-    add = Keyword.fetch!(opts, :add)
-    compare = Keyword.fetch!(opts, :compare)
+    zero = opts[:zero] || 0
+    add = opts[:add] || (&Kernel.+/2)
+    compare = opts[:compare] || (&Yog.Utils.compare/2)
     heuristic = Keyword.fetch!(opts, :heuristic)
 
-    a_star(graph, from, to, zero, add, compare, heuristic)
+    a_star(graph, from, to, heuristic, zero, add, compare)
   end
 
   @doc """
@@ -112,12 +112,12 @@ defmodule Yog.Pathfinding.AStar do
     from = Keyword.fetch!(opts, :from)
     successors = Keyword.fetch!(opts, :successors_with_cost)
     is_goal = Keyword.fetch!(opts, :is_goal)
-    zero = Keyword.fetch!(opts, :zero)
-    add = Keyword.fetch!(opts, :add)
-    compare = Keyword.fetch!(opts, :compare)
+    zero = opts[:zero] || 0
+    add = opts[:add] || (&Kernel.+/2)
+    compare = opts[:compare] || (&Yog.Utils.compare/2)
     heuristic = Keyword.fetch!(opts, :heuristic)
 
-    implicit_a_star(from, successors, is_goal, zero, add, compare, heuristic)
+    implicit_a_star(from, successors, is_goal, heuristic, zero, add, compare)
   end
 
   @doc """
@@ -140,12 +140,12 @@ defmodule Yog.Pathfinding.AStar do
     successors = Keyword.fetch!(opts, :successors_with_cost)
     visited_by = Keyword.fetch!(opts, :visited_by)
     is_goal = Keyword.fetch!(opts, :is_goal)
-    zero = Keyword.fetch!(opts, :zero)
-    add = Keyword.fetch!(opts, :add)
-    compare = Keyword.fetch!(opts, :compare)
+    zero = opts[:zero] || 0
+    add = opts[:add] || (&Kernel.+/2)
+    compare = opts[:compare] || (&Yog.Utils.compare/2)
     heuristic = Keyword.fetch!(opts, :heuristic)
 
-    implicit_a_star_by(from, successors, visited_by, is_goal, zero, add, compare, heuristic)
+    implicit_a_star_by(from, successors, visited_by, is_goal, heuristic, zero, add, compare)
   end
 
   # ============================================================
@@ -181,7 +181,7 @@ defmodule Yog.Pathfinding.AStar do
       iex> # Admissible heuristic (never overestimates)
       iex> h = fn _, _ -> 0 end  # Zero heuristic = Dijkstra
       iex> compare = &Yog.Utils.compare/2
-      iex> {:ok, path} = Yog.Pathfinding.AStar.a_star(graph, :a, :c, 0, &(&1 + &2), compare, h)
+      iex> {:ok, path} = Yog.Pathfinding.AStar.a_star(graph, :a, :c, h, 0, &(&1 + &2), compare)
       iex> path.nodes
       [:a, :b, :c]
       iex> path.weight
@@ -193,7 +193,7 @@ defmodule Yog.Pathfinding.AStar do
       ...> |> Yog.add_edge!({1,0}, {2,0}, 1)
       iex> manhattan = fn {x1, y1}, {x2, y2} -> abs(x1-x2) + abs(y1-y2) end
       iex> compare = &Yog.Utils.compare/2
-      iex> {:ok, path} = Yog.Pathfinding.AStar.a_star(grid, {0,0}, {2,0}, 0, &(&1+&2), compare, manhattan)
+      iex> {:ok, path} = Yog.Pathfinding.AStar.a_star(grid, {0,0}, {2,0}, manhattan, 0, &(&1+&2), compare)
       iex> path.nodes
       [{0,0}, {1,0}, {2,0}]
       iex> path.weight
@@ -203,13 +203,21 @@ defmodule Yog.Pathfinding.AStar do
           Yog.graph(),
           Yog.node_id(),
           Yog.node_id(),
+          (Yog.node_id(), Yog.node_id() -> weight),
           weight,
           (weight, weight -> weight),
-          (weight, weight -> :lt | :eq | :gt),
-          (Yog.node_id(), Yog.node_id() -> weight)
+          (weight, weight -> :lt | :eq | :gt)
         ) :: path_result()
         when weight: var
-  def a_star(graph, from, to, zero, add, compare, heuristic) do
+  def a_star(
+        graph,
+        from,
+        to,
+        heuristic,
+        zero \\ 0,
+        add \\ &Kernel.+/2,
+        compare \\ &Yog.Utils.compare/2
+      ) do
     # Priority queue: {f_score, g_score, node, path}
     # f(n) = g(n) + h(n)
     h0 = heuristic.(from, to)
@@ -221,60 +229,6 @@ defmodule Yog.Pathfinding.AStar do
     initial_g_scores = %{from => zero}
 
     do_a_star(graph, initial_queue, to, add, compare, heuristic, initial_g_scores)
-  end
-
-  @doc """
-  Find the shortest path using A* with integer weights.
-
-  Uses built-in integer arithmetic for efficient computation.
-
-  ## Examples
-
-      iex> graph = Yog.directed()
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(1, 2, 4)
-      ...> |> Yog.add_edge!(2, 3, 1)
-      iex> h = fn _, _ -> 0 end
-      iex> {:ok, path} = Yog.Pathfinding.AStar.a_star_int(graph, 1, 3, h)
-      iex> path.nodes
-      [1, 2, 3]
-      iex> path.weight
-      5
-  """
-  @spec a_star_int(Yog.graph(), Yog.node_id(), Yog.node_id(), (Yog.node_id(), Yog.node_id() ->
-                                                                 integer())) ::
-          path_result()
-  def a_star_int(graph, from, to, heuristic) do
-    a_star(graph, from, to, 0, &(&1 + &2), &Yog.Utils.compare/2, heuristic)
-  end
-
-  @doc """
-  Find the shortest path using A* with float weights.
-
-  Uses built-in float arithmetic for efficient computation.
-
-  ## Examples
-
-      iex> graph = Yog.directed()
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(1, 2, 4.5)
-      ...> |> Yog.add_edge!(2, 3, 1.5)
-      iex> h = fn _, _ -> 0.0 end
-      iex> {:ok, path} = Yog.Pathfinding.AStar.a_star_float(graph, 1, 3, h)
-      iex> path.nodes
-      [1, 2, 3]
-      iex> path.weight
-      6.0
-  """
-  @spec a_star_float(Yog.graph(), Yog.node_id(), Yog.node_id(), (Yog.node_id(), Yog.node_id() ->
-                                                                   float())) ::
-          path_result()
-  def a_star_float(graph, from, to, heuristic) do
-    a_star(graph, from, to, 0.0, &(&1 + &2), &Yog.Utils.compare/2, heuristic)
   end
 
   @doc """
@@ -310,8 +264,8 @@ defmodule Yog.Pathfinding.AStar do
       iex> h = fn n -> 4 - n end
       iex> compare = &Yog.Utils.compare/2
       iex> {:ok, cost} = Yog.Pathfinding.AStar.implicit_a_star(
-      ...>   1, successors, fn x -> x == 4 end,
-      ...>   0, &(&1 + &2), compare, h
+      ...>   1, successors, fn x -> x == 4 end, h,
+      ...>   0, &(&1 + &2), compare
       ...> )
       iex> cost
       6
@@ -320,14 +274,22 @@ defmodule Yog.Pathfinding.AStar do
           state,
           (state -> [{state, cost}]),
           (state -> boolean),
+          (state -> cost),
           cost,
           (cost, cost -> cost),
-          (cost, cost -> :lt | :eq | :gt),
-          (state -> cost)
+          (cost, cost -> :lt | :eq | :gt)
         ) :: {:ok, cost} | :error
         when state: var, cost: var
-  def implicit_a_star(from, successors, is_goal, zero, add, compare, heuristic) do
-    implicit_a_star_by(from, successors, fn x -> x end, is_goal, zero, add, compare, heuristic)
+  def implicit_a_star(
+        from,
+        successors,
+        is_goal,
+        heuristic,
+        zero \\ 0,
+        add \\ &Kernel.+/2,
+        compare \\ &Yog.Utils.compare/2
+      ) do
+    implicit_a_star_by(from, successors, fn x -> x end, is_goal, heuristic, zero, add, compare)
   end
 
   @doc """
@@ -364,13 +326,22 @@ defmodule Yog.Pathfinding.AStar do
           (state -> [{state, cost}]),
           (state -> term()),
           (state -> boolean),
+          (state -> cost),
           cost,
           (cost, cost -> cost),
-          (cost, cost -> :lt | :eq | :gt),
-          (state -> cost)
+          (cost, cost -> :lt | :eq | :gt)
         ) :: {:ok, cost} | :error
         when state: var, cost: var
-  def implicit_a_star_by(from, successors, key_fn, is_goal, zero, add, compare, heuristic) do
+  def implicit_a_star_by(
+        from,
+        successors,
+        key_fn,
+        is_goal,
+        heuristic,
+        zero \\ 0,
+        add \\ &Kernel.+/2,
+        compare \\ &Yog.Utils.compare/2
+      ) do
     h0 = heuristic.(from)
     # Queue: {f_score, g_score, state}
     initial_queue =

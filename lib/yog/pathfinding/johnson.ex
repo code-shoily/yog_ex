@@ -132,7 +132,13 @@ defmodule Yog.Pathfinding.Johnson do
           (any(), any() -> any()),
           (any(), any() -> :lt | :eq | :gt)
         ) :: {:ok, distance_matrix()} | {:error, :negative_cycle}
-  def johnson(graph, zero, add, subtract, compare) do
+  def johnson(
+        graph,
+        zero \\ 0,
+        add \\ &Kernel.+/2,
+        subtract \\ &Kernel.-/2,
+        compare \\ &Yog.Utils.compare/2
+      ) do
     nodes = Model.all_nodes(graph)
 
     # Step 1 & 2: Run Bellman-Ford from temporary source to get potentials h(v)
@@ -145,26 +151,6 @@ defmodule Yog.Pathfinding.Johnson do
       {:error, :negative_cycle} ->
         {:error, :negative_cycle}
     end
-  end
-
-  @doc """
-  Convenience function for integer weights.
-  """
-  @spec johnson_int(Yog.graph()) ::
-          {:ok, %{required({Yog.node_id(), Yog.node_id()}) => integer()}}
-          | {:error, :negative_cycle}
-  def johnson_int(graph) do
-    johnson(graph, 0, &(&1 + &2), &(&1 - &2), &Yog.Utils.compare/2)
-  end
-
-  @doc """
-  Convenience function for float weights.
-  """
-  @spec johnson_float(Yog.graph()) ::
-          {:ok, %{required({Yog.node_id(), Yog.node_id()}) => float()}}
-          | {:error, :negative_cycle}
-  def johnson_float(graph) do
-    johnson(graph, 0.0, &(&1 + &2), &(&1 - &2), &Yog.Utils.compare/2)
   end
 
   # Step 1 & 2: Compute potentials h(v) using Bellman-Ford from temporary source

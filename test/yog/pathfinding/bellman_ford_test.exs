@@ -227,7 +227,7 @@ defmodule Yog.Pathfinding.BellmanFordTest do
 
   # ============= Weight Type Tests =============
 
-  test "bellman_ford_int_test" do
+  test "bellman_ford_int_weights_test" do
     graph =
       Yog.directed()
       |> Yog.add_node(1, "A")
@@ -236,13 +236,13 @@ defmodule Yog.Pathfinding.BellmanFordTest do
       |> Yog.add_edge!(from: 1, to: 2, with: 4)
       |> Yog.add_edge!(from: 2, to: 3, with: -3)
 
-    result = BellmanFord.bellman_ford_int(graph, 1, 3)
+    result = BellmanFord.bellman_ford(graph, 1, 3)
 
     assert {:ok, path} = result
     assert path.weight == 1
   end
 
-  test "bellman_ford_float_test" do
+  test "bellman_ford_float_weights_test" do
     graph =
       Yog.directed()
       |> Yog.add_node(1, "A")
@@ -251,7 +251,7 @@ defmodule Yog.Pathfinding.BellmanFordTest do
       |> Yog.add_edge!(from: 1, to: 2, with: 4.5)
       |> Yog.add_edge!(from: 2, to: 3, with: -3.5)
 
-    result = BellmanFord.bellman_ford_float(graph, 1, 3)
+    result = BellmanFord.bellman_ford(graph, 1, 3)
 
     assert {:ok, path} = result
     assert path.weight == 1.0

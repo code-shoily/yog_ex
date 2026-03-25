@@ -81,9 +81,9 @@ defmodule Yog.Pathfinding.BellmanFord do
     graph = Keyword.fetch!(opts, :in)
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
-    zero = Keyword.fetch!(opts, :zero)
-    add = Keyword.fetch!(opts, :add)
-    compare = Keyword.fetch!(opts, :compare)
+    zero = opts[:zero] || 0
+    add = opts[:add] || (&Kernel.+/2)
+    compare = opts[:compare] || (&Yog.Utils.compare/2)
 
     bellman_ford(graph, from, to, zero, add, compare)
   end
@@ -116,9 +116,9 @@ defmodule Yog.Pathfinding.BellmanFord do
     from = Keyword.fetch!(opts, :from)
     successors = Keyword.fetch!(opts, :successors_with_cost)
     is_goal = Keyword.fetch!(opts, :is_goal)
-    zero = Keyword.fetch!(opts, :zero)
-    add = Keyword.fetch!(opts, :add)
-    compare = Keyword.fetch!(opts, :compare)
+    zero = opts[:zero] || 0
+    add = opts[:add] || (&Kernel.+/2)
+    compare = opts[:compare] || (&Yog.Utils.compare/2)
 
     implicit_bellman_ford(from, successors, is_goal, zero, add, compare)
   end
@@ -142,9 +142,9 @@ defmodule Yog.Pathfinding.BellmanFord do
     successors = Keyword.fetch!(opts, :successors_with_cost)
     visited_by = Keyword.fetch!(opts, :visited_by)
     is_goal = Keyword.fetch!(opts, :is_goal)
-    zero = Keyword.fetch!(opts, :zero)
-    add = Keyword.fetch!(opts, :add)
-    compare = Keyword.fetch!(opts, :compare)
+    zero = opts[:zero] || 0
+    add = opts[:add] || (&Kernel.+/2)
+    compare = opts[:compare] || (&Yog.Utils.compare/2)
 
     implicit_bellman_ford_by(from, successors, visited_by, is_goal, zero, add, compare)
   end
@@ -205,7 +205,14 @@ defmodule Yog.Pathfinding.BellmanFord do
           (weight, weight -> :lt | :eq | :gt)
         ) :: result()
         when weight: var
-  def bellman_ford(graph, from, to, zero, add, compare) do
+  def bellman_ford(
+        graph,
+        from,
+        to,
+        zero \\ 0,
+        add \\ &Kernel.+/2,
+        compare \\ &Yog.Utils.compare/2
+      ) do
     nodes = Model.all_nodes(graph)
     edges = get_all_edges(graph)
     node_count = length(nodes)
@@ -244,38 +251,6 @@ defmodule Yog.Pathfinding.BellmanFord do
   end
 
   @doc """
-  Find shortest path using Bellman-Ford with integer weights.
-
-  ## Examples
-
-      iex> graph = Yog.directed()
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(1, 2, 4)
-      ...> |> Yog.add_edge!(2, 3, -3)
-      iex> {:ok, path} = BellmanFord.bellman_ford_int(graph, 1, 3)
-      iex> path.nodes
-      [1, 2, 3]
-      iex> path.weight
-      1
-  """
-  @spec bellman_ford_int(Yog.t(), Yog.node_id(), Yog.node_id()) :: result()
-  def bellman_ford_int(graph, from, to) do
-    bellman_ford(graph, from, to, 0, &(&1 + &2), &Yog.Utils.compare/2)
-  end
-
-  @doc """
-  Find shortest path using Bellman-Ford with float weights.
-
-  Convenience function for float weights.
-  """
-  @spec bellman_ford_float(Yog.t(), Yog.node_id(), Yog.node_id()) :: result()
-  def bellman_ford_float(graph, from, to) do
-    bellman_ford(graph, from, to, 0.0, &(&1 + &2), &Yog.Utils.compare/2)
-  end
-
-  @doc """
   Computes relaxation passes for all-pairs shortest paths.
 
   Returns a map of all node distances after V-1 relaxation passes.
@@ -287,7 +262,13 @@ defmodule Yog.Pathfinding.BellmanFord do
           (any(), any() -> any()),
           (any(), any() -> :lt | :eq | :gt)
         ) :: %{Yog.node_id() => any()}
-  def relaxation_passes(graph, from, zero, add, compare) do
+  def relaxation_passes(
+        graph,
+        from,
+        zero \\ 0,
+        add \\ &Kernel.+/2,
+        compare \\ &Yog.Utils.compare/2
+      ) do
     nodes = Model.all_nodes(graph)
     edges = get_all_edges(graph)
     node_count = length(nodes)
@@ -314,7 +295,13 @@ defmodule Yog.Pathfinding.BellmanFord do
           (any(), any() -> any()),
           (any(), any() -> :lt | :eq | :gt)
         ) :: boolean()
-  def has_negative_cycle?(graph, from, zero, add, compare) do
+  def has_negative_cycle?(
+        graph,
+        from,
+        zero \\ 0,
+        add \\ &Kernel.+/2,
+        compare \\ &Yog.Utils.compare/2
+      ) do
     nodes = Model.all_nodes(graph)
     edges = get_all_edges(graph)
     node_count = length(nodes)
@@ -389,7 +376,14 @@ defmodule Yog.Pathfinding.BellmanFord do
           (cost, cost -> :lt | :eq | :gt)
         ) :: implicit_result(cost)
         when state: var, cost: var
-  def implicit_bellman_ford(from, successors, is_goal, zero, add, compare) do
+  def implicit_bellman_ford(
+        from,
+        successors,
+        is_goal,
+        zero \\ 0,
+        add \\ &Kernel.+/2,
+        compare \\ &Yog.Utils.compare/2
+      ) do
     implicit_bellman_ford_by(from, successors, fn x -> x end, is_goal, zero, add, compare)
   end
 
@@ -418,7 +412,15 @@ defmodule Yog.Pathfinding.BellmanFord do
           (cost, cost -> :lt | :eq | :gt)
         ) :: implicit_result(cost)
         when state: var, cost: var
-  def implicit_bellman_ford_by(from, successors, key_fn, is_goal, zero, add, compare) do
+  def implicit_bellman_ford_by(
+        from,
+        successors,
+        key_fn,
+        is_goal,
+        zero \\ 0,
+        add \\ &Kernel.+/2,
+        compare \\ &Yog.Utils.compare/2
+      ) do
     # For implicit graphs, we don't know the total node count
     # So we use a limit on iterations and detect when distances stabilize
     initial_distances = %{key_fn.(from) => {from, zero}}

@@ -22,7 +22,7 @@ defmodule Yog.Pathfinding.AStarTest do
 
     heuristic = fn _, _ -> 0 end
 
-    result = AStar.a_star(graph, 1, 3, 0, &add/2, &compare/2, heuristic)
+    result = AStar.a_star(graph, 1, 3, heuristic, 0, &add/2, &compare/2)
 
     assert {:ok, path} = result
     assert path.nodes == [1, 2, 3]
@@ -43,7 +43,7 @@ defmodule Yog.Pathfinding.AStarTest do
       if goal == 3, do: 0, else: 5
     end
 
-    result = AStar.a_star(graph, 1, 3, 0, &add/2, &compare/2, heuristic)
+    result = AStar.a_star(graph, 1, 3, heuristic, 0, &add/2, &compare/2)
 
     assert {:ok, path} = result
     assert path.weight == 15
@@ -60,7 +60,7 @@ defmodule Yog.Pathfinding.AStarTest do
 
     heuristic = fn _, _ -> 0 end
 
-    result = AStar.a_star_int(graph, 1, 3, heuristic)
+    result = AStar.a_star(graph, 1, 3, heuristic)
 
     assert {:ok, path} = result
     assert path.weight == 15
@@ -77,7 +77,7 @@ defmodule Yog.Pathfinding.AStarTest do
 
     heuristic = fn _, _ -> 0.0 end
 
-    result = AStar.a_star_float(graph, 1, 3, heuristic)
+    result = AStar.a_star(graph, 1, 3, heuristic)
 
     assert {:ok, path} = result
     assert path.weight == 16.0
@@ -91,7 +91,7 @@ defmodule Yog.Pathfinding.AStarTest do
 
     heuristic = fn _, _ -> 0 end
 
-    result = AStar.a_star(graph, 1, 2, 0, &add/2, &compare/2, heuristic)
+    result = AStar.a_star(graph, 1, 2, heuristic, 0, &add/2, &compare/2)
 
     assert result == :error
   end
@@ -103,7 +103,7 @@ defmodule Yog.Pathfinding.AStarTest do
 
     heuristic = fn _, _ -> 0 end
 
-    result = AStar.a_star(graph, 1, 1, 0, &add/2, &compare/2, heuristic)
+    result = AStar.a_star(graph, 1, 1, heuristic, 0, &add/2, &compare/2)
 
     assert {:ok, path} = result
     assert path.nodes == [1]
@@ -127,10 +127,10 @@ defmodule Yog.Pathfinding.AStarTest do
         1,
         successors,
         fn x -> x == 4 end,
+        heuristic,
         0,
         &add/2,
-        &compare/2,
-        heuristic
+        &compare/2
       )
 
     assert {:ok, 6} = result
@@ -150,10 +150,10 @@ defmodule Yog.Pathfinding.AStarTest do
         1,
         successors,
         fn x -> x == 99 end,
+        heuristic,
         0,
         &add/2,
-        &compare/2,
-        heuristic
+        &compare/2
       )
 
     assert result == :error
@@ -168,10 +168,10 @@ defmodule Yog.Pathfinding.AStarTest do
         42,
         successors,
         fn x -> x == 42 end,
+        heuristic,
         0,
         &add/2,
-        &compare/2,
-        heuristic
+        &compare/2
       )
 
     assert {:ok, 0} = result

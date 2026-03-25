@@ -150,7 +150,7 @@ defmodule Yog.Flow.MinCut do
 
     {min_weight, partition_size} =
       Enum.reduce(other_nodes, {nil, nil}, fn sink, {best_weight, best_size} ->
-        result = MaxFlow.edmonds_karp_int(directed, source, sink)
+        result = MaxFlow.edmonds_karp(directed, source, sink)
         cut = MaxFlow.extract_min_cut(result)
 
         # Compute actual cut weight

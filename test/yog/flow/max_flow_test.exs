@@ -7,7 +7,7 @@ defmodule Yog.Flow.MaxFlowTest do
   alias Yog.Flow.MaxFlow
   doctest MaxFlow
 
-  describe "edmonds_karp_int/3" do
+  describe "edmonds_karp/3" do
     test "simple flow network" do
       {:ok, graph} =
         Yog.directed()
@@ -23,7 +23,7 @@ defmodule Yog.Flow.MaxFlowTest do
           {3, 4, 10}
         ])
 
-      result = MaxFlow.edmonds_karp_int(graph, 1, 4)
+      result = MaxFlow.edmonds_karp(graph, 1, 4)
 
       assert result.max_flow == 15
       assert result.source == 1
@@ -38,7 +38,7 @@ defmodule Yog.Flow.MaxFlowTest do
         |> Yog.add_node(2, "t")
         |> Yog.add_edge!(from: 1, to: 2, with: 5)
 
-      result = MaxFlow.edmonds_karp_int(graph, 1, 2)
+      result = MaxFlow.edmonds_karp(graph, 1, 2)
 
       assert result.max_flow == 5
       assert result.source == 1
@@ -59,7 +59,7 @@ defmodule Yog.Flow.MaxFlowTest do
           {3, 4, 10}
         ])
 
-      result = MaxFlow.edmonds_karp_int(graph, 1, 4)
+      result = MaxFlow.edmonds_karp(graph, 1, 4)
 
       # Two parallel paths each with capacity 10
       assert result.max_flow == 20
@@ -76,7 +76,7 @@ defmodule Yog.Flow.MaxFlowTest do
           {2, 3, 5}
         ])
 
-      result = MaxFlow.edmonds_karp_int(graph, 1, 3)
+      result = MaxFlow.edmonds_karp(graph, 1, 3)
 
       # Bottleneck is the edge with capacity 5
       assert result.max_flow == 5
@@ -92,7 +92,7 @@ defmodule Yog.Flow.MaxFlowTest do
 
       # No edge to sink
 
-      result = MaxFlow.edmonds_karp_int(graph, 1, 3)
+      result = MaxFlow.edmonds_karp(graph, 1, 3)
 
       assert result.max_flow == 0
     end
@@ -113,7 +113,7 @@ defmodule Yog.Flow.MaxFlowTest do
           {3, 4, 10}
         ])
 
-      max_flow_result = MaxFlow.edmonds_karp_int(graph, 1, 4)
+      max_flow_result = MaxFlow.edmonds_karp(graph, 1, 4)
       min_cut = MaxFlow.extract_min_cut(max_flow_result)
 
       # Source side should contain source node (1)
@@ -138,7 +138,7 @@ defmodule Yog.Flow.MaxFlowTest do
         |> Yog.add_node(2, "t")
         |> Yog.add_edge!(from: 1, to: 2, with: 7)
 
-      max_flow_result = MaxFlow.edmonds_karp_int(graph, 1, 2)
+      max_flow_result = MaxFlow.edmonds_karp(graph, 1, 2)
       min_cut = MaxFlow.extract_min_cut(max_flow_result)
 
       # For a single edge, source side should be {1}, sink side {2}

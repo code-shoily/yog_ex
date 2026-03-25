@@ -8,8 +8,8 @@ defmodule Yog.PBT.CentralityTest do
     property "Star Graph: Center node has strictly highest centrality" do
       check all({graph, center, leaves} <- star_graph_gen()) do
         degree = Yog.Centrality.degree_total(graph)
-        closeness = Yog.Centrality.closeness_int(graph)
-        betweenness = Yog.Centrality.betweenness_int(graph)
+        closeness = Yog.Centrality.closeness(graph)
+        betweenness = Yog.Centrality.betweenness(graph)
         pagerank = Yog.Centrality.pagerank(graph, max_iterations: 200)
         eigenvector = Yog.Centrality.eigenvector(graph, max_iterations: 200)
 

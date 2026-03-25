@@ -104,7 +104,7 @@ defmodule Yog.Flow.MaxFlow do
       ...>   |> Yog.add_node(2, "a")
       ...>   |> Yog.add_node(3, "t")
       ...>   |> Yog.add_edges([{1, 2, 10}, {2, 3, 5}])
-      iex> result = Yog.Flow.MaxFlow.edmonds_karp_int(graph, 1, 3)
+      iex> result = Yog.Flow.MaxFlow.edmonds_karp(graph, 1, 3)
       iex> result.max_flow
       5
   """
@@ -115,10 +115,19 @@ defmodule Yog.Flow.MaxFlow do
           any(),
           (any(), any() -> any()),
           (any(), any() -> any()),
-          (any(), any() -> boolean()),
+          (any(), any() -> :lt | :eq | :gt),
           (any(), any() -> any())
         ) :: max_flow_result()
-  def edmonds_karp(graph, source, sink, zero, add, subtract, compare, min_fn) do
+  def edmonds_karp(
+        graph,
+        source,
+        sink,
+        zero \\ 0,
+        add \\ &Kernel.+/2,
+        subtract \\ &Kernel.-/2,
+        compare \\ &Yog.Utils.compare/2,
+        min_fn \\ &min/2
+      ) do
     # Build initial residual graph with capacities
     residual = build_residual_graph(graph, zero)
 
@@ -128,46 +137,6 @@ defmodule Yog.Flow.MaxFlow do
 
     final_residual_graph = residual_to_graph(graph, final_residual)
     MaxFlowResult.new(max_flow, final_residual_graph, source, sink)
-  end
-
-  @doc """
-  Finds the maximum flow using Edmonds-Karp with integer capacities.
-
-  This is a simplified version that uses integer arithmetic.
-
-  ## Examples
-
-      iex> {:ok, graph} = Yog.directed()
-      ...>   |> Yog.add_node(1, "s")
-      ...>   |> Yog.add_node(2, "a")
-      ...>   |> Yog.add_node(3, "t")
-      ...>   |> Yog.add_edges([{1, 2, 10}, {2, 3, 5}])
-      iex> result = Yog.Flow.MaxFlow.edmonds_karp_int(graph, 1, 3)
-      iex> result.max_flow
-      5
-
-  A more complex example with multiple paths:
-
-      iex> {:ok, graph} = Yog.directed()
-      ...>   |> Yog.add_node(1, "source")
-      ...>   |> Yog.add_node(2, "A")
-      ...>   |> Yog.add_node(3, "B")
-      ...>   |> Yog.add_node(4, "sink")
-      ...>   |> Yog.add_edges([
-      ...>     {1, 2, 10},
-      ...>     {1, 3, 5},
-      ...>     {2, 3, 15},
-      ...>     {2, 4, 10},
-      ...>     {3, 4, 10}
-      ...>   ])
-      iex> result = Yog.Flow.MaxFlow.edmonds_karp_int(graph, 1, 4)
-      iex> result.max_flow
-      15
-  """
-  @spec edmonds_karp_int(Yog.graph(), Yog.node_id(), Yog.node_id()) ::
-          max_flow_result()
-  def edmonds_karp_int(graph, source, sink) do
-    edmonds_karp(graph, source, sink, 0, &+/2, &-/2, fn a, b -> a <= b end, &min/2)
   end
 
   defp build_residual_graph(graph, _zero) do
@@ -218,7 +187,7 @@ defmodule Yog.Flow.MaxFlow do
             new_cap = subtract.(old_cap, bottleneck)
 
             acc =
-              if compare.(new_cap, zero) and compare.(zero, new_cap) do
+              if compare.(new_cap, zero) == :eq do
                 Map.delete(acc, {from, to})
               else
                 Map.put(acc, {from, to}, new_cap)
@@ -258,7 +227,7 @@ defmodule Yog.Flow.MaxFlow do
           {new_queue, new_visited} =
             residual
             |> Enum.filter(fn {{from, _}, cap} ->
-              from == current and (compare.(zero, cap) and not compare.(cap, zero))
+              from == current and compare.(cap, zero) == :gt
             end)
             |> Enum.reduce({rest, visited}, fn {{from, to}, _cap}, {q, v} ->
               if MapSet.member?(v, to) do
@@ -286,7 +255,7 @@ defmodule Yog.Flow.MaxFlow do
 
       case acc do
         nil -> cap
-        current -> if compare.(cap, current), do: cap, else: current
+        current -> if compare.(cap, current) == :lt, do: cap, else: current
       end
     end)
   end
@@ -307,7 +276,7 @@ defmodule Yog.Flow.MaxFlow do
       ...>   |> Yog.add_node(2, "a")
       ...>   |> Yog.add_node(3, "t")
       ...>   |> Yog.add_edges([{1, 2, 10}, {2, 3, 5}])
-      iex> result = Yog.Flow.MaxFlow.edmonds_karp_int(graph, 1, 3)
+      iex> result = Yog.Flow.MaxFlow.edmonds_karp(graph, 1, 3)
       iex> cut = Yog.Flow.MaxFlow.extract_min_cut(result)
       iex> MapSet.member?(cut.source_side, 1)
       true
@@ -318,7 +287,7 @@ defmodule Yog.Flow.MaxFlow do
   def extract_min_cut(%MaxFlowResult{residual_graph: residual, source: source}) do
     # Find all nodes reachable from source in residual graph
     nodes = Model.all_nodes(residual) |> MapSet.new()
-    source_side = bfs_reachable(residual, source, nodes)
+    source_side = bfs_reachable_with_compare(residual, source, nodes, 0, &Yog.Utils.compare/2)
     sink_side = MapSet.difference(nodes, source_side)
 
     MinCutResult.new(source_side, sink_side)
@@ -350,18 +319,17 @@ defmodule Yog.Flow.MaxFlow do
       iex> MapSet.member?(cut.source_side, 1)
       true
   """
-  @spec min_cut(max_flow_result(), any(), (any(), any() -> boolean())) :: min_cut()
-  def min_cut(%MaxFlowResult{residual_graph: residual, source: source}, zero, compare) do
+  @spec min_cut(max_flow_result(), any(), (any(), any() -> :lt | :eq | :gt)) :: min_cut()
+  def min_cut(
+        %MaxFlowResult{residual_graph: residual, source: source},
+        zero \\ 0,
+        compare \\ &Yog.Utils.compare/2
+      ) do
     nodes = Model.all_nodes(residual) |> MapSet.new()
     source_side = bfs_reachable_with_compare(residual, source, nodes, zero, compare)
     sink_side = MapSet.difference(nodes, source_side)
 
     MinCutResult.new(source_side, sink_side)
-  end
-
-  # BFS to find reachable nodes from source
-  defp bfs_reachable(residual, source, _all_nodes) do
-    bfs_reachable_with_compare(residual, source, nil, 0, fn a, b -> a <= b end)
   end
 
   defp bfs_reachable_with_compare(residual, source, _all_nodes, zero, compare) do
@@ -376,7 +344,7 @@ defmodule Yog.Flow.MaxFlow do
     neighbors =
       Model.successors(residual, current)
       |> Enum.filter(fn {_, cap} ->
-        not (compare.(cap, zero) and compare.(zero, cap))
+        compare.(cap, zero) != :eq
       end)
       |> Enum.map(fn {to, _} -> to end)
       |> Enum.filter(fn n -> not MapSet.member?(visited, n) end)

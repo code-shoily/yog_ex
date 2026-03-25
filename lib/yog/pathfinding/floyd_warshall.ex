@@ -120,7 +120,7 @@ defmodule Yog.Pathfinding.FloydWarshall do
           (any(), any() -> any()),
           (any(), any() -> :lt | :eq | :gt)
         ) :: {:ok, distance_matrix()} | {:error, :negative_cycle}
-  def floyd_warshall(graph, zero, add, compare) do
+  def floyd_warshall(graph, zero \\ 0, add \\ &Kernel.+/2, compare \\ &Yog.Utils.compare/2) do
     nodes = Model.all_nodes(graph)
 
     # Initialize distance matrix
@@ -145,26 +145,6 @@ defmodule Yog.Pathfinding.FloydWarshall do
   end
 
   @doc """
-  Convenience function for integer weights.
-  """
-  @spec floyd_warshall_int(Yog.graph()) ::
-          {:ok, %{required({Yog.node_id(), Yog.node_id()}) => integer()}}
-          | {:error, :negative_cycle}
-  def floyd_warshall_int(graph) do
-    floyd_warshall(graph, 0, &(&1 + &2), &Yog.Utils.compare/2)
-  end
-
-  @doc """
-  Convenience function for float weights.
-  """
-  @spec floyd_warshall_float(Yog.graph()) ::
-          {:ok, %{required({Yog.node_id(), Yog.node_id()}) => float()}}
-          | {:error, :negative_cycle}
-  def floyd_warshall_float(graph) do
-    floyd_warshall(graph, 0.0, &(&1 + &2), &Yog.Utils.compare/2)
-  end
-
-  @doc """
   Detects whether the graph contains a negative cycle.
 
   More efficient than running the full algorithm if you only need cycle detection.
@@ -175,7 +155,12 @@ defmodule Yog.Pathfinding.FloydWarshall do
           (any(), any() -> any()),
           (any(), any() -> :lt | :eq | :gt)
         ) :: boolean()
-  def detect_negative_cycle?(graph, zero, add, compare) do
+  def detect_negative_cycle?(
+        graph,
+        zero \\ 0,
+        add \\ &Kernel.+/2,
+        compare \\ &Yog.Utils.compare/2
+      ) do
     case floyd_warshall(graph, zero, add, compare) do
       {:error, :negative_cycle} -> true
       {:ok, _} -> false

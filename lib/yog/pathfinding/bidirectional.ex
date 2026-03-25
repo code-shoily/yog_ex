@@ -96,75 +96,11 @@ defmodule Yog.Pathfinding.Bidirectional do
     graph = Keyword.fetch!(opts, :in)
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
-    zero = Keyword.fetch!(opts, :zero)
-    add = Keyword.fetch!(opts, :add)
-    compare = Keyword.get(opts, :compare, &Yog.Utils.compare/2)
+    zero = opts[:zero] || 0
+    add = opts[:add] || (&Kernel.+/2)
+    compare = opts[:compare] || (&Yog.Utils.compare/2)
 
     shortest_path(graph, from, to, zero, add, compare)
-  end
-
-  @doc """
-  Finds the shortest path using bidirectional Dijkstra with integer weights.
-
-  Convenience wrapper over `shortest_path/1` for graphs with integer weights.
-
-  ## Options
-
-    * `:in` - The graph
-    * `:from` - The starting node ID
-    * `:to` - The target node ID
-
-  ## Examples
-
-      iex> graph = Yog.undirected()
-      ...> |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 10)
-      iex> {:ok, path} = Yog.Pathfinding.Bidirectional.shortest_path_int(in: graph, from: 1, to: 3)
-      iex> path.nodes
-      [1, 2, 3]
-      iex> path.weight
-      15
-  """
-  @spec shortest_path_int(keyword()) :: path_result() | :none
-  def shortest_path_int(opts) do
-    graph = Keyword.fetch!(opts, :in)
-    from = Keyword.fetch!(opts, :from)
-    to = Keyword.fetch!(opts, :to)
-
-    shortest_path_int(graph, from, to)
-  end
-
-  @doc """
-  Finds the shortest path using bidirectional Dijkstra with float weights.
-
-  Convenience wrapper over `shortest_path/1` for graphs with float weights.
-
-  ## Options
-
-    * `:in` - The graph
-    * `:from` - The starting node ID
-    * `:to` - The target node ID
-
-  ## Examples
-
-      iex> graph = Yog.undirected()
-      ...> |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 5.5)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 10.1)
-      iex> {:ok, path} = Yog.Pathfinding.Bidirectional.shortest_path_float(in: graph, from: 1, to: 3)
-      iex> path.nodes
-      [1, 2, 3]
-      iex> path.weight
-      15.6
-  """
-  @spec shortest_path_float(keyword()) :: path_result() | :none
-  def shortest_path_float(opts) do
-    graph = Keyword.fetch!(opts, :in)
-    from = Keyword.fetch!(opts, :from)
-    to = Keyword.fetch!(opts, :to)
-
-    shortest_path_float(graph, from, to)
   end
 
   # ============================================================
@@ -247,70 +183,19 @@ defmodule Yog.Pathfinding.Bidirectional do
           (weight, weight -> :lt | :eq | :gt)
         ) :: path_result() | :error
         when weight: var
-  def shortest_path(graph, from, to, zero, add, compare) do
+  def shortest_path(
+        graph,
+        from,
+        to,
+        zero \\ 0,
+        add \\ &Kernel.+/2,
+        compare \\ &Yog.Utils.compare/2
+      ) do
     if from == to do
       {:ok, Path.new([from], zero, :bidirectional_dijkstra)}
     else
       do_bidirectional_dijkstra(graph, from, to, zero, add, compare)
     end
-  end
-
-  @doc """
-  Finds the shortest path using bidirectional Dijkstra with integer weights.
-
-  Uses built-in integer arithmetic for efficient computation.
-
-  ## Parameters
-
-    * `graph` - The graph to search
-    * `from` - The starting node ID
-    * `to` - The target node ID
-
-  ## Examples
-
-      iex> graph = Yog.undirected()
-      ...> |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 10)
-      iex> {:ok, path} = Yog.Pathfinding.Bidirectional.shortest_path_int(graph, 1, 3)
-      iex> path.nodes
-      [1, 2, 3]
-      iex> path.weight
-      15
-  """
-  @spec shortest_path_int(Yog.t(), Yog.node_id(), Yog.node_id()) ::
-          path_result() | :error
-  def shortest_path_int(graph, from, to) do
-    shortest_path(graph, from, to, 0, &(&1 + &2), &Yog.Utils.compare/2)
-  end
-
-  @doc """
-  Finds the shortest path using bidirectional Dijkstra with float weights.
-
-  Uses built-in float arithmetic for efficient computation.
-
-  ## Parameters
-
-    * `graph` - The graph to search
-    * `from` - The starting node ID
-    * `to` - The target node ID
-
-  ## Examples
-
-      iex> graph = Yog.undirected()
-      ...> |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 5.5)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 10.1)
-      iex> {:ok, path} = Yog.Pathfinding.Bidirectional.shortest_path_float(graph, 1, 3)
-      iex> path.nodes
-      [1, 2, 3]
-      iex> path.weight
-      15.6
-  """
-  @spec shortest_path_float(Yog.t(), Yog.node_id(), Yog.node_id()) ::
-          path_result() | :error
-  def shortest_path_float(graph, from, to) do
-    shortest_path(graph, from, to, 0.0, &(&1 + &2), &Yog.Utils.compare/2)
   end
 
   # Bidirectional BFS implementation

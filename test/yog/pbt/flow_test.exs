@@ -7,7 +7,7 @@ defmodule Yog.PBT.FlowTest do
   describe "Flow Properties" do
     property "Max-Flow Min-Cut Theorem: max_flow value equals cut capacity" do
       check all({graph, s, t} <- flow_problem_gen()) do
-        result = Yog.Flow.MaxFlow.edmonds_karp_int(graph, s, t)
+        result = Yog.Flow.MaxFlow.edmonds_karp(graph, s, t)
         cut = Yog.Flow.MaxFlow.extract_min_cut(result)
 
         cut_value = Yog.Flow.MinCutResult.compute_cut_value(cut, graph)
@@ -17,7 +17,7 @@ defmodule Yog.PBT.FlowTest do
 
     property "Flow Conservation and Capacity Constraints" do
       check all({graph, s, t} <- flow_problem_gen()) do
-        result = Yog.Flow.MaxFlow.edmonds_karp_int(graph, s, t)
+        result = Yog.Flow.MaxFlow.edmonds_karp(graph, s, t)
         res_graph = result.residual_graph
 
         all_node_ids = Yog.all_nodes(graph)

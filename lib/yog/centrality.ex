@@ -143,11 +143,11 @@ defmodule Yog.Centrality do
       1.0
   """
   @spec closeness(Yog.graph(), keyword()) :: centrality_scores()
-  def closeness(graph, opts) do
-    zero = Keyword.fetch!(opts, :zero)
-    add = Keyword.fetch!(opts, :add)
-    compare = Keyword.fetch!(opts, :compare)
-    to_float = Keyword.fetch!(opts, :to_float)
+  def closeness(graph, opts \\ []) do
+    zero = opts[:zero] || 0
+    add = opts[:add] || (&Kernel.+/2)
+    compare = opts[:compare] || (&Yog.Utils.compare/2)
+    to_float = opts[:to_float] || fn x -> x * 1.0 end
 
     nodes = Model.all_nodes(graph)
     n = length(nodes)
@@ -217,11 +217,11 @@ defmodule Yog.Centrality do
       1.0
   """
   @spec harmonic(Yog.graph(), keyword()) :: centrality_scores()
-  def harmonic(graph, opts) do
-    zero = Keyword.fetch!(opts, :zero)
-    add = Keyword.fetch!(opts, :add)
-    compare = Keyword.fetch!(opts, :compare)
-    to_float = Keyword.fetch!(opts, :to_float)
+  def harmonic(graph, opts \\ []) do
+    zero = opts[:zero] || 0
+    add = opts[:add] || (&Kernel.+/2)
+    compare = opts[:compare] || (&Yog.Utils.compare/2)
+    to_float = opts[:to_float] || fn x -> x * 1.0 end
 
     nodes = Model.all_nodes(graph)
     n = length(nodes)
@@ -292,11 +292,11 @@ defmodule Yog.Centrality do
       1.0
   """
   @spec betweenness(Yog.graph(), keyword()) :: centrality_scores()
-  def betweenness(graph, opts) do
-    zero = Keyword.fetch!(opts, :zero)
-    add = Keyword.fetch!(opts, :add)
-    compare = Keyword.fetch!(opts, :compare)
-    _to_float = Keyword.fetch!(opts, :to_float)
+  def betweenness(graph, opts \\ []) do
+    zero = opts[:zero] || 0
+    add = opts[:add] || (&Kernel.+/2)
+    compare = opts[:compare] || (&Yog.Utils.compare/2)
+    _to_float = opts[:to_float] || fn x -> x * 1.0 end
 
     nodes = Model.all_nodes(graph)
 
@@ -539,101 +539,6 @@ defmodule Yog.Centrality do
 
       iterate_alpha(graph, nodes, initial_scores, alpha, max_iterations, tolerance, 0)
     end
-  end
-
-  @doc """
-  Closeness centrality with **Int** weights (e.g., unweighted graphs).
-  Uses 0 as zero, `&Kernel.+/2`, integer comparison, and `&(&1 * 1.0)` for conversion.
-
-  ## Example
-
-      iex> graph =
-      ...>   Yog.undirected()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}, {3, 1, 1}])
-      iex> scores = Yog.Centrality.closeness_int(graph)
-      iex> scores[1] |> Float.round(3)
-      1.0
-  """
-  @spec closeness_int(Yog.graph()) :: centrality_scores()
-  def closeness_int(graph) do
-    closeness(graph,
-      zero: 0,
-      add: &Kernel.+/2,
-      compare: fn a, b ->
-        cond do
-          a < b -> :lt
-          a > b -> :gt
-          true -> :eq
-        end
-      end,
-      to_float: fn x -> x * 1.0 end
-    )
-  end
-
-  @doc """
-  Harmonic centrality with **Int** weights.
-
-  ## Example
-
-      iex> graph =
-      ...>   Yog.undirected()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}, {3, 1, 1}])
-      iex> scores = Yog.Centrality.harmonic_int(graph)
-      iex> scores[1] |> Float.round(3)
-      1.0
-  """
-  @spec harmonic_int(Yog.graph()) :: centrality_scores()
-  def harmonic_int(graph) do
-    harmonic(graph,
-      zero: 0,
-      add: &Kernel.+/2,
-      compare: fn a, b ->
-        cond do
-          a < b -> :lt
-          a > b -> :gt
-          true -> :eq
-        end
-      end,
-      to_float: fn x -> x * 1.0 end
-    )
-  end
-
-  @doc """
-  Betweenness centrality with **Int** weights.
-
-  ## Example
-
-      iex> graph =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}])
-      iex> scores = Yog.Centrality.betweenness_int(graph)
-      iex> # Node 2 is on the shortest path from 1 to 3
-      iex> scores[2] |> Float.round(3)
-      1.0
-  """
-  @spec betweenness_int(Yog.graph()) :: centrality_scores()
-  def betweenness_int(graph) do
-    betweenness(graph,
-      zero: 0,
-      add: &Kernel.+/2,
-      compare: fn a, b ->
-        cond do
-          a < b -> :lt
-          a > b -> :gt
-          true -> :eq
-        end
-      end,
-      to_float: fn x -> x * 1.0 end
-    )
   end
 
   @doc """

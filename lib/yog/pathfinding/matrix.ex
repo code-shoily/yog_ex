@@ -136,7 +136,14 @@ defmodule Yog.Pathfinding.Matrix do
           (any(), any() -> :lt | :eq | :gt),
           (any(), any() -> any()) | nil
         ) :: {:ok, distance_matrix()} | {:error, :negative_cycle}
-  def distance_matrix(graph, points_of_interest, zero, add, compare, subtract \\ nil) do
+  def distance_matrix(
+        graph,
+        points_of_interest,
+        zero \\ 0,
+        add \\ &Kernel.+/2,
+        compare \\ &Yog.Utils.compare/2,
+        subtract \\ nil
+      ) do
     poi_set = MapSet.new(points_of_interest)
     node_count = Model.node_count(graph)
     edge_count = Model.edge_count(graph)

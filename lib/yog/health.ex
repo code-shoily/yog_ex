@@ -65,11 +65,11 @@ defmodule Yog.Health do
       3
   """
   @spec diameter(Yog.graph(), keyword()) :: term() | nil
-  def diameter(graph, opts) do
-    zero = Keyword.fetch!(opts, :with_zero)
-    add = Keyword.fetch!(opts, :with_add)
-    compare = Keyword.fetch!(opts, :with_compare)
-    weight_fn = Keyword.fetch!(opts, :with)
+  def diameter(graph, opts \\ []) do
+    zero = opts[:with_zero] || 0
+    add = opts[:with_add] || (&Kernel.+/2)
+    compare = opts[:with_compare] || (&Yog.Utils.compare/2)
+    weight_fn = opts[:with] || (&Function.identity/1)
 
     nodes = Model.all_nodes(graph)
 
@@ -134,11 +134,11 @@ defmodule Yog.Health do
       1
   """
   @spec radius(Yog.graph(), keyword()) :: term() | nil
-  def radius(graph, opts) do
-    zero = Keyword.fetch!(opts, :with_zero)
-    add = Keyword.fetch!(opts, :with_add)
-    compare = Keyword.fetch!(opts, :with_compare)
-    weight_fn = Keyword.fetch!(opts, :with)
+  def radius(graph, opts \\ []) do
+    zero = opts[:with_zero] || 0
+    add = opts[:with_add] || (&Kernel.+/2)
+    compare = opts[:with_compare] || (&Yog.Utils.compare/2)
+    weight_fn = opts[:with] || (&Function.identity/1)
 
     nodes = Model.all_nodes(graph)
 
@@ -208,11 +208,11 @@ defmodule Yog.Health do
       2
   """
   @spec eccentricity(Yog.graph(), Yog.node_id(), keyword()) :: term() | nil
-  def eccentricity(graph, node, opts) do
-    zero = Keyword.fetch!(opts, :with_zero)
-    add = Keyword.fetch!(opts, :with_add)
-    compare = Keyword.fetch!(opts, :with_compare)
-    weight_fn = Keyword.fetch!(opts, :with)
+  def eccentricity(graph, node, opts \\ []) do
+    zero = opts[:with_zero] || 0
+    add = opts[:with_add] || (&Kernel.+/2)
+    compare = opts[:with_compare] || (&Yog.Utils.compare/2)
+    weight_fn = opts[:with] || (&Function.identity/1)
 
     all_nodes = Model.all_nodes(graph)
     num_nodes = length(all_nodes)
@@ -369,12 +369,12 @@ defmodule Yog.Health do
       true
   """
   @spec average_path_length(Yog.graph(), keyword()) :: float() | nil
-  def average_path_length(graph, opts) do
-    zero = Keyword.fetch!(opts, :with_zero)
-    add = Keyword.fetch!(opts, :with_add)
-    compare = Keyword.fetch!(opts, :with_compare)
-    weight_fn = Keyword.fetch!(opts, :with)
-    to_float = Keyword.fetch!(opts, :with_to_float)
+  def average_path_length(graph, opts \\ []) do
+    zero = opts[:with_zero] || 0
+    add = opts[:with_add] || (&Kernel.+/2)
+    compare = opts[:with_compare] || (&Yog.Utils.compare/2)
+    weight_fn = opts[:with] || (&Function.identity/1)
+    to_float = opts[:with_to_float] || fn x -> x * 1.0 end
 
     nodes = Model.all_nodes(graph)
     num_nodes = length(nodes)

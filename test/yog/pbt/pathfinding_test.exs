@@ -22,7 +22,7 @@ defmodule Yog.PBT.PathfindingTest do
         bfs_path = Yog.Traversal.find_path(unweighted, s, t)
 
         # Dijkstra shortest path
-        dijkstra_result = Yog.Pathfinding.Dijkstra.shortest_path_int(unweighted, s, t)
+        dijkstra_result = Yog.Pathfinding.Dijkstra.shortest_path(unweighted, s, t)
 
         case {bfs_path, dijkstra_result} do
           {b_path, {:ok, d_path}} when is_list(b_path) ->
@@ -49,11 +49,11 @@ defmodule Yog.PBT.PathfindingTest do
             ) do
         graph = build_graph(:directed, nodes, weights)
 
-        d_res = Yog.Pathfinding.Dijkstra.shortest_path_int(graph, s, t)
-        bf_res = Yog.Pathfinding.BellmanFord.bellman_ford_int(graph, s, t)
+        d_res = Yog.Pathfinding.Dijkstra.shortest_path(graph, s, t)
+        bf_res = Yog.Pathfinding.BellmanFord.bellman_ford(graph, s, t)
 
         # A* with zero heuristic (Dijkstra)
-        a_res = Yog.Pathfinding.AStar.a_star_int(graph, s, t, fn _, _ -> 0 end)
+        a_res = Yog.Pathfinding.AStar.a_star(graph, s, t, fn _, _ -> 0 end)
 
         case {d_res, bf_res, a_res} do
           {{:ok, d}, {:ok, bf}, {:ok, a}} ->
@@ -79,8 +79,8 @@ defmodule Yog.PBT.PathfindingTest do
         graph = build_graph(:directed, nodes, weights)
 
         # If FW detects it, BF should too
-        fw_res = Yog.Pathfinding.FloydWarshall.floyd_warshall_int(graph)
-        bf_res = Yog.Pathfinding.BellmanFord.bellman_ford_int(graph, s, t)
+        fw_res = Yog.Pathfinding.FloydWarshall.floyd_warshall(graph)
+        bf_res = Yog.Pathfinding.BellmanFord.bellman_ford(graph, s, t)
 
         if fw_res == {:error, :negative_cycle} do
           # BF only detects reachable negative cycles
@@ -112,7 +112,7 @@ defmodule Yog.PBT.PathfindingTest do
             g |> Yog.add_node(u, nil) |> Yog.add_node(v, nil) |> Yog.add_edge!(u, v, 1)
           end)
 
-        d_res = Yog.Pathfinding.Dijkstra.shortest_path_int(unweighted, s, t)
+        d_res = Yog.Pathfinding.Dijkstra.shortest_path(unweighted, s, t)
         bi_res = Yog.Pathfinding.Bidirectional.shortest_path_unweighted(unweighted, s, t)
 
         case {d_res, bi_res} do
@@ -135,7 +135,7 @@ defmodule Yog.PBT.PathfindingTest do
             ) do
         graph = build_graph(:directed, nodes, weights)
 
-        fw_res = Yog.Pathfinding.FloydWarshall.floyd_warshall_int(graph)
+        fw_res = Yog.Pathfinding.FloydWarshall.floyd_warshall(graph)
 
         matrix_res =
           Yog.Pathfinding.Matrix.distance_matrix(graph, nodes, 0, &+/2, &Yog.Utils.compare/2)

@@ -47,9 +47,9 @@ defmodule Yog.Pathfinding do
     * `:in` - The graph to search
     * `:from` - Starting node ID
     * `:to` - Target node ID
-    * `:zero` - Zero value for weights
-    * `:add` - Addition function for weights
-    * `:compare` - Comparison function for weights (:lt, :eq, :gt)
+    * `:zero` - Zero value for weights (default: 0)
+    * `:add` - Addition function for weights (default: &Kernel.+/2)
+    * `:compare` - Comparison function for weights (:lt, :eq, :gt) (default: &Yog.Utils.compare/2)
 
   ## Example
 
@@ -59,9 +59,7 @@ defmodule Yog.Pathfinding do
       ...>   |> Yog.add_node(3, "C")
       ...>   |> Yog.add_edges([{1, 2, 5}, {2, 3, 3}, {1, 3, 10}])
       iex> {:ok, path} = Yog.Pathfinding.shortest_path(
-      ...>   in: graph, from: 1, to: 3,
-      ...>   zero: 0, add: &+/2,
-      ...>   compare: fn a, b when a < b -> :lt; a, b when a > b -> :gt; _, _ -> :eq end
+      ...>   in: graph, from: 1, to: 3
       ...> )
       iex> path.weight
       8
@@ -69,24 +67,14 @@ defmodule Yog.Pathfinding do
   defdelegate shortest_path(opts), to: Dijkstra
 
   @doc """
-  Shortest path with integer weights (convenience).
-  """
-  defdelegate shortest_path_int(opts), to: Dijkstra
-
-  @doc """
-  Shortest path with float weights (convenience).
-  """
-  defdelegate shortest_path_float(opts), to: Dijkstra
-
-  @doc """
   Single-source distances from a node to all reachable nodes (Dijkstra).
 
   ## Options
     * `:in` - The graph
     * `:from` - Source node
-    * `:zero` - Zero value
-    * `:add` - Addition function
-    * `:compare` - Comparison function
+    * `:zero` - Zero value (default: 0)
+    * `:add` - Addition function (default: &Kernel.+/2)
+    * `:compare` - Comparison function (default: &Yog.Utils.compare/2)
   """
   defdelegate single_source_distances(opts), to: Dijkstra
 
@@ -101,10 +89,10 @@ defmodule Yog.Pathfinding do
     * `:in` - The graph to search
     * `:from` - Starting node ID
     * `:to` - Target node ID
-    * `:zero` - Zero value for weights
-    * `:add` - Addition function for weights
-    * `:compare` - Comparison function for weights
-    * `:heuristic` - Heuristic function `(node, goal) -> weight`
+    * `:zero` - Zero value for weights (default: 0)
+    * `:add` - Addition function for weights (default: &Kernel.+/2)
+    * `:compare` - Comparison function for weights (default: &Yog.Utils.compare/2)
+    * `:heuristic` - Heuristic function `(node, goal) -> weight` (Mandatory)
   """
   defdelegate a_star(opts), to: AStar
 
@@ -126,9 +114,9 @@ defmodule Yog.Pathfinding do
     * `:in` - The graph to search
     * `:from` - Starting node ID
     * `:to` - Target node ID
-    * `:zero` - Identity value for weights
-    * `:add` - Addition function
-    * `:compare` - Comparison function
+    * `:zero` - Identity value for weights (default: 0)
+    * `:add` - Addition function (default: &Kernel.+/2)
+    * `:compare` - Comparison function (default: &Yog.Utils.compare/2)
   """
   defdelegate bellman_ford(opts), to: BellmanFord
 
@@ -153,21 +141,24 @@ defmodule Yog.Pathfinding do
     * `:in` - The graph to search
     * `:from` - Starting node ID
     * `:to` - Target node ID
-    * `:zero` - Zero value for weights
-    * `:add` - Addition function
-    * `:compare` - Comparison function
+    * `:zero` - Zero value for weights (default: 0)
+    * `:add` - Addition function (default: &Kernel.+/2)
+    * `:compare` - Comparison function (default: &Yog.Utils.compare/2)
+
+  ## Example
+
+      iex> {:ok, graph} = Yog.directed()
+      ...>   |> Yog.add_node(1, "A")
+      ...>   |> Yog.add_node(2, "B")
+      ...>   |> Yog.add_node(3, "C")
+      ...>   |> Yog.add_edges([{1, 2, 5}, {2, 3, 3}, {1, 3, 10}])
+      iex> {:ok, path} = Yog.Pathfinding.bidirectional(
+      ...>   in: graph, from: 1, to: 3
+      ...> )
+      iex> path.weight
+      8
   """
   defdelegate bidirectional(opts), to: Bidirectional, as: :shortest_path
-
-  @doc """
-  Bidirectional Dijkstra with integer weights (convenience).
-  """
-  defdelegate bidirectional_int(opts), to: Bidirectional, as: :shortest_path_int
-
-  @doc """
-  Bidirectional Dijkstra with float weights (convenience).
-  """
-  defdelegate bidirectional_float(opts), to: Bidirectional, as: :shortest_path_float
 
   # =============================================================================
   # Floyd-Warshall
@@ -178,27 +169,17 @@ defmodule Yog.Pathfinding do
 
   ## Options
     * `:in` - The graph
-    * `:zero` - Identity element
-    * `:add` - Addition function
-    * `:compare` - Comparison function
+    * `:zero` - Identity element (default: 0)
+    * `:add` - Addition function (default: &Kernel.+/2)
+    * `:compare` - Comparison function (default: &Yog.Utils.compare/2)
   """
   def floyd_warshall(opts) do
     graph = Keyword.fetch!(opts, :in)
-    zero = Keyword.fetch!(opts, :zero)
-    add = Keyword.fetch!(opts, :add)
-    compare = Keyword.fetch!(opts, :compare)
+    zero = opts[:zero] || 0
+    add = opts[:add] || (&Kernel.+/2)
+    compare = opts[:compare] || (&Yog.Utils.compare/2)
     FloydWarshall.floyd_warshall(graph, zero, add, compare)
   end
-
-  @doc """
-  Floyd-Warshall with integer weights.
-  """
-  defdelegate floyd_warshall_int(graph), to: FloydWarshall
-
-  @doc """
-  Floyd-Warshall with float weights.
-  """
-  defdelegate floyd_warshall_float(graph), to: FloydWarshall
 
   @doc """
   Detects negative cycles in the graph via Floyd-Warshall.
@@ -215,17 +196,15 @@ defmodule Yog.Pathfinding do
   More efficient than Floyd-Warshall for sparse graphs. Supports negative
   edge weights (but not negative cycles).
   """
-  defdelegate johnson(graph, zero, add, subtract, compare), to: Johnson
-
-  @doc """
-  Johnson's algorithm with integer weights.
-  """
-  defdelegate johnson_int(graph), to: Johnson
-
-  @doc """
-  Johnson's algorithm with float weights.
-  """
-  defdelegate johnson_float(graph), to: Johnson
+  def johnson(
+        graph,
+        zero \\ 0,
+        add \\ &Kernel.+/2,
+        subtract \\ &Kernel.-/2,
+        compare \\ &Yog.Utils.compare/2
+      ) do
+    Johnson.johnson(graph, zero, add, subtract, compare)
+  end
 
   # =============================================================================
   # Distance Matrix
@@ -236,5 +215,14 @@ defmodule Yog.Pathfinding do
 
   Uses Dijkstra from each point to compute pairwise distances.
   """
-  defdelegate distance_matrix(graph, points, zero, add, compare), to: Matrix
+  def distance_matrix(
+        graph,
+        points,
+        zero \\ 0,
+        add \\ &Kernel.+/2,
+        compare \\ &Yog.Utils.compare/2,
+        subtract \\ nil
+      ) do
+    Matrix.distance_matrix(graph, points, zero, add, compare, subtract)
+  end
 end

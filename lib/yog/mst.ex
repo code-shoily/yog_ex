@@ -85,9 +85,9 @@ defmodule Yog.MST do
       3
   """
   @spec kruskal(keyword()) :: [edge()]
-  def kruskal(opts) do
+  def kruskal(opts) when is_list(opts) do
     graph = Keyword.fetch!(opts, :in)
-    compare = Keyword.fetch!(opts, :compare)
+    compare = opts[:compare] || (&Yog.Utils.compare/2)
     kruskal(graph, compare)
   end
 
@@ -117,7 +117,7 @@ defmodule Yog.MST do
       2
   """
   @spec kruskal(Yog.graph(), (term(), term() -> :lt | :eq | :gt)) :: [edge()]
-  def kruskal(graph, compare) do
+  def kruskal(graph, compare \\ &Yog.Utils.compare/2) do
     edges = extract_edges(graph)
     sorted_edges = Enum.sort(edges, fn a, b -> compare.(a.weight, b.weight) == :lt end)
 
@@ -166,9 +166,9 @@ defmodule Yog.MST do
       3
   """
   @spec prim(keyword()) :: [edge()]
-  def prim(opts) do
+  def prim(opts) when is_list(opts) do
     graph = Keyword.fetch!(opts, :in)
-    compare = Keyword.fetch!(opts, :compare)
+    compare = opts[:compare] || (&Yog.Utils.compare/2)
 
     node_ids = get_all_nodes(graph)
 
@@ -215,7 +215,7 @@ defmodule Yog.MST do
       2
   """
   @spec prim(Yog.graph(), (term(), term() -> :lt | :eq | :gt)) :: [edge()]
-  def prim(graph, compare) do
+  def prim(graph, compare \\ &Yog.Utils.compare/2) do
     node_ids = get_all_nodes(graph)
 
     case node_ids do
