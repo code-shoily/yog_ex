@@ -492,7 +492,7 @@ defmodule Yog.Centrality do
       # Initialize with small perturbation based on node ID to break symmetry
       initial_scores =
         Enum.reduce(nodes, %{}, fn id, acc ->
-          perturbation = id / 1000.0
+          perturbation = :erlang.phash2(id) / 1_000_000_000.0
           Map.put(acc, id, 1.0 + perturbation)
         end)
 
