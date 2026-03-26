@@ -426,6 +426,61 @@ defmodule Yog.IO.JSON do
     }
   end
 
+  # ============= Detection Functions =============
+
+  @doc """
+  Detects the JSON graph format of the given input.
+
+  Supports detection from both JSON strings and decoded maps.
+
+  ## Parameters
+
+  - `input` - JSON string or map to detect the format of
+
+  ## Returns
+
+  - `{:ok, type}` - One of `:yog_generic`, `:network_x`, `:d3_force`, `:cytoscape`, `:visjs`, or `:simple`
+  - `{:error, reason}` - If input is a string and parsing fails
+
+  ## Examples
+
+      iex> json = ~s|{"graph_type":"directed","nodes":[],"edges":[]}|
+      iex> Yog.IO.JSON.json_type(json)
+      {:ok, :yog_generic}
+
+      iex> network_x_map = %{"nodes" => [], "links" => []}
+      iex> Yog.IO.JSON.json_type(network_x_map)
+      {:ok, :network_x}
+  """
+  @spec json_type(String.t() | map()) :: {:ok, atom()} | {:error, String.t()}
+  def json_type(input) when is_binary(input) do
+    case Jason.decode(input) do
+      {:ok, map} -> json_type(map)
+      {:error, _} = error -> error
+    end
+  end
+
+  def json_type(map) when is_map(map) do
+    {:ok, detect_format(map)}
+  end
+
+  @doc """
+  Detects the JSON graph format, raising on error for string input.
+
+  ## Examples
+
+      iex> json = ~s|{"elements": []}|
+      iex> Yog.IO.JSON.json_type!(json)
+      :cytoscape
+  """
+  @spec json_type!(String.t() | map()) :: atom()
+  def json_type!(input) do
+    case json_type(input) do
+      {:ok, type} -> type
+      {:error, reason} -> raise ArgumentError, "Failed to detect JSON format: #{inspect(reason)}"
+    end
+  end
+
   # ============= Import Functions =============
 
   @doc """
@@ -540,31 +595,42 @@ defmodule Yog.IO.JSON do
   end
 
   defp do_from_map(map) do
+    case detect_format(map) do
+      :cytoscape -> parse_cytoscape_format(map)
+      :visjs -> parse_visjs_format(map)
+      :network_x -> parse_networkx_format(map)
+      :yog_generic -> parse_generic_format(map)
+      :d3_force -> parse_d3_format(map)
+      :simple -> parse_simple_format(map)
+    end
+  end
+
+  defp detect_format(map) do
     cond do
       # Cytoscape format: elements array
       Map.has_key?(map, "elements") ->
-        parse_cytoscape_format(map)
+        :cytoscape
 
       # VisJs format: nodes and edges with from/to
       Map.has_key?(map, "nodes") and Map.has_key?(map, "edges") and
           has_visjs_edges?(map["edges"]) ->
-        parse_visjs_format(map)
+        :visjs
 
       # NetworkX format: directed + multigraph + links
       Map.has_key?(map, "directed") or Map.has_key?(map, "links") ->
-        parse_networkx_format(map)
+        :network_x
 
       # Yog generic format: graph_type + edges
       Map.has_key?(map, "graph_type") or Map.has_key?(map, "edges") ->
-        parse_generic_format(map)
+        :yog_generic
 
       # D3 format: nodes + links (no type indicator)
       Map.has_key?(map, "nodes") and Map.has_key?(map, "links") ->
-        parse_d3_format(map)
+        :d3_force
 
       # Fallback: try to interpret as simple graph
       true ->
-        parse_simple_format(map)
+        :simple
     end
   end
 
