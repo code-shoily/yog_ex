@@ -20,10 +20,11 @@ defmodule NetworkCableLayout do
       |> Yog.add_edge!(from: 2, to: 4, with: 200)
       |> Yog.add_edge!(from: 3, to: 4, with: 100)
 
-    cables = Yog.MST.kruskal(
-      in: buildings,
-      compare: fn a, b -> if a < b, do: :lt, else: if(a > b, do: :gt, else: :eq) end
-    )
+    cables =
+      Yog.MST.kruskal(
+        in: buildings,
+        compare: fn a, b -> if a < b, do: :lt, else: if(a > b, do: :gt, else: :eq) end
+      )
 
     total_cost = Enum.reduce(cables, 0, fn edge, sum -> sum + edge.weight end)
 

@@ -69,6 +69,7 @@ defmodule LeetCode do
     Enum.each(grid, fn row ->
       IO.inspect(row)
     end)
+
     IO.puts("")
   end
 end
