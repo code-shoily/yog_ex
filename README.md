@@ -25,9 +25,12 @@
 [![Hex Version](https://img.shields.io/hexpm/v/yog_ex.svg)](https://hex.pm/packages/yog_ex)
 [![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/yog_ex/)
 
-A comprehensive **pure Elixir** graph algorithm library providing implementations of classic graph algorithms with a functional API. Formerly a wrapper around the Gleam [Yog](https://hex.pm/packages/yog) library, YogEx is now fully implemented in Elixir with no external runtime dependencies.
+A comprehensive **pure Elixir** graph algorithm and network analysis library providing implementations of classic graph algorithms with a functional API.
 
-🔷 **Pure Elixir** — No Gleam dependencies, just fast native Elixir graph algorithms
+🔷 **Pure Elixir** — It started off as a wrapper around the Gleam [Yog](https://hex.pm/packages/yog) library, YogEx is now fully implemented in Elixir with no external runtime dependencies.
+ 
+> [!WARNING]
+> **API Stability**: Until the version reaches `1.0.0`, there may be breaking changes. While I'll try my best to keep the API stable, there's no guarantee. The primary focus is on **performance**, **documentation**, **test coverage**, and **bugfixes**.
 
 ## Features
 
@@ -63,7 +66,7 @@ A comprehensive **pure Elixir** graph algorithm library providing implementation
 
 ### Basic Installation
 
-Add YogEx to your list of dependencies in `mix.exs` (or `Mix.install([...])` for LiveBook or Scripts):
+Add YogEx to your list of dependencies in `mix.exs`:
 
 ```elixir
 def deps do
@@ -78,6 +81,18 @@ Then run:
 ```bash
 mix deps.get
 ```
+
+### Livebook
+
+For livebook, add the following:
+
+```elixir
+Mix.install(
+  {:yog_ex, "~> 0.60.0"}
+)
+```
+
+There is a [Kino App](https://github.com/code-shoily/kino_yog) that can be used to explore the library and create and render graphs.
 
 ### Graph I/O Support
 
@@ -103,7 +118,7 @@ def deps do
 end
 ```
 
-When `saxy` is available, GraphML parsing automatically uses a fast streaming SAX parser instead of the default DOM parser. For example, a 60MB GraphML file with ~500k edges loads in ~6s with `saxy` vs ~20s without it.
+When `saxy` is available, GraphML parsing automatically uses a fast streaming SAX parser instead of the default DOM parser. For example, a 12MB [GraphML file](https://snap.stanford.edu/data/soc-Slashdot0902.html) with ~1M edges loads in ~4s with `saxy` vs ~20s without it.
 
 ## Quick Start
 
@@ -247,7 +262,9 @@ alias Yog.Centrality
 
 graph =
   Yog.directed()
-  |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_node(3, nil)
+  |> Yog.add_node(1, nil) 
+  |> Yog.add_node(2, nil) 
+  |> Yog.add_node(3, nil)
   |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}, {1, 3, 1}])
 
 # Various centrality measures
@@ -455,30 +472,6 @@ mix test test/yog/pathfinding/dijkstra_test.exs
 - `lib/yog/` — Core graph library modules (pure Elixir)
 - `test/` — Unit tests and doctests
 - `examples/` — Real-world usage examples
-
-**Pre-publishing checklist:**
-
-1. Update version in `mix.exs` (`@version`)
-2. Update `CHANGELOG.md` with release date and changes
-3. Ensure version is consistent in README.md examples
-4. Run `mix test` - all tests must pass
-5. Run `mix credo --strict` - no issues
-6. Update git: `git add .` and commit changes
-
-**Publishing command:**
-
-```sh
-mix hex.publish package
-```
-
-**Documentation:** HexDocs automatically builds and publishes documentation from your package source code. No separate docs publishing step is needed - your docs will be available at `https://hexdocs.pm/yog_ex` shortly (5-15 minutes) after publishing the package.
-
-**After publishing:**
-
-1. Verify package: `mix hex.info yog_ex`
-2. Check package page: https://hex.pm/packages/yog_ex
-3. Wait for docs to build: https://hexdocs.pm/yog_ex
-4. Tag the release: `git tag v0.60.0 && git push --tags`
 
 ## AI Assistance
 
