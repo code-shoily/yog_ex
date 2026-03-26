@@ -2,6 +2,7 @@ defmodule Yog.Functional.AlgorithmsTest do
   use ExUnit.Case, async: true
   alias Yog.Functional.Model
   alias Yog.Functional.Algorithms
+  doctest Yog.Functional.Algorithms
 
   setup do
     g =

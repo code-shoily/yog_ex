@@ -1,6 +1,7 @@
 defmodule Yog.Functional.ModelTest do
   use ExUnit.Case, async: true
   alias Yog.Functional.Model
+  doctest Yog.Functional.Model
 
   describe "creation and basic properties" do
     test "new/1 creates a graph with specified direction" do

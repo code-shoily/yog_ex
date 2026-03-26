@@ -2,6 +2,7 @@ defmodule Yog.Functional.AnalysisTest do
   use ExUnit.Case, async: true
   alias Yog.Functional.Model
   alias Yog.Functional.Analysis
+  doctest Yog.Functional.Analysis
 
   describe "connected_components" do
     test "finds connected components in undirected graph" do

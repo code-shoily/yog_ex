@@ -2,6 +2,7 @@ defmodule Yog.Functional.TraversalTest do
   use ExUnit.Case, async: true
   alias Yog.Functional.Model
   alias Yog.Functional.Traversal
+  doctest Yog.Functional.Traversal
 
   setup do
     g =

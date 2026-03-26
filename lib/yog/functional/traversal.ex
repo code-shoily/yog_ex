@@ -40,6 +40,15 @@ defmodule Yog.Functional.Traversal do
 
   For directed graphs, only outgoing edges are followed. For undirected graphs,
   edges are stored symmetrically so `out_edges` covers all adjacent nodes.
+
+  ## Examples
+
+      iex> alias Yog.Functional.{Model, Traversal}
+      iex> graph = Model.empty() |> Model.put_node(1, "A") |> Model.put_node(2, "B")
+      ...> |> Model.add_edge!(1, 2)
+      iex> visited = Traversal.dfs(graph, 1)
+      iex> Enum.map(visited, & &1.id)
+      [1, 2]
   """
   @spec dfs(Model.t(), Model.node_id() | [Model.node_id()]) :: [Model.Context.t()]
   def dfs(graph, start_nodes) when is_list(start_nodes) do
@@ -68,6 +77,15 @@ defmodule Yog.Functional.Traversal do
 
   This is an inductive BFS: each step calls `match/2` to extract a node
   and obtain the shrunken graph, ensuring nodes are visited at most once.
+
+  ## Examples
+
+      iex> alias Yog.Functional.{Model, Traversal}
+      iex> graph = Model.empty() |> Model.put_node(1, "A") |> Model.put_node(2, "B")
+      ...> |> Model.add_edge!(1, 2)
+      iex> visited = Traversal.bfs(graph, 1)
+      iex> Enum.map(visited, & &1.id)
+      [1, 2]
   """
   @spec bfs(Model.t(), Model.node_id() | [Model.node_id()]) :: [Model.Context.t()]
   def bfs(graph, start_nodes) when is_list(start_nodes) do

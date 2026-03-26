@@ -2,6 +2,7 @@ defmodule Yog.Functional.TransformTest do
   use ExUnit.Case, async: true
   alias Yog.Functional.Model
   alias Yog.Functional.Transform
+  doctest Yog.Functional.Transform
 
   setup do
     g =

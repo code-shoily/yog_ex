@@ -40,6 +40,15 @@ defmodule Yog.Functional.Algorithms do
   When an edge is removed by `match/2`, affected neighbours' `in_edges` are
   automatically updated by the inductive model, so the in-degree invariant is
   always up to date without a separate tracking structure.
+
+  ## Examples
+
+      iex> alias Yog.Functional.{Model, Algorithms}
+      iex> graph = Model.empty() |> Model.put_node(1, "A") |> Model.put_node(2, "B")
+      ...> |> Model.add_edge!(1, 2)
+      iex> {:ok, order} = Algorithms.topsort(graph)
+      iex> order
+      [1, 2]
   """
   def topsort(graph), do: do_topsort(graph, [])
 
@@ -72,6 +81,14 @@ defmodule Yog.Functional.Algorithms do
   entries. Each step extracts the minimum-distance frontier node using `match/2`.
   Because `match/2` removes the node from the graph, we naturally skip
   already-settled nodes — they simply won't be found anymore.
+
+  ## Examples
+
+      iex> alias Yog.Functional.{Model, Algorithms}
+      iex> graph = Model.empty() |> Model.put_node(1, "A") |> Model.put_node(2, "B")
+      ...> |> Model.add_edge!(1, 2, 10)
+      iex> Algorithms.shortest_path(graph, 1, 2)
+      {:ok, [1, 2], 10}
   """
   def shortest_path(graph, start_id, target_id) do
     if start_id == target_id do
@@ -171,6 +188,15 @@ defmodule Yog.Functional.Algorithms do
   Due to the inductive `match/2` operations, nodes visited in one component
   are naturally removed from the graph, preventing them from bleeding into
   subsequent components.
+
+  ## Examples
+
+      iex> alias Yog.Functional.{Model, Algorithms}
+      iex> graph = Model.empty() |> Model.put_node(1, "A") |> Model.put_node(2, "B")
+      ...> |> Model.add_edge!(1, 2) |> Model.add_edge!(2, 1)
+      iex> sccs = Algorithms.scc(graph)
+      iex> Enum.map(sccs, &Enum.sort/1) |> Enum.sort()
+      [[1, 2]]
   """
   def scc(%Model{direction: :undirected}) do
     raise ArgumentError, "Strongly Connected Components requires a directed graph"

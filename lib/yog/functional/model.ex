@@ -68,11 +68,27 @@ defmodule Yog.Functional.Model do
     defstruct [:id, :label, in_edges: %{}, out_edges: %{}]
   end
 
-  @doc "Creates a new graph with specified direction (defaults to :directed)."
+  @doc """
+  Creates a new graph with specified direction (defaults to :directed).
+
+  ## Examples
+
+      iex> graph = Yog.Functional.Model.new(:directed)
+      iex> graph.direction
+      :directed
+  """
   @spec new(direction()) :: t()
   def new(direction \\ :directed), do: %__MODULE__{direction: direction}
 
-  @doc "Creates an empty directed graph."
+  @doc """
+  Creates an empty directed graph.
+
+  ## Examples
+
+      iex> graph = Yog.Functional.Model.empty()
+      iex> Yog.Functional.Model.empty?(graph)
+      true
+  """
   @spec empty() :: t()
   def empty, do: new(:directed)
 
@@ -80,11 +96,29 @@ defmodule Yog.Functional.Model do
   @spec empty?(t()) :: boolean()
   def empty?(%__MODULE__{nodes: nodes}), do: nodes == %{}
 
-  @doc "Returns the number of nodes in the graph."
+  @doc """
+  Returns the number of nodes in the graph.
+
+  ## Examples
+
+      iex> graph = Yog.Functional.Model.empty() |> Yog.Functional.Model.put_node(1, "A")
+      iex> Yog.Functional.Model.size(graph)
+      1
+  """
   @spec size(t()) :: non_neg_integer()
   def size(%__MODULE__{nodes: nodes}), do: map_size(nodes)
 
-  @doc "Checks if a node exists in the graph."
+  @doc """
+  Checks if a node exists in the graph.
+
+  ## Examples
+
+      iex> graph = Yog.Functional.Model.empty() |> Yog.Functional.Model.put_node(1, "A")
+      iex> Yog.Functional.Model.has_node?(graph, 1)
+      true
+      iex> Yog.Functional.Model.has_node?(graph, 2)
+      false
+  """
   @spec has_node?(t(), node_id()) :: boolean()
   def has_node?(%__MODULE__{nodes: nodes}, id), do: Map.has_key?(nodes, id)
 
@@ -155,7 +189,18 @@ defmodule Yog.Functional.Model do
     end
   end
 
-  @doc "Gets the label of an edge between two nodes."
+  @doc """
+  Gets the label of an edge between two nodes.
+
+  ## Examples
+
+      iex> graph = Yog.Functional.Model.empty()
+      ...> |> Yog.Functional.Model.put_node(1, "A")
+      ...> |> Yog.Functional.Model.put_node(2, "B")
+      ...> |> Yog.Functional.Model.add_edge!(1, 2, "weight")
+      iex> Yog.Functional.Model.get_edge(graph, 1, 2)
+      {:ok, "weight"}
+  """
   @spec get_edge(t(), node_id(), node_id()) :: {:ok, edge_label()} | {:error, :not_found}
   def get_edge(%__MODULE__{nodes: nodes}, from_id, to_id) do
     case Map.fetch(nodes, from_id) do
@@ -318,7 +363,18 @@ defmodule Yog.Functional.Model do
     end
   end
 
-  @doc "Matches an arbitrary node from the graph."
+  @doc """
+  Matches an arbitrary node from the graph.
+
+  ## Examples
+
+      iex> graph = Yog.Functional.Model.empty() |> Yog.Functional.Model.put_node(1, "A")
+      iex> {:ok, ctx, remaining} = Yog.Functional.Model.match_any(graph)
+      iex> ctx.id
+      1
+      iex> Yog.Functional.Model.empty?(remaining)
+      true
+  """
   @spec match_any(t()) :: {:ok, Context.t(), t()} | {:error, :empty}
   def match_any(%__MODULE__{nodes: nodes} = graph) do
     case Map.keys(nodes) do

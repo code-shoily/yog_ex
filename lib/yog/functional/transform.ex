@@ -21,7 +21,18 @@ defmodule Yog.Functional.Transform do
 
   alias Yog.Functional.Model
 
-  @doc "Performs a map operation over all nodes in the graph."
+  @doc """
+  Performs a map operation over all nodes in the graph.
+
+  ## Examples
+
+      iex> alias Yog.Functional.{Model, Transform}
+      iex> graph = Model.empty() |> Model.put_node(1, "A")
+      iex> graph = Transform.map_nodes(graph, fn ctx -> %{ctx | label: "B"} end)
+      iex> {:ok, ctx} = Model.get_node(graph, 1)
+      iex> ctx.label
+      "B"
+  """
   @spec map_nodes(Model.t(), (Model.Context.t() -> Model.Context.t())) :: Model.t()
   def map_nodes(%Model{nodes: nodes} = graph, fun) do
     new_nodes = Map.new(nodes, fn {id, ctx} -> {id, fun.(ctx)} end)
@@ -54,7 +65,18 @@ defmodule Yog.Functional.Transform do
     map_nodes(graph, fn ctx -> %{ctx | label: fun.(ctx.label)} end)
   end
 
-  @doc "Transforms the labels of all edges using the given function."
+  @doc """
+  Transforms the labels of all edges using the given function.
+
+  ## Examples
+
+      iex> alias Yog.Functional.{Model, Transform}
+      iex> graph = Model.empty() |> Model.put_node(1, "A") |> Model.put_node(2, "B")
+      ...> |> Model.add_edge!(1, 2, 10)
+      iex> graph = Transform.map_edge_labels(graph, fn label -> label * 2 end)
+      iex> Model.get_edge(graph, 1, 2)
+      {:ok, 20}
+  """
   @spec map_edge_labels(Model.t(), (Model.edge_label() -> Model.edge_label())) :: Model.t()
   def map_edge_labels(graph, fun) do
     map_nodes(graph, fn ctx ->
@@ -66,7 +88,20 @@ defmodule Yog.Functional.Transform do
     end)
   end
 
-  @doc "Reverses the direction of all edges in a directed graph."
+  @doc """
+  Reverses the direction of all edges in a directed graph.
+
+  ## Examples
+
+      iex> alias Yog.Functional.{Model, Transform}
+      iex> graph = Model.empty() |> Model.put_node(1, "A") |> Model.put_node(2, "B")
+      ...> |> Model.add_edge!(1, 2)
+      iex> graph = Transform.reverse(graph)
+      iex> Model.has_edge?(graph, 2, 1)
+      true
+      iex> Model.has_edge?(graph, 1, 2)
+      false
+  """
   @spec reverse(Model.t()) :: Model.t()
   def reverse(%Model{direction: :directed} = graph) do
     map_nodes(graph, fn ctx ->

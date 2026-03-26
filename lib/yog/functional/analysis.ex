@@ -32,6 +32,18 @@ defmodule Yog.Functional.Analysis do
   @doc """
   Finds all connected components in an undirected graph.
   Returns a list of lists of node IDs.
+
+  ## Examples
+
+      iex> alias Yog.Functional.{Model, Analysis}
+      iex> graph = Model.new(:undirected)
+      ...> |> Model.put_node(1, "A")
+      ...> |> Model.put_node(2, "B")
+      ...> |> Model.put_node(3, "C")
+      ...> |> Model.add_edge!(1, 2)
+      iex> components = Analysis.connected_components(graph)
+      iex> Enum.map(components, &Enum.sort/1) |> Enum.sort()
+      [[1, 2], [3]]
   """
   @spec connected_components(Model.t()) :: [[Model.node_id()]]
   def connected_components(graph) do
@@ -52,6 +64,18 @@ defmodule Yog.Functional.Analysis do
   @doc """
   Identifies bridges (cut-edges) and articulation points (cut-vertices)
   in an undirected graph using a single-pass DFS.
+
+  ## Examples
+
+      iex> alias Yog.Functional.{Model, Analysis}
+      iex> graph = Model.new(:undirected)
+      ...> |> Model.put_node(1, "A") |> Model.put_node(2, "B") |> Model.put_node(3, "C")
+      ...> |> Model.add_edge!(1, 2) |> Model.add_edge!(2, 3)
+      iex> result = Analysis.analyze_connectivity(graph)
+      iex> result.bridges |> Enum.sort()
+      [{1, 2}, {2, 3}]
+      iex> result.points |> Enum.sort()
+      [2]
   """
   @spec analyze_connectivity(Model.t()) ::
           %{bridges: [bridge()], points: [Model.node_id()]}
