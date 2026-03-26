@@ -56,9 +56,6 @@ defmodule Yog.Builder.Labeled do
           next_id: integer()
         }
 
-  @typedoc "Legacy builder type (deprecated)"
-  @type builder :: {:labeled_builder, Model.graph_type(), Yog.graph(), map(), integer()} | t()
-
   @typedoc "Any type can be used as a label"
   @type label :: term()
 
@@ -262,10 +259,8 @@ defmodule Yog.Builder.Labeled do
       iex> Yog.graph?(graph)
       true
   """
-  @spec to_graph(t() | builder()) :: Yog.graph()
+  @spec to_graph(t()) :: Yog.graph()
   def to_graph(%__MODULE__{graph: graph}), do: graph
-
-  def to_graph({:labeled_builder, _kind, graph, _label_to_id, _next_id}), do: graph
 
   @doc """
   Gets the label-to-ID registry as a map.
@@ -280,12 +275,8 @@ defmodule Yog.Builder.Labeled do
       iex> Map.get(registry, "A")
       0
   """
-  @spec to_registry(t() | builder()) :: %{label() => Yog.node_id()}
+  @spec to_registry(t()) :: %{label() => Yog.node_id()}
   def to_registry(%__MODULE__{label_to_id: label_to_id}), do: label_to_id
-
-  def to_registry({:labeled_builder, _kind, _graph, label_to_id, _next_id}) do
-    label_to_id
-  end
 
   # ============= Queries =============
 
@@ -305,12 +296,8 @@ defmodule Yog.Builder.Labeled do
       iex> Yog.Builder.Labeled.get_id(builder, "NonExistent")
       {:error, nil}
   """
-  @spec get_id(t() | builder(), label()) :: {:ok, Yog.node_id()} | {:error, nil}
+  @spec get_id(t(), label()) :: {:ok, Yog.node_id()} | {:error, nil}
   def get_id(%__MODULE__{label_to_id: label_to_id}, label) do
-    do_get_id(label_to_id, label)
-  end
-
-  def get_id({:labeled_builder, _, _, label_to_id, _}, label) do
     do_get_id(label_to_id, label)
   end
 
@@ -332,12 +319,8 @@ defmodule Yog.Builder.Labeled do
       iex> Yog.Builder.Labeled.all_labels(builder)
       ["A", "B"]
   """
-  @spec all_labels(t() | builder()) :: [label()]
+  @spec all_labels(t()) :: [label()]
   def all_labels(%__MODULE__{label_to_id: label_to_id}), do: Map.keys(label_to_id)
-
-  def all_labels({:labeled_builder, _kind, _graph, label_to_id, _next_id}) do
-    Map.keys(label_to_id)
-  end
 
   @doc """
   Gets the next available node ID.
@@ -353,12 +336,8 @@ defmodule Yog.Builder.Labeled do
       iex> Yog.Builder.Labeled.next_id(builder)
       1
   """
-  @spec next_id(t() | builder()) :: Yog.node_id()
+  @spec next_id(t()) :: Yog.node_id()
   def next_id(%__MODULE__{next_id: next_id}), do: next_id
-
-  def next_id({:labeled_builder, _kind, _graph, _label_to_id, next_id}) do
-    next_id
-  end
 
   @doc """
   Gets the successors of a node by its label.
@@ -373,12 +352,8 @@ defmodule Yog.Builder.Labeled do
       iex> Yog.Builder.Labeled.successors(builder, "A")
       {:ok, [{"B", 10}]}
   """
-  @spec successors(t() | builder(), label()) :: {:ok, [{label(), term()}]} | {:error, nil}
+  @spec successors(t(), label()) :: {:ok, [{label(), term()}]} | {:error, nil}
   def successors(%__MODULE__{graph: graph, label_to_id: label_to_id}, label) do
-    do_successors(graph, label_to_id, label)
-  end
-
-  def successors({:labeled_builder, _, graph, label_to_id, _}, label) do
     do_successors(graph, label_to_id, label)
   end
 
@@ -407,12 +382,8 @@ defmodule Yog.Builder.Labeled do
       iex> Yog.Builder.Labeled.predecessors(builder, "B")
       {:ok, [{"A", 5}]}
   """
-  @spec predecessors(t() | builder(), label()) :: {:ok, [{label(), term()}]} | {:error, nil}
+  @spec predecessors(t(), label()) :: {:ok, [{label(), term()}]} | {:error, nil}
   def predecessors(%__MODULE__{graph: graph, label_to_id: label_to_id}, label) do
-    do_predecessors(graph, label_to_id, label)
-  end
-
-  def predecessors({:labeled_builder, _, graph, label_to_id, _}, label) do
     do_predecessors(graph, label_to_id, label)
   end
 

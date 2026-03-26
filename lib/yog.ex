@@ -380,14 +380,6 @@ defmodule Yog do
   end
 
   @doc """
-  Deprecated compatibility alias for `add_edge_ensure`.
-  """
-  @deprecated "Use add_edge_ensure/5 instead"
-  def add_edge_ensured(graph, from, to, weight, default) do
-    add_edge_ensure(graph, from, to, weight, default)
-  end
-
-  @doc """
   Adds an edge with a function to create default node data if nodes don't exist.
 
   If `from` or `to` is not already in the graph, it is created by

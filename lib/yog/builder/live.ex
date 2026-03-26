@@ -86,9 +86,6 @@ defmodule Yog.Builder.Live do
           pending: [transition()]
         }
 
-  @typedoc "Legacy builder type (deprecated)"
-  @type builder :: {:live_builder, map(), integer(), [transition()]} | t()
-
   @typedoc "Any type can be used as a label"
   @type label :: term()
 
@@ -152,7 +149,7 @@ defmodule Yog.Builder.Live do
       iex> is_struct(builder, Yog.Builder.Live)
       true
   """
-  @spec from_labeled(Labeled.t() | Labeled.builder()) :: t()
+  @spec from_labeled(Labeled.t()) :: t()
   def from_labeled(labeled_builder) do
     registry = Labeled.to_registry(labeled_builder)
     next_id = Labeled.next_id(labeled_builder)
@@ -226,19 +223,9 @@ defmodule Yog.Builder.Live do
       iex> is_struct(builder, Yog.Builder.Live)
       true
   """
-  @spec remove_edge(t() | builder(), label(), label()) :: t()
+  @spec remove_edge(t(), label(), label()) :: t()
   def remove_edge(%__MODULE__{registry: registry, pending: pending} = builder, from, to) do
     do_remove_edge(builder, registry, pending, from, to)
-  end
-
-  def remove_edge({:live_builder, registry, next_id, pending}, from, to) do
-    do_remove_edge(
-      %__MODULE__{registry: registry, next_id: next_id, pending: pending},
-      registry,
-      pending,
-      from,
-      to
-    )
   end
 
   defp do_remove_edge(builder, registry, pending, from, to) do
@@ -267,18 +254,9 @@ defmodule Yog.Builder.Live do
       iex> is_struct(builder, Yog.Builder.Live)
       true
   """
-  @spec remove_node(t() | builder(), label()) :: t()
+  @spec remove_node(t(), label()) :: t()
   def remove_node(%__MODULE__{registry: registry, pending: pending} = builder, label) do
     do_remove_node(builder, registry, pending, label)
-  end
-
-  def remove_node({:live_builder, registry, next_id, pending}, label) do
-    do_remove_node(
-      %__MODULE__{registry: registry, next_id: next_id, pending: pending},
-      registry,
-      pending,
-      label
-    )
   end
 
   defp do_remove_node(builder, registry, pending, label) do
@@ -310,7 +288,7 @@ defmodule Yog.Builder.Live do
       iex> length(Yog.all_nodes(graph))
       2
   """
-  @spec sync(t() | builder(), Yog.graph()) :: {t(), Yog.graph()}
+  @spec sync(t(), Yog.graph()) :: {t(), Yog.graph()}
   def sync(%__MODULE__{pending: []} = builder, graph) do
     {builder, graph}
   end
@@ -326,10 +304,6 @@ defmodule Yog.Builder.Live do
     {%{builder | pending: []}, new_graph}
   end
 
-  def sync({:live_builder, registry, next_id, pending}, graph) do
-    sync(%__MODULE__{registry: registry, next_id: next_id, pending: pending}, graph)
-  end
-
   @doc """
   Discards all pending changes without applying them.
 
@@ -343,12 +317,8 @@ defmodule Yog.Builder.Live do
       iex> Yog.Builder.Live.pending_count(builder)
       0
   """
-  @spec purge_pending(t() | builder()) :: t()
+  @spec purge_pending(t()) :: t()
   def purge_pending(%__MODULE__{} = builder), do: %{builder | pending: []}
-
-  def purge_pending({:live_builder, registry, next_id, _pending}) do
-    %__MODULE__{registry: registry, next_id: next_id, pending: []}
-  end
 
   @doc """
   Creates a checkpoint by clearing pending changes while preserving the registry.
@@ -363,12 +333,8 @@ defmodule Yog.Builder.Live do
       iex> Yog.Builder.Live.pending_count(builder)
       0
   """
-  @spec checkpoint(t() | builder()) :: t()
+  @spec checkpoint(t()) :: t()
   def checkpoint(%__MODULE__{} = builder), do: %{builder | pending: []}
-
-  def checkpoint({:live_builder, registry, next_id, _pending}) do
-    %__MODULE__{registry: registry, next_id: next_id, pending: []}
-  end
 
   # ============= Queries =============
 
@@ -387,12 +353,8 @@ defmodule Yog.Builder.Live do
       iex> Yog.Builder.Live.get_id(builder, "A")
       {:ok, 0}
   """
-  @spec get_id(t() | builder(), label()) :: {:ok, Yog.node_id()} | {:error, nil}
+  @spec get_id(t(), label()) :: {:ok, Yog.node_id()} | {:error, nil}
   def get_id(%__MODULE__{registry: registry}, label) do
-    do_get_id(registry, label)
-  end
-
-  def get_id({:live_builder, registry, _, _}, label) do
     do_get_id(registry, label)
   end
 
@@ -414,10 +376,8 @@ defmodule Yog.Builder.Live do
       iex> Enum.sort(labels)
       ["A", "B"]
   """
-  @spec all_labels(t() | builder()) :: [label()]
+  @spec all_labels(t()) :: [label()]
   def all_labels(%__MODULE__{registry: registry}), do: Map.keys(registry)
-
-  def all_labels({:live_builder, registry, _, _}), do: Map.keys(registry)
 
   @doc """
   Returns the number of registered nodes.
@@ -429,10 +389,8 @@ defmodule Yog.Builder.Live do
       iex> Yog.Builder.Live.node_count(builder)
       2
   """
-  @spec node_count(t() | builder()) :: integer()
+  @spec node_count(t()) :: integer()
   def node_count(%__MODULE__{registry: registry}), do: map_size(registry)
-
-  def node_count({:live_builder, registry, _, _}), do: map_size(registry)
 
   @doc """
   Returns the number of pending changes.
@@ -446,10 +404,8 @@ defmodule Yog.Builder.Live do
       iex> Yog.Builder.Live.pending_count(builder) > 0
       true
   """
-  @spec pending_count(t() | builder()) :: integer()
+  @spec pending_count(t()) :: integer()
   def pending_count(%__MODULE__{pending: pending}), do: length(pending)
-
-  def pending_count({:live_builder, _, _, pending}), do: length(pending)
 
   # ============= Private Helpers =============
 
