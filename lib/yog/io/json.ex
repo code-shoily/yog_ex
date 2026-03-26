@@ -448,9 +448,13 @@ defmodule Yog.IO.JSON do
       iex> Yog.IO.JSON.json_type(json)
       {:ok, :yog_generic}
 
-      iex> network_x_map = %{"nodes" => [], "links" => []}
+      iex> network_x_map = %{"nodes" => [], "links" => [], "directed" => true}
       iex> Yog.IO.JSON.json_type(network_x_map)
       {:ok, :network_x}
+
+      iex> d3_force_map = %{"nodes" => [], "links" => []}
+      iex> Yog.IO.JSON.json_type(d3_force_map)
+      {:ok, :d3_force}
   """
   @spec json_type(String.t() | map()) :: {:ok, atom()} | {:error, String.t()}
   def json_type(input) when is_binary(input) do
@@ -617,7 +621,7 @@ defmodule Yog.IO.JSON do
         :visjs
 
       # NetworkX format: directed + multigraph + links
-      Map.has_key?(map, "directed") or Map.has_key?(map, "links") ->
+      Map.has_key?(map, "directed") ->
         :network_x
 
       # Yog generic format: graph_type + edges
