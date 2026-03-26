@@ -6,7 +6,7 @@
 > 2. addition, sum
 
 ```text
-                    ★
+                    λ
                    /|\
                   / | \
                  /  |  \
@@ -30,7 +30,7 @@ A comprehensive **pure Elixir** graph algorithm and network analysis library pro
 🔷 **Pure Elixir** — It started off as a wrapper around the Gleam [Yog](https://hex.pm/packages/yog) library, YogEx is now fully implemented in Elixir with no external runtime dependencies.
  
 > [!WARNING]
-> **API Stability**: Until the version reaches `1.0.0`, there may be breaking changes. While I'll try my best to keep the API stable, there's no guarantee. The primary focus is on **performance**, **documentation**, **test coverage**, and **bugfixes**.
+> **API Stability**: Until the version reaches `1.0.0`, there may be breaking changes. While I'll try my best to keep the API stable, there's no guarantee. The primary focus is on **performance**, **documentation**, and **bugfixes**.
 
 ## Features
 
