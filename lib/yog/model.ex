@@ -190,14 +190,6 @@ defmodule Yog.Model do
   end
 
   @doc """
-  Deprecated compatibility alias for `add_edge_ensure/5`.
-  """
-  @deprecated "Use add_edge_ensure/5 instead"
-  def add_edge_ensured(graph, from, to, weight, default) do
-    add_edge_ensure(graph, from, to, weight, default)
-  end
-
-  @doc """
   Ensures both endpoint nodes exist using a callback, then adds an edge.
 
   If `src` or `dst` is not already in the graph, it is created by
@@ -590,14 +582,14 @@ defmodule Yog.Model do
 
     new_in_cleaned =
       Enum.reduce(target_ids, graph.in_edges, fn target_id, acc_in ->
-        dict_update_inner(acc_in, target_id, id, &Map.delete/2)
+        Map.replace_lazy(acc_in, target_id, &Map.delete(&1, id))
       end)
 
     new_in = Map.delete(new_in_cleaned, id)
 
     new_out_cleaned =
       Enum.reduce(source_ids, new_out, fn source_id, acc_out ->
-        dict_update_inner(acc_out, source_id, id, &Map.delete/2)
+        Map.replace_lazy(acc_out, source_id, &Map.delete(&1, id))
       end)
 
     %{graph | nodes: new_nodes, out_edges: new_out_cleaned, in_edges: new_in}
@@ -807,6 +799,47 @@ defmodule Yog.Model do
   end
 
   @doc """
+  Gets the weight/data of an edge between two nodes.
+  Returns `nil` if the edge doesn't exist.
+
+  ## Example
+
+      iex> graph = Yog.directed() |> Yog.add_edge_ensure(1, 2, 10, nil)
+      iex> Yog.Model.edge_data(graph, 1, 2)
+      10
+  """
+  @spec edge_data(graph(), node_id(), node_id()) :: term() | nil
+  def edge_data(%Graph{out_edges: out}, src, dst) do
+    case Map.fetch(out, src) do
+      {:ok, inner} -> Map.get(inner, dst)
+      :error -> nil
+    end
+  end
+
+  @doc """
+  Gets the weight/data of an edge between two nodes, raising if not found.
+
+  ## Example
+
+      iex> graph = Yog.directed() |> Yog.add_edge_ensure(1, 2, 10, nil)
+      iex> Yog.Model.edge_data!(graph, 1, 2)
+      10
+  """
+  @spec edge_data!(graph(), node_id(), node_id()) :: term()
+  def edge_data!(%Graph{out_edges: out} = graph, src, dst) do
+    case Map.fetch(out, src) do
+      {:ok, inner} ->
+        case Map.fetch(inner, dst) do
+          {:ok, data} -> data
+          :error -> raise "Edge not found: #{src} -> #{dst}"
+        end
+
+      :error ->
+        raise "Edge source node not found: #{src} in #{inspect(graph)}"
+    end
+  end
+
+  @doc """
   Returns all edges in the graph as triplets `{from, to, weight}`.
 
   For directed graphs, returns all edges.
@@ -920,15 +953,6 @@ defmodule Yog.Model do
       end
 
     %{graph | out_edges: new_out, in_edges: new_in}
-  end
-
-  # Updates an inner dictionary within a nested dictionary structure.
-  # This is the equivalent of yog/internal/utils.dict_update_inner
-  defp dict_update_inner(outer, key1, key2, fun) do
-    case Map.fetch(outer, key1) do
-      {:ok, inner} -> Map.put(outer, key1, fun.(inner, key2))
-      :error -> outer
-    end
   end
 
   # Adds a directed edge with weight combination (internal helper).
