@@ -14,6 +14,8 @@ defmodule Yog.Functional.Model do
   | **Decompose** | `match/2` | Extract a node + its edges, returning the *shrunken* graph |
   | **Compose** | `embed/2` | Insert a node context back into a graph |
   | **Inspect** | `match_any/1` | Decompose an arbitrary node |
+  | **Interop** | `from_ephemeral_model/1` | Convert from main `Yog.Graph` |
+  | **Interop** | `to_ephemeral_model/1` | Convert back to main `Yog.Graph` |
 
   ## Key Concepts
 
@@ -49,6 +51,8 @@ defmodule Yog.Functional.Model do
         }
 
   defstruct nodes: %{}, direction: :directed
+
+  alias Yog.Graph
 
   defmodule Context do
     @moduledoc """
@@ -107,6 +111,64 @@ defmodule Yog.Functional.Model do
   """
   @spec size(t()) :: non_neg_integer()
   def size(%__MODULE__{nodes: nodes}), do: map_size(nodes)
+
+  @doc """
+  Converts an ephemeral `Yog.Graph` into a functional `Functional.Model`.
+
+  ## Examples
+
+      iex> alias Yog.Functional.Model
+      iex> eg = Yog.Model.new(:directed) |> Yog.Model.add_node(1, "A")
+      iex> fg = Model.from_ephemeral_model(eg)
+      iex> Model.size(fg)
+      1
+  """
+  @spec from_ephemeral_model(Graph.t()) :: t()
+  def from_ephemeral_model(%Graph{} = graph) do
+    nodes =
+      Enum.into(graph.nodes, %{}, fn {id, data} ->
+        {id,
+         %Context{
+           id: id,
+           label: data,
+           in_edges: Map.get(graph.in_edges, id, %{}),
+           out_edges: Map.get(graph.out_edges, id, %{})
+         }}
+      end)
+
+    %__MODULE__{nodes: nodes, direction: graph.kind}
+  end
+
+  @doc """
+  Converts a functional `Model` into an ephemeral `Yog.Graph`.
+
+  ## Examples
+
+      iex> alias Yog.Functional.Model
+      iex> fg = Model.empty() |> Model.put_node(1, "A")
+      iex> eg = Model.to_ephemeral_model(fg)
+      iex> eg.nodes[1]
+      "A"
+  """
+  @spec to_ephemeral_model(t()) :: Graph.t()
+  def to_ephemeral_model(%__MODULE__{} = graph) do
+    # Ensure every node has an entry in edge maps for Graph consistency
+    {nodes, out_edges, in_edges} =
+      Enum.reduce(graph.nodes, {%{}, %{}, %{}}, fn {id, ctx}, {n, o, i} ->
+        {
+          Map.put(n, id, ctx.label),
+          Map.put(o, id, ctx.out_edges),
+          Map.put(i, id, ctx.in_edges)
+        }
+      end)
+
+    %Graph{
+      kind: graph.direction,
+      nodes: nodes,
+      out_edges: out_edges,
+      in_edges: in_edges
+    }
+  end
 
   @doc """
   Checks if a node exists in the graph.
