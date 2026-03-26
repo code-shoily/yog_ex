@@ -713,15 +713,9 @@ defmodule Yog.Centrality do
                     {q2, ds2, ss2, ps2}
 
                   :eq ->
-                    ss2 =
-                      Map.update(ss, w, Map.get(ss, v, 0), fn curr ->
-                        curr + Map.get(ss, v, 0)
-                      end)
-
-                    ps2 =
-                      Map.update(ps, w, [v], fn curr ->
-                        [v | curr]
-                      end)
+                    sigma_v = Map.get(ss, v, 0)
+                    ss2 = Map.update(ss, w, sigma_v, fn curr -> curr + sigma_v end)
+                    ps2 = Map.put(ps, w, [v | Map.get(ps, w, [])])
 
                     {q, ds, ss2, ps2}
 
@@ -824,8 +818,6 @@ defmodule Yog.Centrality do
         sum + Map.get(ranks, sink, 0.0)
       end)
 
-    sink_sum = sink_total / n_float
-
     new_ranks =
       Enum.reduce(nodes, %{}, fn node, acc ->
         in_neighbors = Map.get(in_map, node, [])
@@ -842,7 +834,10 @@ defmodule Yog.Centrality do
             end
           end)
 
-        new_rank = (1.0 - damping) / n_float + damping * (sink_sum + rank_sum)
+        teleport_const = (1.0 - damping) / n_float + damping * sink_total / n_float
+
+        new_rank = teleport_const + damping * rank_sum
+        # new_rank = (1.0 - damping) / n_float + damping * (sink_sum + rank_sum)
         Map.put(acc, node, new_rank)
       end)
 
