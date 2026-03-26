@@ -34,7 +34,7 @@ defmodule Yog.Pathfinding.Path do
 
   @type t :: %__MODULE__{
           nodes: [Yog.Model.node_id()],
-          weight: number(),
+          weight: any(),
           algorithm: atom(),
           metadata: map()
         }
@@ -50,8 +50,8 @@ defmodule Yog.Pathfinding.Path do
       iex> path.weight
       10
   """
-  @spec new([Yog.Model.node_id()], number()) :: t()
-  def new(nodes, weight) when is_list(nodes) and is_number(weight) do
+  @spec new([Yog.Model.node_id()], any()) :: t()
+  def new(nodes, weight) when is_list(nodes) do
     %__MODULE__{
       nodes: nodes,
       weight: weight
@@ -67,9 +67,9 @@ defmodule Yog.Pathfinding.Path do
       iex> path.algorithm
       :dijkstra
   """
-  @spec new([Yog.Model.node_id()], number(), atom()) :: t()
+  @spec new([Yog.Model.node_id()], any(), atom()) :: t()
   def new(nodes, weight, algorithm)
-      when is_list(nodes) and is_number(weight) and is_atom(algorithm) do
+      when is_list(nodes) and is_atom(algorithm) do
     %__MODULE__{
       nodes: nodes,
       weight: weight,
@@ -86,9 +86,9 @@ defmodule Yog.Pathfinding.Path do
       iex> path.metadata
       %{visited: 42}
   """
-  @spec new([Yog.Model.node_id()], number(), atom(), map()) :: t()
+  @spec new([Yog.Model.node_id()], any(), atom(), map()) :: t()
   def new(nodes, weight, algorithm, metadata)
-      when is_list(nodes) and is_number(weight) and is_atom(algorithm) and is_map(metadata) do
+      when is_list(nodes) and is_atom(algorithm) and is_map(metadata) do
     %__MODULE__{
       nodes: nodes,
       weight: weight,
@@ -206,8 +206,8 @@ defmodule Yog.Pathfinding.Path do
       iex> path.weight
       10
   """
-  @spec from_tuple({:path, [Yog.Model.node_id()], number()}) :: t()
-  def from_tuple({:path, nodes, weight}) when is_list(nodes) and is_number(weight) do
+  @spec from_tuple({:path, [Yog.Model.node_id()], any()}) :: t()
+  def from_tuple({:path, nodes, weight}) when is_list(nodes) do
     new(nodes, weight)
   end
 
@@ -220,7 +220,7 @@ defmodule Yog.Pathfinding.Path do
       iex> Yog.Pathfinding.Path.to_tuple(path)
       {:path, [1, 2, 3], 10}
   """
-  @spec to_tuple(t()) :: {:path, [Yog.Model.node_id()], number()}
+  @spec to_tuple(t()) :: {:path, [Yog.Model.node_id()], any()}
   def to_tuple(%__MODULE__{nodes: nodes, weight: weight}) do
     {:path, nodes, weight}
   end
@@ -286,5 +286,36 @@ defmodule Yog.Pathfinding.Path do
   @spec at(t(), non_neg_integer()) :: Yog.Model.node_id() | nil
   def at(%__MODULE__{nodes: nodes}, index) when is_integer(index) and index >= 0 do
     Enum.at(nodes, index)
+  end
+
+  @doc """
+  Hydrates a path of node IDs with their corresponding edge attributes from the graph.
+
+  This function transforms a list of node IDs representing a path (e.g., `[A, B, C]`)
+  into a list of edge triplets `{u, v, data}` by looking up the edge
+  metadata for each consecutive pair in the graph.
+
+  This is particularly useful when you have a sequence of nodes (from a pathfinding
+  algorithm) and you need to "hydrate" it with the actual edge weights or
+  attributes used to traverse it.
+
+  ## Examples
+
+      iex> graph =
+      ...>   Yog.directed()
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 10, default: nil)
+      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 5, default: nil)
+      iex> path = [1, 2, 3]
+      iex> Yog.Pathfinding.Path.hydrate_path(graph, path)
+      [{1, 2, 10}, {2, 3, 5}]
+
+  """
+  @spec hydrate_path(Yog.Model.graph(), [Yog.Model.node_id()]) :: list()
+  def hydrate_path(graph, node_ids) do
+    node_ids
+    |> Enum.chunk_every(2, 1, :discard)
+    |> Enum.map(fn [u, v] ->
+      {u, v, Yog.Model.edge_data(graph, u, v)}
+    end)
   end
 end
