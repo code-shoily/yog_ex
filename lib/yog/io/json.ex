@@ -23,7 +23,7 @@ defmodule Yog.IO.JSON do
       ...> |> Yog.add_node(2, "Bob")
       ...> |> Yog.add_edge!(from: 1, to: 2, with: "follows")
       iex>
-      iex> json_string = Yog.IO.JSON.to_json(graph, Yog.IO.JSON.default_export_options())
+      iex> json_string = Yog.IO.JSON.to_json(graph)
       iex> String.contains?(json_string, "Alice")
       true
 
@@ -66,7 +66,7 @@ defmodule Yog.IO.JSON do
   @doc """
   Converts a graph to a JSON string according to options.
   """
-  def to_json(graph, options) do
+  def to_json(graph, options \\ default_export_options()) do
     {:json_export_options, format, include_metadata?, node_ser, edge_ser, _pretty?, _meta} =
       options
 
@@ -95,7 +95,7 @@ defmodule Yog.IO.JSON do
   @doc """
   Exports a graph to a JSON file.
   """
-  def to_json_file(graph, path, options) do
+  def to_json_file(graph, path, options \\ default_export_options()) do
     json_string = to_json(graph, options)
 
     case File.write(path, json_string) do
@@ -149,7 +149,7 @@ defmodule Yog.IO.JSON do
   @doc """
   Converts a multigraph to a JSON string.
   """
-  def to_json_multi(graph, options) do
+  def to_json_multi(graph, options \\ default_export_options()) do
     {:json_export_options, _format, include_metadata?, node_ser, edge_ser, _pretty?, _meta} =
       options
 
@@ -160,7 +160,7 @@ defmodule Yog.IO.JSON do
   @doc """
   Exports a multigraph to a JSON file.
   """
-  def to_json_file_multi(graph, path, options) do
+  def to_json_file_multi(graph, path, options \\ default_export_options()) do
     json_string = to_json_multi(graph, options)
     File.write(path, json_string)
   end
