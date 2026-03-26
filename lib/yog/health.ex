@@ -252,7 +252,7 @@ defmodule Yog.Health do
     if num_nodes <= 1 do
       zero
     else
-      distances = dijkstra_single_source(reweighted_graph, node, zero, add, compare)
+      distances = Dijkstra.single_source_distances(reweighted_graph, node, zero, add, compare)
 
       # Check if all nodes are reachable
       if map_size(distances) < num_nodes do
@@ -299,66 +299,43 @@ defmodule Yog.Health do
   def assortativity(graph) do
     nodes = Model.all_nodes(graph)
 
-    # Calculate degrees for all nodes
+    # 1. Pre-calculate degrees
     degrees =
       Enum.reduce(nodes, %{}, fn node, acc ->
-        degree = length(Model.neighbors(graph, node))
-        Map.put(acc, node, degree)
+        deg = map_size(graph.out_edges[node] || %{})
+        Map.put(acc, node, deg)
       end)
 
-    # Collect edges with their degree pairs
     edges_data =
       Enum.flat_map(nodes, fn u ->
         Model.successors(graph, u)
         |> Enum.map(fn {v, _weight} ->
-          du = Map.get(degrees, u, 0)
-          dv = Map.get(degrees, v, 0)
-          {du, dv}
+          {Map.get(degrees, u, 0), Map.get(degrees, v, 0)}
         end)
       end)
 
-    if edges_data == [] do
+    m = length(edges_data) * 1.0
+
+    if m == 0.0 do
       0.0
     else
-      m = length(edges_data) * 1.0
-
-      sum_jk =
-        Enum.reduce(edges_data, 0.0, fn {j, k}, acc ->
-          acc + j * k * 1.0
+      {sum_jk, sum_j_plus_k, sum_j2_plus_k2} =
+        Enum.reduce(edges_data, {0.0, 0.0, 0.0}, fn {j, k}, {sjk, sjk_add, sjk2_add} ->
+          {
+            sjk + j * k,
+            sjk_add + (j + k),
+            sjk2_add + (j * j + k * k)
+          }
         end)
 
-      sum_j =
-        Enum.reduce(edges_data, 0.0, fn {j, _}, acc ->
-          acc + j * 1.0
-        end)
+      # Simplified Newman formula for symmetric edge lists
+      # r = [ Σ(jk) - (Σ(j+k)/2)^2 / M ] / [ Σ(j^2+k^2)/2 - (Σ(j+k)/2)^2 / M ]
 
-      sum_k =
-        Enum.reduce(edges_data, 0.0, fn {_, k}, acc ->
-          acc + k * 1.0
-        end)
+      term1 = sum_j_plus_k / 2.0
+      numerator = sum_jk / m - :math.pow(term1 / m, 2)
+      denominator = sum_j2_plus_k2 / (2.0 * m) - :math.pow(term1 / m, 2)
 
-      sum_j_squared =
-        Enum.reduce(edges_data, 0.0, fn {j, _}, acc ->
-          acc + j * j * 1.0
-        end)
-
-      sum_k_squared =
-        Enum.reduce(edges_data, 0.0, fn {_, k}, acc ->
-          acc + k * k * 1.0
-        end)
-
-      numerator = sum_jk / m - sum_j / m * (sum_k / m)
-
-      denom_j = sum_j_squared / m - sum_j / m * (sum_j / m)
-      denom_k = sum_k_squared / m - sum_k / m * (sum_k / m)
-
-      denominator = :math.sqrt(denom_j * denom_k)
-
-      if denominator > 0.0 do
-        numerator / denominator
-      else
-        0.0
-      end
+      if denominator > 0.0, do: numerator / denominator, else: 0.0
     end
   end
 
@@ -429,7 +406,7 @@ defmodule Yog.Health do
         nodes
         |> Task.async_stream(
           fn source ->
-            dijkstra_single_source(reweighted_graph, source, zero, add, compare)
+            Dijkstra.single_source_distances(reweighted_graph, source, zero, add, compare)
           end,
           parallel_opts
         )
@@ -462,15 +439,5 @@ defmodule Yog.Health do
         nil
       end
     end
-  end
-
-  # =============================================================================
-  # Internal Dijkstra Implementation
-  # =============================================================================
-
-  # Single-source shortest paths using Dijkstra's algorithm
-  # Returns a map of node_id => distance
-  defp dijkstra_single_source(graph, source, zero, add, compare) do
-    Dijkstra.single_source_distances(graph, source, zero, add, compare)
   end
 end
