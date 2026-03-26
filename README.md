@@ -326,6 +326,8 @@ Algorithms.shortest_path(graph, 1, 3)
 # => {:ok, [1, 2, 3], 3}
 ```
 
+📖 **Learn more**: See the [Functional Graphs README](lib/yog/functional/README.md) for a deep dive into the build/burn pattern, context-based traversal, and the philosophy of inductive graph decomposition.
+
 ## Examples
 
 Detailed examples are located in the [examples/](https://github.com/code-shoily/yog_ex/tree/main/examples) directory:

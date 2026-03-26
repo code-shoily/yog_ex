@@ -14,8 +14,8 @@ defmodule Yog.Functional.Model do
   | **Decompose** | `match/2` | Extract a node + its edges, returning the *shrunken* graph |
   | **Compose** | `embed/2` | Insert a node context back into a graph |
   | **Inspect** | `match_any/1` | Decompose an arbitrary node |
-  | **Interop** | `from_ephemeral_model/1` | Convert from main `Yog.Graph` |
-  | **Interop** | `to_ephemeral_model/1` | Convert back to main `Yog.Graph` |
+  | **Interop** | `from_adjacency_graph/1` | Convert from adjacency-based `Yog.Graph` |
+  | **Interop** | `to_adjacency_graph/1` | Convert back to adjacency-based `Yog.Graph` |
 
   ## Key Concepts
 
@@ -113,18 +113,18 @@ defmodule Yog.Functional.Model do
   def size(%__MODULE__{nodes: nodes}), do: map_size(nodes)
 
   @doc """
-  Converts an ephemeral `Yog.Graph` into a functional `Functional.Model`.
+  Converts an adjacency-based `Yog.Graph` into a functional inductive model.
 
   ## Examples
 
       iex> alias Yog.Functional.Model
       iex> eg = Yog.Model.new(:directed) |> Yog.Model.add_node(1, "A")
-      iex> fg = Model.from_ephemeral_model(eg)
+      iex> fg = Model.from_adjacency_graph(eg)
       iex> Model.size(fg)
       1
   """
-  @spec from_ephemeral_model(Graph.t()) :: t()
-  def from_ephemeral_model(%Graph{} = graph) do
+  @spec from_adjacency_graph(Graph.t()) :: t()
+  def from_adjacency_graph(%Graph{} = graph) do
     nodes =
       Enum.into(graph.nodes, %{}, fn {id, data} ->
         {id,
@@ -140,18 +140,18 @@ defmodule Yog.Functional.Model do
   end
 
   @doc """
-  Converts a functional `Model` into an ephemeral `Yog.Graph`.
+  Converts a functional inductive model into an adjacency-based `Yog.Graph`.
 
   ## Examples
 
       iex> alias Yog.Functional.Model
       iex> fg = Model.empty() |> Model.put_node(1, "A")
-      iex> eg = Model.to_ephemeral_model(fg)
+      iex> eg = Model.to_adjacency_graph(fg)
       iex> eg.nodes[1]
       "A"
   """
-  @spec to_ephemeral_model(t()) :: Graph.t()
-  def to_ephemeral_model(%__MODULE__{} = graph) do
+  @spec to_adjacency_graph(t()) :: Graph.t()
+  def to_adjacency_graph(%__MODULE__{} = graph) do
     # Ensure every node has an entry in edge maps for Graph consistency
     {nodes, out_edges, in_edges} =
       Enum.reduce(graph.nodes, {%{}, %{}, %{}}, fn {id, ctx}, {n, o, i} ->

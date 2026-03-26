@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - New `Traversal` operations: `preorder/2`, `postorder/2` (DFS finishing order), and `reachable/2`.
   - New `Analysis` algorithms: `transitive_closure/1` (reachability), `biconnected_components/1`, and `dominators/2` (immediate dominators).
   - New `Algorithms` operation: `distances/2` for all-node distance mapping from a source.
-  - **Interop**: Added `from_ephemeral_model/1` and `to_ephemeral_model/1` to `Yog.Functional.Model` for seamless conversion between inductive and ephemeral graph representations.
+  - **Interop**: Added `from_adjacency_graph/1` and `to_adjacency_graph/1` to `Yog.Functional.Model` for seamless conversion between inductive and adjacency-based graph representations.
 
 ### Changed
 - **Builder API Unification**: Removed legacy tuple-based builder types and function clauses from `Yog.Builder.Labeled` and `Yog.Builder.Live`. All builder APIs are now strictly struct-based (`t()`).
