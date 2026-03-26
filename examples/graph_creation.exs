@@ -12,44 +12,59 @@ defmodule GraphCreation do
 
     # 1. Builder pattern with add_node and add_edge
     IO.puts("1. Builder Pattern")
-    g1 = Yog.directed()
-         |> Yog.add_node(1, "A")
-         |> Yog.add_node(2, "B")
-         |> Yog.add_edge!(from: 1, to: 2, with: 5)
+
+    g1 =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_edge!(from: 1, to: 2, with: 5)
+
     IO.puts("   Created graph with #{count_nodes(g1)} nodes")
 
     # 2. from_edges function for quick creation
     IO.puts("\n2. From Edges")
-    g2 = Yog.from_edges(:directed, [
-      {1, 2, 5},
-      {2, 3, 10}
-    ])
+
+    g2 =
+      Yog.from_edges(:directed, [
+        {1, 2, 5},
+        {2, 3, 10}
+      ])
+
     IO.puts("   Created graph with #{count_nodes(g2)} nodes")
 
     # 3. from_unweighted_edges for graphs without weights
     IO.puts("\n3. From Unweighted Edges")
-    g3 = Yog.from_unweighted_edges(:directed, [
-      {1, 2},
-      {2, 3},
-      {3, 1}
-    ])
+
+    g3 =
+      Yog.from_unweighted_edges(:directed, [
+        {1, 2},
+        {2, 3},
+        {3, 1}
+      ])
+
     IO.puts("   Created graph with #{count_nodes(g3)} nodes")
 
     # 4. from_adjacency_list for adjacency-based construction
     IO.puts("\n4. From Adjacency List")
-    g4 = Yog.from_adjacency_list(:directed, [
-      {1, [{2, 5}, {3, 10}]},
-      {2, [{3, 2}]},
-      {3, []}
-    ])
+
+    g4 =
+      Yog.from_adjacency_list(:directed, [
+        {1, [{2, 5}, {3, 10}]},
+        {2, [{3, 2}]},
+        {3, []}
+      ])
+
     IO.puts("   Created graph with #{count_nodes(g4)} nodes")
 
     # 5. add_simple_edge with default weight of 1
     IO.puts("\n5. Simple Edges (Default Weight = 1)")
-    g5 = Yog.directed()
-         |> Yog.add_node(1, "A")
-         |> Yog.add_node(2, "B")
-         |> Yog.add_simple_edge!(from: 1, to: 2)
+
+    g5 =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_simple_edge!(from: 1, to: 2)
+
     IO.puts("   Created graph with #{count_nodes(g5)} nodes")
 
     # 6. Labeled variants - Note: Labeled API is separate in Yog.Builder.Labeled module
@@ -62,10 +77,13 @@ defmodule GraphCreation do
 
     # 10. Undirected graph support
     IO.puts("\n10. Undirected Graph")
-    g10 = Yog.undirected()
-          |> Yog.add_node(1, "A")
-          |> Yog.add_node(2, "B")
-          |> Yog.add_edge!(from: 1, to: 2, with: 5)
+
+    g10 =
+      Yog.undirected()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_edge!(from: 1, to: 2, with: 5)
+
     IO.puts("   Created undirected graph (edges work both ways)")
 
     IO.puts("\n=== Summary ===")

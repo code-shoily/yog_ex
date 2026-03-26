@@ -34,7 +34,8 @@ defmodule NetworkBandwidth do
       |> Yog.add_edge!(from: 3, to: 5, with: 30)
       # Router C -> Destination (30 Mbps)
       |> Yog.add_edge!(from: 4, to: 5, with: 15)
-      # Router D -> Destination (15 Mbps)
+
+    # Router D -> Destination (15 Mbps)
 
     IO.puts("Network topology:")
     IO.puts(" Source (0) -> RouterA (1): 20 Mbps")

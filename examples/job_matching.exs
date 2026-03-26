@@ -68,16 +68,24 @@ defmodule JobMatching do
 
   defp extract_assignments(_residual, _original, [], _jobs), do: []
 
-  defp extract_assignments(residual, original, [{candidate_id, candidate_name} | rest_candidates], jobs) do
+  defp extract_assignments(
+         residual,
+         original,
+         [{candidate_id, candidate_name} | rest_candidates],
+         jobs
+       ) do
     case find_assignment(residual, original, candidate_id, candidate_name, jobs) do
       {:ok, match} -> [match | extract_assignments(residual, original, rest_candidates, jobs)]
       {:error, _} -> extract_assignments(residual, original, rest_candidates, jobs)
     end
   end
 
-  defp find_assignment(_residual, _original, _candidate_id, _candidate_name, []), do: {:error, nil}
+  defp find_assignment(_residual, _original, _candidate_id, _candidate_name, []),
+    do: {:error, nil}
 
-  defp find_assignment(residual, original, candidate_id, candidate_name, [{job_id, job_name} | rest_jobs]) do
+  defp find_assignment(residual, original, candidate_id, candidate_name, [
+         {job_id, job_name} | rest_jobs
+       ]) do
     # Get original capacity from the original graph
     original_capacity = get_edge_capacity(original, candidate_id, job_id)
 

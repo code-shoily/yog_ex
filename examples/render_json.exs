@@ -21,7 +21,10 @@ defmodule RenderJson do
     IO.puts(json_basic)
 
     IO.puts("\nThis JSON can be used with D3.js, Cytoscape.js, or other visualization libraries.")
-    IO.puts("For custom node/edge formats, you can process the JSON output with your own mappers.")
+
+    IO.puts(
+      "For custom node/edge formats, you can process the JSON output with your own mappers."
+    )
   end
 end
 

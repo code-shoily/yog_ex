@@ -49,8 +49,12 @@ defmodule MedicalResidency do
     IO.puts("")
 
     resident_names = ["Anderson", "Brown", "Chen", "Davis", "Evans"]
+
     hospital_names = [
-      "City General", "Metro Hospital", "University Med", "Regional Care",
+      "City General",
+      "Metro Hospital",
+      "University Med",
+      "Regional Care",
       "Coastal Medical"
     ]
 
@@ -66,7 +70,10 @@ defmodule MedicalResidency do
           resident_rank = get_rank(residents, resident_id, hospital_id)
           hospital_rank = get_rank(hospitals, hospital_id, resident_id)
 
-          IO.puts("Dr. #{resident_name} (##{resident_id}) matched to #{hospital_name} (##{hospital_id})")
+          IO.puts(
+            "Dr. #{resident_name} (##{resident_id}) matched to #{hospital_name} (##{hospital_id})"
+          )
+
           IO.puts("  - Resident's rank for this hospital: #{resident_rank} of 5")
           IO.puts("  - Hospital's rank for this resident: #{hospital_rank} of 5")
       end
@@ -82,7 +89,9 @@ defmodule MedicalResidency do
 
   defp get_rank(prefs, person, target) do
     case Map.get(prefs, person) do
-      nil -> 999
+      nil ->
+        999
+
       pref_list ->
         case Enum.find_index(pref_list, &(&1 == target)) do
           nil -> 999

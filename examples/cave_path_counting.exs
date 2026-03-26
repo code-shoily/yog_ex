@@ -34,7 +34,9 @@ defmodule CavePathCounting do
     cave_name = Map.get(nodes, current)
 
     case cave_name do
-      "end" -> 1
+      "end" ->
+        1
+
       _ ->
         Yog.successors(graph, current)
         |> Enum.reduce(0, fn {neighbor_id, _}, count ->

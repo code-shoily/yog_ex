@@ -23,7 +23,7 @@ defmodule Yog.IO.JSON do
       ...> |> Yog.add_node(2, "Bob")
       ...> |> Yog.add_edge!(from: 1, to: 2, with: "follows")
       iex>
-      iex> json_string = Yog.IO.JSON.to_json(graph, Yog.IO.JSON.default_export_options())
+      iex> json_string = Yog.IO.JSON.to_json(graph)
       iex> String.contains?(json_string, "Alice")
       true
 
@@ -66,7 +66,7 @@ defmodule Yog.IO.JSON do
   @doc """
   Converts a graph to a JSON string according to options.
   """
-  def to_json(graph, options) do
+  def to_json(graph, options \\ default_export_options()) do
     {:json_export_options, format, include_metadata?, node_ser, edge_ser, _pretty?, _meta} =
       options
 
@@ -95,7 +95,7 @@ defmodule Yog.IO.JSON do
   @doc """
   Exports a graph to a JSON file.
   """
-  def to_json_file(graph, path, options) do
+  def to_json_file(graph, path, options \\ default_export_options()) do
     json_string = to_json(graph, options)
 
     case File.write(path, json_string) do
@@ -149,7 +149,7 @@ defmodule Yog.IO.JSON do
   @doc """
   Converts a multigraph to a JSON string.
   """
-  def to_json_multi(graph, options) do
+  def to_json_multi(graph, options \\ default_export_options()) do
     {:json_export_options, _format, include_metadata?, node_ser, edge_ser, _pretty?, _meta} =
       options
 
@@ -160,7 +160,7 @@ defmodule Yog.IO.JSON do
   @doc """
   Exports a multigraph to a JSON file.
   """
-  def to_json_file_multi(graph, path, options) do
+  def to_json_file_multi(graph, path, options \\ default_export_options()) do
     json_string = to_json_multi(graph, options)
     File.write(path, json_string)
   end
@@ -426,6 +426,65 @@ defmodule Yog.IO.JSON do
     }
   end
 
+  # ============= Detection Functions =============
+
+  @doc """
+  Detects the JSON graph format of the given input.
+
+  Supports detection from both JSON strings and decoded maps.
+
+  ## Parameters
+
+  - `input` - JSON string or map to detect the format of
+
+  ## Returns
+
+  - `{:ok, type}` - One of `:yog_generic`, `:network_x`, `:d3_force`, `:cytoscape`, `:visjs`, or `:simple`
+  - `{:error, reason}` - If input is a string and parsing fails
+
+  ## Examples
+
+      iex> json = ~s|{"graph_type":"directed","nodes":[],"edges":[]}|
+      iex> Yog.IO.JSON.json_type(json)
+      {:ok, :yog_generic}
+
+      iex> network_x_map = %{"nodes" => [], "links" => [], "directed" => true}
+      iex> Yog.IO.JSON.json_type(network_x_map)
+      {:ok, :network_x}
+
+      iex> d3_force_map = %{"nodes" => [], "links" => []}
+      iex> Yog.IO.JSON.json_type(d3_force_map)
+      {:ok, :d3_force}
+  """
+  @spec json_type(String.t() | map()) :: {:ok, atom()} | {:error, String.t()}
+  def json_type(input) when is_binary(input) do
+    case Jason.decode(input) do
+      {:ok, map} -> json_type(map)
+      {:error, _} = error -> error
+    end
+  end
+
+  def json_type(map) when is_map(map) do
+    {:ok, detect_format(map)}
+  end
+
+  @doc """
+  Detects the JSON graph format, raising on error for string input.
+
+  ## Examples
+
+      iex> json = ~s|{"elements": []}|
+      iex> Yog.IO.JSON.json_type!(json)
+      :cytoscape
+  """
+  @spec json_type!(String.t() | map()) :: atom()
+  def json_type!(input) do
+    case json_type(input) do
+      {:ok, type} -> type
+      {:error, reason} -> raise ArgumentError, "Failed to detect JSON format: #{inspect(reason)}"
+    end
+  end
+
   # ============= Import Functions =============
 
   @doc """
@@ -540,31 +599,42 @@ defmodule Yog.IO.JSON do
   end
 
   defp do_from_map(map) do
+    case detect_format(map) do
+      :cytoscape -> parse_cytoscape_format(map)
+      :visjs -> parse_visjs_format(map)
+      :network_x -> parse_networkx_format(map)
+      :yog_generic -> parse_generic_format(map)
+      :d3_force -> parse_d3_format(map)
+      :simple -> parse_simple_format(map)
+    end
+  end
+
+  defp detect_format(map) do
     cond do
       # Cytoscape format: elements array
       Map.has_key?(map, "elements") ->
-        parse_cytoscape_format(map)
+        :cytoscape
 
       # VisJs format: nodes and edges with from/to
       Map.has_key?(map, "nodes") and Map.has_key?(map, "edges") and
           has_visjs_edges?(map["edges"]) ->
-        parse_visjs_format(map)
+        :visjs
 
       # NetworkX format: directed + multigraph + links
-      Map.has_key?(map, "directed") or Map.has_key?(map, "links") ->
-        parse_networkx_format(map)
+      Map.has_key?(map, "directed") ->
+        :network_x
 
       # Yog generic format: graph_type + edges
       Map.has_key?(map, "graph_type") or Map.has_key?(map, "edges") ->
-        parse_generic_format(map)
+        :yog_generic
 
       # D3 format: nodes + links (no type indicator)
       Map.has_key?(map, "nodes") and Map.has_key?(map, "links") ->
-        parse_d3_format(map)
+        :d3_force
 
       # Fallback: try to interpret as simple graph
       true ->
-        parse_simple_format(map)
+        :simple
     end
   end
 
