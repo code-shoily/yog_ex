@@ -13,6 +13,9 @@ defmodule Yog.Functional.Traversal do
   |-----------|----------|----------------|
   | [DFS](https://en.wikipedia.org/wiki/Depth-first_search) | `dfs/2` | Stack (list) |
   | [BFS](https://en.wikipedia.org/wiki/Breadth-first_search) | `bfs/2` | Queue (`:queue`) |
+  | Preorder | `preorder/2` | Node IDs in visit order |
+  | Postorder | `postorder/2` | Node IDs in finish order |
+  | Reachable | `reachable/2` | All reachable node IDs |
 
   ## Key Principle
 
@@ -109,6 +112,75 @@ defmodule Yog.Functional.Traversal do
 
       {:empty, _} ->
         Enum.reverse(acc)
+    end
+  end
+
+  @doc """
+  Returns node IDs in Preorder (visit order).
+
+  ## Examples
+
+      iex> alias Yog.Functional.{Model, Traversal}
+      iex> graph = Model.empty() |> Model.put_node(1, "A") |> Model.put_node(2, "B")
+      ...> |> Model.add_edge!(1, 2)
+      iex> Traversal.preorder(graph, 1)
+      [1, 2]
+  """
+  @spec preorder(Model.t(), Model.node_id() | [Model.node_id()]) :: [Model.node_id()]
+  def preorder(graph, start) do
+    dfs(graph, start) |> Enum.map(& &1.id)
+  end
+
+  @doc """
+  Returns node IDs in Postorder (finishing order, last node finishing first).
+
+  ## Examples
+
+      iex> alias Yog.Functional.{Model, Traversal}
+      iex> graph = Model.empty() |> Model.put_node(1, "A") |> Model.put_node(2, "B")
+      ...> |> Model.add_edge!(1, 2)
+      iex> Traversal.postorder(graph, 1)
+      [2, 1]
+  """
+  @spec postorder(Model.t(), Model.node_id() | [Model.node_id()]) :: [Model.node_id()]
+  def postorder(graph, start_nodes) when is_list(start_nodes) do
+    {order, _} = finishing_order(graph, start_nodes, [])
+    Enum.reverse(order)
+  end
+
+  def postorder(graph, start_node), do: postorder(graph, [start_node])
+
+  @doc """
+  Returns all node IDs reachable from the start node(s).
+
+  ## Examples
+
+      iex> alias Yog.Functional.{Model, Traversal}
+      iex> graph = Model.empty() |> Model.put_node(1, "A") |> Model.put_node(2, "B")
+      ...> |> Model.add_edge!(1, 2)
+      iex> Traversal.reachable(graph, 1) |> Enum.sort()
+      [1, 2]
+  """
+  @spec reachable(Model.t(), Model.node_id() | [Model.node_id()]) :: [Model.node_id()]
+  def reachable(graph, start) do
+    dfs(graph, start) |> Enum.map(& &1.id)
+  end
+
+  # Internal finishing order logic (exposed for Algorithms as well)
+  def finishing_order(graph, [], acc), do: {acc, graph}
+
+  def finishing_order(graph, [current | queue], acc) do
+    case Model.match(graph, current) do
+      {:error, :not_found} ->
+        finishing_order(graph, queue, acc)
+
+      {:ok, ctx, remaining_graph} ->
+        children = neighbors_of(ctx)
+
+        {new_acc, graph_after_children} =
+          finishing_order(remaining_graph, children, acc)
+
+        finishing_order(graph_after_children, queue, [current | new_acc])
     end
   end
 
