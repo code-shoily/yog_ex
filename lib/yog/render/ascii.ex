@@ -415,7 +415,7 @@ defmodule Yog.Render.ASCII do
   @spec has_edge?(Yog.graph(), Yog.node_id(), Yog.node_id()) :: boolean()
   defp has_edge?(graph, from, to) do
     case Yog.Model.successors(graph, from) do
-      nil ->
+      [] ->
         false
 
       neighbors ->
