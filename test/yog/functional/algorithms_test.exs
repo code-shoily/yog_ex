@@ -55,11 +55,22 @@ defmodule Yog.Functional.AlgorithmsTest do
     end
 
     test "shortest path when unreachable", %{graph: graph} do
+      g = graph |> Model.add_edge!(1, 2, 1)
+
+      assert {:error, :no_path} = Algorithms.shortest_path(g, 1, 3)
+    end
+  end
+
+  describe "distances" do
+    test "computes all distances from source", %{graph: graph} do
       g =
         graph
         |> Model.add_edge!(1, 2, 1)
+        |> Model.add_edge!(2, 3, 2)
+        |> Model.add_edge!(1, 4, 4)
 
-      assert {:error, :no_path} = Algorithms.shortest_path(g, 1, 3)
+      dist_map = Algorithms.distances(g, 1)
+      assert dist_map == %{1 => 0, 2 => 1, 3 => 3, 4 => 4}
     end
   end
 

@@ -74,4 +74,27 @@ defmodule Yog.Functional.TraversalTest do
       assert MapSet.new(ids) == MapSet.new([1, 2, 3, 4, 5])
     end
   end
+
+  describe "preorder, postorder, and reachable" do
+    test "preorder returns nodes in visit order", %{graph: graph} do
+      ids = Traversal.preorder(graph, 1)
+      assert hd(ids) == 1
+      assert length(ids) == 5
+    end
+
+    test "postorder returns nodes in finishing order", %{graph: graph} do
+      ids = Traversal.postorder(graph, 1)
+      # Last node visited should be first to finish in a linear part
+      assert List.last(ids) == 1
+      assert length(ids) == 5
+    end
+
+    test "reachable returns all reachable node IDs", %{graph: graph} do
+      ids = Traversal.reachable(graph, 1)
+      assert MapSet.new(ids) == MapSet.new([1, 2, 3, 4, 5])
+
+      # From 5, nothing is reachable
+      assert Traversal.reachable(graph, 5) == [5]
+    end
+  end
 end
