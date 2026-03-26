@@ -13,6 +13,7 @@ defmodule Yog.Functional.Algorithms do
   |-----------|----------|-----------------|
   | [Topological Sort](https://en.wikipedia.org/wiki/Topological_sorting) | `topsort/1` | O(V + E) |
   | [Dijkstra's Shortest Path](https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm) | `shortest_path/3` | O((V + E) log V) |
+  | Distances | `distances/2` | Compute all-node distances from source |
   | [Prim's MST](https://en.wikipedia.org/wiki/Prim%27s_algorithm) | `mst_prim/1` | O(E log V) |
   | [Kosaraju's SCC](https://en.wikipedia.org/wiki/Kosaraju%27s_algorithm) | `scc/1` | O(V + E) |
 
@@ -28,7 +29,7 @@ defmodule Yog.Functional.Algorithms do
   - [Wikipedia: Graph Algorithms](https://en.wikipedia.org/wiki/Graph_algorithm)
   """
   alias Yog.Functional.Model
-  alias Yog.Functional.Transform
+  alias Yog.Functional.{Transform, Traversal}
   alias Yog.PriorityQueue, as: PQ
 
   @doc """
@@ -136,6 +137,48 @@ defmodule Yog.Functional.Algorithms do
   end
 
   @doc """
+  Computes the distance from a start node to all reachable nodes using Dijkstra's algorithm.
+  Returns `%{node_id => distance}`.
+
+  ## Examples
+
+      iex> alias Yog.Functional.{Model, Algorithms}
+      iex> graph = Model.empty() |> Model.put_node(1, "A") |> Model.put_node(2, "B")
+      ...> |> Model.add_edge!(1, 2, 10)
+      iex> Algorithms.distances(graph, 1)
+      %{1 => 0, 2 => 10}
+  """
+  @spec distances(Model.t(), Model.node_id()) :: %{Model.node_id() => number()}
+  def distances(graph, start) do
+    pq = PQ.new(fn {d1, _}, {d2, _} -> d1 <= d2 end) |> PQ.push({0, start})
+    do_distances(graph, pq, %{})
+  end
+
+  defp do_distances(graph, pq, acc) do
+    if PQ.empty?(pq) do
+      acc
+    else
+      {:ok, {dist, current}, rest_pq} = PQ.pop(pq)
+
+      case Model.match(graph, current) do
+        {:error, :not_found} ->
+          do_distances(graph, rest_pq, acc)
+
+        {:ok, ctx, remaining_graph} ->
+          new_acc = Map.put(acc, current, dist)
+
+          new_pq =
+            Enum.reduce(ctx.out_edges, rest_pq, fn {neighbor_id, weight}, acc_pq ->
+              w = weight || 1
+              PQ.push(acc_pq, {dist + w, neighbor_id})
+            end)
+
+          do_distances(remaining_graph, new_pq, new_acc)
+      end
+    end
+  end
+
+  @doc """
   Finds the Minimum Spanning Tree of the connected component containing the first node.
   Returns `{:ok, [{from, to, weight}]}` or `{:ok, []}` for empty graphs.
 
@@ -204,28 +247,10 @@ defmodule Yog.Functional.Algorithms do
 
   def scc(%Model{} = graph) do
     {finishing_order, _shrunken_completely} =
-      dfs_finishing_order(graph, Model.node_ids(graph), [])
+      Traversal.finishing_order(graph, Model.node_ids(graph), [])
 
     reversed_graph = Transform.reverse(graph)
     extract_sccs(reversed_graph, finishing_order, [])
-  end
-
-  defp dfs_finishing_order(graph, queue, acc)
-  defp dfs_finishing_order(graph, [], acc), do: {acc, graph}
-
-  defp dfs_finishing_order(graph, [current | queue], acc) do
-    case Model.match(graph, current) do
-      {:error, :not_found} ->
-        dfs_finishing_order(graph, queue, acc)
-
-      {:ok, ctx, remaining_graph} ->
-        children = Map.keys(ctx.out_edges)
-
-        {new_acc, graph_after_children} =
-          dfs_finishing_order(remaining_graph, children, acc)
-
-        dfs_finishing_order(graph_after_children, queue, [current | new_acc])
-    end
   end
 
   defp extract_sccs(_graph, [], acc), do: Enum.reverse(acc)
