@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.80.0] - UNRELEASED
+## [0.80.0] - 2026-03-27
 
 ### Added
 - **`Yog.Flow.MaxFlow`**: Refactored internal residual storage from a flat `{u, v}` map to a nested `u => %{v => capacity}` map, resulting in 30-50% performance improvement for Edmonds-Karp via O(1) successor lookups.

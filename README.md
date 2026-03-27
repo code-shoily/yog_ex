@@ -71,7 +71,7 @@ Add YogEx to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:yog_ex, "~> 0.60.0"}
+    {:yog_ex, "~> 0.80.0"}
   ]
 end
 ```
@@ -88,7 +88,7 @@ For livebook, add the following:
 
 ```elixir
 Mix.install(
-  {:yog_ex, "~> 0.60.0"}
+  {:yog_ex, "~> 0.80.0"}
 )
 ```
 
@@ -104,21 +104,6 @@ YogEx includes comprehensive graph I/O modules (`Yog.IO.*`) for popular formats:
 - **LEDA** - Library of Efficient Data types and Algorithms
 - **TGF** - Trivial Graph Format
 - **JSON** - Adjacency list and matrix formats
-
-### Optional Dependencies
-
-For improved performance with large GraphML files, add the `saxy` dependency:
-
-```elixir
-def deps do
-  [
-    {:yog_ex, "~> 0.60.0"},
-    {:saxy, "~> 1.5"}  # Optional: 3-4x faster GraphML parsing
-  ]
-end
-```
-
-When `saxy` is available, GraphML parsing automatically uses a fast streaming SAX parser instead of the default DOM parser. For example, a 12MB [GraphML file](https://snap.stanford.edu/data/soc-Slashdot0902.html) with ~1M edges loads in ~4s with `saxy` vs ~20s without it.
 
 ## Quick Start
 
