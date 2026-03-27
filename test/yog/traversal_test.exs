@@ -406,6 +406,94 @@ defmodule Yog.TraversalTest do
     assert Enum.sort(result) == [1, 2, 3, 4, 5]
   end
 
+  test "implicit_fold_dfs_test" do
+    # 1 -> [2, 3], 2 -> [4], 3 -> [5]
+    successors = fn n ->
+      case n do
+        1 -> [2, 3]
+        2 -> [4]
+        3 -> [5]
+        _ -> []
+      end
+    end
+
+    result =
+      Yog.Traversal.implicit_fold(
+        from: 1,
+        using: :depth_first,
+        successors_of: successors,
+        initial: [],
+        with: fn acc, node, _meta -> {:continue, [node | acc]} end
+      )
+
+    # DFS visits down one branch completely before another
+    assert length(result) == 5
+    # result is reversed since we [node | acc]
+    assert hd(result) in [4, 5]
+  end
+
+  test "implicit_fold_halt_test" do
+    successors = fn n -> [n + 1] end
+
+    result =
+      Yog.Traversal.implicit_fold(
+        from: 1,
+        using: :breadth_first,
+        successors_of: successors,
+        initial: [],
+        with: fn acc, node, _meta ->
+          if node == 3, do: {:halt, [node | acc]}, else: {:continue, [node | acc]}
+        end
+      )
+
+    assert Enum.sort(result) == [1, 2, 3]
+  end
+
+  test "implicit_fold_stop_test" do
+    # 1 -> [2, 3], 2 -> [4], 3 -> [5]
+    # Stop at 2 means don't explore 4, but continue with 3 and 5.
+    successors = fn n ->
+      case n do
+        1 -> [2, 3]
+        2 -> [4]
+        3 -> [5]
+        _ -> []
+      end
+    end
+
+    result =
+      Yog.Traversal.implicit_fold(
+        from: 1,
+        using: :breadth_first,
+        successors_of: successors,
+        initial: [],
+        with: fn acc, node, _meta ->
+          if node == 2, do: {:stop, [node | acc]}, else: {:continue, [node | acc]}
+        end
+      )
+
+    # Should have 1, 2, 3, 5. 4 should be missing.
+    assert Enum.sort(result) == [1, 2, 3, 5]
+  end
+
+  test "implicit_fold_by_dfs_test" do
+    successors = fn n -> [n + 1, n + 2] end
+    # Deduplicate by key n rem 2
+    result =
+      Yog.Traversal.implicit_fold_by(
+        from: 1,
+        using: :depth_first,
+        successors_of: successors,
+        visited_by: fn n -> rem(n, 2) end,
+        initial: [],
+        with: fn acc, node, _meta -> {:continue, [node | acc]} end
+      )
+
+    # Start 1 (rem 1). Successors 2 (rem 0), 3 (rem 1).
+    # 3 is skipped. 2 explored.
+    assert Enum.sort(result) == [1, 2]
+  end
+
   # ============= Cycle Detection Tests =============
 
   test "cyclic_and_acyclic_test" do

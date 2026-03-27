@@ -147,4 +147,23 @@ defmodule Yog.Property.CyclicityTest do
     assert Cyclicity.acyclic?(graph) == true
     assert Cyclicity.cyclic?(graph) == false
   end
+
+  test "cyclic_directed_2_cycle_test" do
+    # 1 <-> 2
+    g = Yog.directed() |> Yog.add_edge_ensure(1, 2, 1, nil) |> Yog.add_edge_ensure(2, 1, 1, nil)
+    assert Cyclicity.cyclic?(g)
+  end
+
+  test "cyclic_large_c6_test" do
+    g =
+      Yog.undirected()
+      |> Yog.add_edge_ensure(1, 2, 1, nil)
+      |> Yog.add_edge_ensure(2, 3, 1, nil)
+      |> Yog.add_edge_ensure(3, 4, 1, nil)
+      |> Yog.add_edge_ensure(4, 5, 1, nil)
+      |> Yog.add_edge_ensure(5, 6, 1, nil)
+      |> Yog.add_edge_ensure(6, 1, 1, nil)
+
+    assert Cyclicity.cyclic?(g)
+  end
 end

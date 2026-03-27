@@ -44,15 +44,31 @@ defmodule Yog.Property.CliqueTest do
     assert MapSet.size(clique) == 3
   end
 
-  test "max_clique in graph with no edges" do
+  test "max_clique in graph with multiple max cliques" do
+    # Two disconnected triangles
     graph =
       Yog.undirected()
-      |> Yog.add_node(1, "A")
-      |> Yog.add_node(2, "B")
+      |> Yog.add_edge_ensure(1, 2, 1, nil)
+      |> Yog.add_edge_ensure(2, 3, 1, nil)
+      |> Yog.add_edge_ensure(3, 1, 1, nil)
+      |> Yog.add_edge_ensure(4, 5, 1, nil)
+      |> Yog.add_edge_ensure(5, 6, 1, nil)
+      |> Yog.add_edge_ensure(6, 4, 1, nil)
 
     clique = Clique.max_clique(graph)
-    # Single node is the max clique
-    assert MapSet.size(clique) == 1
+    assert MapSet.size(clique) == 3
+  end
+
+  test "max_clique in single node graph" do
+    graph = Yog.undirected() |> Yog.add_node(1, nil)
+    clique = Clique.max_clique(graph)
+    assert MapSet.equal?(clique, MapSet.new([1]))
+  end
+
+  test "max_clique in empty graph" do
+    graph = Yog.undirected()
+    clique = Clique.max_clique(graph)
+    assert MapSet.equal?(clique, MapSet.new())
   end
 
   # ============= All Maximal Cliques Tests =============
