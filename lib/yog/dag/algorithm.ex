@@ -10,9 +10,6 @@ defmodule Yog.DAG.Algorithm do
   alias Yog.DAG.Model
   alias Yog.Pathfinding.Utils, as: PathUtils
 
-  @typedoc "Direction for reachability counting"
-  @type direction :: :ancestors | :descendants
-
   @doc """
   Returns a topological ordering of all nodes in the DAG.
 
@@ -134,128 +131,6 @@ defmodule Yog.DAG.Algorithm do
   defp should_update_longest?(curr, next), do: next > curr
 
   @doc """
-  Computes the transitive closure of the DAG.
-
-  The transitive closure adds an edge from node A to node C whenever there is
-  a path from A to C. The result is a DAG where reachability can be checked
-  in O(1) by looking for a direct edge.
-
-  ## Time Complexity
-
-  O(V × (V + E))
-
-  ## Examples
-
-      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(:a, nil)
-      ...>   |> Yog.add_node(:b, nil)
-      ...>   |> Yog.add_node(:c, nil)
-      ...>   |> Yog.add_edge!(:a, :b, 1)
-      ...>   |> Yog.add_edge!(:b, :c, 1)
-      ...> )
-      iex> closure = Yog.DAG.Algorithm.transitive_closure(dag)
-      iex> is_struct(closure, Yog.DAG)
-      true
-  """
-  @spec transitive_closure(Yog.DAG.t()) :: Yog.DAG.t()
-  def transitive_closure(dag) do
-    graph = Model.to_graph(dag)
-    # Process in reverse topological order (leaves first)
-    sorted_nodes = topological_sort(dag) |> Enum.reverse()
-
-    # For each node, compute all reachable nodes
-    reachable = solve_transitive_reachability(graph, sorted_nodes)
-
-    # Build new graph with closure edges
-    new_graph =
-      Enum.reduce(reachable, graph, fn {node, targets}, g ->
-        add_closure_edges(g, node, targets)
-      end)
-
-    # Unwrap and re-wrap as DAG (closure preserves acyclicity)
-    {:ok, result} = Model.from_graph(new_graph)
-    result
-  end
-
-  defp solve_transitive_reachability(graph, sorted_nodes) do
-    out_edges = graph.out_edges
-
-    Enum.reduce(sorted_nodes, %{}, fn node, acc ->
-      successors = Map.get(out_edges, node, %{}) |> Map.keys()
-
-      all_reachable =
-        Enum.reduce(successors, MapSet.new(successors), fn child, set_acc ->
-          child_reachable = Map.get(acc, child, MapSet.new())
-          MapSet.union(set_acc, child_reachable)
-        end)
-
-      Map.put(acc, node, all_reachable)
-    end)
-  end
-
-  defp add_closure_edges(graph, node, targets) do
-    # Get existing neighbors once as a MapSet for O(1) checks
-    out_edges = graph.out_edges
-    existing = Map.get(out_edges, node, %{}) |> Map.keys() |> MapSet.new()
-
-    Enum.reduce(targets, graph, fn target, g_acc ->
-      if MapSet.member?(existing, target) do
-        g_acc
-      else
-        Yog.add_edge!(g_acc, node, target, 1)
-      end
-    end)
-  end
-
-  @doc """
-  Computes the transitive reduction of the DAG.
-
-  The transitive reduction removes edges that are implied by transitivity.
-  It produces the minimal DAG with the same reachability properties.
-
-  ## Time Complexity
-
-  O(V × (V + E))
-
-  ## Examples
-
-      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(:a, nil)
-      ...>   |> Yog.add_node(:b, nil)
-      ...>   |> Yog.add_node(:c, nil)
-      ...>   |> Yog.add_edge!(:a, :b, 1)
-      ...>   |> Yog.add_edge!(:b, :c, 1)
-      ...> )
-      iex> reduction = Yog.DAG.Algorithm.transitive_reduction(dag)
-      iex> is_struct(reduction, Yog.DAG)
-      true
-  """
-  @spec transitive_reduction(Yog.DAG.t()) :: Yog.DAG.t()
-  def transitive_reduction(dag) do
-    graph = Model.to_graph(dag)
-    nodes = Yog.all_nodes(graph)
-
-    # For each edge, check if it's implied by transitivity
-    edges_to_remove =
-      for node <- nodes,
-          {target, _weight} <- Yog.Model.successors(graph, node),
-          has_indirect_path?(graph, node, target, exclude: target),
-          do: {node, target}
-
-    # Remove redundant edges
-    new_graph =
-      Enum.reduce(edges_to_remove, graph, fn {from, to}, g ->
-        Yog.Model.remove_edge(g, from, to)
-      end)
-
-    # Unwrap and re-wrap as DAG
-    {:ok, result} = Model.from_graph(new_graph)
-    result
-  end
-
-  @doc """
   Finds the shortest path between two nodes in a weighted DAG.
 
   Uses dynamic programming on the topologically sorted DAG.
@@ -332,92 +207,6 @@ defmodule Yog.DAG.Algorithm do
   defp should_update_shortest?(current, new), do: new < current
 
   @doc """
-  Counts the number of ancestors or descendants for every node.
-
-  For each node, returns how many other nodes are reachable from it
-  (`:descendants`) or can reach it (`:ancestors`).
-
-  Uses dynamic programming on the topologically sorted DAG for efficiency.
-  Properly handles diamond patterns where a node is reachable through multiple
-  paths - each node is only counted once.
-
-  ## Time Complexity
-
-  O(V × E) in the worst case (sparse graphs),
-  optimized with set operations for common cases.
-
-  ## Examples
-
-      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(:a, nil)
-      ...>   |> Yog.add_node(:b, nil)
-      ...>   |> Yog.add_node(:c, nil)
-      ...>   |> Yog.add_node(:d, nil)
-      ...>   |> Yog.add_edge!(:a, :b, 1)
-      ...>   |> Yog.add_edge!(:a, :c, 1)
-      ...>   |> Yog.add_edge!(:b, :d, 1)
-      ...>   |> Yog.add_edge!(:c, :d, 1)
-      ...> )
-      iex> counts = Yog.DAG.Algorithm.count_reachability(dag, :descendants)
-      iex> counts[:a]
-      3
-      iex> counts[:d]
-      0
-  """
-  @spec count_reachability(Yog.DAG.t(), direction()) :: %{Yog.node_id() => integer()}
-  def count_reachability(dag, direction) do
-    graph = Model.to_graph(dag)
-
-    # Determine processing order
-    nodes_to_process =
-      case direction do
-        :descendants ->
-          topological_sort(dag) |> Enum.reverse()
-
-        :ancestors ->
-          topological_sort(dag)
-      end
-
-    # Helper to get related nodes based on direction
-    get_related = build_related_fn(graph, direction)
-
-    # DP: Map of node -> Set of all reachable nodes
-    reachability_sets =
-      Enum.reduce(nodes_to_process, %{}, fn node, acc ->
-        related = get_related.(node)
-        related_set = MapSet.new(related)
-
-        all_reachable =
-          Enum.reduce(related, related_set, fn child, set_acc ->
-            child_set = Map.get(acc, child, MapSet.new())
-            MapSet.union(set_acc, child_set)
-          end)
-
-        Map.put(acc, node, all_reachable)
-      end)
-
-    # Convert sets to counts
-    Map.new(reachability_sets, fn {node, set} -> {node, MapSet.size(set)} end)
-  end
-
-  defp build_related_fn(graph, :descendants) do
-    out_edges = graph.out_edges
-
-    fn node ->
-      Map.get(out_edges, node, %{}) |> Map.keys()
-    end
-  end
-
-  defp build_related_fn(graph, :ancestors) do
-    in_edges = graph.in_edges
-
-    fn node ->
-      Map.get(in_edges, node, %{}) |> Map.keys()
-    end
-  end
-
-  @doc """
   Finds the lowest common ancestors (LCAs) of two nodes.
 
   A common ancestor of nodes A and B is any node that has paths to both A and B.
@@ -450,6 +239,7 @@ defmodule Yog.DAG.Algorithm do
   @spec lowest_common_ancestors(Yog.DAG.t(), Yog.node_id(), Yog.node_id()) ::
           [Yog.node_id()]
   def lowest_common_ancestors(dag, node_a, node_b) do
+    graph = Model.to_graph(dag)
     ancestors_a = get_ancestors_set(dag, node_a)
     ancestors_b = get_ancestors_set(dag, node_b)
 
@@ -461,7 +251,7 @@ defmodule Yog.DAG.Algorithm do
     Enum.filter(common_ancestors, fn candidate ->
       is_ancestor_of_another =
         Enum.any?(common_ancestors, fn other ->
-          candidate != other and has_path?(dag, candidate, other)
+          candidate != other and Yog.Traversal.reachable?(graph, candidate, other)
         end)
 
       not is_ancestor_of_another
@@ -488,51 +278,11 @@ defmodule Yog.DAG.Algorithm do
     end
   end
 
-  defp has_indirect_path?(graph, from, to, exclude: exclude) do
-    # Check if there's a path from -> to that doesn't use the direct edge
-    # Simple BFS excluding the direct edge
-    do_has_path?(graph, [from], to, MapSet.new([from]), exclude)
-  end
-
-  defp do_has_path?(_graph, [], _target, _visited, _exclude), do: false
-
-  defp do_has_path?(graph, [current | rest], target, visited, exclude) do
-    if current == target do
-      true
-    else
-      neighbors = get_filtered_neighbors(graph, current, target, exclude)
-
-      new_neighbors =
-        Enum.reject(neighbors, fn n -> MapSet.member?(visited, n) end)
-
-      new_visited =
-        Enum.reduce(new_neighbors, visited, fn n, acc ->
-          MapSet.put(acc, n)
-        end)
-
-      do_has_path?(graph, rest ++ new_neighbors, target, new_visited, exclude)
-    end
-  end
-
-  defp get_filtered_neighbors(graph, current, target, exclude) do
-    Yog.Model.successors(graph, current)
-    |> Enum.map(fn {n, _} -> n end)
-    |> Enum.reject(fn n ->
-      # Skip the excluded edge
-      current == exclude and n == target
-    end)
-  end
-
   defp get_ancestors_set(dag, node) do
     graph = Model.to_graph(dag)
     all_nodes = Yog.all_nodes(graph)
 
     # Ancestors of X are all nodes Y where X is reachable from Y
-    Enum.filter(all_nodes, fn n -> has_path?(dag, n, node) end)
-  end
-
-  defp has_path?(dag, start, target) do
-    graph = Model.to_graph(dag)
-    do_has_path?(graph, [start], target, MapSet.new([start]), nil)
+    Enum.filter(all_nodes, fn n -> Yog.Traversal.reachable?(graph, n, node) end)
   end
 end

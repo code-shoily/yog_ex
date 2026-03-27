@@ -227,4 +227,73 @@ defmodule Yog.ConnectivityTest do
     # Bridges should be stored in canonical order (lower ID first)
     assert result.bridges == [{3, 5}]
   end
+
+  # ============= Reachability Tests =============
+
+  test "reachability_counts_linear_test" do
+    # 1 -> 2 -> 3
+    graph =
+      Yog.directed()
+      |> add_nodes([{1, "1"}, {2, "2"}, {3, "3"}])
+      |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}])
+
+    descendants = Connectivity.reachability_counts(graph, :descendants)
+    assert descendants[1] == 2
+    assert descendants[2] == 1
+    assert descendants[3] == 0
+
+    ancestors = Connectivity.reachability_counts(graph, :ancestors)
+    assert ancestors[1] == 0
+    assert ancestors[2] == 1
+    assert ancestors[3] == 2
+  end
+
+  test "reachability_counts_cyclic_test" do
+    # 1 -> 2 -> 3 -> 1 (cycle) , 3 -> 4
+    graph =
+      Yog.directed()
+      |> add_nodes([{1, "1"}, {2, "2"}, {3, "3"}, {4, "4"}])
+      |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}, {3, 1, 1}, {3, 4, 1}])
+
+    # 1, 2, 3 can each reach themselves and 4.
+    # But reachability_counts excludes the node itself?
+    # Let's check the implementation.
+    # In DAG, descendants = all nodes reachable from me.
+    # In my generalized version:
+    # node_count + (my_scc_size - 1)
+    # For node 1 (SCC size 3): reach 4 (size 1) + (3 - 1) = 3 total.
+    # Node 1 reaches 2, 3, 4.
+
+    descendants = Connectivity.reachability_counts(graph, :descendants)
+    assert descendants[1] == 3
+    assert descendants[2] == 3
+    assert descendants[3] == 3
+    assert descendants[4] == 0
+
+    ancestors = Connectivity.reachability_counts(graph, :ancestors)
+    # 4 is reached by 1, 2, 3
+    assert ancestors[4] == 3
+    # 1 is reached by 2, 3
+    assert ancestors[1] == 2
+  end
+
+  test "reachability_counts_diamond_test" do
+    # a -> b, a -> c, b -> d, c -> d
+    graph =
+      Yog.directed()
+      |> add_nodes([{:a, 1}, {:b, 2}, {:c, 3}, {:d, 4}])
+      |> Yog.add_edges!([{:a, :b, 1}, {:a, :c, 2}, {:b, :d, 3}, {:c, :d, 4}])
+
+    descendants = Connectivity.reachability_counts(graph, :descendants)
+    # a can reach b, c, d (3 nodes)
+    assert descendants[:a] == 3
+    assert descendants[:b] == 1
+    assert descendants[:c] == 1
+    assert descendants[:d] == 0
+
+    ancestors = Connectivity.reachability_counts(graph, :ancestors)
+    # d can be reached from a, b, c (3 nodes)
+    assert ancestors[:d] == 3
+    assert ancestors[:a] == 0
+  end
 end

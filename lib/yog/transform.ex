@@ -790,6 +790,136 @@ defmodule Yog.Transform do
   end
 
   @doc """
+  Computes the transitive closure of the graph.
+
+  The transitive closure adds an edge from node A to node C whenever there is
+  a path from A to C. For a DAG, this uses a topological sorting optimization.
+  For graphs with cycles, it uses a general path-reaching approach.
+
+  **Time Complexity:** O(V × (V + E))
+
+  ## Examples
+
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_edge_ensure(1, 2, 1, nil)
+      ...> |> Yog.add_edge_ensure(2, 3, 1, nil)
+      iex> closure = Yog.Transform.transitive_closure(graph)
+      iex> Yog.Model.has_edge?(closure, 1, 3)
+      true
+  """
+  @spec transitive_closure(Yog.graph()) :: Yog.graph()
+  def transitive_closure(%Yog.Graph{} = graph) do
+    case Yog.Traversal.topological_sort(graph) do
+      {:ok, sorted} ->
+        # Fast DAG-based closure
+        solve_transitive_reachability(graph, Enum.reverse(sorted))
+        |> Enum.reduce(graph, fn {node, targets}, g ->
+          add_closure_edges(g, node, targets)
+        end)
+
+      {:error, :contains_cycle} ->
+        # General closure using BFS/DFS from each node
+        Enum.reduce(Yog.all_nodes(graph), graph, fn src, g_acc ->
+          reachable = Yog.Traversal.walk(in: graph, from: src, using: :breadth_first) |> tl()
+
+          Enum.reduce(reachable, g_acc, fn dst, g ->
+            if Model.has_edge?(g, src, dst) do
+              g
+            else
+              Model.add_edge!(g, src, dst, 1)
+            end
+          end)
+        end)
+    end
+  end
+
+  defp solve_transitive_reachability(graph, sorted_nodes) do
+    out_edges = graph.out_edges
+
+    Enum.reduce(sorted_nodes, %{}, fn node, acc ->
+      successors = Map.get(out_edges, node, %{}) |> Map.keys()
+
+      all_reachable =
+        Enum.reduce(successors, MapSet.new(successors), fn child, set_acc ->
+          child_reachable = Map.get(acc, child, MapSet.new())
+          MapSet.union(set_acc, child_reachable)
+        end)
+
+      Map.put(acc, node, all_reachable)
+    end)
+  end
+
+  defp add_closure_edges(graph, node, targets) do
+    existing = Model.successor_ids(graph, node) |> MapSet.new()
+
+    Enum.reduce(targets, graph, fn target, g_acc ->
+      if MapSet.member?(existing, target) do
+        g_acc
+      else
+        Model.add_edge!(g_acc, node, target, 1)
+      end
+    end)
+  end
+
+  @doc """
+  Computes the transitive reduction of a DAG.
+
+  Transitive reduction removes redundant edges that are implied by transitivity.
+  For Directed Acyclic Graphs (DAGs), the result is unique and minimal.
+
+  If the graph contains cycles, this returns an error as transitive reduction
+  is not uniquely defined for general graphs with cycles.
+
+  **Time Complexity:** O(V × (V + E))
+
+  ## Examples
+
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_edge_ensure(:a, :b, 1, nil)
+      ...> |> Yog.add_edge_ensure(:b, :c, 1, nil)
+      ...> |> Yog.add_edge_ensure(:a, :c, 1, nil)
+      iex> reduction = Yog.Transform.transitive_reduction(graph)
+      iex> {:ok, red} = reduction
+      iex> # Edge a->c is redundant because a->b->c exists
+      iex> Yog.Model.has_edge?(red, :a, :c)
+      false
+  """
+  @spec transitive_reduction(Yog.graph()) :: {:ok, Yog.graph()} | {:error, :contains_cycle}
+  def transitive_reduction(%Yog.Graph{} = graph) do
+    case Yog.Traversal.topological_sort(graph) do
+      {:ok, _sorted} ->
+        nodes = Model.all_nodes(graph)
+
+        edges_to_remove =
+          for node <- nodes,
+              {target, _weight} <- Model.successors(graph, node),
+              has_indirect_path?(graph, node, target),
+              do: {node, target}
+
+        new_graph =
+          Enum.reduce(edges_to_remove, graph, fn {from, to}, g ->
+            Model.remove_edge(g, from, to)
+          end)
+
+        {:ok, new_graph}
+
+      {:error, :contains_cycle} ->
+        {:error, :contains_cycle}
+    end
+  end
+
+  defp has_indirect_path?(graph, from, to) do
+    # To check for an indirect path from 'from' to 'to', we look for any
+    # path that doesn't use the direct edge (from -> to).
+    # We do this by checking if any successor of 'from' (other than 'to') can reach 'to'.
+    Model.successor_ids(graph, from)
+    |> Enum.reject(&(&1 == to))
+    |> Enum.any?(fn successor ->
+      Yog.Traversal.reachable?(graph, successor, to)
+    end)
+  end
+
+  @doc """
   Converts an undirected graph to a directed graph.
 
   Since yog internally stores undirected edges as bidirectional directed edges,

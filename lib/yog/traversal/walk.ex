@@ -167,6 +167,14 @@ defmodule Yog.Traversal.Walk do
     end
   end
 
+  @doc """
+  Checks if there is a path between two nodes.
+  """
+  @spec reachable?(Yog.graph(), Yog.node_id(), Yog.node_id()) :: boolean()
+  def reachable?(graph, from, to) do
+    find_path(graph, from, to) != nil
+  end
+
   # BFS with fold and metadata
   defp do_fold_walk_bfs(graph, q, visited, acc, folder) do
     case :queue.out(q) do
