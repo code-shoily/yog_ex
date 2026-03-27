@@ -21,6 +21,18 @@ defmodule Yog.Utils do
 
   It works for both integers and floats.
 
+  While this function initially was influenced by the Gleamy origin of Yog,
+  it felt more of a direction agnotic way to handle comparisons in algorithms
+  that needed comparators passed into them, for instance, Dijkstra's algorithm
+  could sometimes show `compare.(a, b) == true` but we would need to remember if
+  it means a < b or a > b (what if the comparator passed in was > instead of < ?).
+
+  We could name the parameter `less_than` and `greater_than` to address this, but
+  ternary operator felt more explicit, especially in cases where the algorithms need
+  for comparison would be direction agnostic. Having only :lt or :gt would add to
+  confusion as to where it was `if a < b ... else ...` or `if a > b ... else ...`
+  so a ternary outcome felt explicit (We have examples in `Version` and `Date`)
+
   ## Examples
 
       iex> Yog.Utils.compare(10, 20)
