@@ -141,7 +141,7 @@ defmodule Yog.Flow.MinCut do
   # Find global min cut by trying representative source-sink pairs
   defp find_global_min_cut(graph, nodes) do
     # Convert undirected to directed for max flow
-    directed = to_directed(graph)
+    directed = Yog.to_directed(graph)
 
     # Try all pairs with the first node as source
     # For global min cut, it's sufficient to try all pairs where one node is fixed
@@ -169,13 +169,6 @@ defmodule Yog.Flow.MinCut do
       group_a_size: partition_size,
       group_b_size: length(nodes) - partition_size
     }
-  end
-
-  # Convert undirected graph to directed by adding edges in both directions
-  defp to_directed(graph) do
-    # For undirected graph, edges are already stored bidirectionally
-    # So we can use it as-is for max flow
-    graph
   end
 
   # Compute cut weight between two sets
