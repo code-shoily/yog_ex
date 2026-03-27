@@ -179,6 +179,59 @@ defmodule Yog.Community.LouvainTest do
   end
 
   # ============================================================
+  # Rigorous Modularity Benchmarks
+  # ============================================================
+
+  test "resolution sensitivity: two 10nd-cliques sharing one bridge" do
+    # 0-9 is clique 1, 10-19 is clique 2. Bridge 9-10.
+    edges_a = for u <- 0..9, v <- 0..9, u < v, do: {u, v, 1}
+    edges_b = for u <- 10..19, v <- 10..19, u < v, do: {u, v, 1}
+    bridge = [{9, 10, 1}]
+
+    graph =
+      Enum.reduce(edges_a ++ edges_b ++ bridge, Yog.undirected(), fn {u, v, w}, g ->
+        Yog.add_edge_ensure(g, u, v, w, nil)
+      end)
+
+    # 1. Standard resolution (gamma = 1.0)
+    # Should find exactly 2 communities
+    comms1 = Louvain.detect_with_options(graph, resolution: 1.0, seed: 1)
+    assert comms1.num_communities == 2
+
+    # 2. High resolution (gamma = 10.0)
+    # Should find MANY more communities (likely singlets or very small groups)
+    comms2 = Louvain.detect_with_options(graph, resolution: 10.0, seed: 1)
+    assert comms2.num_communities > 2
+  end
+
+  test "modularity gain verification: single bridge vs 2 bridges" do
+    # Two cliques with 1 bridge vs 2 bridges. 
+    # The modularity should reflect the structural strength.
+    edges_a = for u <- 0..4, v <- 0..4, u < v, do: {u, v, 1}
+    edges_b = for u <- 10..14, v <- 10..14, u < v, do: {u, v, 1}
+
+    g1 =
+      Enum.reduce(edges_a ++ edges_b ++ [{4, 10, 1}], Yog.undirected(), fn {u, v, w}, acc ->
+        Yog.add_edge_ensure(acc, u, v, w, nil)
+      end)
+
+    g2 =
+      Enum.reduce(edges_a ++ edges_b ++ [{4, 10, 1}, {0, 14, 1}], Yog.undirected(), fn {u, v, w},
+                                                                                       acc ->
+        Yog.add_edge_ensure(acc, u, v, w, nil)
+      end)
+
+    comms1 = Louvain.detect(g1)
+    comms2 = Louvain.detect(g2)
+
+    q1 = Metrics.modularity(g1, comms1)
+    q2 = Metrics.modularity(g2, comms2)
+
+    # g1 is more "separate" than g2, so q1 should be higher for the 2-partition
+    assert q1 > q2
+  end
+
+  # ============================================================
   # Stats Detection Tests
   # ============================================================
 

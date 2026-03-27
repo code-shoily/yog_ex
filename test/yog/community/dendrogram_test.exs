@@ -101,6 +101,60 @@ defmodule Yog.Community.DendrogramTest do
   end
 
   # ============================================================
+  # Rigorous Hierarchical Benchmarks
+  # ============================================================
+
+  test "hierarchical merge: 4 nodes merging step by step" do
+    # Level 0 (Singlets): {1}, {2}, {3}, {4} -> 4 communities
+    l0 = Result.new(%{1 => 0, 2 => 1, 3 => 2, 4 => 3})
+
+    # Level 1 (Merge 1-2): {1,2}, {3}, {4} -> 3 communities
+    l1 = Result.new(%{1 => 0, 2 => 0, 3 => 1, 4 => 2})
+
+    # Level 2 (Merge 3-4): {1,2}, {3,4} -> 2 communities
+    l2 = Result.new(%{1 => 0, 2 => 0, 3 => 1, 4 => 1})
+
+    # Level 3 (Final Merge): {1,2,3,4} -> 1 community
+    l3 = Result.new(%{1 => 0, 2 => 0, 3 => 0, 4 => 0})
+
+    dend = Dendrogram.new([l0, l1, l2, l3])
+
+    # Check num communities at each level
+    assert Dendrogram.get_level(dend, 0).num_communities == 4
+    assert Dendrogram.get_level(dend, 1).num_communities == 3
+    assert Dendrogram.get_level(dend, 2).num_communities == 2
+    assert Dendrogram.get_level(dend, 3).num_communities == 1
+
+    # at_level(n) should return the FIRST level with num_communities <= n
+    assert Dendrogram.at_level(dend, 4) == l0
+    assert Dendrogram.at_level(dend, 2) == l2
+    assert Dendrogram.at_level(dend, 1) == l3
+  end
+
+  test "merge jump: level skip from 6 to 2 communities" do
+    # Level 0: 6 nodes in 6 communities
+    l0 = Result.new(for id <- 1..6, do: {id, id - 1}, into: %{})
+    # Level 1: Everyone merged into 2 communities
+    l1 = Result.new(%{1 => 0, 2 => 0, 3 => 0, 4 => 1, 5 => 1, 6 => 1})
+
+    dend = Dendrogram.new([l0, l1])
+
+    # If we want <= 4 communities, it should skip l0 (6) and give l1 (2)
+    result = Dendrogram.at_level(dend, 4)
+    assert result == l1
+    assert result.num_communities == 2
+  end
+
+  test "at_level with unreachable target" do
+    # Only 1 community of 10 nodes exists in coarsest level
+    l1 = Result.new(for id <- 1..10, do: {id, 0}, into: %{})
+    dend = Dendrogram.new([l1])
+
+    # If target is 0 communities, it's unreachable
+    assert Dendrogram.at_level(dend, 0) == nil
+  end
+
+  # ============================================================
   # Conversion Tests
   # ============================================================
 
@@ -116,5 +170,6 @@ defmodule Yog.Community.DendrogramTest do
     restored = Dendrogram.from_map(map)
 
     assert Dendrogram.num_levels(restored) == 2
+    assert restored.merge_order == [{0, 1}]
   end
 end
