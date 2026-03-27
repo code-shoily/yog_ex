@@ -165,4 +165,10 @@ defmodule Yog.Connectivity do
   """
   @spec degeneracy(Yog.graph()) :: integer()
   defdelegate degeneracy(graph), to: KCore
+
+  @doc """
+  Groups nodes into their respective k-shells.
+  """
+  @spec shell_decomposition(Yog.graph()) :: %{integer() => [Yog.node_id()]}
+  defdelegate shell_decomposition(graph), to: KCore
 end

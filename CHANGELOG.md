@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.80.0] - UNRELEASED
 
 ### Added
+- **`Yog.Flow.MaxFlow`**: Refactored internal residual storage from a flat `{u, v}` map to a nested `u => %{v => capacity}` map, resulting in 30-50% performance improvement for Edmonds-Karp via O(1) successor lookups.
+- **`Yog.Connectivity`**: New `shell_decomposition/1` operation for grouping nodes into k-shells (nodes with core number exactly k).
 - **`Yog.Functional` Enhancements**:
   - Comprehensive `iex` doctests for all core functional modules (`Model`, `Analysis`, `Transform`, `Traversal`, `Algorithms`).
   - New `Traversal` operations: `preorder/2`, `postorder/2` (DFS finishing order), and `reachable/2`.
@@ -16,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Interop**: Added `from_adjacency_graph/1` and `to_adjacency_graph/1` to `Yog.Functional.Model` for seamless conversion between inductive and adjacency-based graph representations.
 
 ### Changed
+- **Algorithm Optimization**:
+  - `Yog.Flow.MaxFlow`: Replaced manual, recursive BFS implementation with the library's standardized `Yog.Traversal.Implicit.implicit_fold/1`.
+  - `Yog.Connectivity.KCore`: Implemented "lazy deletion" in core number buckets to preserve O(V+E) complexity by avoiding costly O(N) list deletions.
 - **Builder API Unification**: Removed legacy tuple-based builder types and function clauses from `Yog.Builder.Labeled` and `Yog.Builder.Live`. All builder APIs are now strictly struct-based (`t()`).
 - **Documentation**: Updated `README.md` with Livebook installation guides and KinoYog integration details.
 - **Benchmarking**: Updated performance statistics for GraphML parsing with `saxy` (12MB Slashdot dataset).

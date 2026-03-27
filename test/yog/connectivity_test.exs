@@ -296,4 +296,70 @@ defmodule Yog.ConnectivityTest do
     assert ancestors[:d] == 3
     assert ancestors[:a] == 0
   end
+
+  # ============= K-Core & Shell Decomposition Tests =============
+
+  test "k_core_decomposition_test" do
+    # 0 --- 1 --- 2
+    #       | \ / |
+    #       |  3  |
+    #       | / \ |
+    #       4 --- 5
+    graph =
+      Yog.undirected()
+      |> add_nodes([{0, nil}, {1, nil}, {2, nil}, {3, nil}, {4, nil}, {5, nil}])
+      |> Yog.add_edges!([
+        {0, 1, 1},
+        {1, 2, 1},
+        {1, 3, 1},
+        {2, 3, 1},
+        {3, 4, 1},
+        {3, 5, 1},
+        {4, 5, 1},
+        {1, 4, 1}
+      ])
+
+    # Core numbers:
+    # 0: degree 1 -> core 1
+    # 1: stays in after 0 is removed (deg becomes 3) -> core 3 (actually wait)
+    # Let's re-calculate:
+    # Initially: 0:1, 1:4, 2:2, 3:4, 4:3, 5:2
+    # Process i=1: node 0 (deg 1). core[0]=1. nbr 1 deg 4->3.
+    # Process i=2: nodes 2, 5 (deg 2).
+    #   Take 2: core[2]=2. nbrs 1, 3 degs 3->2, 4->3.
+    #   Take 5: core[5]=2. nbrs 3, 4 degs 3->2, 3->2.
+    # Process i=3: nodes 1, 3, 4 (deg 2, but max(2, current_deg) is used).
+    #   Wait, if we process them at i=2:
+    #   Take 1: core[1]=2. nbr 4 deg 2->1.
+    #   Take 3: core[3]=2. nbr 4 deg 1->0.
+    #   Take 4: core[4]=2.
+    # So all except 0 have core 2.
+
+    cores = Connectivity.core_numbers(graph)
+    assert cores[0] == 1
+    assert cores[1] == 2
+    assert cores[2] == 2
+    assert cores[3] == 2
+    assert cores[4] == 2
+    assert cores[5] == 2
+
+    shells = Connectivity.shell_decomposition(graph)
+    assert Map.keys(shells) |> Enum.sort() == [1, 2]
+    assert shells[1] == [0]
+    assert MapSet.new(shells[2]) == MapSet.new([1, 2, 3, 4, 5])
+  end
+
+  test "k_core_clique_test" do
+    # K4 clique: every node connects to every other node
+    graph =
+      Yog.undirected()
+      |> add_nodes([{1, nil}, {2, nil}, {3, nil}, {4, nil}])
+      |> Yog.add_edges!([{1, 2, 1}, {1, 3, 1}, {1, 4, 1}, {2, 3, 1}, {2, 4, 1}, {3, 4, 1}])
+
+    cores = Connectivity.core_numbers(graph)
+
+    assert Enum.all?(Map.values(cores), fn c -> c == 3 end)
+
+    assert Connectivity.degeneracy(graph) == 3
+  end
 end

@@ -165,55 +165,45 @@ defmodule Yog.Connectivity.KCore do
     cores
   end
 
-  defp process_bucket(graph, i, {degs, cores, buckets, processed}) do
-    # Get current bucket
-    nodes_in_bucket = Map.get(buckets, i, [])
-    buckets = Map.delete(buckets, i)
-
-    case nodes_in_bucket do
+  defp process_bucket(graph, i, {degs, cores, buckets, processed} = state) do
+    case Map.get(buckets, i, []) do
       [] ->
-        {degs, cores, buckets, processed}
+        state
 
       [u | rest] ->
         if MapSet.member?(processed, u) do
-          # Already processed (moved to lower bucket), just continue with rest
+          # Lazy skip: node was already processed at a lower k
           process_bucket(graph, i, {degs, cores, Map.put(buckets, i, rest), processed})
         else
-          # Core number of u is i
+          # Mark u as processed with core number i
           cores = Map.put(cores, u, i)
           processed = MapSet.put(processed, u)
 
-          # Use rest for re-entering the bucket
-          buckets = Map.put(buckets, i, rest)
-
-          # Neighbors degree reduction
+          # Reduce neighbor degrees
           neighbors = Model.neighbor_ids(graph, u)
 
-          {degs, buckets} =
-            Enum.reduce(neighbors, {degs, buckets}, fn v, {acc_degs, acc_buckets} ->
+          # Seed the reduction with the current buckets state (putting 'rest' back into bucket 'i')
+          # to ensure newly reduced neighbors are merged correctly without overwriting.
+          {new_degs, new_buckets} =
+            Enum.reduce(neighbors, {degs, Map.put(buckets, i, rest)}, fn v, {d_acc, b_acc} ->
               if MapSet.member?(processed, v) do
-                {acc_degs, acc_buckets}
+                {d_acc, b_acc}
               else
-                old_deg = Map.get(acc_degs, v)
+                old_v_deg = Map.get(d_acc, v)
+                new_v_deg = old_v_deg - 1
 
-                if old_deg > i do
-                  new_deg = old_deg - 1
-                  acc_degs = Map.put(acc_degs, v, new_deg)
-                  # Move v to a lower bucket
-                  acc_buckets =
-                    Map.update(acc_buckets, old_deg, [], fn list -> List.delete(list, v) end)
-                    |> Map.update(new_deg, [v], &[v | &1])
+                # Update degree
+                d_acc = Map.put(d_acc, v, new_v_deg)
 
-                  {acc_degs, acc_buckets}
-                else
-                  # Already in a lower bucket or current, will be processed later
-                  {acc_degs, acc_buckets}
-                end
+                # Move v to a lower bucket (lazy deletion)
+                target_bucket = max(new_v_deg, i)
+                b_acc = Map.update(b_acc, target_bucket, [v], &[v | &1])
+
+                {d_acc, b_acc}
               end
             end)
 
-          # Reprocess current bucket as it may have new nodes
-          process_bucket(graph, i, {degs, cores, buckets, processed})
+          process_bucket(graph, i, {new_degs, cores, new_buckets, processed})
         end
     end
   end
@@ -224,5 +214,16 @@ defmodule Yog.Connectivity.KCore do
   @spec degeneracy(Yog.graph()) :: integer()
   def degeneracy(graph) do
     core_numbers(graph) |> Map.values() |> Enum.max(fn -> 0 end)
+  end
+
+  @doc """
+  Groups nodes into their respective k-shells.
+  A k-shell contains nodes that have a core number of exactly k.
+  """
+  @spec shell_decomposition(Yog.graph()) :: %{integer() => [Yog.node_id()]}
+  def shell_decomposition(graph) do
+    graph
+    |> core_numbers()
+    |> Enum.group_by(fn {_node, core} -> core end, fn {node, _core} -> node end)
   end
 end
