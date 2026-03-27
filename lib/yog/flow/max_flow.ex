@@ -145,10 +145,16 @@ defmodule Yog.Flow.MaxFlow do
     Enum.reduce(nodes, %{}, fn from, acc ->
       successors = Model.successors(graph, from)
 
-      Enum.reduce(successors, acc, fn {to, capacity}, acc2 ->
-        key = {from, to}
-        Map.put(acc2, key, capacity)
-      end)
+      node_edges =
+        Enum.reduce(successors, %{}, fn {to, capacity}, acc2 ->
+          Map.put(acc2, to, capacity)
+        end)
+
+      if map_size(node_edges) > 0 do
+        Map.put(acc, from, node_edges)
+      else
+        acc
+      end
     end)
   end
 
@@ -160,11 +166,13 @@ defmodule Yog.Flow.MaxFlow do
         Model.add_node(g, node, Map.get(original_graph.nodes, node))
       end)
 
-    Enum.reduce(residual_map, empty_graph, fn {{u, v}, cap}, g ->
-      case Model.add_edge(g, u, v, cap) do
-        {:ok, new_g} -> new_g
-        {:error, _} -> g
-      end
+    Enum.reduce(residual_map, empty_graph, fn {u, edges}, g ->
+      Enum.reduce(edges, g, fn {v, cap}, g_acc ->
+        case Model.add_edge(g_acc, u, v, cap) do
+          {:ok, new_g} -> new_g
+          {:error, _} -> g_acc
+        end
+      end)
     end)
   end
 
@@ -177,19 +185,29 @@ defmodule Yog.Flow.MaxFlow do
       {path, bottleneck} ->
         new_residual =
           Enum.reduce(path, residual, fn {from, to}, acc ->
-            old_cap = Map.get(acc, {from, to}, zero)
+            # Update forward edge
+            from_edges = Map.get(acc, from, %{})
+            old_cap = Map.get(from_edges, to, zero)
             new_cap = subtract.(old_cap, bottleneck)
 
             acc =
               if compare.(new_cap, zero) == :eq do
-                Map.delete(acc, {from, to})
+                new_from_edges = Map.delete(from_edges, to)
+
+                if map_size(new_from_edges) == 0 do
+                  Map.delete(acc, from)
+                else
+                  Map.put(acc, from, new_from_edges)
+                end
               else
-                Map.put(acc, {from, to}, new_cap)
+                Map.put(acc, from, Map.put(from_edges, to, new_cap))
               end
 
-            old_back = Map.get(acc, {to, from}, zero)
+            # Update backward edge
+            to_edges = Map.get(acc, to, %{})
+            old_back = Map.get(to_edges, from, zero)
             new_back = add.(old_back, bottleneck)
-            Map.put(acc, {to, from}, new_back)
+            Map.put(acc, to, Map.put(to_edges, from, new_back))
           end)
 
         {flow_rest, final_residual} =
@@ -207,8 +225,9 @@ defmodule Yog.Flow.MaxFlow do
         using: :breadth_first,
         successors_of: fn node ->
           residual
-          |> Enum.filter(fn {{from, _}, cap} -> from == node and compare.(cap, zero) == :gt end)
-          |> Enum.map(fn {{_, to}, _} -> to end)
+          |> Map.get(node, %{})
+          |> Enum.filter(fn {_to, cap} -> compare.(cap, zero) == :gt end)
+          |> Enum.map(fn {to, _} -> to end)
         end,
         initial: %{},
         with: fn acc, node_id, meta ->
@@ -246,8 +265,8 @@ defmodule Yog.Flow.MaxFlow do
 
   # Compute bottleneck (minimum capacity along path)
   defp compute_bottleneck(residual, path, zero, compare) do
-    Enum.reduce(path, nil, fn edge, acc ->
-      cap = Map.get(residual, edge, zero)
+    Enum.reduce(path, nil, fn {u, v}, acc ->
+      cap = Map.get(residual, u, %{}) |> Map.get(v, zero)
 
       case acc do
         nil -> cap
