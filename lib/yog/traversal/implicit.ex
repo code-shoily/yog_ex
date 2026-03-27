@@ -1,13 +1,26 @@
 defmodule Yog.Traversal.Implicit do
   @moduledoc """
-  Implicit graph traversal — BFS, DFS, and Dijkstra on graphs defined by successor functions
-  rather than materialized data structures.
+  Implicit graph traversal — BFS, DFS, Best-First, and Random on graphs defined by
+  successor functions rather than materialized data structures.
   """
 
   alias Yog.PriorityQueue, as: PQ
 
   @doc """
-  Traverse implicit graphs using BFS or DFS without materializing a `Graph`.
+  Traverse implicit graphs using BFS, DFS, Best-First, or Random order
+  without materializing a `Graph`.
+
+  ## Options
+  - `:from`: Starting node.
+  - `:using`: Traversal order. Options:
+    - `:breadth_first` (BFS)
+    - `:depth_first` (DFS)
+    - `:best_first` - Prioritizes discovery based on a `:priority` function.
+    - `:random` - Randomizes discovery order.
+  - `:priority`: Required if `:using` is `:best_first`. A function taking `(node_id, meta)`.
+  - `:successors_of`: Function returning `[node_id]`.
+  - `:initial`: Initial accumulator.
+  - `:with`: Folder function `(acc, node_id, meta)`.
   """
   @spec implicit_fold(keyword()) :: any()
   def implicit_fold(opts) do
@@ -36,6 +49,30 @@ defmodule Yog.Traversal.Implicit do
           initial,
           successors,
           folder
+        )
+
+      :best_first ->
+        priority_fn = Keyword.fetch!(opts, :priority)
+
+        do_implicit_best_first(
+          PQ.new(fn {p1, _}, {p2, _} -> p1 <= p2 end)
+          |> PQ.push({0, {from, start_meta}}),
+          MapSet.new(),
+          initial,
+          successors,
+          folder,
+          priority_fn
+        )
+
+      :random ->
+        do_implicit_best_first(
+          PQ.new(fn {p1, _}, {p2, _} -> p1 <= p2 end)
+          |> PQ.push({0, {from, start_meta}}),
+          MapSet.new(),
+          initial,
+          successors,
+          folder,
+          fn _id, _meta -> :rand.uniform() end
         )
     end
   end
@@ -73,6 +110,32 @@ defmodule Yog.Traversal.Implicit do
           successors,
           key_fn,
           folder
+        )
+
+      :best_first ->
+        priority_fn = Keyword.fetch!(opts, :priority)
+
+        do_implicit_best_first_by(
+          PQ.new(fn {p1, _}, {p2, _} -> p1 <= p2 end)
+          |> PQ.push({0, {from, start_meta}}),
+          MapSet.new(),
+          initial,
+          successors,
+          key_fn,
+          folder,
+          priority_fn
+        )
+
+      :random ->
+        do_implicit_best_first_by(
+          PQ.new(fn {p1, _}, {p2, _} -> p1 <= p2 end)
+          |> PQ.push({0, {from, start_meta}}),
+          MapSet.new(),
+          initial,
+          successors,
+          key_fn,
+          folder,
+          fn _id, _meta -> :rand.uniform() end
         )
     end
   end
@@ -273,6 +336,89 @@ defmodule Yog.Traversal.Implicit do
 
         _ ->
           do_implicit_dijkstra_pq(rest_pq, best, acc, successors, folder)
+      end
+    end
+  end
+
+  defp do_implicit_best_first(pq, visited, acc, successors, folder, priority_fn) do
+    if PQ.empty?(pq) do
+      acc
+    else
+      {:ok, {_priority, {node_id, meta}}, rest_pq} = PQ.pop(pq)
+
+      if MapSet.member?(visited, node_id) do
+        do_implicit_best_first(rest_pq, visited, acc, successors, folder, priority_fn)
+      else
+        {control, new_acc} = folder.(acc, node_id, meta)
+        new_visited = MapSet.put(visited, node_id)
+
+        case control do
+          :halt ->
+            new_acc
+
+          :stop ->
+            do_implicit_best_first(rest_pq, new_visited, new_acc, successors, folder, priority_fn)
+
+          :continue ->
+            next_pq =
+              Enum.reduce(successors.(node_id), rest_pq, fn next_id, q_acc ->
+                next_meta = %{depth: meta.depth + 1, parent: node_id}
+                p = priority_fn.(next_id, next_meta)
+                PQ.push(q_acc, {p, {next_id, next_meta}})
+              end)
+
+            do_implicit_best_first(next_pq, new_visited, new_acc, successors, folder, priority_fn)
+        end
+      end
+    end
+  end
+
+  defp do_implicit_best_first_by(pq, visited, acc, successors, key_fn, folder, priority_fn) do
+    if PQ.empty?(pq) do
+      acc
+    else
+      {:ok, {_priority, {node_id, meta}}, rest_pq} = PQ.pop(pq)
+      node_key = key_fn.(node_id)
+
+      if MapSet.member?(visited, node_key) do
+        do_implicit_best_first_by(rest_pq, visited, acc, successors, key_fn, folder, priority_fn)
+      else
+        {control, new_acc} = folder.(acc, node_id, meta)
+        new_visited = MapSet.put(visited, node_key)
+
+        case control do
+          :halt ->
+            new_acc
+
+          :stop ->
+            do_implicit_best_first_by(
+              rest_pq,
+              new_visited,
+              new_acc,
+              successors,
+              key_fn,
+              folder,
+              priority_fn
+            )
+
+          :continue ->
+            next_pq =
+              Enum.reduce(successors.(node_id), rest_pq, fn next_id, q_acc ->
+                next_meta = %{depth: meta.depth + 1, parent: node_id}
+                p = priority_fn.(next_id, next_meta)
+                PQ.push(q_acc, {p, {next_id, next_meta}})
+              end)
+
+            do_implicit_best_first_by(
+              next_pq,
+              new_visited,
+              new_acc,
+              successors,
+              key_fn,
+              folder,
+              priority_fn
+            )
+        end
       end
     end
   end

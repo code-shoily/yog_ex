@@ -1,13 +1,18 @@
 defmodule Yog.Traversal.Walk do
   @moduledoc """
-  Graph walking algorithms — BFS and DFS traversals with fold support and path finding.
+  Graph walking algorithms — BFS, DFS, Best-First, and Random traversals.
+
+  This module provides a unified API for exploring graphs starting from a given node.
+  It supports both standard discovery (BFS, DFS) and informed discovery where the
+  next nodes are prioritized based on weights, heuristics, or randomness.
   """
 
   alias Yog.Model
 
-  @type order :: :breadth_first | :depth_first
+  @type order :: :breadth_first | :depth_first | :best_first | :random
   @type walk_control :: :continue | :stop | :halt
   @type walk_metadata :: %{depth: integer(), parent: Yog.node_id() | nil}
+  @type priority_fn :: (Yog.node_id(), number(), walk_metadata() -> number())
 
   @doc """
   Walks the graph starting from the given node, visiting all reachable nodes.
@@ -16,7 +21,24 @@ defmodule Yog.Traversal.Walk do
 
   - `:from` - Starting node ID
   - `:in` - The graph to traverse
-  - `:using` - Traversal order (`:breadth_first` or `:depth_first`)
+  - `:using` - Traversal order. Options:
+    - `:breadth_first` (BFS)
+    - `:depth_first` (DFS)
+    - `:best_first` - Prioritizes discovery based on a `:priority` function.
+    - `:random` - Randomizes discovery order.
+  - `:priority` - Required if `:using` is `:best_first`. A function taking `(node_id, weight, meta)`.
+
+  ## Examples
+
+      # Simple BFS walk
+      iex> graph = Yog.directed() |> Yog.add_edge_ensure(1, 2, 1, nil)
+      iex> Yog.Traversal.Walk.walk(in: graph, from: 1, using: :breadth_first)
+      [1, 2]
+
+      # Greedy walk using edge weights (lowest weight first)
+      iex> graph = Yog.directed() |> Yog.add_edge_ensure(1, 2, 10, nil) |> Yog.add_edge_ensure(1, 3, 5, nil)
+      iex> Yog.Traversal.Walk.walk(in: graph, from: 1, using: :best_first, priority: fn _, w, _ -> w end)
+      [1, 3, 2]
   """
   @spec walk(keyword()) :: [Yog.node_id()]
   def walk(opts) do
@@ -28,6 +50,7 @@ defmodule Yog.Traversal.Walk do
       over: graph,
       from: from,
       using: order,
+      priority: Keyword.get(opts, :priority, fn _id, _weight, _meta -> 0 end),
       initial: [],
       with: fn acc, node_id, _meta -> {:continue, [node_id | acc]} end
     )
@@ -53,6 +76,7 @@ defmodule Yog.Traversal.Walk do
       over: graph,
       from: from,
       using: order,
+      priority: Keyword.get(opts, :priority, fn _id, _weight, _meta -> 0 end),
       initial: [],
       with: fn acc, node_id, _meta ->
         new_acc = [node_id | acc]
@@ -75,6 +99,19 @@ defmodule Yog.Traversal.Walk do
 
   @doc """
   Folds over nodes during graph traversal, accumulating state with metadata.
+
+  The folder function receives `(accumulator, node_id, metadata)` and should
+  return `{control, new_accumulator}`.
+
+  ## Metadata
+  The metadata map contains:
+  - `:depth` - Distance from the starting node.
+  - `:parent` - The node ID that led to this node.
+
+  ## Control Signals
+  - `:continue` - Continue traversal normally.
+  - `:stop` - Do not explore successors of the current node, but continue with the rest of the frontier.
+  - `:halt` - Stop the entire traversal immediately.
   """
   @spec fold_walk(keyword()) :: any()
   def fold_walk(opts) do
@@ -103,6 +140,30 @@ defmodule Yog.Traversal.Walk do
           MapSet.new(),
           initial,
           folder
+        )
+
+      :best_first ->
+        priority_fn = Keyword.fetch!(opts, :priority)
+
+        do_fold_walk_best_first(
+          graph,
+          Yog.PriorityQueue.new(fn {p1, _}, {p2, _} -> p1 <= p2 end)
+          |> Yog.PriorityQueue.push({0, {from, start_metadata}}),
+          MapSet.new(),
+          initial,
+          folder,
+          priority_fn
+        )
+
+      :random ->
+        do_fold_walk_best_first(
+          graph,
+          Yog.PriorityQueue.new(fn {p1, _}, {p2, _} -> p1 <= p2 end)
+          |> Yog.PriorityQueue.push({0, {from, start_metadata}}),
+          MapSet.new(),
+          initial,
+          folder,
+          fn _id, _weight, _meta -> :rand.uniform() end
         )
     end
   end
@@ -164,6 +225,44 @@ defmodule Yog.Traversal.Walk do
     case Map.get(parents, node) do
       nil -> acc
       parent -> reconstruct_path(parents, parent, [parent | acc])
+    end
+  end
+
+  @doc """
+  Performs a random walk of fixed length from the given starting node.
+
+  Unlike discovery traversals (BFS/DFS), a random walk does not keep track
+  of visited nodes and may cross the same node or edge multiple times.
+
+  ## Parameters
+  - `graph`: The graph to walk.
+  - `from`: The starting node ID.
+  - `steps`: The number of jumps/edges to transition (path length in edges).
+
+  ## Examples
+
+      iex> graph = Yog.directed() |> Yog.add_edge_ensure(1, 2, 1, nil) |> Yog.add_edge_ensure(2, 1, 1, nil)
+      iex> path = Yog.Traversal.Walk.random_walk(graph, 1, 3)
+      iex> length(path)
+      4
+  """
+  @spec random_walk(Yog.graph(), Yog.node_id(), integer()) :: [Yog.node_id()]
+  def random_walk(graph, from, steps) do
+    do_random_walk(graph, from, steps, [from])
+  end
+
+  defp do_random_walk(_graph, _current, 0, acc), do: Enum.reverse(acc)
+
+  defp do_random_walk(graph, current, steps, acc) do
+    successors = Model.successor_ids(graph, current)
+
+    case successors do
+      [] ->
+        Enum.reverse(acc)
+
+      nodes ->
+        next = Enum.random(nodes)
+        do_random_walk(graph, next, steps - 1, [next | acc])
     end
   end
 
@@ -248,6 +347,47 @@ defmodule Yog.Traversal.Walk do
                 end)
 
               do_fold_walk_dfs(graph, next_stack, new_visited, new_acc, folder)
+          end
+        end
+    end
+  end
+
+  # Best-first with fold and metadata
+  defp do_fold_walk_best_first(graph, pq, visited, acc, folder, priority_fn) do
+    case Yog.PriorityQueue.pop(pq) do
+      :error ->
+        acc
+
+      {:ok, {_priority, {node_id, metadata}}, rest_pq} ->
+        if MapSet.member?(visited, node_id) do
+          do_fold_walk_best_first(graph, rest_pq, visited, acc, folder, priority_fn)
+        else
+          {control, new_acc} = folder.(acc, node_id, metadata)
+          new_visited = MapSet.put(visited, node_id)
+
+          case control do
+            :halt ->
+              new_acc
+
+            :stop ->
+              do_fold_walk_best_first(graph, rest_pq, new_visited, new_acc, folder, priority_fn)
+
+            :continue ->
+              # Best-first uses successors with weights to determine priorities
+              next_nodes = Model.successors(graph, node_id)
+
+              next_pq =
+                Enum.reduce(next_nodes, rest_pq, fn {next_id, weight}, current_pq ->
+                  next_meta = %{
+                    depth: metadata.depth + 1,
+                    parent: node_id
+                  }
+
+                  p = priority_fn.(next_id, weight, next_meta)
+                  Yog.PriorityQueue.push(current_pq, {p, {next_id, next_meta}})
+                end)
+
+              do_fold_walk_best_first(graph, next_pq, new_visited, new_acc, folder, priority_fn)
           end
         end
     end
