@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - New `Analysis` algorithms: `transitive_closure/1` (reachability), `biconnected_components/1`, and `dominators/2` (immediate dominators).
   - New `Algorithms` operation: `distances/2` for all-node distance mapping from a source.
   - **Interop**: Added `from_adjacency_graph/1` and `to_adjacency_graph/1` to `Yog.Functional.Model` for seamless conversion between inductive and adjacency-based graph representations.
+- **`Yog.Property`**: Added advanced structural analysis predicates: `connected?` (unified strong/weak connectivity), `planar?` (necessary condition verification), and `chordal?` (Maximum Cardinality Search based verification).
 
 ### Changed
 - **Algorithm Optimization**:
