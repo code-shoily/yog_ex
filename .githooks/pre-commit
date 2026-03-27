@@ -11,12 +11,12 @@ if [ $? -ne 0 ]; then
 fi
 
 # Run credo
-# echo "Running mix credo..."
-# mix credo --strict
-# if [ $? -ne 0 ]; then
-#  echo "Credo checks failed!"
-#  exit 1
-# fi
+echo "Running mix credo..."
+mix credo --strict
+if [ $? -ne 0 ]; then
+ echo "Credo checks failed!"
+ exit 1
+fi
 
 echo "All pre-commit checks passed! ✨"
 exit 0
