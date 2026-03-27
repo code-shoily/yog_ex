@@ -159,15 +159,13 @@ alias Yog.Community
 # Build a graph with two communities
 graph =
   Yog.undirected()
-  |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_node(3, nil)
-  |> Yog.add_node(4, nil) |> Yog.add_node(5, nil) |> Yog.add_node(6, nil)
-  |> Yog.add_edge!(from: 1, to: 2, with: 1)
-  |> Yog.add_edge!(from: 2, to: 3, with: 1)
-  |> Yog.add_edge!(from: 1, to: 3, with: 1)   # Triangle: 1-2-3
-  |> Yog.add_edge!(from: 4, to: 5, with: 1)
-  |> Yog.add_edge!(from: 5, to: 6, with: 1)
-  |> Yog.add_edge!(from: 4, to: 6, with: 1)   # Triangle: 4-5-6
-  |> Yog.add_edge!(from: 3, to: 4, with: 1)   # Bridge between communities
+  |> Yog.add_edge_with(1, 2, 1, & &1)
+  |> Yog.add_edge_with(2, 3, 1, & &1)
+  |> Yog.add_edge_with(1, 3, 1, & &1)   # Triangle: 1-2-3
+  |> Yog.add_edge_with(4, 5, 1, & &1)
+  |> Yog.add_edge_with(5, 6, 1, & &1)
+  |> Yog.add_edge_with(4, 6, 1, & &1)   # Triangle: 4-5-6
+  |> Yog.add_edge_with(3, 4, 1, & &1)   # Bridge between communities
 
 communities = Community.Louvain.detect(graph)
 IO.puts("Found #{communities.num_communities} communities")
@@ -203,24 +201,32 @@ alias Yog.Render.ASCII
 
 # Build a maze from a 2D grid
 maze = [
-  [".", ".", "#", "."],
   [".", "#", "#", "."],
-  [".", ".", ".", "."]
+  [".", ".", "#", "#"],
+  ["#", ".", ".", "."],
+  ["#", "#", "#", "."],
+  ["#", ".", "#", "."],
 ]
 
 # Create grid with walkable predicate
 grid = Grid.from_2d_list(maze, :undirected, Grid.including(["."]))
 
-IO.puts(ASCII.grid_to_string_unicode(grid, %{0 => "S", 11 => "E"}))
+IO.puts(ASCII.grid_to_string(grid, %{0 => "S", 19 => "E"}))
 
 # Prints the Maze:
-# ┌───────┬───┬───┐
-# │ S     │   │   │
-# │   ┌───┼───┤   │
-# │   │   │   │   │
-# │   └───┴───┘   │
-# │             E │
-# └───────────────┘
+#
+#  +---+---+---+---+
+#  | S |   |   |   |
+#  +   +---+---+---+
+#  |       |   |   |
+#  +---+   +---+---+
+#  |   |           |
+#  +---+---+---+   +
+#  |   |   |   |   |
+#  +---+---+---+   +
+#  |   |   |   | E |
+#  +---+---+---+---+
+#
 
 ```
 

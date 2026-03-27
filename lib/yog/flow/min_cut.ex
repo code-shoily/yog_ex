@@ -51,7 +51,7 @@ defmodule Yog.Flow.MinCut do
         ])
 
       result = Yog.Flow.MinCut.global_min_cut(graph)
-      # => %{weight: 3, group_a_size: 1, group_b_size: 3}
+      # => %{weight: 6, group_a_size: 1, group_b_size: 3}
 
   ## References
 
@@ -60,8 +60,8 @@ defmodule Yog.Flow.MinCut do
   - [CP-Algorithms: Stoer-Wagner](https://cp-algorithms.com/graph/stoer_wagner.html)
   """
 
-  alias Yog.Flow.MaxFlow
   alias Yog.Model
+  alias Yog.Transform
 
   @typedoc """
   Result of a global minimum cut computation.
@@ -77,10 +77,11 @@ defmodule Yog.Flow.MinCut do
   @doc """
   Finds the global minimum cut of an undirected weighted graph.
 
-  Uses a simplified approach: for small graphs, convert to directed and use
-  max-flow min-cut by trying representative source-sink pairs.
+  This implementation uses the Stoer-Wagner algorithm. It repeatedly finds
+  an s-t min-cut in a phase using Maximum Adjacency Search and then contracts
+  the nodes s and t. The global minimum cut is the minimum of all phase cuts.
 
-  **Time Complexity:** O(V · E²) worst case
+  **Time Complexity:** O(V³)
 
   ## Examples
 
@@ -92,25 +93,9 @@ defmodule Yog.Flow.MinCut do
       ...>   |> Yog.add_node(3, "C")
       ...>   |> Yog.add_edges([{1, 2, 5}, {2, 3, 3}, {1, 3, 2}])
       iex> result = Yog.Flow.MinCut.global_min_cut(graph)
-      iex> result.group_a_size + result.group_b_size
-      3
-
-  A larger example:
-
-      iex> {:ok, graph} = Yog.undirected()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_node(4, "D")
-      ...>   |> Yog.add_edges([
-      ...>     {1, 2, 3},
-      ...>     {1, 3, 4},
-      ...>     {2, 3, 2},
-      ...>     {2, 4, 5},
-      ...>     {3, 4, 1}
-      ...>   ])
-      iex> result = Yog.Flow.MinCut.global_min_cut(graph)
-      iex> result.weight > 0
+      iex> result.weight
+      5
+      iex> (result.group_a_size + result.group_b_size) == 3
       true
 
   ## Notes
@@ -122,86 +107,91 @@ defmodule Yog.Flow.MinCut do
   def global_min_cut(graph) do
     nodes = Model.all_nodes(graph)
 
-    cond do
-      length(nodes) <= 1 ->
-        %{weight: 0, group_a_size: length(nodes), group_b_size: 0}
+    case length(nodes) do
+      n when n <= 1 ->
+        %{weight: 0, group_a_size: n, group_b_size: 0}
 
-      length(nodes) == 2 ->
-        [a, b] = nodes
-        weight = edge_weight(graph, a, b)
-        %{weight: weight, group_a_size: 1, group_b_size: 1}
-
-      true ->
-        # For small graphs, try all pairs using max-flow
-        # For larger graphs, use a sampling approach
-        find_global_min_cut(graph, nodes)
+      n ->
+        sizes = Map.new(nodes, fn id -> {id, 1} end)
+        do_stoer_wagner(graph, sizes, n, nil)
     end
   end
 
-  # Find global min cut by trying representative source-sink pairs
-  defp find_global_min_cut(graph, nodes) do
-    # Convert undirected to directed for max flow
-    directed = to_directed(graph)
+  defp do_stoer_wagner(graph, sizes, total_size, best_cut) do
+    if map_size(graph.nodes) <= 1 do
+      best_cut
+    else
+      {s, t} = min_cut_phase(graph)
+      cut_weight = phase_cut_weight(graph, t)
 
-    # Try all pairs with the first node as source
-    # For global min cut, it's sufficient to try all pairs where one node is fixed
-    source = hd(nodes)
-    other_nodes = tl(nodes)
-
-    {min_weight, partition_size} =
-      Enum.reduce(other_nodes, {nil, nil}, fn sink, {best_weight, best_size} ->
-        result = MaxFlow.edmonds_karp(directed, source, sink)
-        cut = MaxFlow.extract_min_cut(result)
-
-        # Compute actual cut weight
-        cut_weight = compute_cut_weight(graph, cut.source_side, cut.sink_side)
-        size_a = MapSet.size(cut.source_side)
-
-        cond do
-          best_weight == nil -> {cut_weight, size_a}
-          cut_weight < best_weight -> {cut_weight, size_a}
-          true -> {best_weight, best_size}
-        end
-      end)
-
-    %{
-      weight: min_weight,
-      group_a_size: partition_size,
-      group_b_size: length(nodes) - partition_size
-    }
-  end
-
-  # Convert undirected graph to directed by adding edges in both directions
-  defp to_directed(graph) do
-    # For undirected graph, edges are already stored bidirectionally
-    # So we can use it as-is for max flow
-    graph
-  end
-
-  # Compute cut weight between two sets
-  defp compute_cut_weight(graph, set_a, set_b) do
-    set_b_list = MapSet.to_list(set_b)
-
-    Enum.reduce(MapSet.to_list(set_a), 0, fn u, acc ->
-      neighbors = Model.neighbors(graph, u)
-
-      Enum.reduce(neighbors, acc, fn {v, weight}, inner_acc ->
-        if v in set_b_list do
-          inner_acc + weight
+      new_best =
+        if is_nil(best_cut) or cut_weight < best_cut.weight do
+          %{
+            weight: cut_weight,
+            group_a_size: Map.fetch!(sizes, t),
+            group_b_size: total_size - Map.fetch!(sizes, t)
+          }
         else
-          inner_acc
+          best_cut
+        end
+
+      new_graph = Transform.contract(graph, s, t, &+/2)
+
+      new_sizes =
+        sizes
+        |> Map.put(s, Map.fetch!(sizes, s) + Map.fetch!(sizes, t))
+        |> Map.delete(t)
+
+      do_stoer_wagner(new_graph, new_sizes, total_size, new_best)
+    end
+  end
+
+  # Maximum Adjacency Search finds s and t nodes (last two added to search set)
+  defp min_cut_phase(graph) do
+    ids = Map.keys(graph.nodes)
+    [v0 | remaining] = ids
+    dists = Model.neighbors(graph, v0) |> Map.new()
+    in_s = MapSet.new([v0])
+
+    do_mas(graph, in_s, remaining, dists, nil, v0)
+  end
+
+  defp do_mas(_graph, _in_s, [], _dists, s, t), do: {s, t}
+
+  defp do_mas(graph, in_s, remaining, dists, _prev_s, current_t) do
+    {next, _w} = find_max_dist(remaining, dists)
+
+    new_in_s = MapSet.put(in_s, next)
+    new_remaining = List.delete(remaining, next)
+
+    next_neighbors = Model.neighbors(graph, next)
+
+    new_dists =
+      Enum.reduce(next_neighbors, dists, fn {v, w}, acc ->
+        if MapSet.member?(new_in_s, v) do
+          acc
+        else
+          Map.update(acc, v, w, &(&1 + w))
         end
       end)
+
+    do_mas(graph, new_in_s, new_remaining, new_dists, current_t, next)
+  end
+
+  defp find_max_dist([first | rest], dists) do
+    Enum.reduce(rest, {first, Map.get(dists, first, 0)}, fn node, {best_id, best_w} ->
+      w = Map.get(dists, node, 0)
+
+      if w > best_w do
+        {node, w}
+      else
+        {best_id, best_w}
+      end
     end)
   end
 
-  # Get weight of edge between two nodes
-  defp edge_weight(graph, u, v) do
-    neighbors = Model.neighbors(graph, u)
-
-    case List.keyfind(neighbors, v, 0) do
-      {^v, weight} -> weight
-      nil -> 0
-    end
+  defp phase_cut_weight(graph, t) do
+    Model.neighbors(graph, t)
+    |> Enum.reduce(0, fn {_, w}, acc -> acc + w end)
   end
 end

@@ -374,6 +374,38 @@ defmodule Yog.TraversalTest do
     assert Enum.sort(result) == [1, 2]
   end
 
+  test "implicit_fold_best_first_test" do
+    # Goal: visit nodes closest to 10 first
+    successors = fn n -> if n < 5, do: [n + 1, n + 2], else: [] end
+
+    result =
+      Yog.Traversal.implicit_fold(
+        from: 1,
+        using: :best_first,
+        successors_of: successors,
+        priority: fn id, _meta -> abs(10 - id) end,
+        initial: [],
+        with: fn acc, node, _meta -> {:continue, [node | acc]} end
+      )
+
+    assert Enum.sort(result) == [1, 2, 3, 4, 5, 6]
+  end
+
+  test "implicit_fold_random_test" do
+    successors = fn n -> if n < 5, do: [n + 1], else: [] end
+
+    result =
+      Yog.Traversal.implicit_fold(
+        from: 1,
+        using: :random,
+        successors_of: successors,
+        initial: [],
+        with: fn acc, node, _meta -> {:continue, [node | acc]} end
+      )
+
+    assert Enum.sort(result) == [1, 2, 3, 4, 5]
+  end
+
   # ============= Cycle Detection Tests =============
 
   test "cyclic_and_acyclic_test" do
@@ -779,5 +811,102 @@ defmodule Yog.TraversalTest do
 
     assert {:error, :contains_cycle} =
              Yog.Traversal.lexicographical_topological_sort(graph, &<=/2)
+  end
+
+  # ============= Best First Search Tests =============
+
+  test "best_first_greedy_path_test" do
+    # 1 -> 2 (100), 1 -> 3 (10)
+    # 3 leads to 4 (weight 5)
+    # 2 leads to 4 (weight 1)
+    # Greedy walk where we pick lowest edge weight first
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_node(4, "D")
+      |> Yog.add_edge!(from: 1, to: 2, with: 100)
+      |> Yog.add_edge!(from: 1, to: 3, with: 10)
+      |> Yog.add_edge!(from: 2, to: 4, with: 1)
+      |> Yog.add_edge!(from: 3, to: 4, with: 5)
+
+    result =
+      Yog.Traversal.walk(
+        in: graph,
+        from: 1,
+        using: :best_first,
+        priority: fn _id, weight, _meta -> weight end
+      )
+
+    # Starts at 1. 
+    # Frontiers: {10, 3}, {100, 2}
+    # Pops 3. Visited: [1, 3]. 
+    # New Frontiers: {100, 2}, {5, 4}
+    # Pops 4. Visited: [1, 3, 4].
+    # Pops 2. Visited: [1, 3, 4, 2].
+    assert result == [1, 3, 4, 2]
+  end
+
+  test "best_first_heuristic_test" do
+    # A simple grid-like graph where nodes have numerical IDs
+    # Goal: get to node 10. Heuristic: distance to 10.
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_node(3, nil)
+      |> Yog.add_node(10, nil)
+      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge!(from: 1, to: 3, with: 1)
+      |> Yog.add_edge!(from: 3, to: 10, with: 1)
+
+    # If h(2) = 8, h(3) = 7. It should pick 3 first.
+    heuristic = fn id -> abs(10 - id) end
+
+    result =
+      Yog.Traversal.walk(
+        in: graph,
+        from: 1,
+        using: :best_first,
+        priority: fn id, _weight, _meta -> heuristic.(id) end
+      )
+
+    assert result == [1, 10, 3, 2] or result == [1, 3, 10, 2]
+  end
+
+  # ============= Random Walk Tests =============
+
+  test "random_order_traversal_test" do
+    # Simply check that all nodes are visited in some order
+    graph =
+      Yog.directed()
+      |> Yog.add_edge_ensure(1, 2, 1, nil)
+      |> Yog.add_edge_ensure(2, 3, 1, nil)
+      |> Yog.add_edge_ensure(3, 4, 1, nil)
+
+    result = Yog.Traversal.walk(in: graph, from: 1, using: :random)
+    assert length(result) == 4
+    assert Enum.sort(result) == [1, 2, 3, 4]
+  end
+
+  test "stochastic_random_walk_test" do
+    # Path of 10 steps should result in 11 nodes
+    graph =
+      Yog.directed()
+      |> Yog.add_edge_ensure(1, 2, 1, nil)
+      |> Yog.add_edge_ensure(2, 1, 1, nil)
+
+    path = Yog.Traversal.Walk.random_walk(graph, 1, 10)
+    assert length(path) == 11
+    # Check that it alternates between 1 and 2
+    assert Enum.all?(path, fn node -> node in [1, 2] end)
+  end
+
+  test "stochastic_random_walk_dead_end_test" do
+    # Should stop early if it hits a dead end
+    graph = Yog.directed() |> Yog.add_node(1, nil)
+    path = Yog.Traversal.Walk.random_walk(graph, 1, 10)
+    assert path == [1]
   end
 end

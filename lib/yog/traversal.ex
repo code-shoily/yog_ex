@@ -323,6 +323,20 @@ defmodule Yog.Traversal do
   @spec find_path(Yog.graph(), Yog.node_id(), Yog.node_id()) :: [Yog.node_id()] | nil
   defdelegate find_path(graph, from, to), to: Walk
 
+  @doc """
+  Checks if there is a path from the starting node to the target node.
+
+  ## Example
+
+      iex> graph = Yog.directed() |> Yog.add_edge_ensure(1, 2, 1, nil)
+      iex> Yog.Traversal.reachable?(graph, 1, 2)
+      true
+      iex> Yog.Traversal.reachable?(graph, 2, 1)
+      false
+  """
+  @spec reachable?(Yog.graph(), Yog.node_id(), Yog.node_id()) :: boolean()
+  defdelegate reachable?(graph, from, to), to: Walk
+
   # ============= Cycle Detection =============
 
   @doc """

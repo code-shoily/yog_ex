@@ -19,9 +19,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Builder API Unification**: Removed legacy tuple-based builder types and function clauses from `Yog.Builder.Labeled` and `Yog.Builder.Live`. All builder APIs are now strictly struct-based (`t()`).
 - **Documentation**: Updated `README.md` with Livebook installation guides and KinoYog integration details.
 - **Benchmarking**: Updated performance statistics for GraphML parsing with `saxy` (12MB Slashdot dataset).
+- **Algorithm Generalization**:
+  - `transitive_closure/1` and `transitive_reduction/1` moved from `Yog.DAG.Algorithm` to `Yog.Transform`. Now generalized to support both cyclic and acyclic graphs (where applicable).
+  - `count_reachability/2` moved from `Yog.DAG.Algorithm` to `Yog.Connectivity.reachability_counts/2`.
+  - Added `Yog.Traversal.reachable?/3` helper for simple point-to-point reachability checks.
+  - **Traversal Enhancements**:
+    - Added `:best_first` (greedy) order for `walk`, `walk_until`, and `fold_walk` with user-defined priority functions.
+    - Added `:random` order for randomized traversal (visits all reachable nodes in random order).
+    - New `Yog.Traversal.Walk.random_walk/3` for fixed-step stochastic random walks.
 
 ### Removed
 - **Deprecated APIs**: Removed `Yog.Model.add_edge_ensured/5`.
+- **Redundant DAG Algorithms**: Removed `transitive_closure/1`, `transitive_reduction/1`, and `count_reachability/2` from `Yog.DAG.Algorithm`. Use `Yog.Transform` and `Yog.Connectivity` instead.
 
 ## [0.70.0] - 2026-03-26
 

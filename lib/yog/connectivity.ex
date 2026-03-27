@@ -27,11 +27,27 @@ defmodule Yog.Connectivity do
   alias Yog.Connectivity.Analysis
   alias Yog.Connectivity.Components
   alias Yog.Connectivity.KCore
+  alias Yog.Connectivity.Reachability
   alias Yog.Connectivity.SCC
 
   @type bridge :: Analysis.bridge()
   @type component :: Components.component()
   @type connectivity_results :: Analysis.connectivity_results()
+  @type reachability_direction :: Reachability.direction()
+
+  @doc """
+  Counts the number of ancestors or descendants for every node in the graph.
+
+  ## Example
+
+      iex> graph = Yog.directed() |> Yog.add_edge_ensure(1, 2, 1, nil)
+      iex> Yog.Connectivity.reachability_counts(graph, :descendants)[1]
+      1
+  """
+  @spec reachability_counts(Yog.graph(), reachability_direction()) :: %{
+          Yog.node_id() => integer()
+        }
+  defdelegate reachability_counts(graph, direction), to: Reachability, as: :counts
 
   @doc """
   Analyzes an **undirected graph** to find all bridges and articulation points.

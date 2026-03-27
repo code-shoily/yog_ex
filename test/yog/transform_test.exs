@@ -1052,4 +1052,99 @@ defmodule Yog.TransformTest do
     assert Yog.successors(contracted, 1) == []
     assert map_size(contracted.nodes) == 2
   end
+
+  # ============= Transitive Closure Tests =============
+
+  # Helper to add multiple nodes
+  defp add_nodes(graph, nodes) do
+    Enum.reduce(nodes, graph, fn {id, data}, acc ->
+      Yog.add_node(acc, id, data)
+    end)
+  end
+
+  test "transitive_closure_dag_test" do
+    # 1 -> 2 -> 3
+    graph =
+      Yog.directed()
+      |> add_nodes([{1, nil}, {2, nil}, {3, nil}])
+      |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}])
+
+    closure = Yog.Transform.transitive_closure(graph)
+    assert Yog.Model.has_edge?(closure, 1, 2)
+    assert Yog.Model.has_edge?(closure, 2, 3)
+    assert Yog.Model.has_edge?(closure, 1, 3)
+  end
+
+  test "transitive_closure_cyclic_test" do
+    # 1 -> 2 -> 1 (cycle), 2 -> 3
+    graph =
+      Yog.directed()
+      |> add_nodes([{1, nil}, {2, nil}, {3, nil}])
+      |> Yog.add_edges!([{1, 2, 1}, {2, 1, 1}, {2, 3, 1}])
+
+    closure = Yog.Transform.transitive_closure(graph)
+    assert Yog.Model.has_edge?(closure, 1, 3)
+    assert Yog.Model.has_edge?(closure, 2, 3)
+    # Check that there are no edges from/to the wrong place
+    # 3 has no outgoing edges
+    assert Yog.Model.successor_ids(closure, 3) == []
+  end
+
+  test "transitive_closure_diamond_test" do
+    # a -> b, a -> c, b -> d, c -> d
+    graph =
+      Yog.directed()
+      |> add_nodes([{:a, nil}, {:b, nil}, {:c, nil}, {:d, nil}])
+      |> Yog.add_edges!([{:a, :b, 1}, {:a, :c, 2}, {:b, :d, 3}, {:c, :d, 4}])
+
+    closure = Yog.Transform.transitive_closure(graph)
+    # a should have direct edge to all: b, c, d
+    successors = Yog.Model.successor_ids(closure, :a)
+    assert :b in successors
+    assert :c in successors
+    assert :d in successors
+  end
+
+  # ============= Transitive Reduction Tests =============
+
+  test "transitive_reduction_dag_test" do
+    # 1 -> 2, 2 -> 3, 1 -> 3 (redundant)
+    graph =
+      Yog.directed()
+      |> add_nodes([{1, nil}, {2, nil}, {3, nil}])
+      |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}, {1, 3, 1}])
+
+    {:ok, reduction} = Yog.Transform.transitive_reduction(graph)
+    assert Yog.Model.has_edge?(reduction, 1, 2)
+    assert Yog.Model.has_edge?(reduction, 2, 3)
+    # 1 -> 3 was correctly removed
+    refute Yog.Model.has_edge?(reduction, 1, 3)
+  end
+
+  test "transitive_reduction_diamond_test" do
+    # Diamond: a -> b, a -> c, b -> d, c -> d
+    # No edges are redundant here.
+    graph =
+      Yog.directed()
+      |> add_nodes([{:a, nil}, {:b, nil}, {:c, nil}, {:d, nil}])
+      |> Yog.add_edges!([{:a, :b, 1}, {:a, :c, 2}, {:b, :d, 3}, {:c, :d, 4}])
+
+    {:ok, reduction} = Yog.Transform.transitive_reduction(graph)
+    assert Yog.Model.has_edge?(reduction, :a, :b)
+    assert Yog.Model.has_edge?(reduction, :a, :c)
+    assert Yog.Model.has_edge?(reduction, :b, :d)
+    assert Yog.Model.has_edge?(reduction, :c, :d)
+    assert Map.has_key?(reduction.out_edges, :a)
+    assert Map.has_key?(reduction.out_edges, :b)
+    assert Map.has_key?(reduction.out_edges, :c)
+  end
+
+  test "transitive_reduction_error_on_cycle_test" do
+    graph =
+      Yog.directed()
+      |> add_nodes([{1, nil}, {2, nil}])
+      |> Yog.add_edges!([{1, 2, 1}, {2, 1, 1}])
+
+    assert {:error, :contains_cycle} = Yog.Transform.transitive_reduction(graph)
+  end
 end
