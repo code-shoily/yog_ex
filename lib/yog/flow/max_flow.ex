@@ -59,6 +59,7 @@ defmodule Yog.Flow.MaxFlow do
   alias Yog.Flow.MaxFlowResult
   alias Yog.Flow.MinCutResult
   alias Yog.Model
+  alias Yog.Traversal
 
   @typedoc """
   Result of a max flow computation.
@@ -128,10 +129,8 @@ defmodule Yog.Flow.MaxFlow do
         compare \\ &Yog.Utils.compare/2,
         min_fn \\ &min/2
       ) do
-    # Build initial residual graph with capacities
     residual = build_residual_graph(graph, zero)
 
-    # Run Edmonds-Karp
     {max_flow, final_residual} =
       do_edmonds_karp(residual, source, sink, zero, add, subtract, compare, min_fn)
 
@@ -139,8 +138,8 @@ defmodule Yog.Flow.MaxFlow do
     MaxFlowResult.new(max_flow, final_residual_graph, source, sink)
   end
 
+  # Extract all edges and their capacities from the graph
   defp build_residual_graph(graph, _zero) do
-    # Extract all edges and their capacities from the graph
     nodes = Model.all_nodes(graph)
 
     Enum.reduce(nodes, %{}, fn from, acc ->
@@ -155,15 +154,12 @@ defmodule Yog.Flow.MaxFlow do
 
   # Convert internal residual map back to a Yog.Graph structure
   defp residual_to_graph(original_graph, residual_map) do
-    # A residual graph is ALWAYS directed, even if the original was undirected,
-    # because residual capacities are asymmetric.
     empty_graph =
       Model.all_nodes(original_graph)
       |> Enum.reduce(Yog.Graph.new(:directed), fn node, g ->
         Model.add_node(g, node, Map.get(original_graph.nodes, node))
       end)
 
-    # Add all residual edges (including backward edges)
     Enum.reduce(residual_map, empty_graph, fn {{u, v}, cap}, g ->
       case Model.add_edge(g, u, v, cap) do
         {:ok, new_g} -> new_g
@@ -172,17 +168,15 @@ defmodule Yog.Flow.MaxFlow do
     end)
   end
 
-  # Main Edmonds-Karp loop
+  # Edmonds-Karp loop
   defp do_edmonds_karp(residual, source, sink, zero, add, subtract, compare, min_fn) do
     case find_augmenting_path(residual, source, sink, zero, compare) do
       nil ->
         {zero, residual}
 
       {path, bottleneck} ->
-        # Update residual capacities along the path
         new_residual =
           Enum.reduce(path, residual, fn {from, to}, acc ->
-            # Decrease forward capacity
             old_cap = Map.get(acc, {from, to}, zero)
             new_cap = subtract.(old_cap, bottleneck)
 
@@ -193,7 +187,6 @@ defmodule Yog.Flow.MaxFlow do
                 Map.put(acc, {from, to}, new_cap)
               end
 
-            # Increase backward capacity
             old_back = Map.get(acc, {to, from}, zero)
             new_back = add.(old_back, bottleneck)
             Map.put(acc, {to, from}, new_back)
@@ -208,43 +201,46 @@ defmodule Yog.Flow.MaxFlow do
 
   # Find augmenting path using BFS
   defp find_augmenting_path(residual, source, sink, zero, compare) do
-    # BFS to find shortest path with available capacity
-    queue = :queue.in({source, []}, :queue.new())
-    visited = MapSet.new([source])
+    parents =
+      Traversal.Implicit.implicit_fold(
+        from: source,
+        using: :breadth_first,
+        successors_of: fn node ->
+          residual
+          |> Enum.filter(fn {{from, _}, cap} -> from == node and compare.(cap, zero) == :gt end)
+          |> Enum.map(fn {{_, to}, _} -> to end)
+        end,
+        initial: %{},
+        with: fn acc, node_id, meta ->
+          new_acc = if meta.parent, do: Map.put(acc, node_id, meta.parent), else: acc
 
-    do_bfs(residual, queue, visited, sink, zero, compare)
+          if node_id == sink do
+            {:halt, new_acc}
+          else
+            {:continue, new_acc}
+          end
+        end
+      )
+
+    if Map.has_key?(parents, sink) or source == sink do
+      path_nodes = reconstruct_path_nodes(parents, sink, [])
+
+      path_edges =
+        path_nodes
+        |> Enum.chunk_every(2, 1, :discard)
+        |> Enum.map(fn [u, v] -> {u, v} end)
+
+      bottleneck = compute_bottleneck(residual, path_edges, zero, compare)
+      {path_edges, bottleneck}
+    else
+      nil
+    end
   end
 
-  defp do_bfs(residual, queue, visited, sink, zero, compare) do
-    case :queue.out(queue) do
-      {{:value, {current, path}}, rest} ->
-        if current == sink do
-          # Found path - compute bottleneck
-          bottleneck = compute_bottleneck(residual, path, zero, compare)
-          {path, bottleneck}
-        else
-          # Explore neighbors with remaining capacity
-          {new_queue, new_visited} =
-            residual
-            |> Enum.filter(fn {{from, _}, cap} ->
-              from == current and compare.(cap, zero) == :gt
-            end)
-            |> Enum.reduce({rest, visited}, fn {{from, to}, _cap}, {q, v} ->
-              if MapSet.member?(v, to) do
-                {q, v}
-              else
-                # credo:disable-for-next-line Credo.Check.Refactor.AppendSingleItem
-                new_q = :queue.in({to, path ++ [{from, to}]}, q)
-                new_v = MapSet.put(v, to)
-                {new_q, new_v}
-              end
-            end)
-
-          do_bfs(residual, new_queue, new_visited, sink, zero, compare)
-        end
-
-      {:empty, _} ->
-        nil
+  defp reconstruct_path_nodes(parents, node, acc) do
+    case Map.get(parents, node) do
+      nil -> [node | acc]
+      parent -> reconstruct_path_nodes(parents, parent, [node | acc])
     end
   end
 
@@ -285,7 +281,6 @@ defmodule Yog.Flow.MaxFlow do
   """
   @spec extract_min_cut(max_flow_result()) :: min_cut()
   def extract_min_cut(%MaxFlowResult{residual_graph: residual, source: source}) do
-    # Find all nodes reachable from source in residual graph
     nodes = Model.all_nodes(residual) |> MapSet.new()
     source_side = bfs_reachable_with_compare(residual, source, nodes, 0, &Yog.Utils.compare/2)
     sink_side = MapSet.difference(nodes, source_side)
@@ -333,23 +328,16 @@ defmodule Yog.Flow.MaxFlow do
   end
 
   defp bfs_reachable_with_compare(residual, source, _all_nodes, zero, compare) do
-    do_bfs_reachable(residual, [source], MapSet.new([source]), zero, compare)
-  end
-
-  defp do_bfs_reachable(_residual, [], visited, _zero, _compare), do: visited
-
-  defp do_bfs_reachable(residual, [current | rest], visited, zero, compare) do
-    # Find all neighbors with positive residual capacity
-    # Since 'residual' is now a Yog.Graph, we use Model.successors
-    neighbors =
-      Model.successors(residual, current)
-      |> Enum.filter(fn {_, cap} ->
-        compare.(cap, zero) != :eq
-      end)
-      |> Enum.map(fn {to, _} -> to end)
-      |> Enum.filter(fn n -> not MapSet.member?(visited, n) end)
-
-    new_visited = Enum.reduce(neighbors, visited, fn n, acc -> MapSet.put(acc, n) end)
-    do_bfs_reachable(residual, rest ++ neighbors, new_visited, zero, compare)
+    Traversal.Implicit.implicit_fold(
+      from: source,
+      using: :breadth_first,
+      successors_of: fn node ->
+        Model.successors(residual, node)
+        |> Enum.filter(fn {_, cap} -> compare.(cap, zero) != :eq end)
+        |> Enum.map(fn {to, _} -> to end)
+      end,
+      initial: MapSet.new(),
+      with: fn acc, node_id, _meta -> {:continue, MapSet.put(acc, node_id)} end
+    )
   end
 end

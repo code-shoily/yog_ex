@@ -71,7 +71,6 @@ defmodule Yog.Flow.MaxFlowResult do
   """
   @spec residual_capacity(t(), Yog.Model.node_id(), Yog.Model.node_id()) :: number()
   def residual_capacity(%__MODULE__{residual_graph: graph}, src, dst) do
-    # Get successors and find the specific edge
     successors = Yog.Model.successors(graph, src)
 
     case Enum.find(successors, fn {id, _} -> id == dst end) do
