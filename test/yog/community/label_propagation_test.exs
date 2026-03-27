@@ -114,4 +114,18 @@ defmodule Yog.Community.LabelPropagationTest do
     assert comms.num_communities == 1
     assert comms.assignments[0] == 0
   end
+
+  # ============================================================
+  # Rigorous Community Benchmarks
+  # ============================================================
+
+  test "detect on Zachary's Karate Club" do
+    graph = Yog.Test.Datasets.karate_club()
+    result = LabelPropagation.detect_with_options(graph, max_iterations: 100, seed: 1)
+
+    # Label propagation outcome can be highly sensitive to seeds
+    assert result.num_communities >= 1
+    assert result.num_communities <= 12
+    assert map_size(result.assignments) == 34
+  end
 end

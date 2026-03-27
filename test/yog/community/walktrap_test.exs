@@ -97,4 +97,18 @@ defmodule Yog.Community.WalktrapTest do
 
     assert comms.num_communities == 1
   end
+
+  # ============================================================
+  # Rigorous Community Benchmarks
+  # ============================================================
+
+  test "detect on Zachary's Karate Club" do
+    graph = Yog.Test.Datasets.karate_club()
+    result = Walktrap.detect_with_options(graph, walk_length: 4, seed: 1)
+
+    # Walktrap outcome can vary by walk_length and seeds
+    assert result.num_communities >= 1
+    assert result.num_communities <= 8
+    assert map_size(result.assignments) == 34
+  end
 end

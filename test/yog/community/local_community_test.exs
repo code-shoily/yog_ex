@@ -82,4 +82,19 @@ defmodule Yog.Community.LocalCommunityTest do
     assert MapSet.member?(result, 0)
     assert MapSet.member?(result, 2)
   end
+
+  # ============================================================
+  # Rigorous Community Benchmarks
+  # ============================================================
+
+  test "detect on Zachary's Karate Club from seed" do
+    graph = Yog.Test.Datasets.karate_club()
+    # Node 1 is the Officer
+    result = LocalCommunity.detect(graph, seeds: [1])
+
+    assert MapSet.member?(result, 1)
+    # Growing from node 1 should find a sizeable local community
+    assert MapSet.size(result) >= 5
+    assert MapSet.size(result) <= 34
+  end
 end

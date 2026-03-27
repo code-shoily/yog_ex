@@ -94,7 +94,21 @@ defmodule Yog.Community.GirvanNewmanTest do
 
     comms = GirvanNewman.detect(graph)
 
-    # Single node should be in one community (or unassigned for some algorithms)
-    assert comms.num_communities >= 0
+    # Single node should be in one community
+    assert comms.num_communities == 1
+  end
+
+  # ============================================================
+  # Rigorous Community Benchmarks
+  # ============================================================
+
+  test "detect on Zachary's Karate Club" do
+    graph = Yog.Test.Datasets.karate_club()
+    # GN can be slow, but for 34 nodes it should be fine.
+    # We target 2 factions.
+    {:ok, result} = GirvanNewman.detect_with_options(graph, target_communities: 2)
+
+    assert result.num_communities == 2
+    assert map_size(result.assignments) == 34
   end
 end
