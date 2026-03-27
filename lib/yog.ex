@@ -95,9 +95,11 @@ defmodule Yog do
   ### Transformations
   - `Yog.Transform` - Graph transformations
       - Transpose (O(1) edge reversal!)
-      - Map nodes and edges (functor operations)
+      - Map and update nodes/edges
       - Filter nodes with auto-pruning
-      - Merge graphs
+      - Merge and subgraph extraction
+      - Transitive closure and reduction
+      - Complement and contraction
 
   ## Features
 
@@ -743,6 +745,12 @@ defmodule Yog do
   defdelegate edge_count(graph), to: Model
 
   @doc """
+  Gets the data associated with a node.
+  """
+  @spec node(graph(), node_id()) :: term() | nil
+  defdelegate node(graph, id), to: Model
+
+  @doc """
   Checks if the graph contains a node with the given ID.
   """
   @spec has_node?(graph(), node_id()) :: boolean()
@@ -887,8 +895,20 @@ defmodule Yog do
       iex> Yog.successors(doubled, 1)
       [{2, 20}]
   """
-  @spec map_edges(graph(), (any() -> any())) :: graph()
+  @spec map_edges(graph(), (term() -> term())) :: graph()
   defdelegate map_edges(graph, func), to: Transform
+
+  @doc """
+  Updates a specific node's data using an updater function.
+  """
+  @spec update_node(graph(), node_id(), term(), (term() -> term())) :: graph()
+  defdelegate update_node(graph, id, default, fun), to: Transform
+
+  @doc """
+  Updates a specific edge's weight/metadata.
+  """
+  @spec update_edge(graph(), node_id(), node_id(), term(), (term() -> term())) :: graph()
+  defdelegate update_edge(graph, u, v, default, fun), to: Transform
 
   @doc """
   Filter nodes by a predicate. Removes nodes that don't match the predicate

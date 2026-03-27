@@ -1147,4 +1147,66 @@ defmodule Yog.TransformTest do
 
     assert {:error, :contains_cycle} = Yog.Transform.transitive_reduction(graph)
   end
+
+  # ============= Update Tests =============
+
+  test "update_node_existing_test" do
+    graph = Yog.directed() |> Yog.add_node(1, 100)
+    updated = Yog.Transform.update_node(graph, 1, 0, fn x -> x + 50 end)
+    assert Yog.Model.node(updated, 1) == 150
+  end
+
+  test "update_node_missing_test" do
+    graph = Yog.directed()
+    updated = Yog.Transform.update_node(graph, 1, 5, fn x -> x + 5 end)
+    assert Yog.Model.node(updated, 1) == 5
+  end
+
+  test "update_edge_directed_test" do
+    {:ok, graph} =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_edge(1, 2, 10)
+
+    updated = Yog.Transform.update_edge(graph, 1, 2, 0, fn w -> w + 5 end)
+    assert Yog.successors(updated, 1) == [{2, 15}]
+    assert Yog.predecessors(updated, 2) == [{1, 15}]
+  end
+
+  test "update_edge_undirected_test" do
+    {:ok, graph} =
+      Yog.undirected()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_edge(1, 2, 10)
+
+    updated = Yog.Transform.update_edge(graph, 1, 2, 0, fn w -> w * 2 end)
+    assert Yog.successors(updated, 1) == [{2, 20}]
+    assert Yog.successors(updated, 2) == [{1, 20}]
+  end
+
+  test "update_edge_missing_node_test" do
+    graph = Yog.directed() |> Yog.add_node(1, "A")
+    # Node 2 doesn't exist
+    updated = Yog.Transform.update_edge(graph, 1, 2, 10, fn w -> w + 1 end)
+    assert updated == graph
+    refute Yog.Model.has_edge?(updated, 1, 2)
+  end
+
+  test "update_edge_self_loop_undirected_test" do
+    {:ok, graph} =
+      Yog.undirected()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_edge(1, 1, 5)
+
+    updated = Yog.Transform.update_edge(graph, 1, 1, 0, fn w -> w + 1 end)
+    assert Yog.successors(updated, 1) == [{1, 6}]
+  end
+
+  test "update_edge_adds_if_not_exists_but_nodes_exist_test" do
+    graph = Yog.directed() |> Yog.add_node(1, "A") |> Yog.add_node(2, "B")
+    updated = Yog.Transform.update_edge(graph, 1, 2, 10, fn w -> w + 5 end)
+    assert Yog.successors(updated, 1) == [{2, 10}]
+  end
 end

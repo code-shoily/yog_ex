@@ -501,6 +501,93 @@ defmodule Yog.Transform do
   end
 
   @doc """
+  Updates a specific node's data using an updater function.
+
+  Similar to `Map.update/4`, it takes an initial value if the node doesn't exist,
+  but since this is a graph transformation, it is typically used on existing nodes.
+
+  ## Example
+
+      iex> graph = Yog.directed() |> Yog.add_node(1, 100)
+      iex> updated = Yog.Transform.update_node(graph, 1, 0, fn x -> x + 50 end)
+      iex> Yog.Model.node(updated, 1)
+      150
+
+      iex> graph = Yog.directed()
+      iex> updated = Yog.Transform.update_node(graph, 1, 5, fn x -> x + 5 end)
+      iex> Yog.Model.node(updated, 1)
+      5
+  """
+  @spec update_node(Yog.graph(), Yog.node_id(), term(), (term() -> term())) :: Yog.graph()
+  def update_node(%Yog.Graph{} = graph, id, default, fun) do
+    %{graph | nodes: Map.update(graph.nodes, id, default, fun)}
+  end
+
+  @doc """
+  Updates a specific edge's weight/metadata.
+
+  This is the "safe" way to perform the update, ensuring that
+  both `in_edges` and `out_edges` stay in sync. It also handles undirected graphs
+  properly.
+
+  If either node `u` or `v` does not exist in the graph, the original graph
+  is returned unchanged.
+
+  ## Example
+
+      iex> {:ok, graph} = Yog.directed()
+      ...>   |> Yog.add_node(1, "A") |> Yog.add_node(2, "B")
+      ...>   |> Yog.add_edge(1, 2, 10)
+      iex> updated = Yog.Transform.update_edge(graph, 1, 2, 0, fn w -> w + 5 end)
+      iex> Yog.successors(updated, 1)
+      [{2, 15}]
+
+      iex> {:ok, graph} = Yog.undirected()
+      ...>   |> Yog.add_node(1, "A") |> Yog.add_node(2, "B")
+      ...>   |> Yog.add_edge(1, 2, 10)
+      iex> updated = Yog.Transform.update_edge(graph, 1, 2, 0, fn w -> w * 2 end)
+      iex> Yog.successors(updated, 1)
+      [{2, 20}]
+      iex> Yog.successors(updated, 2)
+      [{1, 20}]
+  """
+  @spec update_edge(Yog.graph(), Yog.node_id(), Yog.node_id(), term(), (term() -> term())) ::
+          Yog.graph()
+  def update_edge(%Yog.Graph{} = graph, u, v, default, fun) do
+    if Map.has_key?(graph.nodes, u) and Map.has_key?(graph.nodes, v) do
+      update_directed = fn g, src, dst ->
+        update_map = fn map, start, finish ->
+          inner = Map.get(map, start, %{})
+          new_inner = Map.update(inner, finish, default, fun)
+          Map.put(map, start, new_inner)
+        end
+
+        %{
+          g
+          | out_edges: update_map.(g.out_edges, src, dst),
+            in_edges: update_map.(g.in_edges, dst, src)
+        }
+      end
+
+      case graph.kind do
+        :directed ->
+          update_directed.(graph, u, v)
+
+        :undirected ->
+          if u == v do
+            update_directed.(graph, u, v)
+          else
+            graph
+            |> update_directed.(u, v)
+            |> update_directed.(v, u)
+          end
+      end
+    else
+      graph
+    end
+  end
+
+  @doc """
   Creates the complement of a graph.
 
   The complement contains the same nodes but connects all pairs of nodes

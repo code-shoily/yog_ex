@@ -545,5 +545,19 @@ defmodule YogTest do
       assert Yog.cyclic?(cyclic_g) == true
       assert Yog.acyclic?(cyclic_g) == false
     end
+
+    test "facade_update_node_test" do
+      graph = Yog.directed() |> Yog.add_node(1, 10)
+      updated = Yog.update_node(graph, 1, 0, fn x -> x * 2 end)
+      assert Yog.node(updated, 1) == 20
+    end
+
+    test "facade_update_edge_test" do
+      {:ok, graph} =
+        Yog.directed() |> Yog.add_node(1, "A") |> Yog.add_node(2, "B") |> Yog.add_edge(1, 2, 5)
+
+      updated = Yog.update_edge(graph, 1, 2, 0, fn w -> w + 10 end)
+      assert Yog.successors(updated, 1) == [{2, 15}]
+    end
   end
 end
