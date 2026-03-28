@@ -34,10 +34,9 @@ defmodule Yog.DisjointSet do
 
   - [Wikipedia: Disjoint-set data structure](https://en.wikipedia.org/wiki/Disjoint-set_data_structure)
   - [CP-Algorithms: Disjoint Set Union](https://cp-algorithms.com/data_structures/disjoint_set_union.html)
-
-  > **Migration Note:** This module was ported from Gleam to pure Elixir in v0.53.0.
-  > The API remains unchanged.
   """
+
+  defstruct parents: %{}, ranks: %{}
 
   @typedoc """
   Disjoint Set Union (Union-Find) data structure.
@@ -47,7 +46,7 @@ defmodule Yog.DisjointSet do
 
   **Time Complexity:** O(α(n)) amortized per operation, where α is the inverse Ackermann function
   """
-  @type t :: {:disjoint_set, map(), map()}
+  @type t :: %__MODULE__{}
 
   @doc """
   Creates a new empty disjoint set structure.
@@ -60,7 +59,7 @@ defmodule Yog.DisjointSet do
   """
   @spec new() :: t()
   def new do
-    {:disjoint_set, %{}, %{}}
+    %__MODULE__{parents: %{}, ranks: %{}}
   end
 
   @doc """
@@ -79,13 +78,13 @@ defmodule Yog.DisjointSet do
       2
   """
   @spec add(t(), term()) :: t()
-  def add({:disjoint_set, parents, ranks}, element) do
+  def add(%__MODULE__{parents: parents, ranks: ranks}, element) do
     if Map.has_key?(parents, element) do
-      {:disjoint_set, parents, ranks}
+      %__MODULE__{parents: parents, ranks: ranks}
     else
       new_parents = Map.put(parents, element, element)
       new_ranks = Map.put(ranks, element, 0)
-      {:disjoint_set, new_parents, new_ranks}
+      %__MODULE__{parents: new_parents, ranks: new_ranks}
     end
   end
 
@@ -110,7 +109,7 @@ defmodule Yog.DisjointSet do
       true
   """
   @spec find(t(), term()) :: {t(), term()}
-  def find({:disjoint_set, parents, ranks} = dsu, element) do
+  def find(%__MODULE__{parents: parents, ranks: ranks} = dsu, element) do
     case Map.fetch(parents, element) do
       :error ->
         # Element not found, add it and return as its own root
@@ -123,10 +122,10 @@ defmodule Yog.DisjointSet do
 
       {:ok, parent} ->
         # Recursively find root with path compression
-        {updated_dsu, root} = find({:disjoint_set, parents, ranks}, parent)
+        {updated_dsu, root} = find(%__MODULE__{parents: parents, ranks: ranks}, parent)
         # Compress path: point element directly to root
-        new_parents = Map.put(updated_dsu |> elem(1), element, root)
-        {{:disjoint_set, new_parents, updated_dsu |> elem(2)}, root}
+        new_parents = Map.put(updated_dsu.parents, element, root)
+        {%__MODULE__{parents: new_parents, ranks: updated_dsu.ranks}, root}
     end
   end
 
@@ -218,7 +217,7 @@ defmodule Yog.DisjointSet do
       2
   """
   @spec size(t()) :: non_neg_integer()
-  def size({:disjoint_set, parents, _ranks}) do
+  def size(%__MODULE__{parents: parents}) do
     map_size(parents)
   end
 
@@ -235,7 +234,7 @@ defmodule Yog.DisjointSet do
       2
   """
   @spec count_sets(t()) :: non_neg_integer()
-  def count_sets({:disjoint_set, parents, _ranks} = dsu) do
+  def count_sets(%__MODULE__{parents: parents} = dsu) do
     parents
     |> Map.keys()
     |> Enum.map(fn element -> find_root_readonly(dsu, element) end)
@@ -260,7 +259,7 @@ defmodule Yog.DisjointSet do
       3
   """
   @spec to_lists(t()) :: [[term()]]
-  def to_lists({:disjoint_set, parents, _ranks} = dsu) do
+  def to_lists(%__MODULE__{parents: parents} = dsu) do
     parents
     |> Map.keys()
     |> Enum.reduce(%{}, fn element, acc ->
@@ -279,7 +278,7 @@ defmodule Yog.DisjointSet do
 
   # Unions two sets by their ranks (internal helper).
   # Precondition: root_x and root_y are different roots.
-  defp do_union_by_rank({:disjoint_set, parents, ranks}, root_x, root_y) do
+  defp do_union_by_rank(%__MODULE__{parents: parents, ranks: ranks}, root_x, root_y) do
     rank_x = Map.get(ranks, root_x, 0)
     rank_y = Map.get(ranks, root_y, 0)
 
@@ -287,7 +286,7 @@ defmodule Yog.DisjointSet do
       rank_x < rank_y ->
         # Attach x's tree under y's tree
         new_parents = Map.put(parents, root_x, root_y)
-        {:disjoint_set, new_parents, ranks}
+        %__MODULE__{parents: new_parents, ranks: ranks}
 
       rank_x >= rank_y ->
         # Attach y's tree under x's tree
@@ -301,13 +300,13 @@ defmodule Yog.DisjointSet do
             ranks
           end
 
-        {:disjoint_set, new_parents, new_ranks}
+        %__MODULE__{parents: new_parents, ranks: new_ranks}
     end
   end
 
   # Finds root without path compression (read-only operation).
   # Used by count_sets and to_lists to avoid modifying structure.
-  defp find_root_readonly({:disjoint_set, parents, _ranks}, element) do
+  defp find_root_readonly(%__MODULE__{parents: parents}, element) do
     case Map.fetch(parents, element) do
       :error ->
         element
@@ -316,7 +315,7 @@ defmodule Yog.DisjointSet do
         element
 
       {:ok, parent} ->
-        find_root_readonly({:disjoint_set, parents, %{}}, parent)
+        find_root_readonly(%__MODULE__{parents: parents, ranks: %{}}, parent)
     end
   end
 end
