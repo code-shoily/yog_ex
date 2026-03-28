@@ -183,7 +183,7 @@ defmodule Yog.Multi.Eulerian do
   @doc """
   Finds an Eulerian circuit using Hierholzer's algorithm adapted for multigraphs.
 
-  Returns the circuit as a list of `EdgeId`s, or `:none` if no circuit exists.
+  Returns the circuit as a list of `EdgeId`s, or `:error` if no circuit exists.
 
   ## Important Note on Multigraphs
 
@@ -233,7 +233,7 @@ defmodule Yog.Multi.Eulerian do
   @doc """
   Finds an Eulerian path using Hierholzer's algorithm adapted for multigraphs.
 
-  Returns the path as a list of `EdgeId`s, or `:none` if no path exists.
+  Returns the path as a list of `EdgeId`s, or `:error` if no path exists.
 
   ## Important Note on Multigraphs
 

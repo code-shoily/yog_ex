@@ -28,12 +28,12 @@ defmodule Yog.Multi.EulerianTest do
       refute Eulerian.has_eulerian_path?(graph)
     end
 
-    test "find_eulerian_circuit/1 returns :none for empty graph" do
+    test "find_eulerian_circuit/1 returns :error for empty graph" do
       graph = Model.directed()
       assert Eulerian.find_eulerian_circuit(graph) == :error
     end
 
-    test "find_eulerian_path/1 returns :none for empty graph" do
+    test "find_eulerian_path/1 returns :error for empty graph" do
       graph = Model.directed()
       assert Eulerian.find_eulerian_path(graph) == :error
     end

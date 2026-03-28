@@ -55,7 +55,7 @@ defmodule Yog.Pathfinding.Bidirectional do
       :error
 
   """
-  @spec shortest_path_unweighted(keyword()) :: path_result() | :none
+  @spec shortest_path_unweighted(keyword()) :: path_result()
   def shortest_path_unweighted(opts) do
     graph = Keyword.fetch!(opts, :in)
     from = Keyword.fetch!(opts, :from)
@@ -91,7 +91,7 @@ defmodule Yog.Pathfinding.Bidirectional do
       iex> path.weight
       15
   """
-  @spec shortest_path(keyword()) :: path_result() | :none
+  @spec shortest_path(keyword()) :: path_result()
   def shortest_path(opts) do
     graph = Keyword.fetch!(opts, :in)
     from = Keyword.fetch!(opts, :from)

@@ -106,7 +106,7 @@ defmodule Yog.Community do
   @doc """
   Returns the community ID with the largest number of nodes.
 
-  Returns `:none` if there are no communities (empty graph or no assignments).
+  Returns `:error` if there are no communities (empty graph or no assignments).
 
   ## Examples
 
@@ -235,7 +235,7 @@ defmodule Yog.Community do
   @doc """
   Returns the community ID for a specific node.
 
-  Returns `:none` if the node is not assigned to any community.
+  Returns `:error` if the node is not assigned to any community.
 
   ## Examples
 

@@ -153,7 +153,7 @@ defmodule Yog.DAG.Algorithm do
       iex> {:path, [:a, :b, :c], 5} = path
   """
   @spec shortest_path(Yog.DAG.t(), Yog.node_id(), Yog.node_id()) ::
-          {:some, PathUtils.path(any())} | :none
+          {:ok, PathUtils.path(any())} | :error
   def shortest_path(dag, from, to) do
     graph = Model.to_graph(dag)
     sorted_nodes = topological_sort(dag)
@@ -162,7 +162,7 @@ defmodule Yog.DAG.Algorithm do
     relevant_nodes = Enum.drop_while(sorted_nodes, fn node -> node != from end)
 
     if relevant_nodes == [] do
-      :none
+      :error
     else
       {distances, predecessors} = solve_shortest_path_dp(relevant_nodes, from, graph)
 
