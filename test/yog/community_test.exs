@@ -19,13 +19,13 @@ defmodule Yog.CommunityTest do
   test "largest_test" do
     communities = Community.Result.new(%{1 => 0, 2 => 0, 3 => 0, 4 => 1})
 
-    assert Community.largest(communities) == {:some, 0}
+    assert Community.largest(communities) == {:ok, 0}
   end
 
   test "largest_empty_test" do
     communities = Community.Result.new(%{})
 
-    assert Community.largest(communities) == :none
+    assert Community.largest(communities) == :error
   end
 
   test "sizes_test" do
@@ -61,9 +61,9 @@ defmodule Yog.CommunityTest do
   test "for_node_test" do
     communities = Community.Result.new(%{1 => 0, 2 => 1})
 
-    assert Community.for_node(communities, 1) == {:some, 0}
-    assert Community.for_node(communities, 2) == {:some, 1}
-    assert Community.for_node(communities, 999) == :none
+    assert Community.for_node(communities, 1) == {:ok, 0}
+    assert Community.for_node(communities, 2) == {:ok, 1}
+    assert Community.for_node(communities, 999) == :error
   end
 
   # ============= Metrics Tests =============

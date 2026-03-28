@@ -49,7 +49,7 @@ defmodule Yog.Community do
       iex> communities_dict = Yog.Community.to_dict(communities)
       iex> map_size(communities_dict) >= 2
       true
-      iex> {:some, _community_id} = Yog.Community.largest(communities)
+      iex> {:ok, _community_id} = Yog.Community.largest(communities)
       iex> true
       true
 
@@ -112,9 +112,9 @@ defmodule Yog.Community do
 
       iex> communities = Yog.Community.Result.new(%{1 => 0, 2 => 0, 3 => 0, 4 => 1})
       iex> Yog.Community.largest(communities)
-      {:some, 0}
+      {:ok, 0}
   """
-  @spec largest(communities()) :: {:some, community_id()} | :none
+  @spec largest(communities()) :: {:ok, community_id()} | :error
   def largest(%Result{} = communities) do
     communities
     |> sizes()
@@ -122,8 +122,8 @@ defmodule Yog.Community do
     |> Enum.sort_by(fn {_, size} -> size end, :desc)
     |> List.first()
     |> case do
-      nil -> :none
-      {community_id, _} -> {:some, community_id}
+      nil -> :error
+      {community_id, _} -> {:ok, community_id}
     end
   end
 
@@ -241,16 +241,13 @@ defmodule Yog.Community do
 
       iex> communities = Yog.Community.Result.new(%{1 => 0, 2 => 0, 3 => 1})
       iex> Yog.Community.for_node(communities, 1)
-      {:some, 0}
+      {:ok, 0}
       iex> Yog.Community.for_node(communities, 999)
-      :none
+      :error
   """
-  @spec for_node(communities(), Yog.node_id()) :: {:some, community_id()} | :none
+  @spec for_node(communities(), Yog.node_id()) :: {:ok, community_id()} | :error
   def for_node(%Result{} = communities, node) do
-    case Map.fetch(communities.assignments, node) do
-      {:ok, community} -> {:some, community}
-      :error -> :none
-    end
+    Map.fetch(communities.assignments, node)
   end
 
   # ============================================================
