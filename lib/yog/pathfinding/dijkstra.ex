@@ -288,7 +288,7 @@ defmodule Yog.Pathfinding.Dijkstra do
         compare \\ &Yog.Utils.compare/2
       ) do
     case do_dijkstra(graph, from, nil, zero, add, compare, false) do
-      :none -> %{}
+      :error -> %{}
       {_path, _weight, distances} -> distances
     end
   end

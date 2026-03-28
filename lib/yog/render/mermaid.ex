@@ -257,10 +257,10 @@ defmodule Yog.Render.Mermaid do
   ## Example
 
       case Yog.Pathfinding.Dijkstra.shortest_path(...) do
-        {:some, path} ->
+        {:ok, path} ->
           options = Yog.Render.Mermaid.path_to_options(path, Yog.Render.Mermaid.default_options())
           mermaid = Yog.Render.Mermaid.to_mermaid(graph, options)
-        :none ->
+        :error ->
           ""
       end
   """
