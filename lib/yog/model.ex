@@ -155,6 +155,85 @@ defmodule Yog.Model do
   end
 
   @doc """
+  Adds an edge to the graph.
+
+  For directed graphs, adds a single edge from `from` to `to`.
+  For undirected graphs, adds edges in both directions.
+
+  Returns `{:ok, graph}` or `{:error, reason}`.
+
+  ## Example
+
+      iex> {:ok, graph} =
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(1, "A")
+      ...>   |> Yog.add_node(2, "B")
+      ...>   |> Yog.add_edge(from: 1, to: 2, with: 10)
+      iex> Yog.successors(graph, 1)
+      [{2, 10}]
+
+  ## With pattern matching for chaining
+
+      iex> graph = Yog.directed() |> Yog.add_node(1, "A") |> Yog.add_node(2, "B")
+      iex> {:ok, graph} = Yog.add_edge(graph, from: 1, to: 2, with: 10)
+      iex> {:ok, graph} = Yog.add_edge(graph, from: 2, to: 1, with: 5)
+      iex> Yog.successors(graph, 2)
+      [{1, 5}]
+  """
+  @spec add_edge(graph(), keyword()) :: {:ok, graph()} | {:error, String.t()}
+  def add_edge(graph, opts) when is_list(opts) do
+    from = Keyword.fetch!(opts, :from)
+    to = Keyword.fetch!(opts, :to)
+    weight = Keyword.fetch!(opts, :with)
+    add_edge(graph, from, to, weight)
+  end
+
+  @doc """
+  Adds an edge to the graph, raising on error.
+
+  ## Example
+
+      iex> graph = Yog.directed() |> Yog.add_node(1, "A") |> Yog.add_node(2, "B")
+      iex> graph = Yog.add_edge!(graph, from: 1, to: 2, with: 10)
+      iex> Yog.successors(graph, 1)
+      [{2, 10}]
+  """
+  @spec add_edge!(graph(), keyword()) :: graph()
+  def add_edge!(graph, opts) do
+    from = Keyword.fetch!(opts, :from)
+    to = Keyword.fetch!(opts, :to)
+    weight = Keyword.fetch!(opts, :with)
+    add_edge!(graph, from, to, weight)
+  end
+
+  @doc """
+  Ensures both endpoint nodes exist, then adds an edge.
+
+  If `from` or `to` is not already in the graph, it is created with
+  the supplied `default` node data. Existing nodes are left unchanged.
+
+  Always succeeds and returns a `Graph` (never fails).
+  Use this when you want to build graphs quickly without pre-creating nodes.
+
+  ## Example
+
+      iex> graph =
+      ...>   Yog.directed()
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 10, default: "anon")
+      iex> # Nodes 1 and 2 are auto-created with data "anon"
+      iex> Yog.successors(graph, 1)
+      [{2, 10}]
+  """
+  @spec add_edge_ensure(graph(), keyword()) :: graph()
+  def add_edge_ensure(graph, opts) when is_list(opts) do
+    from = Keyword.fetch!(opts, :from)
+    to = Keyword.fetch!(opts, :to)
+    weight = Keyword.fetch!(opts, :with)
+    default = Keyword.get(opts, :default, nil)
+    add_edge_ensure(graph, from, to, weight, default)
+  end
+
+  @doc """
   Ensures both endpoint nodes exist, then adds an edge.
 
   If `src` or `dst` is not already in the graph, it is created with
@@ -187,6 +266,31 @@ defmodule Yog.Model do
     |> ensure_node(src, default)
     |> ensure_node(dst, default)
     |> add_edge_unchecked(src, dst, weight)
+  end
+
+  @doc """
+  Adds an unweighted edge to the graph.
+
+  This is a convenience function for graphs where edges have no meaningful weight.
+  Uses `nil` as the edge data type.
+
+  Returns `{:ok, graph}` or `{:error, reason}` if either endpoint node doesn't exist.
+
+  ## Example
+
+      iex> {:ok, graph} =
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(1, "A")
+      ...>   |> Yog.add_node(2, "B")
+      ...>   |> Yog.add_unweighted_edge(from: 1, to: 2)
+      iex> Yog.successors(graph, 1)
+      [{2, nil}]
+  """
+  @spec add_unweighted_edge(graph(), keyword()) :: {:ok, graph()} | {:error, String.t()}
+  def add_unweighted_edge(graph, opts) when is_list(opts) do
+    from = Keyword.fetch!(opts, :from)
+    to = Keyword.fetch!(opts, :to)
+    add_edge(graph, from, to, nil)
   end
 
   @doc """
@@ -253,6 +357,27 @@ defmodule Yog.Model do
         {:error, reason} -> {:halt, {:error, reason}}
       end
     end)
+  end
+
+  @doc """
+  Adds multiple edges to the graph, raising on error.
+
+  ## Example
+
+      iex> graph =
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(1, "A")
+      ...>   |> Yog.add_node(2, "B")
+      ...>   |> Yog.add_node(3, "C")
+      ...>   |> Yog.add_edges!([{1, 2, 10}, {2, 3, 5}])
+      iex> length(Yog.successors(graph, 1))
+      1
+  """
+  def add_edges!(graph, edges) do
+    case add_edges(graph, edges) do
+      {:ok, graph} -> graph
+      {:error, reason} -> raise ArgumentError, reason
+    end
   end
 
   @doc """

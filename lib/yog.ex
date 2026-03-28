@@ -32,83 +32,6 @@ defmodule Yog do
       IO.puts("No path exists")
   end
   ```
-
-  ## Modules
-
-  ### Core
-  - `Yog.Model` - Graph data structures and basic operations
-      - Create directed/undirected graphs
-      - Add nodes and edges
-      - Query successors, predecessors, neighbors
-
-  - `Yog.Builder.Labeled` - Build graphs with arbitrary labels
-      - Use strings or any type as node identifiers
-      - Automatically maps labels to internal integer IDs
-      - Convert to standard Graph for use with all algorithms
-
-  ### Algorithms
-  - `Yog.Pathfinding` - Shortest path algorithms
-      - Dijkstra's algorithm (non-negative weights)
-      - A* search (with heuristics)
-      - Bellman-Ford (negative weights, cycle detection)
-
-  - `Yog.Traversal` - Graph traversal
-      - Breadth-First Search (BFS)
-      - Depth-First Search (DFS)
-      - Early termination support
-
-  - `Yog.MST` - Minimum Spanning Tree
-      - Kruskal's algorithm with Union-Find
-      - Prim's algorithm with priority queue
-
-  - `Yog.DAG` - Topological ordering
-      - Kahn's algorithm
-      - Lexicographical variant (heap-based)
-
-  - `Yog.Connectivity` - Connected components
-      - Tarjan's algorithm for Strongly Connected Components (SCC)
-      - Kosaraju's algorithm for SCC (two-pass with transpose)
-
-  - `Yog.Connectivity` - Graph connectivity analysis
-      - Tarjan's algorithm for bridges and articulation points
-
-  - `Yog.Flow` / `Yog.MinCut` - Minimum cut algorithms
-      - Stoer-Wagner algorithm for global minimum cut
-
-  - `Yog.Eulerian` - Eulerian paths and circuits
-      - Detection of Eulerian paths and circuits
-      - Hierholzer's algorithm for finding paths
-      - Works on both directed and undirected graphs
-
-  - `Yog.Bipartite` - Bipartite graph detection and matching
-      - Bipartite detection (2-coloring)
-      - Partition extraction (independent sets)
-      - Maximum matching (augmenting path algorithm)
-
-  ### Data Structures
-  - `Yog.DisjointSet` - Union-Find / Disjoint Set
-      - Path compression and union by rank
-      - O(α(n)) amortized operations (practically constant)
-      - Dynamic connectivity queries
-      - Generic over any type
-
-  ### Transformations
-  - `Yog.Transform` - Graph transformations
-      - Transpose (O(1) edge reversal!)
-      - Map and update nodes/edges
-      - Filter nodes with auto-pruning
-      - Merge and subgraph extraction
-      - Transitive closure and reduction
-      - Complement and contraction
-
-  ## Features
-
-  - **Functional and Immutable**: All operations return new graphs
-  - **Generic**: Works with any node/edge data types
-  - **Type-Safe**: Leverages Elixir's type system
-  - **Well-Tested**: 494+ tests covering all algorithms and data structures
-  - **Efficient**: Optimal data structures (pairing heaps, union-find)
-  - **Documented**: Every function has examples
   """
   alias Yog.Connectivity
   alias Yog.Graph
@@ -287,12 +210,7 @@ defmodule Yog do
       [{1, 5}]
   """
   @spec add_edge(graph(), keyword()) :: {:ok, graph()} | {:error, String.t()}
-  def add_edge(graph, opts) when is_list(opts) do
-    from = Keyword.fetch!(opts, :from)
-    to = Keyword.fetch!(opts, :to)
-    weight = Keyword.fetch!(opts, :with)
-    Model.add_edge(graph, from, to, weight)
-  end
+  defdelegate add_edge(graph, opts), to: Model
 
   @doc """
   Raw binding for add_edge with positional arguments.
@@ -318,12 +236,7 @@ defmodule Yog do
       [{2, 10}]
   """
   @spec add_edge!(graph(), keyword()) :: graph()
-  def add_edge!(graph, opts) when is_list(opts) do
-    from = Keyword.fetch!(opts, :from)
-    to = Keyword.fetch!(opts, :to)
-    weight = Keyword.fetch!(opts, :with)
-    Model.add_edge!(graph, from, to, weight)
-  end
+  defdelegate add_edge!(graph, opts), to: Model
 
   @doc """
   Adds an edge to the graph with positional arguments, raising on error.
@@ -356,13 +269,7 @@ defmodule Yog do
       [{2, 10}]
   """
   @spec add_edge_ensure(graph(), keyword()) :: graph()
-  def add_edge_ensure(graph, opts) when is_list(opts) do
-    from = Keyword.fetch!(opts, :from)
-    to = Keyword.fetch!(opts, :to)
-    weight = Keyword.fetch!(opts, :with)
-    default = Keyword.get(opts, :default, nil)
-    Model.add_edge_ensure(graph, from, to, weight, default)
-  end
+  defdelegate add_edge_ensure(graph, opts), to: Model
 
   @doc """
   Ensures both endpoint nodes exist with positional arguments, then adds an edge.
@@ -415,11 +322,7 @@ defmodule Yog do
       [{2, nil}]
   """
   @spec add_unweighted_edge(graph(), keyword()) :: {:ok, graph()} | {:error, String.t()}
-  def add_unweighted_edge(graph, opts) when is_list(opts) do
-    from = Keyword.fetch!(opts, :from)
-    to = Keyword.fetch!(opts, :to)
-    Model.add_edge(graph, from, to, nil)
-  end
+  defdelegate add_unweighted_edge(graph, opts), to: Model
 
   @doc """
   Adds an unweighted edge with positional arguments.
@@ -566,12 +469,7 @@ defmodule Yog do
       iex> length(Yog.successors(graph, 1))
       1
   """
-  def add_edges!(graph, edges) do
-    case add_edges(graph, edges) do
-      {:ok, graph} -> graph
-      {:error, reason} -> raise ArgumentError, reason
-    end
-  end
+  defdelegate add_edges!(graph, edges), to: Model
 
   @doc """
   Adds multiple simple edges (weight = 1).
