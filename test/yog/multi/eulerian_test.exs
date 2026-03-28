@@ -30,12 +30,12 @@ defmodule Yog.Multi.EulerianTest do
 
     test "find_eulerian_circuit/1 returns :none for empty graph" do
       graph = Model.directed()
-      assert Eulerian.find_eulerian_circuit(graph) == :none
+      assert Eulerian.find_eulerian_circuit(graph) == :error
     end
 
     test "find_eulerian_path/1 returns :none for empty graph" do
       graph = Model.directed()
-      assert Eulerian.find_eulerian_path(graph) == :none
+      assert Eulerian.find_eulerian_path(graph) == :error
     end
   end
 
@@ -52,7 +52,7 @@ defmodule Yog.Multi.EulerianTest do
         |> add_edge!(:a, :b, 1)
 
       refute Eulerian.has_eulerian_circuit?(graph)
-      assert Eulerian.find_eulerian_circuit(graph) == :none
+      assert Eulerian.find_eulerian_circuit(graph) == :error
     end
 
     test "cycle has eulerian circuit" do
@@ -68,10 +68,10 @@ defmodule Yog.Multi.EulerianTest do
       assert Eulerian.has_eulerian_circuit?(graph)
 
       case Eulerian.find_eulerian_circuit(graph) do
-        {:some, edge_ids} ->
+        {:ok, edge_ids} ->
           assert length(edge_ids) == 3
 
-        :none ->
+        :error ->
           flunk("Expected to find an Eulerian circuit")
       end
     end
@@ -123,8 +123,8 @@ defmodule Yog.Multi.EulerianTest do
       assert Eulerian.has_eulerian_path?(graph)
 
       case Eulerian.find_eulerian_path(graph) do
-        {:some, edge_ids} -> assert length(edge_ids) == 1
-        :none -> flunk("Expected to find an Eulerian path")
+        {:ok, edge_ids} -> assert length(edge_ids) == 1
+        :error -> flunk("Expected to find an Eulerian path")
       end
     end
 
@@ -143,10 +143,10 @@ defmodule Yog.Multi.EulerianTest do
       assert Eulerian.has_eulerian_path?(graph)
 
       case Eulerian.find_eulerian_path(graph) do
-        {:some, edge_ids} ->
+        {:ok, edge_ids} ->
           assert length(edge_ids) == 2
 
-        :none ->
+        :error ->
           flunk("Expected to find an Eulerian path")
       end
     end
@@ -200,10 +200,10 @@ defmodule Yog.Multi.EulerianTest do
       assert Eulerian.has_eulerian_circuit?(graph)
 
       case Eulerian.find_eulerian_circuit(graph) do
-        {:some, edge_ids} ->
+        {:ok, edge_ids} ->
           assert length(edge_ids) == 3
 
-        :none ->
+        :error ->
           flunk("Expected to find an Eulerian circuit")
       end
     end
@@ -259,10 +259,10 @@ defmodule Yog.Multi.EulerianTest do
       assert Eulerian.has_eulerian_path?(graph)
 
       case Eulerian.find_eulerian_path(graph) do
-        {:some, edge_ids} ->
+        {:ok, edge_ids} ->
           assert length(edge_ids) == 2
 
-        :none ->
+        :error ->
           flunk("Expected to find an Eulerian path")
       end
     end
@@ -319,10 +319,10 @@ defmodule Yog.Multi.EulerianTest do
       assert Eulerian.has_eulerian_circuit?(graph)
 
       case Eulerian.find_eulerian_circuit(graph) do
-        {:some, edge_ids} ->
+        {:ok, edge_ids} ->
           assert length(edge_ids) == 2
 
-        :none ->
+        :error ->
           flunk("Expected to find an Eulerian circuit")
       end
     end
@@ -383,10 +383,10 @@ defmodule Yog.Multi.EulerianTest do
       assert Eulerian.has_eulerian_circuit?(graph)
 
       case Eulerian.find_eulerian_circuit(graph) do
-        {:some, edge_ids} ->
+        {:ok, edge_ids} ->
           assert length(edge_ids) == 6
 
-        :none ->
+        :error ->
           flunk("Expected to find an Eulerian circuit")
       end
     end

@@ -32,7 +32,7 @@ defmodule Yog.Multi.Eulerian do
 
       # Check if a graph has an Eulerian circuit
       if Yog.Multi.Eulerian.has_eulerian_circuit?(graph) do
-        {:some, edge_ids} = Yog.Multi.Eulerian.find_eulerian_circuit(graph)
+        {:ok, edge_ids} = Yog.Multi.Eulerian.find_eulerian_circuit(graph)
         # Traverse the circuit using edge_ids...
       end
 
@@ -205,8 +205,8 @@ defmodule Yog.Multi.Eulerian do
       ...> graph = elem(Yog.Multi.Model.add_edge(graph, :b, :c, 2), 0)
       ...> graph = elem(Yog.Multi.Model.add_edge(graph, :c, :a, 3), 0)
       ...> case Yog.Multi.Eulerian.find_eulerian_circuit(graph) do
-      ...>   {:some, edge_ids} -> length(edge_ids)
-      ...>   :none -> 0
+      ...>   {:ok, edge_ids} -> length(edge_ids)
+      ...>   :error -> 0
       ...> end
       3
 
@@ -216,17 +216,17 @@ defmodule Yog.Multi.Eulerian do
       ...>   |> Yog.Multi.Model.add_node(:b, "B")
       ...> graph = elem(Yog.Multi.Model.add_edge(graph, :a, :b, 1), 0)
       ...> Yog.Multi.Eulerian.find_eulerian_circuit(graph)
-      :none
+      :error
   """
-  @spec find_eulerian_circuit(Model.t()) :: {:some, [Model.edge_id()]} | :none
+  @spec find_eulerian_circuit(Model.t()) :: {:ok, [Model.edge_id()]} | :error
   def find_eulerian_circuit(graph) do
     if has_eulerian_circuit?(graph) do
       case Model.all_nodes(graph) |> List.first() do
-        nil -> :none
+        nil -> :error
         start -> run_hierholzer(graph, start)
       end
     else
-      :none
+      :error
     end
   end
 
@@ -254,8 +254,8 @@ defmodule Yog.Multi.Eulerian do
       ...> graph = elem(Yog.Multi.Model.add_edge(graph, :a, :b, 1), 0)
       ...> graph = elem(Yog.Multi.Model.add_edge(graph, :b, :c, 2), 0)
       ...> case Yog.Multi.Eulerian.find_eulerian_path(graph) do
-      ...>   {:some, edge_ids} -> length(edge_ids)
-      ...>   :none -> 0
+      ...>   {:ok, edge_ids} -> length(edge_ids)
+      ...>   :error -> 0
       ...> end
       2
 
@@ -268,8 +268,8 @@ defmodule Yog.Multi.Eulerian do
       ...> graph = elem(Yog.Multi.Model.add_edge(graph, :b, :c, 2), 0)
       ...> graph = elem(Yog.Multi.Model.add_edge(graph, :c, :a, 3), 0)
       ...> case Yog.Multi.Eulerian.find_eulerian_path(graph) do
-      ...>   {:some, edge_ids} -> length(edge_ids)
-      ...>   :none -> 0
+      ...>   {:ok, edge_ids} -> length(edge_ids)
+      ...>   :error -> 0
       ...> end
       3
 
@@ -281,17 +281,17 @@ defmodule Yog.Multi.Eulerian do
       ...> graph = elem(Yog.Multi.Model.add_edge(graph, :a, :b, 1), 0)
       ...> graph = elem(Yog.Multi.Model.add_edge(graph, :a, :c, 2), 0)
       ...> Yog.Multi.Eulerian.find_eulerian_path(graph)
-      :none
+      :error
   """
-  @spec find_eulerian_path(Model.t()) :: {:some, [Model.edge_id()]} | :none
+  @spec find_eulerian_path(Model.t()) :: {:ok, [Model.edge_id()]} | :error
   def find_eulerian_path(graph) do
     if has_eulerian_path?(graph) do
       case find_path_start(graph) do
-        nil -> :none
+        nil -> :error
         start -> run_hierholzer(graph, start)
       end
     else
-      :none
+      :error
     end
   end
 
@@ -387,13 +387,13 @@ defmodule Yog.Multi.Eulerian do
     {_, path} = do_hierholzer(graph, start, all_ids, [])
 
     if path == [] do
-      :none
+      :error
     else
       # Hierholzer builds the path in post-order, so it's naturally reversed but we want the sequence
       # Wait, [eid | built] in post-order actually prepends, so it builds [e1, e2, ...] in forward order?
       # Let's check: in post-order, the LAST edge visited is the FIRST one returned.
       # So we need to reverse it to get the correct traversal order.
-      {:some, Enum.reverse(path)}
+      {:ok, Enum.reverse(path)}
     end
   end
 

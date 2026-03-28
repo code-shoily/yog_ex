@@ -149,7 +149,7 @@ defmodule Yog.DAG.Algorithm do
       ...>   |> Yog.add_edge_ensure(:a, :b, 3)
       ...>   |> Yog.add_edge_ensure(:b, :c, 2)
       ...> )
-      iex> {:some, path} = Yog.DAG.Algorithm.shortest_path(dag, :a, :c)
+      iex> {:ok, path} = Yog.DAG.Algorithm.shortest_path(dag, :a, :c)
       iex> {:path, [:a, :b, :c], 5} = path
   """
   @spec shortest_path(Yog.DAG.t(), Yog.node_id(), Yog.node_id()) ::
@@ -169,10 +169,10 @@ defmodule Yog.DAG.Algorithm do
       case Map.fetch(distances, to) do
         {:ok, total_dist} ->
           path = reconstruct_path_backward(to, from, predecessors, [])
-          {:some, PathUtils.path(path, total_dist)}
+          {:ok, PathUtils.path(path, total_dist)}
 
-        :error ->
-          :none
+        _ ->
+          :error
       end
     end
   end
