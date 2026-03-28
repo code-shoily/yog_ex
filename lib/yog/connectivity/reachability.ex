@@ -31,8 +31,8 @@ defmodule Yog.Connectivity.Reachability do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
       iex> counts = Yog.Connectivity.Reachability.counts(graph, :descendants)
       iex> counts[1]
       2

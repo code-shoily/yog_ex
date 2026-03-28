@@ -66,7 +66,7 @@ defmodule YogTest do
         Yog.directed()
         |> Yog.add_node(1, "Node A")
         |> Yog.add_node(2, "Node B")
-        |> Yog.add_edge!(from: 1, to: 2, with: 10)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
 
       out_edges = graph.out_edges
       in_edges = graph.in_edges
@@ -85,8 +85,8 @@ defmodule YogTest do
         |> Yog.add_node(1, "Node A")
         |> Yog.add_node(2, "Node B")
         |> Yog.add_node(3, "Node C")
-        |> Yog.add_edge!(from: 1, to: 2, with: 10)
-        |> Yog.add_edge!(from: 1, to: 3, with: 20)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+        |> Yog.add_edge_ensure(from: 1, to: 3, with: 20)
 
       out_edges_1 = graph.out_edges |> Map.get(1)
       assert map_size(out_edges_1) == 2
@@ -101,8 +101,8 @@ defmodule YogTest do
         |> Yog.add_node(1, "Node A")
         |> Yog.add_node(2, "Node B")
         |> Yog.add_node(3, "Node C")
-        |> Yog.add_edge!(from: 1, to: 3, with: 10)
-        |> Yog.add_edge!(from: 2, to: 3, with: 20)
+        |> Yog.add_edge_ensure(from: 1, to: 3, with: 10)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 20)
 
       in_edges_3 = graph.in_edges |> Map.get(3)
       assert map_size(in_edges_3) == 2
@@ -116,7 +116,7 @@ defmodule YogTest do
         Yog.undirected()
         |> Yog.add_node(1, "Node A")
         |> Yog.add_node(2, "Node B")
-        |> Yog.add_edge!(from: 1, to: 2, with: 15)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 15)
 
       out_edges = graph.out_edges
       in_edges = graph.in_edges
@@ -134,8 +134,8 @@ defmodule YogTest do
         Yog.directed()
         |> Yog.add_node(1, "Node A")
         |> Yog.add_node(2, "Node B")
-        |> Yog.add_edge!(from: 1, to: 2, with: 10)
-        |> Yog.add_edge!(from: 1, to: 2, with: 25)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 25)
 
       out_edges = graph.out_edges
       assert Map.get(out_edges, 1) == %{2 => 25}
@@ -147,7 +147,7 @@ defmodule YogTest do
         Yog.directed()
         |> Yog.add_node(1, 100)
         |> Yog.add_node(2, 200)
-        |> Yog.add_edge!(from: 1, to: 2, with: "labeled_edge")
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: "labeled_edge")
 
       nodes = graph.nodes
       assert Map.get(nodes, 1) == 100
@@ -164,11 +164,11 @@ defmodule YogTest do
         |> Yog.add_node(2, "B")
         |> Yog.add_node(3, "C")
         |> Yog.add_node(4, "D")
-        |> Yog.add_edge!(from: 1, to: 2, with: 1.0)
-        |> Yog.add_edge!(from: 1, to: 3, with: 2.0)
-        |> Yog.add_edge!(from: 2, to: 3, with: 1.5)
-        |> Yog.add_edge!(from: 3, to: 4, with: 3.0)
-        |> Yog.add_edge!(from: 2, to: 4, with: 2.5)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1.0)
+        |> Yog.add_edge_ensure(from: 1, to: 3, with: 2.0)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 1.5)
+        |> Yog.add_edge_ensure(from: 3, to: 4, with: 3.0)
+        |> Yog.add_edge_ensure(from: 2, to: 4, with: 2.5)
 
       nodes = graph.nodes
       out_edges = graph.out_edges
@@ -186,7 +186,7 @@ defmodule YogTest do
       graph =
         Yog.directed()
         |> Yog.add_node(1, "Node A")
-        |> Yog.add_edge!(from: 1, to: 1, with: 5)
+        |> Yog.add_edge_ensure(from: 1, to: 1, with: 5)
 
       out_edges = graph.out_edges
       in_edges = graph.in_edges
@@ -215,7 +215,7 @@ defmodule YogTest do
         Yog.directed()
         |> Yog.add_node(1, "Node A")
         |> Yog.add_node(2, "Node B")
-        |> Yog.add_edge!(from: 1, to: 2, with: 10)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
 
       assert Yog.successors(graph, 1) == [{2, 10}]
     end
@@ -227,9 +227,9 @@ defmodule YogTest do
         |> Yog.add_node(2, "Node B")
         |> Yog.add_node(3, "Node C")
         |> Yog.add_node(4, "Node D")
-        |> Yog.add_edge!(from: 1, to: 2, with: 10)
-        |> Yog.add_edge!(from: 1, to: 3, with: 20)
-        |> Yog.add_edge!(from: 1, to: 4, with: 30)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+        |> Yog.add_edge_ensure(from: 1, to: 3, with: 20)
+        |> Yog.add_edge_ensure(from: 1, to: 4, with: 30)
 
       result = Yog.successors(graph, 1)
       assert length(result) == 3
@@ -258,7 +258,7 @@ defmodule YogTest do
         Yog.directed()
         |> Yog.add_node(1, "Node A")
         |> Yog.add_node(2, "Node B")
-        |> Yog.add_edge!(from: 1, to: 2, with: 10)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
 
       assert Yog.predecessors(graph, 2) == [{1, 10}]
     end
@@ -270,9 +270,9 @@ defmodule YogTest do
         |> Yog.add_node(2, "Node B")
         |> Yog.add_node(3, "Node C")
         |> Yog.add_node(4, "Node D")
-        |> Yog.add_edge!(from: 1, to: 4, with: 10)
-        |> Yog.add_edge!(from: 2, to: 4, with: 20)
-        |> Yog.add_edge!(from: 3, to: 4, with: 30)
+        |> Yog.add_edge_ensure(from: 1, to: 4, with: 10)
+        |> Yog.add_edge_ensure(from: 2, to: 4, with: 20)
+        |> Yog.add_edge_ensure(from: 3, to: 4, with: 30)
 
       result = Yog.predecessors(graph, 4)
       assert length(result) == 3
@@ -288,8 +288,8 @@ defmodule YogTest do
         |> Yog.add_node(1, "Node A")
         |> Yog.add_node(2, "Node B")
         |> Yog.add_node(3, "Node C")
-        |> Yog.add_edge!(from: 1, to: 2, with: 10)
-        |> Yog.add_edge!(from: 1, to: 3, with: 20)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+        |> Yog.add_edge_ensure(from: 1, to: 3, with: 20)
 
       neighbors = Yog.neighbors(graph, 1)
       successors = Yog.successors(graph, 1)
@@ -304,8 +304,8 @@ defmodule YogTest do
         |> Yog.add_node(1, "Node A")
         |> Yog.add_node(2, "Node B")
         |> Yog.add_node(3, "Node C")
-        |> Yog.add_edge!(from: 1, to: 2, with: 10)
-        |> Yog.add_edge!(from: 1, to: 3, with: 20)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+        |> Yog.add_edge_ensure(from: 1, to: 3, with: 20)
 
       neighbors = Yog.neighbors(graph, 1)
       assert length(neighbors) == 2
@@ -319,8 +319,8 @@ defmodule YogTest do
         |> Yog.add_node(1, "Node A")
         |> Yog.add_node(2, "Node B")
         |> Yog.add_node(3, "Node C")
-        |> Yog.add_edge!(from: 2, to: 1, with: 10)
-        |> Yog.add_edge!(from: 3, to: 1, with: 20)
+        |> Yog.add_edge_ensure(from: 2, to: 1, with: 10)
+        |> Yog.add_edge_ensure(from: 3, to: 1, with: 20)
 
       neighbors = Yog.neighbors(graph, 1)
       assert length(neighbors) == 2
@@ -335,9 +335,9 @@ defmodule YogTest do
         |> Yog.add_node(2, "Node B")
         |> Yog.add_node(3, "Node C")
         |> Yog.add_node(4, "Node D")
-        |> Yog.add_edge!(from: 1, to: 2, with: 10)
-        |> Yog.add_edge!(from: 1, to: 3, with: 20)
-        |> Yog.add_edge!(from: 4, to: 1, with: 30)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+        |> Yog.add_edge_ensure(from: 1, to: 3, with: 20)
+        |> Yog.add_edge_ensure(from: 4, to: 1, with: 30)
 
       neighbors = Yog.neighbors(graph, 1)
       assert length(neighbors) == 3
@@ -351,8 +351,8 @@ defmodule YogTest do
         Yog.directed()
         |> Yog.add_node(1, "Node A")
         |> Yog.add_node(2, "Node B")
-        |> Yog.add_edge!(from: 1, to: 2, with: 10)
-        |> Yog.add_edge!(from: 2, to: 1, with: 20)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+        |> Yog.add_edge_ensure(from: 2, to: 1, with: 20)
 
       neighbors = Yog.neighbors(graph, 1)
       assert length(neighbors) == 1
@@ -394,8 +394,8 @@ defmodule YogTest do
         |> Yog.add_node(2, "Node B")
         |> Yog.add_node(3, "Node C")
         |> Yog.add_node(4, "Node D")
-        |> Yog.add_edge!(from: 1, to: 2, with: 10)
-        |> Yog.add_edge!(from: 2, to: 3, with: 20)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 20)
 
       result = Yog.all_nodes(graph)
       assert length(result) == 4
@@ -411,7 +411,7 @@ defmodule YogTest do
         |> Yog.add_node(1, "Node A")
         |> Yog.add_node(2, "Node B")
         |> Yog.add_node(3, "Node C")
-        |> Yog.add_edge!(from: 1, to: 2, with: 10)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
 
       result = Yog.all_nodes(graph)
       assert length(result) == 3
@@ -424,7 +424,7 @@ defmodule YogTest do
       graph =
         Yog.directed()
         |> Yog.add_node(1, "Node A")
-        |> Yog.add_edge!(from: 1, to: 1, with: 5)
+        |> Yog.add_edge_ensure(from: 1, to: 1, with: 5)
 
       assert Yog.all_nodes(graph) == [1]
     end
@@ -434,8 +434,8 @@ defmodule YogTest do
         Yog.directed()
         |> Yog.add_node(1, "Node A")
         |> Yog.add_node(2, "Node B")
-        |> Yog.add_edge!(from: 1, to: 2, with: 10)
-        |> Yog.add_edge!(from: 2, to: 1, with: 20)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+        |> Yog.add_edge_ensure(from: 2, to: 1, with: 20)
 
       result = Yog.all_nodes(graph)
       assert length(result) == 2
@@ -463,7 +463,7 @@ defmodule YogTest do
         Yog.directed()
         |> Yog.add_node(1, "Node A")
         |> Yog.add_node(2, "Node B")
-        |> Yog.add_edge!(from: 1, to: 2, with: 10)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
 
       assert Yog.successor_ids(graph, 1) == [2]
     end
@@ -475,9 +475,9 @@ defmodule YogTest do
         |> Yog.add_node(2, "Node B")
         |> Yog.add_node(3, "Node C")
         |> Yog.add_node(4, "Node D")
-        |> Yog.add_edge!(from: 1, to: 2, with: 10)
-        |> Yog.add_edge!(from: 1, to: 3, with: 20)
-        |> Yog.add_edge!(from: 1, to: 4, with: 30)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+        |> Yog.add_edge_ensure(from: 1, to: 3, with: 20)
+        |> Yog.add_edge_ensure(from: 1, to: 4, with: 30)
 
       result = Yog.successor_ids(graph, 1)
       assert length(result) == 3
@@ -490,7 +490,7 @@ defmodule YogTest do
       graph =
         Yog.directed()
         |> Yog.add_node(1, "Node A")
-        |> Yog.add_edge!(from: 1, to: 1, with: 5)
+        |> Yog.add_edge_ensure(from: 1, to: 1, with: 5)
 
       assert Yog.successor_ids(graph, 1) == [1]
     end
@@ -501,8 +501,8 @@ defmodule YogTest do
         |> Yog.add_node(1, "Node A")
         |> Yog.add_node(2, "Node B")
         |> Yog.add_node(3, "Node C")
-        |> Yog.add_edge!(from: 1, to: 2, with: 100)
-        |> Yog.add_edge!(from: 1, to: 3, with: 200)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 100)
+        |> Yog.add_edge_ensure(from: 1, to: 3, with: 200)
 
       successor_ids = Yog.successor_ids(graph, 1)
       successors = Yog.successors(graph, 1) |> Enum.map(&elem(&1, 0))
@@ -515,7 +515,14 @@ defmodule YogTest do
     test "all_yog_facade_delegates_test" do
       g1 = Yog.directed()
 
-      g1 = Yog.add_node(g1, 1, "A")
+      g1 =
+        g1
+        |> Yog.add_node(1, "A")
+        |> Yog.add_node(2, "B")
+        |> Yog.add_node(3, "C")
+        |> Yog.add_node(4, "D")
+        |> Yog.add_node(5, "E")
+
       g1 = Yog.add_edge!(g1, from: 1, to: 2, with: 5)
       g1 = Yog.add_unweighted_edge!(g1, from: 2, to: 3)
       g1 = Yog.add_unweighted_edge!(g1, 2, 4)
@@ -533,8 +540,8 @@ defmodule YogTest do
         |> Yog.add_node(1, "A")
         |> Yog.add_node(2, "B")
         |> Yog.add_node(3, "C")
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
-        |> Yog.add_edge!(from: 2, to: 3, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
 
       assert Yog.cyclic?(acyclic_g) == false
       assert Yog.acyclic?(acyclic_g) == true

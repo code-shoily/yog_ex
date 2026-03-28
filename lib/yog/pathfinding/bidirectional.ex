@@ -44,8 +44,8 @@ defmodule Yog.Pathfinding.Bidirectional do
 
       iex> graph = Yog.undirected()
       ...> |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
       iex> {:ok, path} = Yog.Pathfinding.Bidirectional.shortest_path_unweighted(in: graph, from: 1, to: 3)
       iex> path.nodes
       [1, 2, 3]
@@ -80,8 +80,8 @@ defmodule Yog.Pathfinding.Bidirectional do
 
       iex> graph = Yog.undirected()
       ...> |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 10)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
       iex> {:ok, path} = Yog.Pathfinding.Bidirectional.shortest_path(
       ...>   in: graph, from: 1, to: 3,
       ...>   zero: 0, add: &+/2, compare: &Yog.Utils.compare/2
@@ -125,8 +125,8 @@ defmodule Yog.Pathfinding.Bidirectional do
 
       iex> graph = Yog.undirected()
       ...> |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
       iex> {:ok, path} = Yog.Pathfinding.Bidirectional.shortest_path_unweighted(graph, 1, 3)
       iex> path.nodes
       [1, 2, 3]
@@ -166,8 +166,8 @@ defmodule Yog.Pathfinding.Bidirectional do
 
       iex> graph = Yog.undirected()
       ...> |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 10)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
       iex> {:ok, path} = Yog.Pathfinding.Bidirectional.shortest_path(graph, 1, 3, 0, &+/2, &Yog.Utils.compare/2)
       iex> path.nodes
       [1, 2, 3]

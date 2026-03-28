@@ -152,8 +152,8 @@ defmodule Yog.IO.Matrix do
       ...>   |> Yog.add_node(1, nil)
       ...>   |> Yog.add_node(2, nil)
       ...>   |> Yog.add_node(3, nil)
-      ...>   |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      ...>   |> Yog.add_edge!(from: 2, to: 3, with: 7)
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 7)
       iex> {nodes, matrix} = Yog.IO.Matrix.to_matrix(graph)
       iex> nodes
       [1, 2, 3]

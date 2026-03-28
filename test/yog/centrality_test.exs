@@ -9,8 +9,8 @@ defmodule Yog.CentralityTest do
     |> Yog.add_node(1, "A")
     |> Yog.add_node(2, "B")
     |> Yog.add_node(3, "C")
-    |> Yog.add_edge!(from: 1, to: 2, with: 1)
-    |> Yog.add_edge!(from: 2, to: 3, with: 1)
+    |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+    |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
   end
 
   defp triangle_graph do
@@ -18,9 +18,9 @@ defmodule Yog.CentralityTest do
     |> Yog.add_node(1, "A")
     |> Yog.add_node(2, "B")
     |> Yog.add_node(3, "C")
-    |> Yog.add_edge!(from: 1, to: 2, with: 1)
-    |> Yog.add_edge!(from: 2, to: 3, with: 1)
-    |> Yog.add_edge!(from: 3, to: 1, with: 1)
+    |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+    |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+    |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
   end
 
   defp star_graph do
@@ -30,9 +30,9 @@ defmodule Yog.CentralityTest do
     |> Yog.add_node(2, "A")
     |> Yog.add_node(3, "B")
     |> Yog.add_node(4, "C")
-    |> Yog.add_edge!(from: 1, to: 2, with: 1)
-    |> Yog.add_edge!(from: 1, to: 3, with: 1)
-    |> Yog.add_edge!(from: 1, to: 4, with: 1)
+    |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+    |> Yog.add_edge_ensure(from: 1, to: 3, with: 1)
+    |> Yog.add_edge_ensure(from: 1, to: 4, with: 1)
   end
 
   # ============= Degree Centrality Tests =============
@@ -295,9 +295,9 @@ defmodule Yog.CentralityTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 1, to: 3, with: 1)
-      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
 
     scores = Yog.Centrality.alpha(graph, alpha: 0.3, initial: 1.0)
 

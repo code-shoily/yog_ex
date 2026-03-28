@@ -25,7 +25,7 @@ defmodule Yog.IO.MatrixMarket do
       iex> graph = Yog.directed()
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 5.0)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 5.0)
       iex>
       iex> mtx_string = Yog.IO.MatrixMarket.serialize(graph)
       iex> String.contains?(mtx_string, "%%MatrixMarket matrix coordinate real general")
@@ -68,7 +68,7 @@ defmodule Yog.IO.MatrixMarket do
       iex> graph = Yog.directed()
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1.5)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1.5)
       iex> mtx = Yog.IO.MatrixMarket.serialize(graph)
       iex> String.contains?(mtx, "1 2 1.5")
       true

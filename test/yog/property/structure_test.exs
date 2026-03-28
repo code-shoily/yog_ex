@@ -11,7 +11,7 @@ defmodule Yog.Property.StructureTest do
     assert Structure.tree?(g)
 
     # Cycle is not a tree
-    g = g |> Yog.add_edge!(3, 1, 1)
+    g = g |> Yog.add_edge_ensure(3, 1, 1)
     assert not Structure.tree?(g)
 
     # Disconnected is not a tree
@@ -36,7 +36,7 @@ defmodule Yog.Property.StructureTest do
     assert not Structure.arborescence?(g2)
 
     # Cycle -> not an arborescence
-    g3 = g |> Yog.add_edge!(3, 1, 1)
+    g3 = g |> Yog.add_edge_ensure(3, 1, 1)
     assert not Structure.arborescence?(g3)
 
     # Node with two parents -> not an arborescence
@@ -69,7 +69,7 @@ defmodule Yog.Property.StructureTest do
     assert not Structure.complete?(not_k3)
 
     # Self loops make it not complete (by definition here)
-    with_loop = k3 |> Yog.add_edge!(1, 1, 1)
+    with_loop = k3 |> Yog.add_edge_ensure(1, 1, 1)
     assert not Structure.complete?(with_loop)
   end
 
@@ -102,18 +102,18 @@ defmodule Yog.Property.StructureTest do
   # ============= Connectivity Tests =============
 
   test "connected? undirected" do
-    g = Yog.undirected() |> Yog.add_edge!(1, 2, 1) |> Yog.add_node(3, nil)
+    g = Yog.undirected() |> Yog.add_edge_ensure(1, 2, 1) |> Yog.add_node(3, nil)
     assert not Structure.connected?(g)
-    g = g |> Yog.add_edge!(2, 3, 1)
+    g = g |> Yog.add_edge_ensure(2, 3, 1)
     assert Structure.connected?(g)
   end
 
   test "strongly_connected? directed" do
-    g = Yog.directed() |> Yog.add_edge!(1, 2, 1) |> Yog.add_edge!(2, 1, 1)
+    g = Yog.directed() |> Yog.add_edge_ensure(1, 2, 1) |> Yog.add_edge_ensure(2, 1, 1)
     assert Structure.strongly_connected?(g)
-    g = g |> Yog.add_edge!(2, 3, 1)
+    g = g |> Yog.add_edge_ensure(2, 3, 1)
     assert not Structure.strongly_connected?(g)
-    g = g |> Yog.add_edge!(3, 1, 1)
+    g = g |> Yog.add_edge_ensure(3, 1, 1)
     assert Structure.strongly_connected?(g)
   end
 
@@ -134,24 +134,24 @@ defmodule Yog.Property.StructureTest do
     # Triangle is chordal
     g =
       Yog.undirected()
-      |> Yog.add_edge!(1, 2, 1)
-      |> Yog.add_edge!(2, 3, 1)
-      |> Yog.add_edge!(3, 1, 1)
+      |> Yog.add_edge_ensure(1, 2, 1)
+      |> Yog.add_edge_ensure(2, 3, 1)
+      |> Yog.add_edge_ensure(3, 1, 1)
 
     assert Structure.chordal?(g)
 
     # C4 is NOT chordal
     g2 =
       Yog.undirected()
-      |> Yog.add_edge!(1, 2, 1)
-      |> Yog.add_edge!(2, 3, 1)
-      |> Yog.add_edge!(3, 4, 1)
-      |> Yog.add_edge!(4, 1, 1)
+      |> Yog.add_edge_ensure(1, 2, 1)
+      |> Yog.add_edge_ensure(2, 3, 1)
+      |> Yog.add_edge_ensure(3, 4, 1)
+      |> Yog.add_edge_ensure(4, 1, 1)
 
     assert not Structure.chordal?(g2)
 
     # C4 with chord is chordal
-    g3 = g2 |> Yog.add_edge!(1, 3, 1)
+    g3 = g2 |> Yog.add_edge_ensure(1, 3, 1)
     assert Structure.chordal?(g3)
   end
 

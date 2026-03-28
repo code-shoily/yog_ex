@@ -30,7 +30,7 @@ defmodule Yog.IO.JSONTest do
       Yog.directed()
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
-      |> Yog.add_edge!(from: 1, to: 2, with: "follows")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "follows")
 
     options = JSON.default_export_options()
     json_string = JSON.to_json(graph, options)
@@ -55,7 +55,7 @@ defmodule Yog.IO.JSONTest do
       Yog.undirected()
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
-      |> Yog.add_edge!(from: 1, to: 2, with: "friends")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "friends")
 
     options = JSON.default_export_options()
     json_string = JSON.to_json(graph, options)
@@ -109,7 +109,7 @@ defmodule Yog.IO.JSONTest do
       Yog.directed()
       |> Yog.add_node(1, 100)
       |> Yog.add_node(2, 200)
-      |> Yog.add_edge!(from: 1, to: 2, with: "link")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "link")
 
     node_ser = fn n -> "value_#{n}" end
     edge_ser = fn e -> e end
@@ -126,7 +126,7 @@ defmodule Yog.IO.JSONTest do
       Yog.directed()
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
-      |> Yog.add_edge!(from: 1, to: 2, with: 42)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 42)
 
     node_ser = fn n -> n end
     edge_ser = fn e -> "weight_#{e}" end
@@ -142,7 +142,7 @@ defmodule Yog.IO.JSONTest do
       Yog.directed()
       |> Yog.add_node(1, %{name: "Alice", age: 30})
       |> Yog.add_node(2, %{name: "Bob", age: 25})
-      |> Yog.add_edge!(from: 1, to: 2, with: %{type: "follows", since: 2020})
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: %{type: "follows", since: 2020})
 
     node_ser = fn n -> n end
     edge_ser = fn e -> e end
@@ -168,7 +168,7 @@ defmodule Yog.IO.JSONTest do
       Yog.directed()
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
-      |> Yog.add_edge!(from: 1, to: 2, with: "follows")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "follows")
 
     options =
       {:json_export_options, :network_x, true, &Function.identity/1, &Function.identity/1, false,
@@ -233,7 +233,7 @@ defmodule Yog.IO.JSONTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge!(from: 1, to: 2, with: "link")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "link")
 
     options =
       {:json_export_options, :d3_force, false, &Function.identity/1, &Function.identity/1, false,
@@ -257,7 +257,7 @@ defmodule Yog.IO.JSONTest do
       Yog.directed()
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
-      |> Yog.add_edge!(from: 1, to: 2, with: "follows")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "follows")
 
     json_string = JSON.to_cytoscape_json(graph, &Function.identity/1, &Function.identity/1)
     result = Jason.decode!(json_string)
@@ -277,7 +277,7 @@ defmodule Yog.IO.JSONTest do
       Yog.undirected()
       |> Yog.add_node(1, "Node1")
       |> Yog.add_node(2, "Node2")
-      |> Yog.add_edge!(from: 1, to: 2, with: "connection")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "connection")
 
     options =
       {:json_export_options, :cytoscape, false, &Function.identity/1, &Function.identity/1, false,
@@ -303,7 +303,7 @@ defmodule Yog.IO.JSONTest do
       Yog.directed()
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
-      |> Yog.add_edge!(from: 1, to: 2, with: "follows")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "follows")
 
     json_string = JSON.to_visjs_json(graph, &Function.identity/1, &Function.identity/1)
     result = Jason.decode!(json_string)
@@ -326,7 +326,7 @@ defmodule Yog.IO.JSONTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge!(from: 1, to: 2, with: "edge")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "edge")
 
     options =
       {:json_export_options, :visjs, false, &Function.identity/1, &Function.identity/1, false,
@@ -372,7 +372,7 @@ defmodule Yog.IO.JSONTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge!(from: 1, to: 2, with: "first")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "first")
 
     options = JSON.default_export_options()
     json_string = JSON.to_json(graph, options)
@@ -385,7 +385,7 @@ defmodule Yog.IO.JSONTest do
     graph =
       Yog.directed()
       |> Yog.add_node(1, "Self")
-      |> Yog.add_edge!(from: 1, to: 1, with: "loop")
+      |> Yog.add_edge_ensure(from: 1, to: 1, with: "loop")
 
     options = JSON.default_export_options()
     json_string = JSON.to_json(graph, options)
@@ -440,7 +440,7 @@ defmodule Yog.IO.JSONTest do
       Yog.directed()
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
-      |> Yog.add_edge!(from: 1, to: 2, with: "follows")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "follows")
 
     path = "/tmp/test_graph_#{:rand.uniform(1_000_000)}.json"
 

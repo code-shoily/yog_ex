@@ -14,9 +14,9 @@ defmodule SocialNetworkAnalysis do
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
       |> Yog.add_node(3, "Carol")
-      |> Yog.add_edge!(from: 1, to: 2, with: nil)
-      |> Yog.add_edge!(from: 2, to: 3, with: nil)
-      |> Yog.add_edge!(from: 3, to: 1, with: nil)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: nil)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: nil)
+      |> Yog.add_edge_ensure(from: 3, to: 1, with: nil)
 
     # Find groups of mutually connected users
     communities = Yog.Connectivity.scc(social_graph)

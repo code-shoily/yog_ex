@@ -176,8 +176,8 @@ defmodule Yog.Pathfinding.AStar do
       ...> |> Yog.add_node(:a, nil)
       ...> |> Yog.add_node(:b, nil)
       ...> |> Yog.add_node(:c, nil)
-      ...> |> Yog.add_edge!(:a, :b, 4)
-      ...> |> Yog.add_edge!(:b, :c, 1)
+      ...> |> Yog.add_edge_ensure(:a, :b, 4)
+      ...> |> Yog.add_edge_ensure(:b, :c, 1)
       iex> # Admissible heuristic (never overestimates)
       iex> h = fn _, _ -> 0 end  # Zero heuristic = Dijkstra
       iex> compare = &Yog.Utils.compare/2
@@ -189,8 +189,8 @@ defmodule Yog.Pathfinding.AStar do
 
       iex> # Grid with Manhattan distance heuristic
       iex> grid = Yog.directed()
-      ...> |> Yog.add_edge!({0,0}, {1,0}, 1)
-      ...> |> Yog.add_edge!({1,0}, {2,0}, 1)
+      ...> |> Yog.add_edge_ensure({0,0}, {1,0}, 1)
+      ...> |> Yog.add_edge_ensure({1,0}, {2,0}, 1)
       iex> manhattan = fn {x1, y1}, {x2, y2} -> abs(x1-x2) + abs(y1-y2) end
       iex> compare = &Yog.Utils.compare/2
       iex> {:ok, path} = Yog.Pathfinding.AStar.a_star(grid, {0,0}, {2,0}, manhattan, 0, &(&1+&2), compare)

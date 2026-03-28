@@ -131,7 +131,7 @@ defmodule Yog.Flow.NetworkSimplex do
       iex> graph = Yog.directed()
       ...>   |> Yog.add_node(1, "s")
       ...>   |> Yog.add_node(2, "t")
-      ...>   |> Yog.add_edge!(from: 1, to: 2, with: 10)
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
       iex> get_demand = fn
       ...>   "s" -> -5   # supply 5
       ...>   "t" -> 5    # demand 5

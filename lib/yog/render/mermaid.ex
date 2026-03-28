@@ -190,8 +190,8 @@ defmodule Yog.Render.Mermaid do
         |> Yog.add_node(1, "Start")
         |> Yog.add_node(2, "Process")
         |> Yog.add_node(3, "End")
-        |> Yog.add_edge!(from: 1, to: 2, with: "5")
-        |> Yog.add_edge!(from: 2, to: 3, with: "3")
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: "5")
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: "3")
 
       # Basic rendering
       diagram = Yog.Render.Mermaid.to_mermaid(graph, default_options())

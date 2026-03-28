@@ -28,9 +28,9 @@ defmodule Yog.Property.BipartiteTest do
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
       |> Yog.add_node(4, nil)
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
 
     assert Bipartite.bipartite?(graph) == true
   end
@@ -43,10 +43,10 @@ defmodule Yog.Property.BipartiteTest do
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
       |> Yog.add_node(4, nil)
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      |> Yog.add_edge!(from: 3, to: 4, with: 1)
-      |> Yog.add_edge!(from: 4, to: 1, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 4, to: 1, with: 1)
 
     assert Bipartite.bipartite?(graph) == true
   end
@@ -58,9 +58,9 @@ defmodule Yog.Property.BipartiteTest do
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
 
     assert Bipartite.bipartite?(graph) == false
   end
@@ -74,12 +74,12 @@ defmodule Yog.Property.BipartiteTest do
       |> Yog.add_node(3, nil)
       |> Yog.add_node(4, nil)
       |> Yog.add_node(5, nil)
-      |> Yog.add_edge!(from: 1, to: 3, with: 1)
-      |> Yog.add_edge!(from: 1, to: 4, with: 1)
-      |> Yog.add_edge!(from: 1, to: 5, with: 1)
-      |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      |> Yog.add_edge!(from: 2, to: 4, with: 1)
-      |> Yog.add_edge!(from: 2, to: 5, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 5, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 5, with: 1)
 
     assert Bipartite.bipartite?(graph) == true
   end
@@ -93,10 +93,10 @@ defmodule Yog.Property.BipartiteTest do
       |> Yog.add_node(3, nil)
       |> Yog.add_node(4, nil)
       |> Yog.add_node(5, nil)
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 1, to: 3, with: 1)
-      |> Yog.add_edge!(from: 2, to: 4, with: 1)
-      |> Yog.add_edge!(from: 2, to: 5, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 5, with: 1)
 
     assert Bipartite.bipartite?(graph) == true
   end
@@ -109,16 +109,16 @@ defmodule Yog.Property.BipartiteTest do
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
       |> Yog.add_node(4, nil)
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 2, to: 1, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 1, with: 1)
       |> Yog.add_node(5, nil)
       |> Yog.add_node(6, nil)
       |> Yog.add_node(7, nil)
       |> Yog.add_node(8, nil)
-      |> Yog.add_edge!(from: 5, to: 6, with: 1)
-      |> Yog.add_edge!(from: 6, to: 7, with: 1)
-      |> Yog.add_edge!(from: 7, to: 8, with: 1)
-      |> Yog.add_edge!(from: 8, to: 5, with: 1)
+      |> Yog.add_edge_ensure(from: 5, to: 6, with: 1)
+      |> Yog.add_edge_ensure(from: 6, to: 7, with: 1)
+      |> Yog.add_edge_ensure(from: 7, to: 8, with: 1)
+      |> Yog.add_edge_ensure(from: 8, to: 5, with: 1)
 
     assert Bipartite.bipartite?(graph) == true
   end
@@ -131,16 +131,16 @@ defmodule Yog.Property.BipartiteTest do
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
       |> Yog.add_node(4, nil)
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      |> Yog.add_edge!(from: 3, to: 4, with: 1)
-      |> Yog.add_edge!(from: 4, to: 1, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 4, to: 1, with: 1)
       |> Yog.add_node(5, nil)
       |> Yog.add_node(6, nil)
       |> Yog.add_node(7, nil)
-      |> Yog.add_edge!(from: 5, to: 6, with: 1)
-      |> Yog.add_edge!(from: 6, to: 7, with: 1)
-      |> Yog.add_edge!(from: 7, to: 5, with: 1)
+      |> Yog.add_edge_ensure(from: 5, to: 6, with: 1)
+      |> Yog.add_edge_ensure(from: 6, to: 7, with: 1)
+      |> Yog.add_edge_ensure(from: 7, to: 5, with: 1)
 
     assert Bipartite.bipartite?(graph) == false
   end
@@ -154,9 +154,9 @@ defmodule Yog.Property.BipartiteTest do
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
       |> Yog.add_node(4, nil)
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
 
     case Bipartite.partition(graph) do
       {:error, _} ->
@@ -190,9 +190,9 @@ defmodule Yog.Property.BipartiteTest do
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
 
     case Bipartite.partition(graph) do
       {:error, :not_bipartite} -> assert true
@@ -210,10 +210,10 @@ defmodule Yog.Property.BipartiteTest do
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
       |> Yog.add_node(4, nil)
-      |> Yog.add_edge!(from: 1, to: 3, with: 1)
-      |> Yog.add_edge!(from: 1, to: 4, with: 1)
-      |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      |> Yog.add_edge!(from: 2, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 4, with: 1)
 
     case Bipartite.partition(graph) do
       {:error, _} ->
@@ -242,9 +242,9 @@ defmodule Yog.Property.BipartiteTest do
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
       |> Yog.add_node(4, nil)
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
 
     case Bipartite.partition(graph) do
       {:error, _} ->
@@ -268,12 +268,12 @@ defmodule Yog.Property.BipartiteTest do
       |> Yog.add_node(3, nil)
       |> Yog.add_node(4, nil)
       |> Yog.add_node(5, nil)
-      |> Yog.add_edge!(from: 1, to: 3, with: 1)
-      |> Yog.add_edge!(from: 1, to: 4, with: 1)
-      |> Yog.add_edge!(from: 1, to: 5, with: 1)
-      |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      |> Yog.add_edge!(from: 2, to: 4, with: 1)
-      |> Yog.add_edge!(from: 2, to: 5, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 5, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 5, with: 1)
 
     case Bipartite.partition(graph) do
       {:error, _} ->
@@ -332,9 +332,9 @@ defmodule Yog.Property.BipartiteTest do
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
       |> Yog.add_node(4, nil)
-      |> Yog.add_edge!(from: 1, to: 3, with: 1)
-      |> Yog.add_edge!(from: 1, to: 4, with: 1)
-      |> Yog.add_edge!(from: 2, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 4, with: 1)
 
     case Bipartite.partition(graph) do
       {:error, _} ->
@@ -356,10 +356,10 @@ defmodule Yog.Property.BipartiteTest do
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
       |> Yog.add_node(4, nil)
-      |> Yog.add_edge!(from: 1, to: 3, with: 1)
-      |> Yog.add_edge!(from: 1, to: 4, with: 1)
-      |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      |> Yog.add_edge!(from: 2, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 4, with: 1)
 
     case Bipartite.partition(graph) do
       {:error, _} ->

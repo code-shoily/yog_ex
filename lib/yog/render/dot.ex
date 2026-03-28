@@ -328,7 +328,7 @@ defmodule Yog.Render.DOT do
         Yog.directed()
         |> Yog.add_node(1, "Start")
         |> Yog.add_node(2, "Process")
-        |> Yog.add_edge!(from: 1, to: 2, with: "5")
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: "5")
 
       diagram = Yog.Render.DOT.to_dot(graph, Yog.Render.DOT.default_options())
   """

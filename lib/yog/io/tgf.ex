@@ -17,7 +17,7 @@ defmodule Yog.IO.TGF do
       iex> graph = Yog.directed()
       ...> |> Yog.add_node(1, "Alice")
       ...> |> Yog.add_node(2, "Bob")
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: "follows")
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: "follows")
       iex>
       iex> tgf_string = Yog.IO.TGF.serialize(graph)
       iex> String.contains?(tgf_string, "1 Alice")
@@ -105,7 +105,7 @@ defmodule Yog.IO.TGF do
       iex> graph = Yog.directed()
       ...> |> Yog.add_node(1, %{name: "Alice"})
       ...> |> Yog.add_node(2, %{name: "Bob"})
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 10)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
       iex> options = Yog.IO.TGF.options_with(
       ...>   fn data -> data.name end,
       ...>   fn weight -> {:some, Integer.to_string(weight)} end
@@ -156,7 +156,7 @@ defmodule Yog.IO.TGF do
       iex> graph = Yog.directed()
       ...> |> Yog.add_node(1, "Alice")
       ...> |> Yog.add_node(2, "Bob")
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: "follows")
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: "follows")
       iex> tgf = Yog.IO.TGF.serialize(graph)
       iex> String.contains?(tgf, "1 Alice") and String.contains?(tgf, "1 2")
       true
@@ -185,7 +185,7 @@ defmodule Yog.IO.TGF do
       graph = Yog.directed()
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
-      |> Yog.add_edge!(from: 1, to: 2, with: "follows")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "follows")
 
       Yog.IO.TGF.write("network.tgf", graph)
       # => :ok

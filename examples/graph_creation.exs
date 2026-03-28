@@ -17,7 +17,7 @@ defmodule GraphCreation do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
 
     IO.puts("   Created graph with #{count_nodes(g1)} nodes")
 
@@ -82,7 +82,7 @@ defmodule GraphCreation do
       Yog.undirected()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
 
     IO.puts("   Created undirected graph (edges work both ways)")
 

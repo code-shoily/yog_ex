@@ -145,7 +145,7 @@ defimpl Inspect, for: Yog.Graph do
       "#Yog.Graph<:directed, 1 node, 0 edges>"
 
       iex> graph = Yog.undirected() |> Yog.add_node(1, "A") |> Yog.add_node(2, "B")
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 5)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
       iex> inspect(graph)
       "#Yog.Graph<:undirected, 2 nodes, 1 edge>"
   """

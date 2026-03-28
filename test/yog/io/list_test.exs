@@ -155,8 +155,8 @@ defmodule Yog.IO.ListTest do
     test "exports undirected graph" do
       graph =
         Yog.undirected()
-        |> Yog.add_edge!(from: 1, to: 2, with: 5)
-        |> Yog.add_edge!(from: 2, to: 3, with: 7)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 7)
 
       entries = List.to_list(graph)
       assert entries == [{1, [{2, 5}]}, {2, [{1, 5}, {3, 7}]}, {3, [{2, 7}]}]
@@ -165,8 +165,8 @@ defmodule Yog.IO.ListTest do
     test "exports directed graph" do
       graph =
         Yog.directed()
-        |> Yog.add_edge!(from: 1, to: 2, with: 5)
-        |> Yog.add_edge!(from: 2, to: 3, with: 7)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 7)
 
       entries = List.to_list(graph)
       assert entries == [{1, [{2, 5}]}, {2, [{3, 7}]}, {3, []}]
@@ -192,7 +192,7 @@ defmodule Yog.IO.ListTest do
     test "exports unweighted format" do
       graph =
         Yog.undirected()
-        |> Yog.add_edge!(from: 1, to: 2, with: 5)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
 
       str = List.to_string(graph)
       assert str == "1: 2\n2: 1"
@@ -201,7 +201,7 @@ defmodule Yog.IO.ListTest do
     test "exports weighted format" do
       graph =
         Yog.undirected()
-        |> Yog.add_edge!(from: 1, to: 2, with: 5)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
 
       str = List.to_string(graph, weighted: true)
       assert str == "1: 2,5\n2: 1,5"
@@ -219,7 +219,7 @@ defmodule Yog.IO.ListTest do
     test "custom delimiter" do
       graph =
         Yog.undirected()
-        |> Yog.add_edge!(from: 1, to: 2, with: 5)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
 
       str = List.to_string(graph, delimiter: "->")
       assert str == "1-> 2\n2-> 1"
@@ -233,8 +233,8 @@ defmodule Yog.IO.ListTest do
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
         |> Yog.add_node(3, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 5)
-        |> Yog.add_edge!(from: 2, to: 3, with: 7)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 7)
 
       entries = List.to_list(original)
       restored = List.from_list(:undirected, entries)

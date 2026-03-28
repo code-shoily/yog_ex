@@ -23,8 +23,8 @@ defmodule Yog.Community.LabelPropagation do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
       iex> communities = Yog.Community.LabelPropagation.detect(graph)
       iex> is_map(communities.assignments)
       true
@@ -48,7 +48,7 @@ defmodule Yog.Community.LabelPropagation do
       iex> graph = Yog.undirected()
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
       iex> communities = Yog.Community.LabelPropagation.detect(graph)
       iex> is_map(communities.assignments)
       true
@@ -71,7 +71,7 @@ defmodule Yog.Community.LabelPropagation do
       iex> graph = Yog.undirected()
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
       iex> communities = Yog.Community.LabelPropagation.detect_with_options(graph,
       ...>   max_iterations: 200,
       ...>   seed: 42

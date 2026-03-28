@@ -26,8 +26,8 @@ defmodule Yog.Pathfinding.Dijkstra do
       |> Yog.add_node(:a, nil)
       |> Yog.add_node(:b, nil)
       |> Yog.add_node(:c, nil)
-      |> Yog.add_edge!(:a, :b, 4)
-      |> Yog.add_edge!(:b, :c, 1)
+      |> Yog.add_edge_ensure(:a, :b, 4)
+      |> Yog.add_edge_ensure(:b, :c, 1)
 
       compare = &Yog.Utils.compare/2
       Dijkstra.shortest_path(graph, :a, :c, 0, &(&1 + &2), compare)
@@ -204,8 +204,8 @@ defmodule Yog.Pathfinding.Dijkstra do
       ...> |> Yog.add_node(:a, nil)
       ...> |> Yog.add_node(:b, nil)
       ...> |> Yog.add_node(:c, nil)
-      ...> |> Yog.add_edge!(:a, :b, 4)
-      ...> |> Yog.add_edge!(:b, :c, 1)
+      ...> |> Yog.add_edge_ensure(:a, :b, 4)
+      ...> |> Yog.add_edge_ensure(:b, :c, 1)
       iex> compare = &Yog.Utils.compare/2
       iex> {:ok, path} = Dijkstra.shortest_path(graph, :a, :c, 0, &(&1 + &2), compare)
       iex> path.nodes
@@ -217,8 +217,8 @@ defmodule Yog.Pathfinding.Dijkstra do
       ...> |> Yog.add_node(:a, nil)
       ...> |> Yog.add_node(:b, nil)
       ...> |> Yog.add_node(:c, nil)
-      ...> |> Yog.add_edge!(:a, :b, 4)
-      ...> |> Yog.add_edge!(:b, :c, 1)
+      ...> |> Yog.add_edge_ensure(:a, :b, 4)
+      ...> |> Yog.add_edge_ensure(:b, :c, 1)
       iex> compare = &Yog.Utils.compare/2
       iex> Dijkstra.shortest_path(graph, :a, :nonexistent, 0, &(&1 + &2), compare)
       :error
@@ -265,9 +265,9 @@ defmodule Yog.Pathfinding.Dijkstra do
       ...> |> Yog.add_node(:a, nil)
       ...> |> Yog.add_node(:b, nil)
       ...> |> Yog.add_node(:c, nil)
-      ...> |> Yog.add_edge!(:a, :b, 4)
-      ...> |> Yog.add_edge!(:a, :c, 2)
-      ...> |> Yog.add_edge!(:b, :c, 1)
+      ...> |> Yog.add_edge_ensure(:a, :b, 4)
+      ...> |> Yog.add_edge_ensure(:a, :c, 2)
+      ...> |> Yog.add_edge_ensure(:b, :c, 1)
       iex> compare = &Yog.Utils.compare/2
       iex> Dijkstra.single_source_distances(graph, :a, 0, &(&1 + &2), compare)
       %{a: 0, b: 4, c: 2}

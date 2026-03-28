@@ -17,8 +17,8 @@ defmodule Yog.Pathfinding.AStarTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
 
     heuristic = fn _, _ -> 0 end
 
@@ -35,8 +35,8 @@ defmodule Yog.Pathfinding.AStarTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
 
     # Simple heuristic
     heuristic = fn _current, goal ->
@@ -55,8 +55,8 @@ defmodule Yog.Pathfinding.AStarTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
 
     heuristic = fn _, _ -> 0 end
 
@@ -72,8 +72,8 @@ defmodule Yog.Pathfinding.AStarTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5.5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 10.5)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5.5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10.5)
 
     heuristic = fn _, _ -> 0.0 end
 

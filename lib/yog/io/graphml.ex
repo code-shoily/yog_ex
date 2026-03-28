@@ -37,7 +37,7 @@ defmodule Yog.IO.GraphML do
       iex> graph = Yog.directed()
       ...> |> Yog.add_node(1, "Alice")
       ...> |> Yog.add_node(2, "Bob")
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: "friend")
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: "friend")
       iex> xml = Yog.IO.GraphML.serialize(graph)
       iex> String.contains?(xml, "Alice")
       true
@@ -49,7 +49,7 @@ defmodule Yog.IO.GraphML do
       iex> graph = Yog.directed()
       ...> |> Yog.add_node(1, %{name: "Alice", age: 30})
       ...> |> Yog.add_node(2, %{name: "Bob", age: 25})
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: %{weight: 5, relation: "friend"})
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: %{weight: 5, relation: "friend"})
       iex> node_attr = fn data ->
       ...>   %{"label" => data.name, "age" => Integer.to_string(data.age)}
       ...> end
@@ -140,7 +140,7 @@ defmodule Yog.IO.GraphML do
       iex> graph = Yog.directed()
       ...> |> Yog.add_node(1, %{name: "Alice", role: "admin"})
       ...> |> Yog.add_node(2, %{name: "Bob", role: "user"})
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: %{since: "2024"})
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: %{since: "2024"})
       iex> node_attr = fn data ->
       ...>   %{"label" => data.name, "role" => data.role}
       ...> end
@@ -341,7 +341,7 @@ defmodule Yog.IO.GraphML do
       iex> graph = Yog.directed()
       ...> |> Yog.add_node(1, "Alice")
       ...> |> Yog.add_node(2, "Bob")
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: "friend")
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: "friend")
       iex> xml = Yog.IO.GraphML.serialize(graph)
       iex> String.contains?(xml, ~s(<node id="1">)) and String.contains?(xml, "Alice")
       true
@@ -374,7 +374,7 @@ defmodule Yog.IO.GraphML do
       graph = Yog.directed()
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
-      |> Yog.add_edge!(from: 1, to: 2, with: "friend")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "friend")
 
       Yog.IO.GraphML.write("network.graphml", graph)
       # => {:ok, nil}

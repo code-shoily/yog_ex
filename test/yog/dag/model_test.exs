@@ -27,7 +27,7 @@ defmodule Yog.DAG.ModelTest do
         Yog.directed()
         |> Yog.add_node(1, "A")
         |> Yog.add_node(2, "B")
-        |> Yog.add_edge!(1, 2, 10)
+        |> Yog.add_edge_ensure(1, 2, 10)
 
       assert {:ok, %Yog.DAG{}} = Model.from_graph(graph)
     end
@@ -37,8 +37,8 @@ defmodule Yog.DAG.ModelTest do
         Yog.directed()
         |> Yog.add_node(1, "A")
         |> Yog.add_node(2, "B")
-        |> Yog.add_edge!(1, 2, 10)
-        |> Yog.add_edge!(2, 1, 10)
+        |> Yog.add_edge_ensure(1, 2, 10)
+        |> Yog.add_edge_ensure(2, 1, 10)
 
       assert {:error, :cycle_detected} = Model.from_graph(graph)
     end
@@ -74,7 +74,7 @@ defmodule Yog.DAG.ModelTest do
         Yog.directed()
         |> Yog.add_node(1, "A")
         |> Yog.add_node(2, "B")
-        |> Yog.add_edge!(1, 2, 10)
+        |> Yog.add_edge_ensure(1, 2, 10)
         |> Model.from_graph()
 
       dag = Model.remove_node(dag, 2)
@@ -128,7 +128,7 @@ defmodule Yog.DAG.ModelTest do
         Yog.directed()
         |> Yog.add_node(1, "A")
         |> Yog.add_node(2, "B")
-        |> Yog.add_edge!(1, 2, 10)
+        |> Yog.add_edge_ensure(1, 2, 10)
         |> Model.from_graph()
 
       dag = Model.remove_edge(dag, 1, 2)
@@ -218,9 +218,9 @@ defmodule Yog.DAG.ModelTest do
         |> Yog.add_node(1, "A")
         |> Yog.add_node(2, "B")
         |> Yog.add_node(3, "C")
-        |> Yog.add_edge!(1, 2, 1)
-        |> Yog.add_edge!(2, 3, 2)
-        |> Yog.add_edge!(3, 1, 3)
+        |> Yog.add_edge_ensure(1, 2, 1)
+        |> Yog.add_edge_ensure(2, 3, 2)
+        |> Yog.add_edge_ensure(3, 1, 3)
 
       assert {:error, :cycle_detected} = Model.from_graph(graph)
     end

@@ -58,8 +58,8 @@ defmodule Yog.Connectivity do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: nil)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: nil)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: nil)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: nil)
       iex> results = Yog.Connectivity.analyze(in: graph)
       iex> results.bridges
       [{1, 2}, {2, 3}]
@@ -90,9 +90,9 @@ defmodule Yog.Connectivity do
       ...> |> Yog.add_node(1, "A")
       ...> |> Yog.add_node(2, "B")
       ...> |> Yog.add_node(3, "C")
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
       iex> sccs = Yog.Connectivity.kosaraju(graph)
       iex> hd(sccs) |> Enum.sort()
       [1, 2, 3]
@@ -110,8 +110,8 @@ defmodule Yog.Connectivity do
       ...> |> Yog.add_node(2, "B")
       ...> |> Yog.add_node(3, "C")
       ...> |> Yog.add_node(4, "D")
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
       iex> components = Yog.Connectivity.connected_components(graph)
       iex> Enum.map(components, &Enum.sort/1) |> Enum.sort()
       [[1, 2], [3, 4]]
@@ -128,8 +128,8 @@ defmodule Yog.Connectivity do
       ...> |> Yog.add_node(1, "A")
       ...> |> Yog.add_node(2, "B")
       ...> |> Yog.add_node(3, "C")
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 3, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 3, to: 2, with: 1)
       iex> wccs = Yog.Connectivity.weakly_connected_components(graph)
       iex> hd(wccs) |> Enum.sort()
       [1, 2, 3]

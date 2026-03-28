@@ -73,7 +73,7 @@ defmodule Yog.CommunityTest do
       Yog.undirected()
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
 
     communities = Community.Result.new(%{1 => 0, 2 => 0})
 
@@ -87,9 +87,9 @@ defmodule Yog.CommunityTest do
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
 
     assert Community.count_triangles(graph) == 1
   end
@@ -100,9 +100,9 @@ defmodule Yog.CommunityTest do
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
 
     result = Community.triangles_per_node(graph)
     assert result[1] == 1
@@ -116,9 +116,9 @@ defmodule Yog.CommunityTest do
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
 
     # In a triangle, each node has clustering coefficient 1.0
     assert Community.clustering_coefficient(graph, 1) == 1.0
@@ -132,9 +132,9 @@ defmodule Yog.CommunityTest do
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
 
     assert Community.average_clustering_coefficient(graph) == 1.0
   end
@@ -145,7 +145,7 @@ defmodule Yog.CommunityTest do
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
       |> Yog.add_node(3, nil)
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
 
     d = Community.density(graph)
     assert is_float(d)
@@ -156,7 +156,7 @@ defmodule Yog.CommunityTest do
       Yog.undirected()
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
 
     communities = Community.Result.new(%{1 => 0, 2 => 0})
 
@@ -169,7 +169,7 @@ defmodule Yog.CommunityTest do
       Yog.undirected()
       |> Yog.add_node(1, nil)
       |> Yog.add_node(2, nil)
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
 
     communities = Community.Result.new(%{1 => 0, 2 => 0})
 

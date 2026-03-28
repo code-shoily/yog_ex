@@ -24,8 +24,8 @@ defmodule Yog.Property.CyclicityTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
 
     assert Cyclicity.acyclic?(graph) == true
   end
@@ -38,9 +38,9 @@ defmodule Yog.Property.CyclicityTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 1, to: 3, with: 1)
-      |> Yog.add_edge!(from: 1, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 4, with: 1)
 
     assert Cyclicity.acyclic?(graph) == true
   end
@@ -52,7 +52,7 @@ defmodule Yog.Property.CyclicityTest do
     graph =
       Yog.directed()
       |> Yog.add_node(1, "A")
-      |> Yog.add_edge!(from: 1, to: 1, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 1, with: 1)
 
     assert Cyclicity.cyclic?(graph) == true
     assert Cyclicity.acyclic?(graph) == false
@@ -65,9 +65,9 @@ defmodule Yog.Property.CyclicityTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
 
     assert Cyclicity.cyclic?(graph) == true
     assert Cyclicity.acyclic?(graph) == false
@@ -80,9 +80,9 @@ defmodule Yog.Property.CyclicityTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
 
     assert Cyclicity.cyclic?(graph) == true
     assert Cyclicity.acyclic?(graph) == false
@@ -96,12 +96,12 @@ defmodule Yog.Property.CyclicityTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 1, to: 3, with: 1)
-      |> Yog.add_edge!(from: 2, to: 4, with: 1)
-      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
       # Back edge creates cycle
-      |> Yog.add_edge!(from: 4, to: 1, with: 1)
+      |> Yog.add_edge_ensure(from: 4, to: 1, with: 1)
 
     assert Cyclicity.cyclic?(graph) == true
     assert Cyclicity.acyclic?(graph) == false
@@ -117,10 +117,10 @@ defmodule Yog.Property.CyclicityTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 1, to: 3, with: 1)
-      |> Yog.add_edge!(from: 2, to: 4, with: 1)
-      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
 
     assert Cyclicity.acyclic?(graph) == true
     assert Cyclicity.cyclic?(graph) == false
@@ -141,8 +141,8 @@ defmodule Yog.Property.CyclicityTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
 
     assert Cyclicity.acyclic?(graph) == true
     assert Cyclicity.cyclic?(graph) == false

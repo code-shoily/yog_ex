@@ -24,7 +24,7 @@ defmodule Yog.Render.MermaidTest do
         Yog.directed()
         |> Yog.add_node(1, "Start")
         |> Yog.add_node(2, "End")
-        |> Yog.add_edge!(from: 1, to: 2, with: "5")
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: "5")
 
       mermaid = Mermaid.to_mermaid(graph, Mermaid.default_options())
 
@@ -39,7 +39,7 @@ defmodule Yog.Render.MermaidTest do
         Yog.undirected()
         |> Yog.add_node(1, "A")
         |> Yog.add_node(2, "B")
-        |> Yog.add_edge!(from: 1, to: 2, with: "1")
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: "1")
 
       mermaid = Mermaid.to_mermaid(graph, Mermaid.default_options())
 
@@ -54,8 +54,8 @@ defmodule Yog.Render.MermaidTest do
         |> Yog.add_node(1, "Start")
         |> Yog.add_node(2, "Process")
         |> Yog.add_node(3, "End")
-        |> Yog.add_edge!(from: 1, to: 2, with: "10")
-        |> Yog.add_edge!(from: 2, to: 3, with: "5")
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: "10")
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: "5")
 
       mermaid = Mermaid.to_mermaid(graph, Mermaid.default_options())
 
@@ -70,7 +70,7 @@ defmodule Yog.Render.MermaidTest do
         Yog.directed()
         |> Yog.add_node(1, "Start")
         |> Yog.add_node(2, "End")
-        |> Yog.add_edge!(from: 1, to: 2, with: "5")
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: "5")
 
       opts =
         Map.merge(Mermaid.default_options(), %{
@@ -89,7 +89,7 @@ defmodule Yog.Render.MermaidTest do
         Yog.directed()
         |> Yog.add_node(1, "A")
         |> Yog.add_node(2, "B")
-        |> Yog.add_edge!(from: 1, to: 2, with: "1")
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: "1")
 
       # Test left-to-right
       lr_opts = Map.put(Mermaid.default_options(), :direction, :lr)

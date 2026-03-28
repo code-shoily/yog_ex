@@ -123,7 +123,7 @@ defmodule Yog.IO.JSONImportTest do
         Yog.undirected()
         |> Yog.add_node(1, "Node A")
         |> Yog.add_node(2, "Node B")
-        |> Yog.add_edge!(from: 1, to: 2, with: 5)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
 
       # Export to JSON
       json = JSON.to_json(original, JSON.default_export_options())
@@ -141,7 +141,7 @@ defmodule Yog.IO.JSONImportTest do
         Yog.directed()
         |> Yog.add_node(1, %{name: "Task 1", status: :pending})
         |> Yog.add_node(2, %{name: "Task 2", status: :done})
-        |> Yog.add_edge!(from: 1, to: 2, with: :depends_on)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: :depends_on)
 
       # Export
       json = JSON.to_json(original, JSON.default_export_options())
@@ -164,8 +164,8 @@ defmodule Yog.IO.JSONImportTest do
         |> Yog.add_node(1, %{title: "Learn Elixir", completed: false})
         |> Yog.add_node(2, %{title: "Build Graph App", completed: false})
         |> Yog.add_node(3, %{title: "Deploy to Production", completed: false})
-        |> Yog.add_edge!(from: 1, to: 2, with: :prerequisite)
-        |> Yog.add_edge!(from: 2, to: 3, with: :prerequisite)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: :prerequisite)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: :prerequisite)
 
       # Save to Postgres (as JSONB)
       json_string = JSON.to_json(graph, JSON.default_export_options())

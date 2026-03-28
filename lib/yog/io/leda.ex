@@ -19,7 +19,7 @@ defmodule Yog.IO.LEDA do
       iex> graph = Yog.directed()
       ...> |> Yog.add_node(1, "Alice")
       ...> |> Yog.add_node(2, "Bob")
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: "5")
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: "5")
       iex>
       iex> leda_string = Yog.IO.LEDA.serialize(graph)
       iex> String.contains?(leda_string, "LEDA.GRAPH")
@@ -166,7 +166,7 @@ defmodule Yog.IO.LEDA do
       iex> graph = Yog.directed()
       ...> |> Yog.add_node(1, "Alice")
       ...> |> Yog.add_node(2, "Bob")
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: "5")
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: "5")
       iex> leda = Yog.IO.LEDA.serialize(graph)
       iex> String.contains?(leda, "LEDA.GRAPH") and String.contains?(leda, "Alice")
       true

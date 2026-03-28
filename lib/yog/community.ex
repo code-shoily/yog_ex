@@ -36,13 +36,13 @@ defmodule Yog.Community do
       ...> |> Yog.add_node(4, nil)
       ...> |> Yog.add_node(5, nil)
       ...> |> Yog.add_node(6, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 1, to: 3, with: 1)  # Triangle: 1-2-3
-      ...> |> Yog.add_edge!(from: 4, to: 5, with: 1)
-      ...> |> Yog.add_edge!(from: 5, to: 6, with: 1)
-      ...> |> Yog.add_edge!(from: 4, to: 6, with: 1)  # Triangle: 4-5-6
-      ...> |> Yog.add_edge!(from: 3, to: 4, with: 1)  # Bridge between communities
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 3, with: 1)  # Triangle: 1-2-3
+      ...> |> Yog.add_edge_ensure(from: 4, to: 5, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 5, to: 6, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 4, to: 6, with: 1)  # Triangle: 4-5-6
+      ...> |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)  # Bridge between communities
       iex> communities = Yog.Community.Louvain.detect(graph)
       iex> communities.num_communities >= 2
       true
@@ -272,8 +272,8 @@ defmodule Yog.Community do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
       iex> communities = Yog.Community.Result.new(%{1 => 0, 2 => 0, 3 => 0})
       iex> q = Yog.Community.modularity(graph, communities)
       iex> is_float(q)
@@ -294,9 +294,9 @@ defmodule Yog.Community do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
       iex> Yog.Community.count_triangles(graph)
       1
   """
@@ -314,9 +314,9 @@ defmodule Yog.Community do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
       iex> Yog.Community.triangles_per_node(graph)
       %{1 => 1, 2 => 1, 3 => 1}
   """
@@ -338,9 +338,9 @@ defmodule Yog.Community do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
       iex> Yog.Community.clustering_coefficient(graph, 1)
       1.0
   """
@@ -358,9 +358,9 @@ defmodule Yog.Community do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
       iex> Yog.Community.average_clustering_coefficient(graph)
       1.0
   """
@@ -380,7 +380,7 @@ defmodule Yog.Community do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
       iex> d = Yog.Community.density(graph)
       iex> is_float(d)
       true
@@ -399,7 +399,7 @@ defmodule Yog.Community do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
       iex> communities = Yog.Community.Result.new(%{1 => 0, 2 => 0, 3 => 0})
       iex> cd = Yog.Community.community_density(graph, communities, 0)
       iex> is_float(cd)
@@ -420,7 +420,7 @@ defmodule Yog.Community do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
       iex> communities = Yog.Community.Result.new(%{1 => 0, 2 => 0, 3 => 0})
       iex> avg_cd = Yog.Community.average_community_density(graph, communities)
       iex> is_float(avg_cd)

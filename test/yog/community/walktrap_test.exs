@@ -26,15 +26,15 @@ defmodule Yog.Community.WalktrapTest do
       |> Yog.add_node(4, nil)
       |> Yog.add_node(5, nil)
       # First triangle
-      |> Yog.add_edge!(from: 0, to: 1, with: 1)
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 2, to: 0, with: 1)
+      |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 0, with: 1)
       # Second triangle
-      |> Yog.add_edge!(from: 3, to: 4, with: 1)
-      |> Yog.add_edge!(from: 4, to: 5, with: 1)
-      |> Yog.add_edge!(from: 5, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 4, to: 5, with: 1)
+      |> Yog.add_edge_ensure(from: 5, to: 3, with: 1)
       # Bridge edge
-      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
 
     comms = Walktrap.detect(graph)
 

@@ -33,7 +33,7 @@ defmodule Yog.ConnectivityTest do
       Yog.undirected()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
 
     result = Connectivity.analyze(in: graph)
     assert length(result.bridges) == 1
@@ -48,9 +48,9 @@ defmodule Yog.ConnectivityTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
 
     result = Connectivity.analyze(in: graph)
     assert length(result.bridges) == 3
@@ -68,9 +68,9 @@ defmodule Yog.ConnectivityTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
 
     result = Connectivity.analyze(in: graph)
     assert result.bridges == []
@@ -84,7 +84,7 @@ defmodule Yog.ConnectivityTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
 
     result = Connectivity.strongly_connected_components(graph)
     assert length(result) == 2
@@ -221,7 +221,7 @@ defmodule Yog.ConnectivityTest do
       Yog.undirected()
       |> Yog.add_node(5, "A")
       |> Yog.add_node(3, "B")
-      |> Yog.add_edge!(from: 5, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 5, to: 3, with: 1)
 
     result = Connectivity.analyze(in: graph)
     # Bridges should be stored in canonical order (lower ID first)

@@ -21,7 +21,7 @@ defmodule Yog.IO.JSON do
       iex> graph = Yog.directed()
       ...> |> Yog.add_node(1, "Alice")
       ...> |> Yog.add_node(2, "Bob")
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: "follows")
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: "follows")
       iex>
       iex> json_string = Yog.IO.JSON.to_json(graph)
       iex> String.contains?(json_string, "Alice")
