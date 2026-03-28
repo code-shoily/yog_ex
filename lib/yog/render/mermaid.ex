@@ -157,7 +157,7 @@ defmodule Yog.Render.Mermaid do
   @spec default_options() :: options()
   def default_options do
     %{
-      node_label: fn id, _data -> Integer.to_string(id) end,
+      node_label: fn id, _data -> to_string(id) end,
       edge_label: fn weight -> to_string(weight) end,
       highlighted_nodes: nil,
       highlighted_edges: nil,
@@ -217,7 +217,7 @@ defmodule Yog.Render.Mermaid do
   ````
   """
   @spec to_mermaid(Yog.graph(), options()) :: String.t()
-  def to_mermaid(graph, options) do
+  def to_mermaid(graph, options \\ default_options()) do
     nodes = extract_nodes(graph)
     edges = extract_edges(graph)
     kind = extract_kind(graph)
@@ -265,7 +265,7 @@ defmodule Yog.Render.Mermaid do
       end
   """
   @spec path_to_options(map(), options()) :: options()
-  def path_to_options(path, base_options) do
+  def path_to_options(path, base_options \\ default_options()) do
     nodes = Map.get(path, :nodes, [])
     edges = path_to_edges(nodes)
 

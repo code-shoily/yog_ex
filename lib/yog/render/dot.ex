@@ -239,7 +239,7 @@ defmodule Yog.Render.DOT do
   @spec default_options() :: options()
   def default_options do
     %{
-      node_label: fn id, _data -> Integer.to_string(id) end,
+      node_label: fn id, _data -> to_string(id) end,
       edge_label: fn weight -> to_string(weight) end,
       highlighted_nodes: nil,
       highlighted_edges: nil,
@@ -333,7 +333,7 @@ defmodule Yog.Render.DOT do
       diagram = Yog.Render.DOT.to_dot(graph, Yog.Render.DOT.default_options())
   """
   @spec to_dot(Yog.graph(), options()) :: String.t()
-  def to_dot(graph, options) do
+  def to_dot(graph, options \\ default_options()) do
     nodes = extract_nodes(graph)
     edges = extract_edges(graph)
     kind = extract_kind(graph)
@@ -393,7 +393,7 @@ defmodule Yog.Render.DOT do
       end
   """
   @spec path_to_options(map(), options()) :: options()
-  def path_to_options(path, base_options) do
+  def path_to_options(path, base_options \\ default_options()) do
     nodes = Map.get(path, :nodes, [])
     edges = path_to_edges(nodes)
 
@@ -491,7 +491,7 @@ defmodule Yog.Render.DOT do
   defp build_node_lines(nodes, options) do
     Enum.map_join(nodes, "", fn {id, data} ->
       label = options.node_label.(id, data)
-      id_str = Integer.to_string(id)
+      id_str = to_string(id)
 
       # Build attribute list starting with label
       attrs = [{:label, label}]
@@ -555,7 +555,7 @@ defmodule Yog.Render.DOT do
             ""
 
           ids ->
-            Enum.map_join(ids, ";\n", &("    " <> Integer.to_string(&1))) <> ";\n"
+            Enum.map_join(ids, ";\n", &("    " <> to_string(&1))) <> ";\n"
         end
 
       header <> label <> style <> fillcolor <> color <> node_list <> "  }\n"
