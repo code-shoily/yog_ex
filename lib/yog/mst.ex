@@ -69,9 +69,9 @@ defmodule Yog.MST do
       ...>   |> Yog.add_node(1, "A")
       ...>   |> Yog.add_node(2, "B")
       ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...>   |> Yog.add_edge!(from: 2, to: 3, with: 2)
-      ...>   |> Yog.add_edge!(from: 1, to: 3, with: 3)
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 2)
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 3, with: 3)
       iex> mst_edges = Yog.MST.kruskal(in: graph, compare: fn a, b ->
       ...>   cond do
       ...>     a < b -> :lt
@@ -103,9 +103,9 @@ defmodule Yog.MST do
       ...>   |> Yog.add_node(1, "A")
       ...>   |> Yog.add_node(2, "B")
       ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...>   |> Yog.add_edge!(from: 2, to: 3, with: 2)
-      ...>   |> Yog.add_edge!(from: 1, to: 3, with: 3)
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 2)
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 3, with: 3)
       iex> mst_edges = graph |> Yog.MST.kruskal(fn a, b ->
       ...>   cond do
       ...>     a < b -> :lt
@@ -150,9 +150,9 @@ defmodule Yog.MST do
       ...>   |> Yog.add_node(1, "A")
       ...>   |> Yog.add_node(2, "B")
       ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...>   |> Yog.add_edge!(from: 2, to: 3, with: 2)
-      ...>   |> Yog.add_edge!(from: 1, to: 3, with: 3)
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 2)
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 3, with: 3)
       iex> mst_edges = Yog.MST.prim(in: graph, compare: fn a, b ->
       ...>   cond do
       ...>     a < b -> :lt
@@ -201,9 +201,9 @@ defmodule Yog.MST do
       ...>   |> Yog.add_node(1, "A")
       ...>   |> Yog.add_node(2, "B")
       ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...>   |> Yog.add_edge!(from: 2, to: 3, with: 2)
-      ...>   |> Yog.add_edge!(from: 1, to: 3, with: 3)
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 2)
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 3, with: 3)
       iex> mst_edges = graph |> Yog.MST.prim(fn a, b ->
       ...>   cond do
       ...>     a < b -> :lt

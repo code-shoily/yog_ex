@@ -53,7 +53,7 @@ defmodule Yog.IO.GDFTest do
       Yog.directed()
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
-      |> Yog.add_edge!(from: 1, to: 2, with: "5")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "5")
 
     gdf_str = GDF.serialize(graph)
 
@@ -82,7 +82,7 @@ defmodule Yog.IO.GDFTest do
       Yog.undirected()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge!(from: 1, to: 2, with: "10")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "10")
 
     gdf_str = GDF.serialize(graph)
 
@@ -103,7 +103,7 @@ defmodule Yog.IO.GDFTest do
       Yog.directed()
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
-      |> Yog.add_edge!(from: 1, to: 2, with: 42)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 42)
 
     gdf_str = GDF.serialize_weighted(graph)
 
@@ -116,7 +116,7 @@ defmodule Yog.IO.GDFTest do
       Yog.directed()
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
-      |> Yog.add_edge!(from: 1, to: 2, with: "friend")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "friend")
 
     node_attr = fn name -> %{"name" => name, "role" => "user"} end
     edge_attr = fn rel -> %{"relation" => rel, "weight" => "strong"} end
@@ -386,7 +386,7 @@ defmodule Yog.IO.GDFTest do
       Yog.directed()
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
-      |> Yog.add_edge!(from: 1, to: 2, with: "friend")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "friend")
 
     gdf_str = GDF.serialize(original)
     {:ok, loaded} = GDF.deserialize(gdf_str)
@@ -472,7 +472,7 @@ defmodule Yog.IO.GDFTest do
       Yog.directed()
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
-      |> Yog.add_edge!(from: 1, to: 2, with: "5")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "5")
 
     # Write
     assert {:ok, nil} = GDF.write(path, original)

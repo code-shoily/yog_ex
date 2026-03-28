@@ -15,8 +15,8 @@ defmodule Yog.IO.LEDATest do
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
       |> Yog.add_node(3, "Carol")
-      |> Yog.add_edge!(from: 1, to: 2, with: "follows")
-      |> Yog.add_edge!(from: 2, to: 3, with: "knows")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "follows")
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: "knows")
 
     options = LEDA.options_with(fn d -> d end, fn d -> d end, fn s -> s end, fn s -> s end)
     result = LEDA.serialize_with(options, graph)
@@ -36,7 +36,7 @@ defmodule Yog.IO.LEDATest do
       Yog.undirected()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge!(from: 1, to: 2, with: "edge1")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "edge1")
 
     result = LEDA.serialize(graph)
 
@@ -50,7 +50,7 @@ defmodule Yog.IO.LEDATest do
       Yog.directed()
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
-      |> Yog.add_edge!(from: 1, to: 2, with: "follows")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "follows")
 
     result = LEDA.serialize(graph)
 
@@ -64,7 +64,7 @@ defmodule Yog.IO.LEDATest do
       Yog.directed()
       |> Yog.add_node(1, "Start")
       |> Yog.add_node(2, "End")
-      |> Yog.add_edge!(from: 1, to: 2, with: "connects")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "connects")
 
     result = LEDA.to_string(graph)
 
@@ -133,7 +133,7 @@ defmodule Yog.IO.LEDATest do
       Yog.directed()
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
-      |> Yog.add_edge!(from: 1, to: 2, with: "follows")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "follows")
 
     options = LEDA.options_with(fn d -> d end, fn d -> d end, fn s -> s end, fn s -> s end)
     exported = LEDA.serialize_with(options, graph)
@@ -174,7 +174,7 @@ defmodule Yog.IO.LEDATest do
       Yog.directed()
       |> Yog.add_node(1, 100)
       |> Yog.add_node(2, 200)
-      |> Yog.add_edge!(from: 1, to: 2, with: 42)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 42)
 
     int_parser = fn s ->
       case Integer.parse(s) do

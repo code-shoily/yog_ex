@@ -36,10 +36,10 @@ defmodule Yog.Connectivity.KCore do
       ...>   |> Yog.add_node(2, nil)
       ...>   |> Yog.add_node(3, nil)
       ...>   |> Yog.add_node(4, nil)
-      ...>   |> Yog.add_edge!(1, 2, 1)
-      ...>   |> Yog.add_edge!(2, 3, 1)
-      ...>   |> Yog.add_edge!(3, 4, 1)
-      ...>   |> Yog.add_edge!(4, 1, 1)
+      ...>   |> Yog.add_edge_ensure(1, 2, 1)
+      ...>   |> Yog.add_edge_ensure(2, 3, 1)
+      ...>   |> Yog.add_edge_ensure(3, 4, 1)
+      ...>   |> Yog.add_edge_ensure(4, 1, 1)
       iex> core_2 = Yog.Connectivity.KCore.detect(graph, 2)
       iex> Yog.node_count(core_2)
       4
@@ -126,7 +126,7 @@ defmodule Yog.Connectivity.KCore do
 
   ## Examples
 
-      iex> graph = Yog.undirected() |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_edge!(1, 2, 1)
+      iex> graph = Yog.undirected() |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_edge_ensure(1, 2, 1)
       iex> Yog.Connectivity.KCore.core_numbers(graph)
       %{1 => 1, 2 => 1}
   """

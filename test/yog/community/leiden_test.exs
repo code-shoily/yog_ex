@@ -27,15 +27,15 @@ defmodule Yog.Community.LeidenTest do
       |> Yog.add_node(4, nil)
       |> Yog.add_node(5, nil)
       # First triangle
-      |> Yog.add_edge!(from: 0, to: 1, with: 1)
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 2, to: 0, with: 1)
+      |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 0, with: 1)
       # Second triangle
-      |> Yog.add_edge!(from: 3, to: 4, with: 1)
-      |> Yog.add_edge!(from: 4, to: 5, with: 1)
-      |> Yog.add_edge!(from: 5, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 4, to: 5, with: 1)
+      |> Yog.add_edge_ensure(from: 5, to: 3, with: 1)
       # Bridge edge
-      |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
 
     comms = Leiden.detect(graph)
 
@@ -195,8 +195,8 @@ defmodule Yog.Community.LeidenTest do
   end
 
   test "connectivity guarantee: isolated communities stay separate" do
-    # Two disjoint cliques. 
-    # Louvain might merge them on very small graphs due to resolution limit, 
+    # Two disjoint cliques.
+    # Louvain might merge them on very small graphs due to resolution limit,
     # but Leiden refinement step aims to keep them separate if not connected.
     edges_a = for u <- 0..4, v <- 0..4, u < v, do: {u, v, 1}
     edges_b = for u <- 10..14, v <- 10..14, u < v, do: {u, v, 1}

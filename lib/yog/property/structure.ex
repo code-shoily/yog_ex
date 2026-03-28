@@ -34,13 +34,13 @@ defmodule Yog.Property.Structure do
       iex> graph = Yog.undirected()
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_edge!(1, 2, 1)
+      ...> |> Yog.add_edge_ensure(1, 2, 1)
       iex> Yog.Property.Structure.tree?(graph)
       true
 
       # Complete graph K3 (triangle)
       iex> graph = Yog.undirected() |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(1, 2, 1) |> Yog.add_edge!(2, 3, 1) |> Yog.add_edge!(3, 1, 1)
+      ...> |> Yog.add_edge_ensure(1, 2, 1) |> Yog.add_edge_ensure(2, 3, 1) |> Yog.add_edge_ensure(3, 1, 1)
       iex> Yog.Property.Structure.complete?(graph)
       true
   """

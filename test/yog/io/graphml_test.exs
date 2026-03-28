@@ -55,7 +55,7 @@ defmodule Yog.IO.GraphMLTest do
       Yog.directed()
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
-      |> Yog.add_edge!(from: 1, to: 2, with: "5")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "5")
 
     xml = GraphML.serialize(graph)
 
@@ -84,7 +84,7 @@ defmodule Yog.IO.GraphMLTest do
       Yog.undirected()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge!(from: 1, to: 2, with: "10")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "10")
 
     xml = GraphML.serialize(graph)
 
@@ -98,7 +98,7 @@ defmodule Yog.IO.GraphMLTest do
       Yog.directed()
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
-      |> Yog.add_edge!(from: 1, to: 2, with: "friend")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "friend")
 
     node_attr = fn name -> %{"name" => name, "type" => "person"} end
     edge_attr = fn rel -> %{"relation" => rel, "strength" => "strong"} end
@@ -325,7 +325,7 @@ defmodule Yog.IO.GraphMLTest do
       Yog.directed()
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
-      |> Yog.add_edge!(from: 1, to: 2, with: "friend")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "friend")
 
     xml = GraphML.serialize(original)
     {:ok, loaded} = GraphML.deserialize(xml)
@@ -391,7 +391,7 @@ defmodule Yog.IO.GraphMLTest do
       Yog.directed()
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
-      |> Yog.add_edge!(from: 1, to: 2, with: "5")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "5")
 
     assert {:ok, nil} = GraphML.write(path, original)
 

@@ -177,8 +177,8 @@ defmodule Yog.Pathfinding.BellmanFord do
       ...> |> Yog.add_node(:a, nil)
       ...> |> Yog.add_node(:b, nil)
       ...> |> Yog.add_node(:c, nil)
-      ...> |> Yog.add_edge!(:a, :b, 4)
-      ...> |> Yog.add_edge!(:b, :c, -3)
+      ...> |> Yog.add_edge_ensure(:a, :b, 4)
+      ...> |> Yog.add_edge_ensure(:b, :c, -3)
       iex> compare = &Yog.Utils.compare/2
       iex> {:ok, path} = BellmanFord.bellman_ford(graph, :a, :c, 0, &(&1 + &2), compare)
       iex> path.nodes
@@ -190,8 +190,8 @@ defmodule Yog.Pathfinding.BellmanFord do
       iex> bad_graph = Yog.directed()
       ...> |> Yog.add_node(:a, nil)
       ...> |> Yog.add_node(:b, nil)
-      ...> |> Yog.add_edge!(:a, :b, 1)
-      ...> |> Yog.add_edge!(:b, :a, -3)
+      ...> |> Yog.add_edge_ensure(:a, :b, 1)
+      ...> |> Yog.add_edge_ensure(:b, :a, -3)
       iex> compare = &Yog.Utils.compare/2
       iex> BellmanFord.bellman_ford(bad_graph, :a, :b, 0, &(&1 + &2), compare)
       {:error, :negative_cycle}

@@ -191,8 +191,8 @@ defmodule Yog.IO.List do
       ...>   |> Yog.add_node(1, nil)
       ...>   |> Yog.add_node(2, nil)
       ...>   |> Yog.add_node(3, nil)
-      ...>   |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      ...>   |> Yog.add_edge!(from: 2, to: 3, with: 7)
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 7)
       iex> entries = Yog.IO.List.to_list(graph)
       iex> entries
       [{1, [{2, 5}]}, {2, [{1, 5}, {3, 7}]}, {3, [{2, 7}]}]
@@ -228,14 +228,14 @@ defmodule Yog.IO.List do
   ## Examples
 
       iex> graph = Yog.undirected()
-      ...>   |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      ...>   |> Yog.add_edge!(from: 2, to: 3, with: 7)
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 7)
       iex> Yog.IO.List.to_string(graph)
       "1: 2\\n2: 1 3\\n3: 2"
 
       iex> graph = Yog.undirected()
-      ...>   |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      ...>   |> Yog.add_edge!(from: 2, to: 3, with: 7)
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 7)
       iex> Yog.IO.List.to_string(graph, weighted: true)
       "1: 2,5\\n2: 1,5 3,7\\n3: 2,7"
   """

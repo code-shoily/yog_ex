@@ -182,7 +182,7 @@ defmodule Yog.Model do
       {"Alice", "anon"}
   """
   @spec add_edge_ensure(graph(), node_id(), node_id(), term(), term()) :: graph()
-  def add_edge_ensure(graph, src, dst, weight, default) do
+  def add_edge_ensure(graph, src, dst, weight, default \\ nil) do
     graph
     |> ensure_node(src, default)
     |> ensure_node(dst, default)
@@ -402,8 +402,8 @@ defmodule Yog.Model do
       ...>   |> Yog.add_node(1, "A")
       ...>   |> Yog.add_node(2, "B")
       ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edge!(from: 1, to: 2, with: 10)
-      ...>   |> Yog.add_edge!(from: 1, to: 3, with: 20)
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 3, with: 20)
       iex> Yog.Model.neighbor_ids(graph, 1) |> Enum.sort()
       [2, 3]
   """

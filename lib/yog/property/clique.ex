@@ -60,12 +60,12 @@ defmodule Yog.Property.Clique do
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
       ...> |> Yog.add_node(4, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 1, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 1, to: 4, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 4, with: 1)
-      ...> |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 4, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 4, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
       iex> Yog.Property.Clique.max_clique(graph) |> MapSet.size()
       4
 
@@ -91,9 +91,9 @@ defmodule Yog.Property.Clique do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
       iex> Yog.Property.Clique.max_clique(graph) |> MapSet.size()
       3
 
@@ -102,8 +102,8 @@ defmodule Yog.Property.Clique do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
       iex> Yog.Property.Clique.max_clique(path) |> MapSet.size()
       2
 
@@ -145,9 +145,9 @@ defmodule Yog.Property.Clique do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
       iex> Yog.Property.Clique.all_maximal_cliques(graph) |> length()
       1
 
@@ -156,8 +156,8 @@ defmodule Yog.Property.Clique do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
       iex> Yog.Property.Clique.all_maximal_cliques(path) |> length()
       2
       iex> # Empty graph has no cliques
@@ -272,12 +272,12 @@ defmodule Yog.Property.Clique do
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
       ...> |> Yog.add_node(4, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 1, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 1, to: 4, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 4, with: 1)
-      ...> |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 4, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 4, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
       iex> Yog.Property.Clique.k_cliques(graph, 3) |> length()
       4
       iex> # Find edges (cliques of size 2)

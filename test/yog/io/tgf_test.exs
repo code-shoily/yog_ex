@@ -33,7 +33,7 @@ defmodule Yog.IO.TGFTest do
       Yog.directed()
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
-      |> Yog.add_edge!(from: 1, to: 2, with: "follows")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "follows")
 
     options = TGF.options_with(fn data -> data end, fn label -> {:some, label} end)
     result = TGF.serialize_with(options, graph)
@@ -46,7 +46,7 @@ defmodule Yog.IO.TGFTest do
       Yog.directed()
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
-      |> Yog.add_edge!(from: 1, to: 2, with: "follows")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "follows")
 
     result = TGF.serialize(graph)
 
@@ -155,10 +155,10 @@ defmodule Yog.IO.TGFTest do
 
   test "parse whitespace handling" do
     input = """
-      1  Alice  
-      2  Bob  
-      #  
-      1  2  follows  
+      1  Alice
+      2  Bob
+      #
+      1  2  follows
     """
 
     {:ok, {:tgf_result, graph, _warnings}} = TGF.parse(input, :directed)
@@ -199,7 +199,7 @@ defmodule Yog.IO.TGFTest do
       Yog.directed()
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
-      |> Yog.add_edge!(from: 1, to: 2, with: "follows")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "follows")
 
     options = TGF.options_with(fn data -> data end, fn label -> {:some, label} end)
     exported = TGF.serialize_with(options, graph)
@@ -225,7 +225,7 @@ defmodule Yog.IO.TGFTest do
       Yog.directed()
       |> Yog.add_node(1, 100)
       |> Yog.add_node(2, 200)
-      |> Yog.add_edge!(from: 1, to: 2, with: 42)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 42)
 
     options =
       TGF.options_with(

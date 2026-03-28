@@ -17,7 +17,7 @@ defmodule Yog.IO.GDF do
       iex> graph = Yog.directed()
       ...> |> Yog.add_node(1, "Alice")
       ...> |> Yog.add_node(2, "Bob")
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: "5")
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: "5")
       iex>
       iex> # Serialize to GDF
       iex> _gdf_string = Yog.IO.GDF.serialize(graph)
@@ -69,7 +69,7 @@ defmodule Yog.IO.GDF do
       iex> graph = Yog.directed()
       ...> |> Yog.add_node(1, %{name: "Alice", age: 30})
       ...> |> Yog.add_node(2, %{name: "Bob", age: 25})
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: %{weight: 10, relation: "friend"})
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: %{weight: 10, relation: "friend"})
       iex>
       iex> node_attr = fn data -> %{"label" => data.name, "age" => Integer.to_string(data.age)} end
       iex> edge_attr = fn data -> %{"weight" => Integer.to_string(data.weight), "type" => data.relation} end
@@ -197,7 +197,7 @@ defmodule Yog.IO.GDF do
       iex> graph = Yog.directed()
       ...> |> Yog.add_node(1, "Alice")
       ...> |> Yog.add_node(2, "Bob")
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: "friend")
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: "friend")
       iex>
       iex> gdf = Yog.IO.GDF.serialize(graph)
       iex> String.contains?(gdf, "1,Alice")
@@ -225,7 +225,7 @@ defmodule Yog.IO.GDF do
       iex> graph = Yog.directed()
       ...> |> Yog.add_node(1, "Alice")
       ...> |> Yog.add_node(2, "Bob")
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 5)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
       iex>
       iex> gdf = Yog.IO.GDF.serialize_weighted(graph)
       iex> String.contains?(gdf, "1,2,true,5")
@@ -247,7 +247,7 @@ defmodule Yog.IO.GDF do
       iex> graph = Yog.directed()
       ...> |> Yog.add_node(1, "Start")
       ...> |> Yog.add_node(2, "End")
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: "connection")
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: "connection")
       iex>
       iex> path = "/tmp/test1.gdf"
       iex> Yog.IO.GDF.write(path, graph)

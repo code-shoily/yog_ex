@@ -20,7 +20,7 @@ defmodule Yog.Pathfinding.PathTest do
         Yog.directed()
         |> Yog.add_node(1, "A")
         |> Yog.add_node(2, "B")
-        |> Yog.add_edge!(1, 2, 10)
+        |> Yog.add_edge_ensure(1, 2, 10)
 
       path = [1, 2]
       assert Path.hydrate_path(graph, path) == [{1, 2, 10}]

@@ -36,7 +36,7 @@ defmodule Yog.Flow.MaxFlowTest do
         Yog.directed()
         |> Yog.add_node(1, "s")
         |> Yog.add_node(2, "t")
-        |> Yog.add_edge!(from: 1, to: 2, with: 5)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
 
       result = MaxFlow.edmonds_karp(graph, 1, 2)
 
@@ -88,7 +88,7 @@ defmodule Yog.Flow.MaxFlowTest do
         |> Yog.add_node(1, "s")
         |> Yog.add_node(2, "a")
         |> Yog.add_node(3, "t")
-        |> Yog.add_edge!(from: 1, to: 2, with: 10)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
 
       # No edge to sink
 
@@ -136,7 +136,7 @@ defmodule Yog.Flow.MaxFlowTest do
         Yog.directed()
         |> Yog.add_node(1, "s")
         |> Yog.add_node(2, "t")
-        |> Yog.add_edge!(from: 1, to: 2, with: 7)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 7)
 
       max_flow_result = MaxFlow.edmonds_karp(graph, 1, 2)
       min_cut = MaxFlow.extract_min_cut(max_flow_result)

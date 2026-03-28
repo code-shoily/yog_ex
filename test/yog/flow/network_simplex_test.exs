@@ -18,7 +18,7 @@ defmodule Yog.Flow.NetworkSimplexTest do
         Yog.directed()
         |> Yog.add_node(1, "s")
         |> Yog.add_node(2, "t")
-        |> Yog.add_edge!(from: 1, to: 2, with: 10)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
 
       # Supply doesn't equal demand (-10 ≠ 5)
       get_demand = fn
@@ -39,7 +39,7 @@ defmodule Yog.Flow.NetworkSimplexTest do
         Yog.directed()
         |> Yog.add_node(1, "s")
         |> Yog.add_node(2, "t")
-        |> Yog.add_edge!(from: 1, to: 2, with: 10)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
 
       # Zero demand/supply
       get_demand = fn
@@ -69,7 +69,7 @@ defmodule Yog.Flow.NetworkSimplexTest do
         Yog.directed()
         |> Yog.add_node(1, "a")
         |> Yog.add_node(2, "b")
-        |> Yog.add_edge!(from: 1, to: 2, with: 5)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
 
       # Functions take node/edge data (strings and integers)
       get_demand = fn

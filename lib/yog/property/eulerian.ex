@@ -72,10 +72,10 @@ defmodule Yog.Property.Eulerian do
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
       ...> |> Yog.add_node(4, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 3, to: 4, with: 1)
-      ...> |> Yog.add_edge!(from: 4, to: 1, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 4, to: 1, with: 1)
       iex> Yog.Property.Eulerian.has_eulerian_circuit?(graph)
       true
 
@@ -106,10 +106,10 @@ defmodule Yog.Property.Eulerian do
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
       ...> |> Yog.add_node(4, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 3, to: 4, with: 1)
-      ...> |> Yog.add_edge!(from: 4, to: 1, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 4, to: 1, with: 1)
       iex> Yog.Property.Eulerian.has_eulerian_circuit?(graph)
       true
 
@@ -118,8 +118,8 @@ defmodule Yog.Property.Eulerian do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
       iex> Yog.Property.Eulerian.has_eulerian_circuit?(path)
       false
 
@@ -190,8 +190,8 @@ defmodule Yog.Property.Eulerian do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
       iex> Yog.Property.Eulerian.has_eulerian_path?(graph)
       true
 
@@ -201,10 +201,10 @@ defmodule Yog.Property.Eulerian do
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
       ...> |> Yog.add_node(4, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 3, to: 4, with: 1)
-      ...> |> Yog.add_edge!(from: 4, to: 1, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 4, to: 1, with: 1)
       iex> Yog.Property.Eulerian.has_eulerian_path?(square)
       true
 
@@ -311,10 +311,10 @@ defmodule Yog.Property.Eulerian do
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
       ...> |> Yog.add_node(4, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 3, to: 4, with: 1)
-      ...> |> Yog.add_edge!(from: 4, to: 1, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 4, to: 1, with: 1)
       iex> {:ok, circuit} = Yog.Property.Eulerian.eulerian_circuit(graph)
       iex> length(circuit)
       5  # Includes return to start
@@ -324,8 +324,8 @@ defmodule Yog.Property.Eulerian do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
       iex> Yog.Property.Eulerian.eulerian_circuit(path)
       {:error, :no_eulerian_circuit}
 
@@ -359,8 +359,8 @@ defmodule Yog.Property.Eulerian do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
       iex> {:ok, path} = Yog.Property.Eulerian.eulerian_path(graph)
       iex> length(path)
       3
@@ -371,10 +371,10 @@ defmodule Yog.Property.Eulerian do
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
       ...> |> Yog.add_node(4, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 3, to: 4, with: 1)
-      ...> |> Yog.add_edge!(from: 4, to: 1, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 4, to: 1, with: 1)
       iex> {:ok, path} = Yog.Property.Eulerian.eulerian_path(square)
       iex> length(path)
       5

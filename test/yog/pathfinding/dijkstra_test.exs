@@ -17,8 +17,8 @@ defmodule Yog.Pathfinding.DijkstraTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
 
     result = Dijkstra.shortest_path(graph, 1, 3, 0, &add/2, &compare/2)
 
@@ -32,7 +32,7 @@ defmodule Yog.Pathfinding.DijkstraTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge!(from: 1, to: 2, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
 
     result = Dijkstra.shortest_path(graph, 1, 2, 0, &add/2, &compare/2)
 
@@ -93,9 +93,9 @@ defmodule Yog.Pathfinding.DijkstraTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 10)
-      |> Yog.add_edge!(from: 1, to: 3, with: 100)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 100)
 
     result = Dijkstra.shortest_path(graph, 1, 3, 0, &add/2, &compare/2)
 
@@ -111,9 +111,9 @@ defmodule Yog.Pathfinding.DijkstraTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 5)
-      |> Yog.add_edge!(from: 1, to: 3, with: 100)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 5)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 100)
 
     result = Dijkstra.shortest_path(graph, 1, 3, 0, &add/2, &compare/2)
 
@@ -137,10 +137,10 @@ defmodule Yog.Pathfinding.DijkstraTest do
       |> Yog.add_node(2, "Left")
       |> Yog.add_node(3, "Right")
       |> Yog.add_node(4, "Bottom")
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 1, to: 3, with: 4)
-      |> Yog.add_edge!(from: 2, to: 4, with: 2)
-      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 4)
+      |> Yog.add_edge_ensure(from: 2, to: 4, with: 2)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
 
     result = Dijkstra.shortest_path(graph, 1, 4, 0, &add/2, &compare/2)
 
@@ -158,9 +158,9 @@ defmodule Yog.Pathfinding.DijkstraTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 10)
-      |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
+      |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
 
     result = Dijkstra.shortest_path(graph, 1, 3, 0, &add/2, &compare/2)
 
@@ -177,8 +177,8 @@ defmodule Yog.Pathfinding.DijkstraTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
 
     result = Dijkstra.shortest_path(graph, 1, 3, 0, &add/2, &compare/2)
 
@@ -194,8 +194,8 @@ defmodule Yog.Pathfinding.DijkstraTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
 
     result = Dijkstra.shortest_path(graph, 1, 3)
 
@@ -210,8 +210,8 @@ defmodule Yog.Pathfinding.DijkstraTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5.5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 10.5)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5.5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10.5)
 
     result = Dijkstra.shortest_path(graph, 1, 3)
 
@@ -226,8 +226,8 @@ defmodule Yog.Pathfinding.DijkstraTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 0)
-      |> Yog.add_edge!(from: 2, to: 3, with: 0)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 0)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 0)
 
     result = Dijkstra.shortest_path(graph, 1, 3, 0, &add/2, &compare/2)
 
@@ -243,8 +243,8 @@ defmodule Yog.Pathfinding.DijkstraTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
 
     distances = Dijkstra.single_source_distances(graph, 1, 0, &add/2, &compare/2)
 
@@ -259,7 +259,7 @@ defmodule Yog.Pathfinding.DijkstraTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
 
     distances = Dijkstra.single_source_distances(graph, 1, 0, &add/2, &compare/2)
 
@@ -277,12 +277,12 @@ defmodule Yog.Pathfinding.DijkstraTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 1, to: 3, with: 2)
-      |> Yog.add_edge!(from: 1, to: 4, with: 3)
-      |> Yog.add_edge!(from: 2, to: 3, with: 4)
-      |> Yog.add_edge!(from: 2, to: 4, with: 5)
-      |> Yog.add_edge!(from: 3, to: 4, with: 6)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 2)
+      |> Yog.add_edge_ensure(from: 1, to: 4, with: 3)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 4)
+      |> Yog.add_edge_ensure(from: 2, to: 4, with: 5)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 6)
 
     distances = Dijkstra.single_source_distances(graph, 1, 0, &add/2, &compare/2)
 
@@ -309,9 +309,9 @@ defmodule Yog.Pathfinding.DijkstraTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 10)
-      |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
+      |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
 
     distances = Dijkstra.single_source_distances(graph, 1, 0, &add/2, &compare/2)
 
@@ -326,8 +326,8 @@ defmodule Yog.Pathfinding.DijkstraTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
 
     distances = Dijkstra.single_source_distances(graph, 2, 0, &add/2, &compare/2)
 
@@ -342,8 +342,8 @@ defmodule Yog.Pathfinding.DijkstraTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5.5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 10.5)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5.5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10.5)
 
     compare_float = fn a, b -> if(a < b, do: :lt, else: if(a > b, do: :gt, else: :eq)) end
 
@@ -363,10 +363,10 @@ defmodule Yog.Pathfinding.DijkstraTest do
       |> Yog.add_node(3, "B")
       |> Yog.add_node(4, "C")
       |> Yog.add_node(5, "D")
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 1, to: 3, with: 2)
-      |> Yog.add_edge!(from: 1, to: 4, with: 3)
-      |> Yog.add_edge!(from: 1, to: 5, with: 4)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 2)
+      |> Yog.add_edge_ensure(from: 1, to: 4, with: 3)
+      |> Yog.add_edge_ensure(from: 1, to: 5, with: 4)
 
     distances = Dijkstra.single_source_distances(graph, 1, 0, &add/2, &compare/2)
 
@@ -527,8 +527,8 @@ defmodule Yog.Pathfinding.DijkstraTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
 
     result =
       Dijkstra.shortest_path(
@@ -549,7 +549,7 @@ defmodule Yog.Pathfinding.DijkstraTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
 
     distances =
       Dijkstra.single_source_distances(

@@ -12,9 +12,9 @@ defmodule Yog.Pathfinding.MatrixTest do
         |> Yog.add_node(2, nil)
         |> Yog.add_node(3, nil)
         |> Yog.add_node(4, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 4)
-        |> Yog.add_edge!(from: 2, to: 3, with: 1)
-        |> Yog.add_edge!(from: 3, to: 4, with: 2)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 4)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+        |> Yog.add_edge_ensure(from: 3, to: 4, with: 2)
 
       # 3 POIs out of 4 nodes: P = 3, V = 4, so P > V/3, uses Floyd-Warshall
       # Actually 3 <= 4/3 is false, so 3 > 1.33, so uses Floyd-Warshall
@@ -40,8 +40,8 @@ defmodule Yog.Pathfinding.MatrixTest do
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
         |> Yog.add_node(3, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 4)
-        |> Yog.add_edge!(from: 2, to: 3, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 4)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
 
       # All 3 nodes as POIs: P = 3, V = 3, P > V/3 (3 > 1), uses Floyd-Warshall
       pois = [1, 2, 3]
@@ -63,7 +63,7 @@ defmodule Yog.Pathfinding.MatrixTest do
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
         |> Yog.add_node(3, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 5)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
 
       # Node 3 is isolated
 
@@ -86,7 +86,7 @@ defmodule Yog.Pathfinding.MatrixTest do
         Yog.undirected()
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 5)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
 
       pois = [1]
 
@@ -101,7 +101,7 @@ defmodule Yog.Pathfinding.MatrixTest do
       graph =
         Yog.undirected()
         |> Yog.add_node(1, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 5)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
 
       assert {:ok, distances} =
                Matrix.distance_matrix(graph, [], 0, &(&1 + &2), &Yog.Utils.compare/2)
@@ -118,8 +118,8 @@ defmodule Yog.Pathfinding.MatrixTest do
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
         |> Yog.add_node(3, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 4)
-        |> Yog.add_edge!(from: 2, to: 3, with: -2)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 4)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: -2)
 
       pois = [1, 3]
 
@@ -143,8 +143,8 @@ defmodule Yog.Pathfinding.MatrixTest do
         Yog.directed()
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
-        |> Yog.add_edge!(from: 2, to: 1, with: -3)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 2, to: 1, with: -3)
 
       pois = [1, 2]
 
@@ -167,12 +167,12 @@ defmodule Yog.Pathfinding.MatrixTest do
         |> Yog.add_node(2, nil)
         |> Yog.add_node(3, nil)
         |> Yog.add_node(4, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
-        |> Yog.add_edge!(from: 2, to: 3, with: 2)
-        |> Yog.add_edge!(from: 3, to: 4, with: -1)
-        |> Yog.add_edge!(from: 1, to: 3, with: 5)
-        |> Yog.add_edge!(from: 2, to: 4, with: 3)
-        |> Yog.add_edge!(from: 1, to: 4, with: 10)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 2)
+        |> Yog.add_edge_ensure(from: 3, to: 4, with: -1)
+        |> Yog.add_edge_ensure(from: 1, to: 3, with: 5)
+        |> Yog.add_edge_ensure(from: 2, to: 4, with: 3)
+        |> Yog.add_edge_ensure(from: 1, to: 4, with: 10)
 
       pois = [1, 4]
 
@@ -198,8 +198,8 @@ defmodule Yog.Pathfinding.MatrixTest do
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
         |> Yog.add_node(3, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1.5)
-        |> Yog.add_edge!(from: 2, to: 3, with: 2.5)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1.5)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 2.5)
 
       pois = [1, 3]
 
@@ -216,7 +216,7 @@ defmodule Yog.Pathfinding.MatrixTest do
           g
           |> Yog.add_node(i, nil)
           |> Yog.add_node(i + 1, nil)
-          |> Yog.add_edge!(from: i, to: i + 1, with: 1)
+          |> Yog.add_edge_ensure(from: i, to: i + 1, with: 1)
         end)
 
       # Select every other node as POI

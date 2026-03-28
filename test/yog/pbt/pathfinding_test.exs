@@ -15,7 +15,7 @@ defmodule Yog.PBT.PathfindingTest do
         # Create unweighted version (all weights = 1)
         unweighted =
           Enum.reduce(Yog.all_edges(graph), Yog.new(graph.kind), fn {u, v, _}, g ->
-            g |> Yog.add_node(u, nil) |> Yog.add_node(v, nil) |> Yog.add_edge!(u, v, 1)
+            g |> Yog.add_node(u, nil) |> Yog.add_node(v, nil) |> Yog.add_edge_ensure(u, v, 1)
           end)
 
         # BFS shortest path (via Traversal)
@@ -109,7 +109,7 @@ defmodule Yog.PBT.PathfindingTest do
         # Let's force all weights to 1 for this comparison
         unweighted =
           Enum.reduce(Yog.all_edges(graph), Yog.new(:undirected), fn {u, v, _}, g ->
-            g |> Yog.add_node(u, nil) |> Yog.add_node(v, nil) |> Yog.add_edge!(u, v, 1)
+            g |> Yog.add_node(u, nil) |> Yog.add_node(v, nil) |> Yog.add_edge_ensure(u, v, 1)
           end)
 
         d_res = Yog.Pathfinding.Dijkstra.shortest_path(unweighted, s, t)

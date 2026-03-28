@@ -95,9 +95,9 @@ defmodule Yog.Pathfinding.FloydWarshall do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 4)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 1, to: 3, with: 10)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 4)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 3, with: 10)
       iex> compare = &Yog.Utils.compare/2
       iex> {:ok, distances} = Yog.Pathfinding.FloydWarshall.floyd_warshall(graph, 0, &(&1 + &2), compare)
       iex> # Shortest path from 1 to 3 should be 1->2->3 = 5, not direct 10
@@ -108,8 +108,8 @@ defmodule Yog.Pathfinding.FloydWarshall do
       iex> bad_graph = Yog.directed()
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 1, with: -3)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 1, with: -3)
       iex> compare = &Yog.Utils.compare/2
       iex> Yog.Pathfinding.FloydWarshall.floyd_warshall(bad_graph, 0, &(&1 + &2), compare)
       {:error, :negative_cycle}

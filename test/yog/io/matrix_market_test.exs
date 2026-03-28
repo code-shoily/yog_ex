@@ -11,7 +11,7 @@ defmodule Yog.IO.MatrixMarketTest do
         Yog.directed()
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 5.5)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 5.5)
 
       result = MatrixMarket.serialize(graph)
 
@@ -25,7 +25,7 @@ defmodule Yog.IO.MatrixMarketTest do
         Yog.undirected()
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 10)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
 
       result = MatrixMarket.serialize(graph)
 
@@ -39,7 +39,7 @@ defmodule Yog.IO.MatrixMarketTest do
         Yog.directed()
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: {1, 2})
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: {1, 2})
 
       options = MatrixMarket.options_with(fn {a, b} -> "#{a}/#{b}" end)
       result = MatrixMarket.serialize_with(options, graph)
@@ -174,7 +174,7 @@ defmodule Yog.IO.MatrixMarketTest do
         Yog.directed()
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 5.5)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 5.5)
 
       assert :ok = MatrixMarket.write(@tmp_file, graph)
       assert File.exists?(@tmp_file)

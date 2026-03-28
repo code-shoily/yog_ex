@@ -51,9 +51,9 @@ defmodule Yog.Property.Bipartite do
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
       ...> |> Yog.add_node(4, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
       iex> Yog.Property.Bipartite.bipartite?(graph)
       true
 
@@ -64,9 +64,9 @@ defmodule Yog.Property.Bipartite do
       ...>   |> Yog.add_node(2, nil)
       ...>   |> Yog.add_node(3, nil)
       ...>   |> Yog.add_node(4, nil)
-      ...>   |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...>   |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...>   |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...>   |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
       iex> {:ok, %{left: left, right: right}} = Yog.Property.Bipartite.partition(graph)
       iex> MapSet.size(left) + MapSet.size(right)
       4
@@ -102,8 +102,8 @@ defmodule Yog.Property.Bipartite do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
       iex> Yog.Property.Bipartite.bipartite?(graph)
       true
 
@@ -112,9 +112,9 @@ defmodule Yog.Property.Bipartite do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
       iex> Yog.Property.Bipartite.bipartite?(triangle)
       false
 
@@ -143,9 +143,9 @@ defmodule Yog.Property.Bipartite do
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
       ...> |> Yog.add_node(4, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
       iex> {:ok, %{left: left, right: right}} = Yog.Property.Bipartite.partition(graph)
       iex> MapSet.size(left) == 2 and MapSet.size(right) == 2
       true
@@ -155,9 +155,9 @@ defmodule Yog.Property.Bipartite do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
       iex> Yog.Property.Bipartite.partition(triangle)
       {:error, :not_bipartite}
 
@@ -268,8 +268,8 @@ defmodule Yog.Property.Bipartite do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
       iex> {:ok, coloring} = Yog.Property.Bipartite.coloring(graph)
       iex> # Adjacent nodes should have different colors
       ...> coloring[1] != coloring[2] and coloring[2] != coloring[3]
@@ -279,9 +279,9 @@ defmodule Yog.Property.Bipartite do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
       iex> Yog.Property.Bipartite.coloring(triangle)
       {:error, :not_bipartite}
   """
@@ -317,10 +317,10 @@ defmodule Yog.Property.Bipartite do
       ...> |> Yog.add_node(2, nil)  # left
       ...> |> Yog.add_node(3, nil)  # right
       ...> |> Yog.add_node(4, nil)  # right
-      ...> |> Yog.add_edge!(from: 1, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 1, to: 4, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 4, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 4, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 4, with: 1)
       iex> {:ok, p} = Yog.Property.Bipartite.partition(graph)
       iex> matching = Yog.Property.Bipartite.maximum_matching(graph, p)
       iex> length(matching)

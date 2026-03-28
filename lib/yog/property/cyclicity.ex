@@ -56,8 +56,8 @@ defmodule Yog.Property.Cyclicity do
       ...> |> Yog.add_node(1, "A")
       ...> |> Yog.add_node(2, "B")
       ...> |> Yog.add_node(3, "C")
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
       iex> Yog.Property.Cyclicity.acyclic?(dag)
       true
       iex> Yog.Property.Cyclicity.cyclic?(dag)
@@ -68,9 +68,9 @@ defmodule Yog.Property.Cyclicity do
       ...> |> Yog.add_node(1, "A")
       ...> |> Yog.add_node(2, "B")
       ...> |> Yog.add_node(3, "C")
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
       iex> Yog.Property.Cyclicity.cyclic?(triangle)
       true
 
@@ -105,15 +105,15 @@ defmodule Yog.Property.Cyclicity do
       ...> |> Yog.add_node(1, "A")
       ...> |> Yog.add_node(2, "B")
       ...> |> Yog.add_node(3, "C")
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
       iex> Yog.Property.Cyclicity.acyclic?(dag)
       true
 
       # Self-loop creates a cycle
       iex> cyclic = Yog.directed()
       ...> |> Yog.add_node(1, "A")
-      ...> |> Yog.add_edge!(from: 1, to: 1, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 1, with: 1)
       iex> Yog.Property.Cyclicity.acyclic?(cyclic)
       false
 
@@ -122,9 +122,9 @@ defmodule Yog.Property.Cyclicity do
       ...> |> Yog.add_node(1, "A")
       ...> |> Yog.add_node(2, "B")
       ...> |> Yog.add_node(3, "C")
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
       iex> Yog.Property.Cyclicity.acyclic?(triangle)
       false
 
@@ -151,9 +151,9 @@ defmodule Yog.Property.Cyclicity do
       ...> |> Yog.add_node(1, "A")
       ...> |> Yog.add_node(2, "B")
       ...> |> Yog.add_node(3, "C")
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 3, to: 1, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
       iex> Yog.Property.Cyclicity.cyclic?(cycle)
       true
 

@@ -77,7 +77,7 @@ defmodule Yog.Flow.MinCutTest do
         Yog.undirected()
         |> Yog.add_node(1, "A")
         |> Yog.add_node(2, "B")
-        |> Yog.add_edge!(from: 1, to: 2, with: 5)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
 
       result = MinCut.global_min_cut(graph)
 

@@ -404,8 +404,8 @@ defmodule Yog.Transform do
       ...>   |> Yog.add_node(1, "apple")
       ...>   |> Yog.add_node(2, "banana")
       ...>   |> Yog.add_node(3, "apricot")
-      ...>   |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      ...>   |> Yog.add_edge!(from: 2, to: 3, with: 2)
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 2)
       iex> # Keep only nodes starting with 'a'
       iex> filtered = Yog.Transform.filter_nodes(graph, fn s ->
       ...>   String.starts_with?(s, "a")
@@ -605,7 +605,7 @@ defmodule Yog.Transform do
       ...>   |> Yog.add_node(1, "A")
       ...>   |> Yog.add_node(2, "B")
       ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edge!(from: 1, to: 2, with: 1)
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
       iex> comp = Yog.Transform.complement(graph, 100)
       iex> # Original: 1-2 connected, 1-3 and 2-3 not
       iex> # Complement: 1-3 and 2-3 connected, 1-2 not
@@ -683,12 +683,12 @@ defmodule Yog.Transform do
       ...>   Yog.directed()
       ...>   |> Yog.add_node(1, "Original")
       ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_edge!(from: 1, to: 2, with: 10)
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
       iex> other =
       ...>   Yog.directed()
       ...>   |> Yog.add_node(1, "Updated")
       ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edge!(from: 1, to: 3, with: 20)
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 3, with: 20)
       iex> merged = Yog.Transform.merge(base, other)
       iex> # Node 1 has "Updated" (from other)
       iex> # Node 1 has edges to: 2 and 3 (all edges combined)
@@ -804,8 +804,8 @@ defmodule Yog.Transform do
       ...>   |> Yog.add_node(1, "A")
       ...>   |> Yog.add_node(2, "B")
       ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edge!(from: 1, to: 2, with: 10)
-      ...>   |> Yog.add_edge!(from: 2, to: 3, with: 20)
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 20)
       iex> contracted = Yog.Transform.contract(graph, 1, 2, fn w1, w2 -> w1 + w2 end)
       iex> # Result: nodes [1, 3], edge 1->3 with weight 20
       iex> # Node 2 is merged into node 1
@@ -822,8 +822,8 @@ defmodule Yog.Transform do
       ...>   |> Yog.add_node(1, "A")
       ...>   |> Yog.add_node(2, "B")
       ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edge!(from: 1, to: 3, with: 5)
-      ...>   |> Yog.add_edge!(from: 2, to: 3, with: 10)
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 3, with: 5)
+      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
       iex> contracted = Yog.Transform.contract(graph, 1, 2, fn w1, w2 -> w1 + w2 end)
       iex> # After: a->c (15) (5 + 10)
       iex> Yog.successors(contracted, 1)
@@ -1024,7 +1024,7 @@ defmodule Yog.Transform do
       ...>   Yog.undirected()
       ...>   |> Yog.add_node(1, "A")
       ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_edge!(from: 1, to: 2, with: 10)
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
       iex> directed = Yog.Transform.to_directed(undirected)
       iex> # Has edges: 1->2 and 2->1 (both with weight 10)
       iex> directed.kind
@@ -1066,7 +1066,7 @@ defmodule Yog.Transform do
       ...>   Yog.directed()
       ...>   |> Yog.add_node(1, "A")
       ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_edge!(from: 1, to: 2, with: 5)
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
       iex> undirected = Yog.Transform.to_undirected(directed, &min/2)
       iex> # Edge exists in both directions with weight 5
       iex> Enum.sort(Yog.successors(undirected, 1))

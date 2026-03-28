@@ -18,7 +18,7 @@ defmodule Yog.IO.Pajek do
       iex> graph = Yog.directed()
       ...> |> Yog.add_node(1, "Alice")
       ...> |> Yog.add_node(2, "Bob")
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: "5")
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: "5")
       iex>
       iex> pajek_string = Yog.IO.Pajek.serialize(graph)
       iex> String.contains?(pajek_string, "*Vertices 2")
@@ -125,7 +125,7 @@ defmodule Yog.IO.Pajek do
       graph = Yog.directed()
       |> Yog.add_node(1, %{name: "Alice"})
       |> Yog.add_node(2, %{name: "Bob"})
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
 
       options = Yog.IO.Pajek.options_with(
         fn data -> data.name end,
@@ -185,7 +185,7 @@ defmodule Yog.IO.Pajek do
       iex> graph = Yog.directed()
       ...> |> Yog.add_node(1, "Alice")
       ...> |> Yog.add_node(2, "Bob")
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: "5")
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: "5")
       iex> pajek = Yog.IO.Pajek.serialize(graph)
       iex> String.contains?(pajek, "*Vertices 2") and String.contains?(pajek, ~s("Alice"))
       true
@@ -225,7 +225,7 @@ defmodule Yog.IO.Pajek do
       graph = Yog.directed()
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
-      |> Yog.add_edge!(from: 1, to: 2, with: "follows")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "follows")
 
       Yog.IO.Pajek.write("network.net", graph)
       # => :ok

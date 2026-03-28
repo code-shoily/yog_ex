@@ -17,8 +17,8 @@ defmodule Yog.Pathfinding.BellmanFordTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
 
     result = BellmanFord.bellman_ford(graph, 1, 3, 0, &add/2, &compare/2)
 
@@ -32,7 +32,7 @@ defmodule Yog.Pathfinding.BellmanFordTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge!(from: 1, to: 2, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
 
     result = BellmanFord.bellman_ford(graph, 1, 2, 0, &add/2, &compare/2)
 
@@ -73,9 +73,9 @@ defmodule Yog.Pathfinding.BellmanFordTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 4)
-      |> Yog.add_edge!(from: 2, to: 3, with: -3)
-      |> Yog.add_edge!(from: 1, to: 3, with: 2)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 4)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: -3)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 2)
 
     result = BellmanFord.bellman_ford(graph, 1, 3, 0, &add/2, &compare/2)
 
@@ -90,8 +90,8 @@ defmodule Yog.Pathfinding.BellmanFordTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: -1)
-      |> Yog.add_edge!(from: 2, to: 3, with: -2)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: -1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: -2)
 
     result = BellmanFord.bellman_ford(graph, 1, 3, 0, &add/2, &compare/2)
 
@@ -106,10 +106,10 @@ defmodule Yog.Pathfinding.BellmanFordTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 1, to: 3, with: -10)
-      |> Yog.add_edge!(from: 2, to: 4, with: 3)
-      |> Yog.add_edge!(from: 3, to: 4, with: 20)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: -10)
+      |> Yog.add_edge_ensure(from: 2, to: 4, with: 3)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 20)
 
     result = BellmanFord.bellman_ford(graph, 1, 4, 0, &add/2, &compare/2)
 
@@ -126,8 +126,8 @@ defmodule Yog.Pathfinding.BellmanFordTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 2, to: 1, with: -3)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 1, with: -3)
 
     result = BellmanFord.bellman_ford(graph, 1, 2, 0, &add/2, &compare/2)
 
@@ -141,9 +141,9 @@ defmodule Yog.Pathfinding.BellmanFordTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 2, to: 3, with: -2)
-      |> Yog.add_edge!(from: 3, to: 1, with: -2)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: -2)
+      |> Yog.add_edge_ensure(from: 3, to: 1, with: -2)
 
     result = BellmanFord.bellman_ford(graph, 1, 3, 0, &add/2, &compare/2)
 
@@ -156,8 +156,8 @@ defmodule Yog.Pathfinding.BellmanFordTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 2, to: 1, with: 3)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 1, with: 3)
 
     result = BellmanFord.bellman_ford(graph, 1, 2, 0, &add/2, &compare/2)
 
@@ -173,8 +173,8 @@ defmodule Yog.Pathfinding.BellmanFordTest do
   #     Yog.directed()
   #     |> Yog.add_node(1, "A")
   #     |> Yog.add_node(2, "B")
-  #     |> Yog.add_edge!(from: 1, to: 2, with: 1)
-  #     |> Yog.add_edge!(from: 2, to: 1, with: -3)
+  #     |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+  #     |> Yog.add_edge_ensure(from: 2, to: 1, with: -3)
   #
   #   assert BellmanFord.has_negative_cycle?(graph, 1, 0, &add/2, &compare/2) == true
   # end
@@ -184,7 +184,7 @@ defmodule Yog.Pathfinding.BellmanFordTest do
   #     Yog.directed()
   #     |> Yog.add_node(1, "A")
   #     |> Yog.add_node(2, "B")
-  #     |> Yog.add_edge!(from: 1, to: 2, with: 5)
+  #     |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
   #
   #   assert BellmanFord.has_negative_cycle?(graph, 1, 0, &add/2, &compare/2) == false
   # end
@@ -197,9 +197,9 @@ defmodule Yog.Pathfinding.BellmanFordTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 10)
-      |> Yog.add_edge!(from: 1, to: 3, with: 100)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 100)
 
     result = BellmanFord.bellman_ford(graph, 1, 3, 0, &add/2, &compare/2)
 
@@ -214,9 +214,9 @@ defmodule Yog.Pathfinding.BellmanFordTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 10)
-      |> Yog.add_edge!(from: 2, to: 3, with: -5)
-      |> Yog.add_edge!(from: 1, to: 3, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: -5)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 10)
 
     result = BellmanFord.bellman_ford(graph, 1, 3, 0, &add/2, &compare/2)
 
@@ -233,8 +233,8 @@ defmodule Yog.Pathfinding.BellmanFordTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 4)
-      |> Yog.add_edge!(from: 2, to: 3, with: -3)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 4)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: -3)
 
     result = BellmanFord.bellman_ford(graph, 1, 3)
 
@@ -248,8 +248,8 @@ defmodule Yog.Pathfinding.BellmanFordTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 4.5)
-      |> Yog.add_edge!(from: 2, to: 3, with: -3.5)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 4.5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: -3.5)
 
     result = BellmanFord.bellman_ford(graph, 1, 3)
 
@@ -272,10 +272,10 @@ defmodule Yog.Pathfinding.BellmanFordTest do
       |> Yog.add_node(2, "Left")
       |> Yog.add_node(3, "Right")
       |> Yog.add_node(4, "Bottom")
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 1, to: 3, with: 4)
-      |> Yog.add_edge!(from: 2, to: 4, with: -5)
-      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 4)
+      |> Yog.add_edge_ensure(from: 2, to: 4, with: -5)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
 
     result = BellmanFord.bellman_ford(graph, 1, 4, 0, &add/2, &compare/2)
 
@@ -383,8 +383,8 @@ defmodule Yog.Pathfinding.BellmanFordTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
 
     distances = BellmanFord.relaxation_passes(graph, 1, 0, &add/2, &compare/2)
 
@@ -401,8 +401,8 @@ defmodule Yog.Pathfinding.BellmanFordTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
 
     result = BellmanFord.bellman_ford(graph, 1, 3, 0, &add/2, &compare/2)
 
@@ -421,14 +421,14 @@ defmodule Yog.Pathfinding.BellmanFordTest do
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
       |> Yog.add_node(5, "E")
-      |> Yog.add_edge!(from: 1, to: 2, with: 6)
-      |> Yog.add_edge!(from: 1, to: 3, with: 7)
-      |> Yog.add_edge!(from: 2, to: 3, with: 8)
-      |> Yog.add_edge!(from: 2, to: 4, with: -4)
-      |> Yog.add_edge!(from: 2, to: 5, with: 5)
-      |> Yog.add_edge!(from: 3, to: 4, with: 9)
-      |> Yog.add_edge!(from: 3, to: 5, with: -3)
-      |> Yog.add_edge!(from: 4, to: 5, with: 7)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 6)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 7)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 8)
+      |> Yog.add_edge_ensure(from: 2, to: 4, with: -4)
+      |> Yog.add_edge_ensure(from: 2, to: 5, with: 5)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 9)
+      |> Yog.add_edge_ensure(from: 3, to: 5, with: -3)
+      |> Yog.add_edge_ensure(from: 4, to: 5, with: 7)
 
     result = BellmanFord.bellman_ford(graph, 1, 5, 0, &add/2, &compare/2)
 
@@ -445,8 +445,8 @@ defmodule Yog.Pathfinding.BellmanFordTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 4)
-      |> Yog.add_edge!(from: 2, to: 3, with: -3)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 4)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: -3)
 
     result =
       BellmanFord.bellman_ford(

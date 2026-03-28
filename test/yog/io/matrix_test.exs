@@ -92,8 +92,8 @@ defmodule Yog.IO.MatrixTest do
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
         |> Yog.add_node(3, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 5)
-        |> Yog.add_edge!(from: 2, to: 3, with: 7)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 7)
 
       {nodes, matrix} = Matrix.to_matrix(graph)
       assert nodes == [1, 2, 3]
@@ -105,7 +105,7 @@ defmodule Yog.IO.MatrixTest do
         Yog.directed()
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 10)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
 
       {nodes, matrix} = Matrix.to_matrix(graph)
       assert nodes == [1, 2]
@@ -126,8 +126,8 @@ defmodule Yog.IO.MatrixTest do
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
         |> Yog.add_node(3, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 5)
-        |> Yog.add_edge!(from: 2, to: 3, with: 7)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 7)
 
       {_nodes, matrix} = Matrix.to_matrix(original)
       restored = Matrix.from_matrix(:undirected, matrix)

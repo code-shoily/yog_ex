@@ -17,8 +17,8 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
 
     result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
 
@@ -36,7 +36,7 @@ defmodule Yog.Pathfinding.JohnsonTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge!(from: 1, to: 2, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
 
     result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
 
@@ -75,9 +75,9 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 10)
-      |> Yog.add_edge!(from: 1, to: 3, with: 20)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 20)
 
     result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
 
@@ -94,14 +94,14 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge!(from: 1, to: 2, with: 3)
-      |> Yog.add_edge!(from: 1, to: 3, with: 8)
-      |> Yog.add_edge!(from: 1, to: 4, with: 5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      |> Yog.add_edge!(from: 2, to: 4, with: 7)
-      |> Yog.add_edge!(from: 3, to: 1, with: 2)
-      |> Yog.add_edge!(from: 3, to: 4, with: 3)
-      |> Yog.add_edge!(from: 4, to: 2, with: 2)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 3)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 8)
+      |> Yog.add_edge_ensure(from: 1, to: 4, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 4, with: 7)
+      |> Yog.add_edge_ensure(from: 3, to: 1, with: 2)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 3)
+      |> Yog.add_edge_ensure(from: 4, to: 2, with: 2)
 
     result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
 
@@ -128,10 +128,10 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_node(2, "Left")
       |> Yog.add_node(3, "Right")
       |> Yog.add_node(4, "Bottom")
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 1, to: 3, with: 4)
-      |> Yog.add_edge!(from: 2, to: 4, with: 2)
-      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 4)
+      |> Yog.add_edge_ensure(from: 2, to: 4, with: 2)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
 
     result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
 
@@ -148,9 +148,9 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 4)
-      |> Yog.add_edge!(from: 2, to: 3, with: -3)
-      |> Yog.add_edge!(from: 1, to: 3, with: 2)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 4)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: -3)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 2)
 
     result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
 
@@ -165,9 +165,9 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: -1)
-      |> Yog.add_edge!(from: 2, to: 3, with: -2)
-      |> Yog.add_edge!(from: 1, to: 3, with: -5)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: -1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: -2)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: -5)
 
     result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
 
@@ -183,10 +183,10 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 1, to: 3, with: -10)
-      |> Yog.add_edge!(from: 2, to: 4, with: 3)
-      |> Yog.add_edge!(from: 3, to: 4, with: 20)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: -10)
+      |> Yog.add_edge_ensure(from: 2, to: 4, with: 3)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 20)
 
     result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
 
@@ -203,8 +203,8 @@ defmodule Yog.Pathfinding.JohnsonTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 2, to: 1, with: -3)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 1, with: -3)
 
     result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
 
@@ -218,9 +218,9 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 2, to: 3, with: -2)
-      |> Yog.add_edge!(from: 3, to: 1, with: -2)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: -2)
+      |> Yog.add_edge_ensure(from: 3, to: 1, with: -2)
 
     result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
 
@@ -233,8 +233,8 @@ defmodule Yog.Pathfinding.JohnsonTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 2, to: 1, with: 3)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 1, with: 3)
 
     result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
 
@@ -250,8 +250,8 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 3, to: 4, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 10)
 
     result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
 
@@ -272,8 +272,8 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
 
     result = Johnson.johnson(graph)
 
@@ -287,8 +287,8 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5.5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 10.5)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5.5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10.5)
 
     result = Johnson.johnson(graph)
 
@@ -302,8 +302,8 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 0)
-      |> Yog.add_edge!(from: 2, to: 3, with: 0)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 0)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 0)
 
     result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
 
@@ -319,8 +319,8 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
 
     result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
 
@@ -343,15 +343,15 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
       |> Yog.add_node(5, "E")
-      |> Yog.add_edge!(from: 1, to: 2, with: 3)
-      |> Yog.add_edge!(from: 1, to: 3, with: 8)
-      |> Yog.add_edge!(from: 1, to: 5, with: -4)
-      |> Yog.add_edge!(from: 2, to: 4, with: 1)
-      |> Yog.add_edge!(from: 2, to: 5, with: 7)
-      |> Yog.add_edge!(from: 3, to: 2, with: 4)
-      |> Yog.add_edge!(from: 4, to: 1, with: 2)
-      |> Yog.add_edge!(from: 4, to: 3, with: -5)
-      |> Yog.add_edge!(from: 5, to: 4, with: 6)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 3)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 8)
+      |> Yog.add_edge_ensure(from: 1, to: 5, with: -4)
+      |> Yog.add_edge_ensure(from: 2, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 5, with: 7)
+      |> Yog.add_edge_ensure(from: 3, to: 2, with: 4)
+      |> Yog.add_edge_ensure(from: 4, to: 1, with: 2)
+      |> Yog.add_edge_ensure(from: 4, to: 3, with: -5)
+      |> Yog.add_edge_ensure(from: 5, to: 4, with: 6)
 
     result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
 
@@ -370,9 +370,9 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_node(2, "A")
       |> Yog.add_node(3, "B")
       |> Yog.add_node(4, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 1, to: 3, with: 2)
-      |> Yog.add_edge!(from: 1, to: 4, with: 3)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 2)
+      |> Yog.add_edge_ensure(from: 1, to: 4, with: 3)
 
     result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
 
@@ -392,9 +392,9 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      |> Yog.add_edge!(from: 3, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
 
     result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
 
@@ -417,11 +417,11 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_node(3, "C")
       |> Yog.add_node(4, "D")
       |> Yog.add_node(5, "E")
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      |> Yog.add_edge!(from: 3, to: 4, with: 1)
-      |> Yog.add_edge!(from: 4, to: 5, with: 1)
-      |> Yog.add_edge!(from: 1, to: 5, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 4, to: 5, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 5, with: 10)
 
     result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
 
@@ -443,13 +443,13 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_node(4, "D")
       |> Yog.add_node(5, "E")
       |> Yog.add_node(6, "F")
-      |> Yog.add_edge!(from: 1, to: 2, with: 1)
-      |> Yog.add_edge!(from: 2, to: 3, with: -2)
-      |> Yog.add_edge!(from: 3, to: 4, with: 3)
-      |> Yog.add_edge!(from: 1, to: 5, with: 5)
-      |> Yog.add_edge!(from: 5, to: 6, with: -1)
-      |> Yog.add_edge!(from: 4, to: 6, with: 2)
-      |> Yog.add_edge!(from: 2, to: 6, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: -2)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 3)
+      |> Yog.add_edge_ensure(from: 1, to: 5, with: 5)
+      |> Yog.add_edge_ensure(from: 5, to: 6, with: -1)
+      |> Yog.add_edge_ensure(from: 4, to: 6, with: 2)
+      |> Yog.add_edge_ensure(from: 2, to: 6, with: 10)
 
     result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
 
@@ -468,9 +468,9 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_node(1, "A")
       |> Yog.add_node(2, "B")
       |> Yog.add_node(3, "C")
-      |> Yog.add_edge!(from: 1, to: 2, with: 5)
-      |> Yog.add_edge!(from: 2, to: 3, with: 10)
-      |> Yog.add_edge!(from: 1, to: 3, with: 20)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 20)
 
     result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
 

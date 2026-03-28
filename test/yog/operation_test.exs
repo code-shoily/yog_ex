@@ -13,13 +13,13 @@ defmodule Yog.OperationTest do
         Yog.undirected()
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
 
       g2 =
         Yog.undirected()
         |> Yog.add_node(3, nil)
         |> Yog.add_node(4, nil)
-        |> Yog.add_edge!(from: 3, to: 4, with: 1)
+        |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
 
       result = Operation.union(g1, g2)
 
@@ -33,13 +33,13 @@ defmodule Yog.OperationTest do
         Yog.undirected()
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
 
       g2 =
         Yog.undirected()
         |> Yog.add_node(2, nil)
         |> Yog.add_node(3, nil)
-        |> Yog.add_edge!(from: 2, to: 3, with: 1)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
 
       result = Operation.union(g1, g2)
 
@@ -56,15 +56,15 @@ defmodule Yog.OperationTest do
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
         |> Yog.add_node(3, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
-        |> Yog.add_edge!(from: 2, to: 3, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
 
       g2 =
         Yog.undirected()
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
         |> Yog.add_node(3, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
 
       result = Operation.intersection(g1, g2)
 
@@ -77,12 +77,12 @@ defmodule Yog.OperationTest do
       g1 =
         Yog.undirected()
         |> Yog.add_node(1, nil)
-        |> Yog.add_edge!(from: 1, to: 1, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 1, with: 1)
 
       g2 =
         Yog.undirected()
         |> Yog.add_node(2, nil)
-        |> Yog.add_edge!(from: 2, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 2, to: 2, with: 1)
 
       result = Operation.intersection(g1, g2)
 
@@ -97,13 +97,13 @@ defmodule Yog.OperationTest do
         Yog.undirected()
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
 
       g2 =
         Yog.undirected()
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
 
       result = Operation.difference(g1, g2)
 
@@ -118,14 +118,14 @@ defmodule Yog.OperationTest do
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
         |> Yog.add_node(3, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
-        |> Yog.add_edge!(from: 2, to: 3, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
 
       g2 =
         Yog.undirected()
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
 
       result = Operation.difference(g1, g2)
 
@@ -141,13 +141,13 @@ defmodule Yog.OperationTest do
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
         |> Yog.add_node(3, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
 
       g2 =
         Yog.undirected()
         |> Yog.add_node(2, nil)
         |> Yog.add_node(3, nil)
-        |> Yog.add_edge!(from: 2, to: 3, with: 1)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
 
       result = Operation.symmetric_difference(g1, g2)
 
@@ -164,13 +164,13 @@ defmodule Yog.OperationTest do
         Yog.undirected()
         |> Yog.add_node(0, nil)
         |> Yog.add_node(1, nil)
-        |> Yog.add_edge!(from: 0, to: 1, with: 1)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
 
       g2 =
         Yog.undirected()
         |> Yog.add_node(0, nil)
         |> Yog.add_node(1, nil)
-        |> Yog.add_edge!(from: 0, to: 1, with: 1)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
 
       result = Operation.disjoint_union(g1, g2)
 
@@ -192,15 +192,15 @@ defmodule Yog.OperationTest do
         |> Yog.add_node(0, nil)
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
-        |> Yog.add_edge!(from: 0, to: 1, with: 1)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
-        |> Yog.add_edge!(from: 2, to: 0, with: 1)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 2, to: 0, with: 1)
 
       g2 =
         Yog.undirected()
         |> Yog.add_node(0, nil)
         |> Yog.add_node(1, nil)
-        |> Yog.add_edge!(from: 0, to: 1, with: 1)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
 
       result = Operation.disjoint_union(g1, g2)
 
@@ -216,14 +216,14 @@ defmodule Yog.OperationTest do
         Yog.undirected()
         |> Yog.add_node(0, nil)
         |> Yog.add_node(1, nil)
-        |> Yog.add_edge!(from: 0, to: 1, with: 1)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
 
       # Path of 2 nodes
       g2 =
         Yog.undirected()
         |> Yog.add_node(0, nil)
         |> Yog.add_node(1, nil)
-        |> Yog.add_edge!(from: 0, to: 1, with: 1)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
 
       result = Operation.cartesian_product(g1, g2, 0, 0)
 
@@ -236,15 +236,15 @@ defmodule Yog.OperationTest do
         Yog.undirected()
         |> Yog.add_node(0, nil)
         |> Yog.add_node(1, nil)
-        |> Yog.add_edge!(from: 0, to: 1, with: 1)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
 
       g2 =
         Yog.undirected()
         |> Yog.add_node(0, nil)
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
-        |> Yog.add_edge!(from: 0, to: 1, with: 1)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
 
       result = Operation.cartesian_product(g1, g2, 0, 0)
 
@@ -259,13 +259,13 @@ defmodule Yog.OperationTest do
         Yog.undirected()
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
 
       g2 =
         Yog.undirected()
         |> Yog.add_node(2, nil)
         |> Yog.add_node(3, nil)
-        |> Yog.add_edge!(from: 2, to: 3, with: 1)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
 
       result = Operation.compose(g1, g2)
 
@@ -281,7 +281,7 @@ defmodule Yog.OperationTest do
         Yog.undirected()
         |> Yog.add_node(0, nil)
         |> Yog.add_node(1, nil)
-        |> Yog.add_edge!(from: 0, to: 1, with: 1)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
 
       result = Operation.power(g, 1, 1)
 
@@ -295,8 +295,8 @@ defmodule Yog.OperationTest do
         |> Yog.add_node(0, nil)
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
-        |> Yog.add_edge!(from: 0, to: 1, with: 1)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
 
       result = Operation.power(g, 2, 1)
 
@@ -310,7 +310,7 @@ defmodule Yog.OperationTest do
         Yog.undirected()
         |> Yog.add_node(0, nil)
         |> Yog.add_node(1, nil)
-        |> Yog.add_edge!(from: 0, to: 1, with: 1)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
 
       result = Operation.power(g, 0, 1)
 
@@ -327,14 +327,14 @@ defmodule Yog.OperationTest do
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
         |> Yog.add_node(3, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
-        |> Yog.add_edge!(from: 2, to: 3, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
 
       potential =
         Yog.undirected()
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
 
       assert Operation.subgraph?(potential, container) == true
     end
@@ -344,13 +344,13 @@ defmodule Yog.OperationTest do
         Yog.undirected()
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
 
       potential =
         Yog.undirected()
         |> Yog.add_node(3, nil)
         |> Yog.add_node(4, nil)
-        |> Yog.add_edge!(from: 3, to: 4, with: 1)
+        |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
 
       assert Operation.subgraph?(potential, container) == false
     end
@@ -360,7 +360,7 @@ defmodule Yog.OperationTest do
         Yog.undirected()
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
 
       assert Operation.subgraph?(g, g) == true
     end
@@ -372,13 +372,13 @@ defmodule Yog.OperationTest do
         Yog.undirected()
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
 
       g2 =
         Yog.undirected()
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
 
       assert Operation.isomorphic?(g1, g2) == true
     end
@@ -390,9 +390,9 @@ defmodule Yog.OperationTest do
         |> Yog.add_node(0, nil)
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
-        |> Yog.add_edge!(from: 0, to: 1, with: 1)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
-        |> Yog.add_edge!(from: 2, to: 0, with: 1)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 2, to: 0, with: 1)
 
       # Same triangle, different node IDs
       g2 =
@@ -400,9 +400,9 @@ defmodule Yog.OperationTest do
         |> Yog.add_node(10, nil)
         |> Yog.add_node(20, nil)
         |> Yog.add_node(30, nil)
-        |> Yog.add_edge!(from: 10, to: 20, with: 1)
-        |> Yog.add_edge!(from: 20, to: 30, with: 1)
-        |> Yog.add_edge!(from: 30, to: 10, with: 1)
+        |> Yog.add_edge_ensure(from: 10, to: 20, with: 1)
+        |> Yog.add_edge_ensure(from: 20, to: 30, with: 1)
+        |> Yog.add_edge_ensure(from: 30, to: 10, with: 1)
 
       assert Operation.isomorphic?(g1, g2) == true
     end
@@ -414,9 +414,9 @@ defmodule Yog.OperationTest do
         |> Yog.add_node(0, nil)
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
-        |> Yog.add_edge!(from: 0, to: 1, with: 1)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
-        |> Yog.add_edge!(from: 2, to: 0, with: 1)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 2, to: 0, with: 1)
 
       # Path of 3
       g2 =
@@ -424,8 +424,8 @@ defmodule Yog.OperationTest do
         |> Yog.add_node(0, nil)
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
-        |> Yog.add_edge!(from: 0, to: 1, with: 1)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
 
       assert Operation.isomorphic?(g1, g2) == false
     end
@@ -435,14 +435,14 @@ defmodule Yog.OperationTest do
         Yog.undirected()
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
 
       g2 =
         Yog.undirected()
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
         |> Yog.add_node(3, nil)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
 
       assert Operation.isomorphic?(g1, g2) == false
     end
@@ -455,10 +455,10 @@ defmodule Yog.OperationTest do
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
         |> Yog.add_node(3, nil)
-        |> Yog.add_edge!(from: 0, to: 1, with: 1)
-        |> Yog.add_edge!(from: 1, to: 2, with: 1)
-        |> Yog.add_edge!(from: 2, to: 3, with: 1)
-        |> Yog.add_edge!(from: 3, to: 0, with: 1)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+        |> Yog.add_edge_ensure(from: 3, to: 0, with: 1)
 
       # Same square, different IDs
       g2 =
@@ -467,10 +467,10 @@ defmodule Yog.OperationTest do
         |> Yog.add_node(6, nil)
         |> Yog.add_node(7, nil)
         |> Yog.add_node(8, nil)
-        |> Yog.add_edge!(from: 5, to: 6, with: 1)
-        |> Yog.add_edge!(from: 6, to: 7, with: 1)
-        |> Yog.add_edge!(from: 7, to: 8, with: 1)
-        |> Yog.add_edge!(from: 8, to: 5, with: 1)
+        |> Yog.add_edge_ensure(from: 5, to: 6, with: 1)
+        |> Yog.add_edge_ensure(from: 6, to: 7, with: 1)
+        |> Yog.add_edge_ensure(from: 7, to: 8, with: 1)
+        |> Yog.add_edge_ensure(from: 8, to: 5, with: 1)
 
       assert Operation.isomorphic?(g1, g2) == true
     end

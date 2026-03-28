@@ -26,7 +26,7 @@ defmodule Yog.Render.DOTTest do
         Yog.directed()
         |> Yog.add_node(1, "Start")
         |> Yog.add_node(2, "End")
-        |> Yog.add_edge!(from: 1, to: 2, with: "5")
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: "5")
 
       dot = DOT.to_dot(graph, DOT.default_options())
 
@@ -42,7 +42,7 @@ defmodule Yog.Render.DOTTest do
         Yog.undirected()
         |> Yog.add_node(1, "A")
         |> Yog.add_node(2, "B")
-        |> Yog.add_edge!(from: 1, to: 2, with: "1")
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: "1")
 
       dot = DOT.to_dot(graph, DOT.default_options())
 
@@ -56,8 +56,8 @@ defmodule Yog.Render.DOTTest do
         |> Yog.add_node(1, "Start")
         |> Yog.add_node(2, "Process")
         |> Yog.add_node(3, "End")
-        |> Yog.add_edge!(from: 1, to: 2, with: "10")
-        |> Yog.add_edge!(from: 2, to: 3, with: "5")
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: "10")
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: "5")
 
       dot = DOT.to_dot(graph, DOT.default_options())
 
@@ -72,7 +72,7 @@ defmodule Yog.Render.DOTTest do
         Yog.directed()
         |> Yog.add_node(1, "Node 1")
         |> Yog.add_node(2, "Node 2")
-        |> Yog.add_edge!(from: 1, to: 2, with: "1")
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: "1")
 
       opts =
         Map.merge(DOT.default_options(), %{

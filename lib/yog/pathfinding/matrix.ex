@@ -48,9 +48,9 @@ defmodule Yog.Pathfinding.Matrix do
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
       ...> |> Yog.add_node(4, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 4)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
-      ...> |> Yog.add_edge!(from: 3, to: 4, with: 2)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 4)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 3, to: 4, with: 2)
       iex> pois = [1, 2, 4]  # Only care about these 3 nodes
       iex> {:ok, distances} = Yog.Pathfinding.Matrix.distance_matrix(
       ...>   graph, pois, 0, &(&1 + &2), &Yog.Utils.compare/2
@@ -107,8 +107,8 @@ defmodule Yog.Pathfinding.Matrix do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 4)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 4)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
       iex> {:ok, distances} = Yog.Pathfinding.Matrix.distance_matrix(
       ...>   graph, [1, 3], 0, &(&1 + &2), &Yog.Utils.compare/2
       ...> )
@@ -120,8 +120,8 @@ defmodule Yog.Pathfinding.Matrix do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge!(from: 1, to: 2, with: 4)
-      ...> |> Yog.add_edge!(from: 2, to: 3, with: -2)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 4)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: -2)
       iex> {:ok, distances} = Yog.Pathfinding.Matrix.distance_matrix(
       ...>   neg_graph, [1, 3], 0, &(&1 + &2), &Yog.Utils.compare/2, &(&1 - &2)
       ...> )
