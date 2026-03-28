@@ -37,6 +37,7 @@ defmodule Yog.MST do
   """
 
   alias Yog.DisjointSet
+  alias Yog.Model
   alias Yog.PriorityQueue, as: PQ
 
   @typedoc """
@@ -170,7 +171,7 @@ defmodule Yog.MST do
     graph = Keyword.fetch!(opts, :in)
     compare = opts[:compare] || (&Yog.Utils.compare/2)
 
-    node_ids = get_all_nodes(graph)
+    node_ids = Model.all_nodes(graph)
 
     case node_ids do
       [] ->
@@ -216,7 +217,7 @@ defmodule Yog.MST do
   """
   @spec prim(Yog.graph(), (term(), term() -> :lt | :eq | :gt)) :: [edge()]
   def prim(graph, compare \\ &Yog.Utils.compare/2) do
-    node_ids = get_all_nodes(graph)
+    node_ids = Model.all_nodes(graph)
 
     case node_ids do
       [] ->
@@ -249,7 +250,6 @@ defmodule Yog.MST do
   defp extract_edges(%Yog.Graph{kind: kind, out_edges: out_edges}) do
     Enum.flat_map(out_edges, fn {from_id, targets} ->
       Enum.flat_map(targets, fn {to_id, weight} ->
-        # For undirected graphs, only include each edge once
         if kind == :undirected && from_id > to_id do
           []
         else
@@ -269,10 +269,8 @@ defmodule Yog.MST do
     {ds2, root_to} = DisjointSet.find(ds1, edge.to)
 
     if root_from == root_to do
-      # Skip this edge - would form a cycle
       do_kruskal(rest, ds2, acc)
     else
-      # Add this edge to MST
       ds3 = DisjointSet.union(ds2, edge.from, edge.to)
       do_kruskal(rest, ds3, [edge | acc])
     end
@@ -281,23 +279,12 @@ defmodule Yog.MST do
   # =============================================================================
   # Private Helper Functions - Prim's Algorithm
   # =============================================================================
-
-  # Gets all node IDs from a graph.
-  defp get_all_nodes(%Yog.Graph{nodes: nodes}) do
-    Map.keys(nodes)
-  end
-
   # Gets all outgoing edges from a specific node.
-  defp get_all_edges_from_node(%Yog.Graph{out_edges: out_edges}, from_id) do
-    case Map.fetch(out_edges, from_id) do
-      {:ok, targets} ->
-        Enum.map(targets, fn {to_id, weight} ->
-          %{from: from_id, to: to_id, weight: weight}
-        end)
-
-      :error ->
-        []
-    end
+  defp get_all_edges_from_node(graph, from_id) do
+    Model.successors(graph, from_id)
+    |> Enum.map(fn {to_id, weight} ->
+      %{from: from_id, to: to_id, weight: weight}
+    end)
   end
 
   # Main Prim loop - grows MST from starting node.
@@ -308,17 +295,13 @@ defmodule Yog.MST do
       {:ok, edge, rest_pq} = PQ.pop(pq)
 
       if MapSet.member?(visited, edge.to) do
-        # Skip - already visited
         do_prim(graph, rest_pq, visited, acc, compare)
       else
-        # Add this edge to MST
         new_visited = MapSet.put(visited, edge.to)
         new_acc = [edge | acc]
 
-        # Get new edges from the newly visited node
         new_edges = get_all_edges_from_node(graph, edge.to)
 
-        # Filter out edges to already visited nodes and add to PQ
         new_pq =
           Enum.reject(new_edges, fn e -> MapSet.member?(new_visited, e.to) end)
           |> Enum.reduce(rest_pq, fn e, acc_pq -> PQ.push(acc_pq, e) end)
