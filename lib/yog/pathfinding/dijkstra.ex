@@ -31,7 +31,7 @@ defmodule Yog.Pathfinding.Dijkstra do
 
       compare = &Yog.Utils.compare/2
       Dijkstra.shortest_path(graph, :a, :c, 0, &(&1 + &2), compare)
-      #=> {:some, {:path, [:a, :b, :c], 5}}
+      #=> {:ok, {:path, [:a, :b, :c], 5}}
 
       # Find all distances from a source
       Dijkstra.single_source_distances(graph, :a, 0, &(&1 + &2), compare)

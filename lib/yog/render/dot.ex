@@ -385,10 +385,10 @@ defmodule Yog.Render.DOT do
   ## Example
 
       case Yog.Pathfinding.Dijkstra.shortest_path(...) do
-        {:some, path} ->
+        {:ok, path} ->
           options = Yog.Render.DOT.path_to_options(path, Yog.Render.DOT.default_options())
           dot_string = Yog.Render.DOT.to_dot(graph, options)
-        :none ->
+        :error ->
           ""
       end
   """

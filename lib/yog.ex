@@ -24,11 +24,11 @@ defmodule Yog do
          with_add: &Kernel.+/2,
          with_compare: &Kernel.<=/2
        ) do
-    {:some, path} ->
+    {:ok, path} ->
       # Path: %{nodes: [1, 2, 3], total_weight: 8}
       IO.puts("Shortest path found!")
 
-    :none ->
+    _ ->
       IO.puts("No path exists")
   end
   ```

@@ -27,8 +27,8 @@ defmodule Yog.Builder.Labeled do
         add: &Kernel.+/2,
         compare: &Integer.compare/2
       ) do
-        {:some, path} -> path
-        :none -> :no_path
+        {:ok, path} -> path
+        _ -> :no_path
       end
 
   ## Batch Construction

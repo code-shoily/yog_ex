@@ -120,33 +120,33 @@ defmodule Yog.Pathfinding.AStar do
     implicit_a_star(from, successors, is_goal, heuristic, zero, add, compare)
   end
 
-  @doc """
-  Implicit A* with key function using keyword options.
+  # @doc """
+  # Implicit A* with key function using keyword options.
 
-  ## Options
+  # ## Options
 
-    * `:from` - Starting state
-    * `:successors_with_cost` - Function returning neighbors with costs
-    * `:visited_by` - Function to extract a key for visited tracking
-    * `:is_goal` - Function to check if a state is the goal
-    * `:zero` - Identity value for the weight type
-    * `:add` - Function to add two weights
-    * `:compare` - Function to compare weights
-    * `:heuristic` - Function estimating cost to goal: `fn(state) -> cost`
-  """
-  @spec implicit_a_star_by(keyword()) :: {:ok, any()} | :error
-  def implicit_a_star_by(opts) do
-    from = Keyword.fetch!(opts, :from)
-    successors = Keyword.fetch!(opts, :successors_with_cost)
-    visited_by = Keyword.fetch!(opts, :visited_by)
-    is_goal = Keyword.fetch!(opts, :is_goal)
-    zero = opts[:zero] || 0
-    add = opts[:add] || (&Kernel.+/2)
-    compare = opts[:compare] || (&Yog.Utils.compare/2)
-    heuristic = Keyword.fetch!(opts, :heuristic)
+  #   * `:from` - Starting state
+  #   * `:successors_with_cost` - Function returning neighbors with costs
+  #   * `:visited_by` - Function to extract a key for visited tracking
+  #   * `:is_goal` - Function to check if a state is the goal
+  #   * `:zero` - Identity value for the weight type
+  #   * `:add` - Function to add two weights
+  #   * `:compare` - Function to compare weights
+  #   * `:heuristic` - Function estimating cost to goal: `fn(state) -> cost`
+  # """
+  # @spec implicit_a_star_by(keyword()) :: {:ok, any()} | :error
+  # def implicit_a_star_by(opts) do
+  #   from = Keyword.fetch!(opts, :from)
+  #   successors = Keyword.fetch!(opts, :successors_with_cost)
+  #   visited_by = Keyword.fetch!(opts, :visited_by)
+  #   is_goal = Keyword.fetch!(opts, :is_goal)
+  #   zero = opts[:zero] || 0
+  #   add = opts[:add] || (&Kernel.+/2)
+  #   compare = opts[:compare] || (&Yog.Utils.compare/2)
+  #   heuristic = Keyword.fetch!(opts, :heuristic)
 
-    implicit_a_star_by(from, successors, visited_by, is_goal, heuristic, zero, add, compare)
-  end
+  #   implicit_a_star_by(from, successors, visited_by, is_goal, heuristic, zero, add, compare)
+  # end
 
   # ============================================================
   # Direct API
@@ -163,7 +163,7 @@ defmodule Yog.Pathfinding.AStar do
     * `zero` - Identity value for the weight type
     * `add` - Function to add two weights
     * `compare` - Function to compare weights (`:lt`, `:eq`, `:gt`)
-    * `heuristic` - Function `fn(node, goal) -> cost` estimating cost to goal
+    * `heuristic` - Function `fn(node, goal) -> cost` estimating cost to goal, use closure if node data stores info
 
   ## Returns
 
@@ -187,7 +187,7 @@ defmodule Yog.Pathfinding.AStar do
       iex> path.weight
       5
 
-      iex> # Grid with Manhattan distance heuristic
+      iex> # Grid with Manhattan distance heuristic - node ID stores info
       iex> grid = Yog.directed()
       ...> |> Yog.add_edge_ensure({0,0}, {1,0}, 1)
       ...> |> Yog.add_edge_ensure({1,0}, {2,0}, 1)
@@ -196,6 +196,27 @@ defmodule Yog.Pathfinding.AStar do
       iex> {:ok, path} = Yog.Pathfinding.AStar.a_star(grid, {0,0}, {2,0}, manhattan, 0, &(&1+&2), compare)
       iex> path.nodes
       [{0,0}, {1,0}, {2,0}]
+      iex> path.weight
+      2
+
+      iex> # Grid with Manhattan distance heuristic - node data stores info
+      iex> grid = Yog.directed()
+      ...> |> Yog.add_node(0, {0, 0})
+      ...> |> Yog.add_node(1, {1, 0})
+      ...> |> Yog.add_node(2, {2, 0})
+      ...> |> Yog.add_edge!(0, 1, 1)
+      ...> |> Yog.add_edge!(1, 2, 1)
+      iex> manhattan = fn graph ->
+      ...>  fn a, b ->
+      ...>     {x1, y1} = Yog.Model.node(graph, a)
+      ...>     {x2, y2} = Yog.Model.node(graph, b)
+      ...>     abs(x1-x2) + abs(y1-y2)
+      ...>  end
+      ...> end
+      iex> compare = &Yog.Utils.compare/2
+      iex> {:ok, path} = Yog.Pathfinding.AStar.a_star(grid, 0, 2, manhattan.(grid), 0, &(&1+&2), compare)
+      iex> path.nodes
+      [0, 1, 2]
       iex> path.weight
       2
   """
@@ -310,16 +331,18 @@ defmodule Yog.Pathfinding.AStar do
 
   ## Examples
 
-      iex> _successors = fn {x, y, _dir} -> [{{x + 1, y, :east}, 1}, {{x, y + 1, :south}, 1}] end
-      iex> _key_fn = fn {x, y, _dir} -> {x, y} end
-      iex> _h = fn {x, y, _} -> (10 - x) + (10 - y) end
-      iex> _goal_fn = fn {x, y, _} -> x == 10 and y == 10 end
-      iex> _compare = &Yog.Utils.compare/2
+      iex> #successors = fn {x, y, _dir} -> [{{x + 1, y, :east}, 1}, {{x, y + 1, :south}, 1}] end
+      iex> #key_fn = fn {x, y, _dir} -> {x, y} end
+      iex> #h = fn {x, y, _} -> (10 - x) + (10 - y) end
+      iex> #goal_fn = fn {x, y, _} -> x == 10 and y == 10 end
       iex> #Yog.Pathfinding.AStar.implicit_a_star_by(
-      ...> #  {0, 0, :north}, _successors, _key_fn,
-      ...> #  _goal_fn, 0, &(&1 + &2), _compare, _h
+      ...> #  {0, 0, :north},
+      ...> #  successors,
+      ...> #  key_fn,
+      ...> #  goal_fn,
+      ...> #  h
       ...> #)
-      ...> # {:some, 20}
+      ...> # {:ok, 20}
   """
   @spec implicit_a_star_by(
           state,
@@ -345,7 +368,9 @@ defmodule Yog.Pathfinding.AStar do
     h0 = heuristic.(from)
     # Queue: {f_score, g_score, state}
     initial_queue =
-      PQ.new(fn {f1, _, _}, {f2, _, _} -> compare.(f1, f2) != :gt end)
+      PQ.new(fn {f1, _, _}, {f2, _, _} ->
+        compare.(f1, f2) != :gt
+      end)
       |> PQ.push({add.(zero, h0), zero, from})
 
     initial_g_scores = %{key_fn.(from) => zero}
@@ -419,7 +444,6 @@ defmodule Yog.Pathfinding.AStar do
     end
   end
 
-  # Implicit A* implementation
   defp do_implicit_a_star(
          queue,
          successors,
