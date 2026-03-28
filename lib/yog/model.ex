@@ -43,7 +43,7 @@ defmodule Yog.Model do
   @typedoc """
   Unique identifier for a node in the graph.
   """
-  @type node_id :: integer()
+  @type node_id :: term()
 
   @typedoc """
   The type of graph: `:directed` or `:undirected`.
