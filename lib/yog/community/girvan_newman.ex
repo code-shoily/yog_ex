@@ -336,7 +336,7 @@ defmodule Yog.Community.GirvanNewman do
         if MapSet.member?(visited, u) do
           {visited, assignments, count}
         else
-          component = Yog.walk(graph, u, :breadth_first)
+          component = Yog.Traversal.walk(graph, u, :breadth_first)
           new_visited = Enum.reduce(component, visited, &MapSet.put(&2, &1))
 
           new_assignments =

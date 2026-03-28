@@ -342,6 +342,12 @@ defmodule Yog.Traversal do
   @doc """
   Determines if a graph contains any cycles.
 
+  For directed graphs, a cycle exists if there is a path from a node back to itself.
+  For undirected graphs, a cycle exists if there is a path of length >= 3 from a node back to itself,
+  or a self-loop.
+
+  **Time Complexity:** O(V + E)
+
   ## Example
 
       iex> graph =
@@ -350,7 +356,7 @@ defmodule Yog.Traversal do
       ...>   |> Yog.add_node(2, "B")
       ...>   |> Yog.add_node(3, "C")
       ...>   |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}, {3, 1, 1}])
-      iex> Yog.Traversal.cyclic?(graph)
+      iex> Yog.cyclic?(graph)
       true
   """
   @spec cyclic?(Yog.graph()) :: boolean()

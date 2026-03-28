@@ -47,6 +47,7 @@ defmodule Yog.Property.Structure do
 
   alias Yog.Model
   alias Yog.Property.Bipartite
+  alias Yog.Traversal
 
   @doc """
   Checks if the graph is a tree (connected and acyclic).
@@ -326,7 +327,7 @@ defmodule Yog.Property.Structure do
   end
 
   defp reachable_count(graph, start) do
-    Yog.walk(graph, start, :breadth_first) |> length()
+    Traversal.walk(graph, start, :breadth_first) |> length()
   end
 
   defp no_self_loops?(graph) do

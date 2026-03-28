@@ -22,7 +22,7 @@ defmodule Yog.PBT.StructureTest do
         assert root != nil
 
         nodes = Yog.all_nodes(graph)
-        visited = Yog.walk(graph, root, :breadth_first)
+        visited = Yog.Traversal.walk(graph, root, :breadth_first)
         assert length(visited) == length(nodes)
 
         for node <- nodes do
