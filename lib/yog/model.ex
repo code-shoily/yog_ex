@@ -57,6 +57,10 @@ defmodule Yog.Model do
   """
   @type graph :: Graph.t()
 
+  # =============================================================================
+  # CREATE/UPDATE GRAPH
+  # =============================================================================
+
   @doc """
   Creates a new empty graph of the specified type.
 
@@ -437,6 +441,180 @@ defmodule Yog.Model do
   end
 
   @doc """
+  Adds an edge, but if an edge already exists between `src` and `dst`,
+  it combines the new weight with the existing one using `with_combine`.
+
+  The combine function receives `(existing_weight, new_weight)` and should
+  return the combined weight.
+
+  Returns `{:error, reason}` if either endpoint node doesn't exist in `graph.nodes`.
+
+  **Time Complexity:** O(1)
+
+  ## Example
+
+      iex> {:ok, graph} =
+      ...>   Yog.Model.new(:directed)
+      ...>   |> Yog.Model.add_node(1, "A")
+      ...>   |> Yog.Model.add_node(2, "B")
+      ...>   |> Yog.Model.add_edge(1, 2, 10)
+      iex> {:ok, graph} = Yog.Model.add_edge_with_combine(graph, 1, 2, 5, &Kernel.+/2)
+      iex> # Edge 1->2 now has weight 15 (10 + 5)
+      iex> Yog.Model.successors(graph, 1)
+      [{2, 15}]
+
+  ## Use Cases
+
+  - **Edge contraction** in graph algorithms (Stoer-Wagner min-cut)
+  - **Multi-graph support** (adding parallel edges with combined weights)
+  - **Incremental graph building** (accumulating weights from multiple sources)
+  """
+  @spec add_edge_with_combine(graph(), node_id(), node_id(), term(), (term(), term() -> term())) ::
+          {:ok, graph()} | {:error, String.t()}
+  def add_edge_with_combine(%Graph{nodes: nodes} = graph, src, dst, weight, with_combine) do
+    has_src = Map.has_key?(nodes, src)
+    has_dst = Map.has_key?(nodes, dst)
+
+    cond do
+      has_src and has_dst ->
+        graph = do_add_directed_combine(graph, src, dst, weight, with_combine)
+
+        result =
+          case graph.kind do
+            :directed ->
+              graph
+
+            :undirected ->
+              do_add_directed_combine(graph, dst, src, weight, with_combine)
+          end
+
+        {:ok, result}
+
+      not has_src and not has_dst ->
+        {:error, "Nodes #{src} and #{dst} do not exist"}
+
+      not has_src ->
+        {:error, "Node #{src} does not exist"}
+
+      true ->
+        {:error, "Node #{dst} does not exist"}
+    end
+  end
+
+  @doc """
+  Same as `add_edge_with_combine/5` but raises on error.
+
+  ## Example
+
+      iex> graph =
+      ...>   Yog.Model.new(:directed)
+      ...>   |> Yog.Model.add_node(1, "A")
+      ...>   |> Yog.Model.add_node(2, "B")
+      ...>   |> Yog.Model.add_edge!(1, 2, 10)
+      ...>   |> Yog.Model.add_edge_with_combine!(1, 2, 5, &Kernel.+/2)
+      iex> Yog.Model.successors(graph, 1)
+      [{2, 15}]
+  """
+  @spec add_edge_with_combine!(graph(), node_id(), node_id(), term(), (term(), term() -> term())) ::
+          graph()
+  def add_edge_with_combine!(graph, src, dst, weight, with_combine) do
+    case add_edge_with_combine(graph, src, dst, weight, with_combine) do
+      {:ok, g} -> g
+      {:error, reason} -> raise ArgumentError, reason
+    end
+  end
+
+  @doc """
+  Removes a node and all its connected edges (incoming and outgoing).
+
+  **Time Complexity:** O(deg(v)) - proportional to the number of edges
+  connected to the node, not the whole graph.
+
+  ## Example
+
+      iex> {:ok, graph} =
+      ...>   Yog.Model.new(:directed)
+      ...>   |> Yog.Model.add_node(1, "A")
+      ...>   |> Yog.Model.add_node(2, "B")
+      ...>   |> Yog.Model.add_node(3, "C")
+      ...>   |> Yog.Model.add_edges([{1, 2, 10}, {2, 3, 20}])
+      iex> graph = Yog.Model.remove_node(graph, 2)
+      iex> # Node 2 is removed, along with edges 1->2 and 2->3
+      iex> Yog.Model.order(graph)
+      2
+  """
+  @spec remove_node(graph(), node_id()) :: graph()
+  def remove_node(%Graph{} = graph, id) do
+    target_ids = successor_ids(graph, id)
+    source_ids = predecessor_ids(graph, id)
+
+    new_nodes = Map.delete(graph.nodes, id)
+    new_out = Map.delete(graph.out_edges, id)
+
+    new_in_cleaned =
+      Enum.reduce(target_ids, graph.in_edges, fn target_id, acc_in ->
+        Map.replace_lazy(acc_in, target_id, &Map.delete(&1, id))
+      end)
+
+    new_in = Map.delete(new_in_cleaned, id)
+
+    new_out_cleaned =
+      Enum.reduce(source_ids, new_out, fn source_id, acc_out ->
+        Map.replace_lazy(acc_out, source_id, &Map.delete(&1, id))
+      end)
+
+    %{graph | nodes: new_nodes, out_edges: new_out_cleaned, in_edges: new_in}
+  end
+
+  @doc """
+  Removes a directed edge from `src` to `dst`.
+
+  For **directed graphs**, this removes the single directed edge from `src` to `dst`.
+  For **undirected graphs**, this removes the edges in both directions
+  (from `src` to `dst` and from `dst` to `src`).
+
+  **Time Complexity:** O(1)
+
+  ## Example
+
+      iex> # Directed graph - removes single directed edge
+      iex> {:ok, graph} =
+      ...>   Yog.Model.new(:directed)
+      ...>   |> Yog.Model.add_node(1, "A")
+      ...>   |> Yog.Model.add_node(2, "B")
+      ...>   |> Yog.Model.add_edge(1, 2, 10)
+      iex> graph = Yog.Model.remove_edge(graph, 1, 2)
+      iex> # Edge 1->2 is removed
+      iex> Yog.Model.successors(graph, 1)
+      []
+
+      iex> # Undirected graph - removes both directions
+      iex> {:ok, graph} =
+      ...>   Yog.Model.new(:undirected)
+      ...>   |> Yog.Model.add_node(1, "A")
+      ...>   |> Yog.Model.add_node(2, "B")
+      ...>   |> Yog.Model.add_edge(1, 2, 10)
+      iex> graph = Yog.Model.remove_edge(graph, 1, 2)
+      iex> # Edge between 1 and 2 is fully removed
+      iex> Yog.Model.successors(graph, 1)
+      []
+  """
+  @spec remove_edge(graph(), node_id(), node_id()) :: graph()
+  def remove_edge(%Graph{kind: :directed} = graph, src, dst) do
+    do_remove_directed_edge(graph, src, dst)
+  end
+
+  def remove_edge(%Graph{kind: :undirected} = graph, src, dst) do
+    graph
+    |> do_remove_directed_edge(src, dst)
+    |> do_remove_directed_edge(dst, src)
+  end
+
+  # =============================================================================
+  # GRAPH QUERIES
+  # =============================================================================
+
+  @doc """
   Gets nodes you can travel TO from the given node (successors).
   Returns a list of tuples containing the destination node ID and edge data.
 
@@ -659,6 +837,7 @@ defmodule Yog.Model do
       ...>   |> Yog.Model.add_edge(1, 2, 10)
       iex> Yog.Model.edge_count(graph)
       1
+
   """
   @spec edge_count(graph()) :: integer()
   def edge_count(%Graph{kind: :directed, out_edges: out_edges}) do
@@ -676,176 +855,6 @@ defmodule Yog.Model do
       end)
 
     div(total - self_loops, 2) + self_loops
-  end
-
-  @doc """
-  Removes a node and all its connected edges (incoming and outgoing).
-
-  **Time Complexity:** O(deg(v)) - proportional to the number of edges
-  connected to the node, not the whole graph.
-
-  ## Example
-
-      iex> {:ok, graph} =
-      ...>   Yog.Model.new(:directed)
-      ...>   |> Yog.Model.add_node(1, "A")
-      ...>   |> Yog.Model.add_node(2, "B")
-      ...>   |> Yog.Model.add_node(3, "C")
-      ...>   |> Yog.Model.add_edges([{1, 2, 10}, {2, 3, 20}])
-      iex> graph = Yog.Model.remove_node(graph, 2)
-      iex> # Node 2 is removed, along with edges 1->2 and 2->3
-      iex> Yog.Model.order(graph)
-      2
-  """
-  @spec remove_node(graph(), node_id()) :: graph()
-  def remove_node(%Graph{} = graph, id) do
-    target_ids = successor_ids(graph, id)
-    source_ids = predecessor_ids(graph, id)
-
-    new_nodes = Map.delete(graph.nodes, id)
-    new_out = Map.delete(graph.out_edges, id)
-
-    new_in_cleaned =
-      Enum.reduce(target_ids, graph.in_edges, fn target_id, acc_in ->
-        Map.replace_lazy(acc_in, target_id, &Map.delete(&1, id))
-      end)
-
-    new_in = Map.delete(new_in_cleaned, id)
-
-    new_out_cleaned =
-      Enum.reduce(source_ids, new_out, fn source_id, acc_out ->
-        Map.replace_lazy(acc_out, source_id, &Map.delete(&1, id))
-      end)
-
-    %{graph | nodes: new_nodes, out_edges: new_out_cleaned, in_edges: new_in}
-  end
-
-  @doc """
-  Removes a directed edge from `src` to `dst`.
-
-  For **directed graphs**, this removes the single directed edge from `src` to `dst`.
-  For **undirected graphs**, this removes the edges in both directions
-  (from `src` to `dst` and from `dst` to `src`).
-
-  **Time Complexity:** O(1)
-
-  ## Example
-
-      iex> # Directed graph - removes single directed edge
-      iex> {:ok, graph} =
-      ...>   Yog.Model.new(:directed)
-      ...>   |> Yog.Model.add_node(1, "A")
-      ...>   |> Yog.Model.add_node(2, "B")
-      ...>   |> Yog.Model.add_edge(1, 2, 10)
-      iex> graph = Yog.Model.remove_edge(graph, 1, 2)
-      iex> # Edge 1->2 is removed
-      iex> Yog.Model.successors(graph, 1)
-      []
-
-      iex> # Undirected graph - removes both directions
-      iex> {:ok, graph} =
-      ...>   Yog.Model.new(:undirected)
-      ...>   |> Yog.Model.add_node(1, "A")
-      ...>   |> Yog.Model.add_node(2, "B")
-      ...>   |> Yog.Model.add_edge(1, 2, 10)
-      iex> graph = Yog.Model.remove_edge(graph, 1, 2)
-      iex> # Edge between 1 and 2 is fully removed
-      iex> Yog.Model.successors(graph, 1)
-      []
-  """
-  @spec remove_edge(graph(), node_id(), node_id()) :: graph()
-  def remove_edge(%Graph{kind: :directed} = graph, src, dst) do
-    do_remove_directed_edge(graph, src, dst)
-  end
-
-  def remove_edge(%Graph{kind: :undirected} = graph, src, dst) do
-    graph
-    |> do_remove_directed_edge(src, dst)
-    |> do_remove_directed_edge(dst, src)
-  end
-
-  @doc """
-  Adds an edge, but if an edge already exists between `src` and `dst`,
-  it combines the new weight with the existing one using `with_combine`.
-
-  The combine function receives `(existing_weight, new_weight)` and should
-  return the combined weight.
-
-  Returns `{:error, reason}` if either endpoint node doesn't exist in `graph.nodes`.
-
-  **Time Complexity:** O(1)
-
-  ## Example
-
-      iex> {:ok, graph} =
-      ...>   Yog.Model.new(:directed)
-      ...>   |> Yog.Model.add_node(1, "A")
-      ...>   |> Yog.Model.add_node(2, "B")
-      ...>   |> Yog.Model.add_edge(1, 2, 10)
-      iex> {:ok, graph} = Yog.Model.add_edge_with_combine(graph, 1, 2, 5, &Kernel.+/2)
-      iex> # Edge 1->2 now has weight 15 (10 + 5)
-      iex> Yog.Model.successors(graph, 1)
-      [{2, 15}]
-
-  ## Use Cases
-
-  - **Edge contraction** in graph algorithms (Stoer-Wagner min-cut)
-  - **Multi-graph support** (adding parallel edges with combined weights)
-  - **Incremental graph building** (accumulating weights from multiple sources)
-  """
-  @spec add_edge_with_combine(graph(), node_id(), node_id(), term(), (term(), term() -> term())) ::
-          {:ok, graph()} | {:error, String.t()}
-  def add_edge_with_combine(%Graph{nodes: nodes} = graph, src, dst, weight, with_combine) do
-    has_src = Map.has_key?(nodes, src)
-    has_dst = Map.has_key?(nodes, dst)
-
-    cond do
-      has_src and has_dst ->
-        graph = do_add_directed_combine(graph, src, dst, weight, with_combine)
-
-        result =
-          case graph.kind do
-            :directed ->
-              graph
-
-            :undirected ->
-              do_add_directed_combine(graph, dst, src, weight, with_combine)
-          end
-
-        {:ok, result}
-
-      not has_src and not has_dst ->
-        {:error, "Nodes #{src} and #{dst} do not exist"}
-
-      not has_src ->
-        {:error, "Node #{src} does not exist"}
-
-      true ->
-        {:error, "Node #{dst} does not exist"}
-    end
-  end
-
-  @doc """
-  Same as `add_edge_with_combine/5` but raises on error.
-
-  ## Example
-
-      iex> graph =
-      ...>   Yog.Model.new(:directed)
-      ...>   |> Yog.Model.add_node(1, "A")
-      ...>   |> Yog.Model.add_node(2, "B")
-      ...>   |> Yog.Model.add_edge!(1, 2, 10)
-      ...>   |> Yog.Model.add_edge_with_combine!(1, 2, 5, &Kernel.+/2)
-      iex> Yog.Model.successors(graph, 1)
-      [{2, 15}]
-  """
-  @spec add_edge_with_combine!(graph(), node_id(), node_id(), term(), (term(), term() -> term())) ::
-          graph()
-  def add_edge_with_combine!(graph, src, dst, weight, with_combine) do
-    case add_edge_with_combine(graph, src, dst, weight, with_combine) do
-      {:ok, g} -> g
-      {:error, reason} -> raise ArgumentError, reason
-    end
   end
 
   @doc """
@@ -901,6 +910,14 @@ defmodule Yog.Model do
   @doc """
   Checks if the graph contains a node with the given ID.
 
+  ## Example
+
+      iex> graph = Yog.undirected() |> Yog.add_node(1, nil)
+      iex> Yog.Model.has_node?(graph, 1)
+      true
+      iex> Yog.Model.has_node?(graph, 2)
+      false
+
   **Time Complexity:** O(1)
   """
   @spec has_node?(graph(), node_id()) :: boolean()
@@ -912,6 +929,20 @@ defmodule Yog.Model do
   Checks if the graph contains an edge between `src` and `dst`.
 
   Returns `true` if an edge exists, `false` otherwise.
+
+  ## Examples
+
+      iex> graph = Yog.from_edges(:directed, [{1, 2, 10}, {1, 3, 20}, {3, 4, 2}])
+      iex> Yog.Model.has_edge?(graph, 1, 2)
+      true
+      iex> Yog.Model.has_edge?(graph, 2, 1)
+      false
+
+      iex> graph = Yog.from_edges(:undirected, [{1, 2, 10}, {1, 3, 20}])
+      iex> Yog.Model.has_edge?(graph, 2, 1)
+      true
+      iex> Yog.Model.has_edge?(graph, 2, 4)
+      false
 
   **Time Complexity:** O(1)
   """
