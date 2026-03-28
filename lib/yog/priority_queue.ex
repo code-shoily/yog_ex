@@ -1,9 +1,12 @@
 defmodule Yog.PriorityQueue do
   @moduledoc """
-  A Priority Queue implementation based on Pairing Heap.
+  A Priority Queue implementation based on [Pairing Heap](https://en.wikipedia.org/wiki/Pairing_heap).
 
   This module provides a priority queue with support for custom comparison functions,
   making it suitable for various graph algorithms like Dijkstra's, Prim's, and A*.
+
+  Implementation inspired by [Gleamy Structures](https://github.com/schurhammer/gleamy_structures/blob/main/src/gleamy/pairing_heap.gleam)
+  and [ex_algo](https://github.com/code-shoily/ex_algo/blob/main/lib/ex_algo/heap/pairing_heap.ex)
 
   ## Features
 
