@@ -24,8 +24,11 @@ defmodule Yog.Traversal.Cycle do
         end
 
       :undirected ->
-        nodes = Model.all_nodes(graph)
-        do_has_undirected_cycle(graph, nodes, MapSet.new())
+        do_has_undirected_cycle(
+          graph,
+          Model.all_nodes(graph),
+          MapSet.new()
+        )
     end
   end
 
@@ -62,9 +65,7 @@ defmodule Yog.Traversal.Cycle do
 
     Enum.reduce_while(neighbors, {false, new_visited}, fn neighbor, {_, current_visited} ->
       if MapSet.member?(current_visited, neighbor) do
-        is_parent = parent == neighbor
-
-        if is_parent do
+        if parent == neighbor do
           {:cont, {false, current_visited}}
         else
           {:halt, {true, current_visited}}
