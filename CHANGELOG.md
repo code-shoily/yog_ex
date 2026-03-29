@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.90.0] - Unreleased
+
+### Breaking
+- Remove `implicity_dijkstra` function from `Yog.Traversal`
+- Remove `from_tuple` from `Yog.Pathfinding.Path` module - we have converted all tuple based data structure from path and will no longer be needing this.
+- Change data type of `Yog.DisjointSet` from tuple to struct
+
 ## [0.80.0] - 2026-03-27
 
 ### Added

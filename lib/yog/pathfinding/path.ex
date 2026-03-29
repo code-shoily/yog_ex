@@ -196,22 +196,6 @@ defmodule Yog.Pathfinding.Path do
   end
 
   @doc """
-  Creates a path from the legacy tuple format `{:path, nodes, weight}`.
-
-  ## Examples
-
-      iex> path = Yog.Pathfinding.Path.from_tuple({:path, [1, 2, 3], 10})
-      iex> path.nodes
-      [1, 2, 3]
-      iex> path.weight
-      10
-  """
-  @spec from_tuple({:path, [Yog.Model.node_id()], any()}) :: t()
-  def from_tuple({:path, nodes, weight}) when is_list(nodes) do
-    new(nodes, weight)
-  end
-
-  @doc """
   Converts the path to a legacy tuple format `{:path, nodes, weight}`.
 
   ## Examples
