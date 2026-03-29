@@ -620,7 +620,7 @@ defmodule Yog do
       true
   """
   @spec cyclic?(graph()) :: boolean()
-  defdelegate cyclic?(graph), to: Traversal
+  defdelegate cyclic?(graph), to: Traversal.Cycle
 
   @doc """
   Returns true if the graph is a tree (undirected, connected, and acyclic).

@@ -49,7 +49,7 @@ A comprehensive **pure Elixir** graph algorithm and network analysis library pro
 - **Centrality Measures**: PageRank, betweenness, closeness, harmonic, eigenvector, Katz, degree
 - **Community Detection**: Louvain, Leiden, Label Propagation, Girvan-Newman, Infomap, Walktrap, Clique Percolation, Local Community, Fluid Communities
 - **Community Metrics**: Modularity, clustering coefficients, density, triangle counts
-- **DAG Operations**: Type-safe wrapper for directed acyclic graphs with longest path, LCA, transitive closure/reduction
+- **DAG Operations**: Wrapper for directed acyclic graphs with longest path, LCA, transitive closure/reduction
 - **Topological Sorting**: Kahn's algorithm with lexicographical variant
 - **Strongly Connected Components**: Tarjan's and Kosaraju's algorithms
 - **Maximum Clique**: Bron-Kerbosch algorithm for maximal and all maximal cliques
@@ -60,7 +60,7 @@ A comprehensive **pure Elixir** graph algorithm and network analysis library pro
 - **Graph Builders**: Grid builders (regular & toroidal), labeled builders, live/incremental builders
 - **Disjoint Set (Union-Find)**: With path compression and union by rank
 - **Efficient Data Structures**: Pairing heap for priority queues, two-list queue for BFS
-- **Functional Graphs (Experimental)**: Elegant port of Erwig's Inductive Graph Library (FGL) for purely functional recursive traversal
+- **Functional Graphs (Experimental)**: Port of Erwig's elegant Inductive Graph Library (FGL) for purely functional recursive traversal
 
 ## Installation
 
