@@ -476,28 +476,4 @@ defmodule Yog.Traversal do
   """
   @spec implicit_fold_by(keyword()) :: any()
   defdelegate implicit_fold_by(opts), to: Implicit
-
-  @doc """
-  Traverse an implicit weighted graph using Dijkstra's algorithm.
-
-  ## Example
-
-      iex> # Shortest path in an implicit chain
-      iex> successors = fn n ->
-      ...>   if n < 5, do: [{n + 1, 10}], else: []
-      ...> end
-      iex> result = Yog.Traversal.implicit_dijkstra(
-      ...>   from: 1,
-      ...>   initial: -1,
-      ...>   successors_of: successors,
-      ...>   with: fn _acc, node, cost ->
-      ...>     if node == 5, do: {:halt, cost}, else: {:continue, -1}
-      ...>   end
-      ...> )
-      iex> # Path: 1->2->3->4->5 = 4 edges * 10 = 40
-      iex> result
-      40
-  """
-  @spec implicit_dijkstra(keyword()) :: any()
-  defdelegate implicit_dijkstra(opts), to: Implicit
 end

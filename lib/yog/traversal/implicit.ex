@@ -140,25 +140,6 @@ defmodule Yog.Traversal.Implicit do
     end
   end
 
-  @doc """
-  Traverse an implicit weighted graph using Dijkstra's algorithm.
-  """
-  @spec implicit_dijkstra(keyword()) :: any()
-  def implicit_dijkstra(opts) do
-    from = Keyword.fetch!(opts, :from)
-    initial = Keyword.fetch!(opts, :initial)
-    successors = Keyword.fetch!(opts, :successors_of)
-    folder = Keyword.fetch!(opts, :with)
-
-    frontier =
-      PQ.new(fn {cost_a, _}, {cost_b, _} -> cost_a <= cost_b end)
-      |> PQ.push({0, from})
-
-    best = %{}
-
-    do_implicit_dijkstra_pq(frontier, best, initial, successors, folder)
-  end
-
   # Implicit BFS
   defp do_implicit_bfs(q, visited, acc, successors, folder) do
     case :queue.out(q) do
@@ -294,49 +275,6 @@ defmodule Yog.Traversal.Implicit do
               do_implicit_dfs_by(next_stack, new_visited, new_acc, successors, key_fn, folder)
           end
         end
-    end
-  end
-
-  # Implicit Dijkstra with priority queue
-  defp do_implicit_dijkstra_pq(pq, best, acc, successors, folder) do
-    if PQ.empty?(pq) do
-      acc
-    else
-      {:ok, {cost, node}, rest_pq} = PQ.pop(pq)
-
-      case Map.get(best, node) do
-        nil ->
-          new_best = Map.put(best, node, cost)
-          {control, new_acc} = folder.(acc, node, cost)
-
-          case control do
-            :halt ->
-              new_acc
-
-            :stop ->
-              do_implicit_dijkstra_pq(rest_pq, new_best, new_acc, successors, folder)
-
-            :continue ->
-              next_pq =
-                Enum.reduce(successors.(node), rest_pq, fn {nb_node, edge_cost}, acc_pq ->
-                  new_cost = cost + edge_cost
-
-                  case Map.get(new_best, nb_node) do
-                    nil -> PQ.push(acc_pq, {new_cost, nb_node})
-                    prev_cost when prev_cost <= new_cost -> acc_pq
-                    _ -> PQ.push(acc_pq, {new_cost, nb_node})
-                  end
-                end)
-
-              do_implicit_dijkstra_pq(next_pq, new_best, new_acc, successors, folder)
-          end
-
-        prev_cost when prev_cost < cost ->
-          do_implicit_dijkstra_pq(rest_pq, best, acc, successors, folder)
-
-        _ ->
-          do_implicit_dijkstra_pq(rest_pq, best, acc, successors, folder)
-      end
     end
   end
 
