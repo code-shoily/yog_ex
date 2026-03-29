@@ -148,13 +148,14 @@ defimpl Inspect, for: Yog.Graph do
       ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
       iex> inspect(graph)
       "#Yog.Graph<:undirected, 2 nodes, 1 edge>"
+
   """
 
   import Inspect.Algebra
 
   def inspect(%Yog.Graph{} = graph, opts) do
     node_count = map_size(graph.nodes)
-    edge_count = edge_count(graph)
+    edge_count = Yog.Graph.edge_count(graph)
 
     node_str = if node_count == 1, do: "node", else: "nodes"
     edge_str = if edge_count == 1, do: "edge", else: "edges"
@@ -167,22 +168,5 @@ defimpl Inspect, for: Yog.Graph do
       "#{edge_count} #{edge_str}",
       ">"
     ])
-  end
-
-  defp edge_count(%{kind: :directed, out_edges: out_edges}) do
-    out_edges
-    |> Map.values()
-    |> Enum.map(&map_size/1)
-    |> Enum.sum()
-  end
-
-  defp edge_count(%{kind: :undirected, out_edges: out_edges}) do
-    count =
-      out_edges
-      |> Map.values()
-      |> Enum.map(&map_size/1)
-      |> Enum.sum()
-
-    div(count, 2)
   end
 end

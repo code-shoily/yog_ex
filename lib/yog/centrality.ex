@@ -18,7 +18,6 @@ defmodule Yog.Centrality do
   | Katz | `katz/2` | Attenuated influence with base score |
   | Alpha | `alpha/2` | Directed graph influence |
 
-
   """
 
   alias Yog.Model
