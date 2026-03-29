@@ -34,8 +34,7 @@ defmodule Yog.Model do
   operations, at the cost of increased memory usage and slightly more complex edge
   updates.
 
-  > **Migration Note:** This module was ported from Gleam to pure Elixir in v0.53.0.
-  > The API remains unchanged.
+
   """
 
   alias Yog.Graph

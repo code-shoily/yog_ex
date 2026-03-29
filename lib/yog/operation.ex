@@ -67,8 +67,7 @@ defmodule Yog.Operation do
       iex> Yog.Model.order(common)
       2
 
-  > **Migration Note:** This module was ported from Gleam to pure Elixir in v0.53.0.
-  > The API remains unchanged.
+
   """
 
   alias Yog.Model

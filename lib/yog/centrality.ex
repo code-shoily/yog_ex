@@ -18,8 +18,7 @@ defmodule Yog.Centrality do
   | Katz | `katz/2` | Attenuated influence with base score |
   | Alpha | `alpha/2` | Directed graph influence |
 
-  > **Migration Note:** This module was ported from Gleam to pure Elixir in v0.53.0.
-  > The API remains unchanged.
+
   """
 
   alias Yog.Model

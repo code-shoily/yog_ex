@@ -48,8 +48,7 @@ defmodule Yog.Transform do
   - **Weight Normalization**: Preprocessing edge weights
   - **Parallel Processing**: Large-scale data transformations on multi-core systems
 
-  > **Migration Note:** This module was ported from Gleam to pure Elixir in v0.53.0.
-  > The API remains unchanged. Async variants added in v0.60.1.
+  Async variants added in v0.60.1.
   """
 
   alias Yog.Model

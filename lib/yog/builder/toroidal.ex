@@ -43,8 +43,7 @@ defmodule Yog.Builder.Toroidal do
       dist = Yog.Builder.Toroidal.toroidal_manhattan_distance(start, goal, 3, 3)
       # dist = 2
 
-  > **Migration Note:** This module was ported from Gleam to pure Elixir in v0.53.0.
-  > The API remains unchanged.
+
   """
 
   alias Yog.Builder.Grid

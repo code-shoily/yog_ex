@@ -70,8 +70,7 @@ defmodule Yog.Builder.Live do
       {:ok, a_id} = Yog.Builder.Live.get_id(builder, "A")
       {:ok, c_id} = Yog.Builder.Live.get_id(builder, "C")
 
-  > **Migration Note:** This module was ported from Gleam to pure Elixir in v0.53.0.
-  > The API remains unchanged.
+
   """
 
   alias Yog.Builder.Labeled

@@ -39,8 +39,7 @@ defmodule Yog.Builder.Labeled do
       builder = Yog.Builder.Labeled.from_list(:directed, edges)
       graph = Yog.Builder.Labeled.to_graph(builder)
 
-  > **Migration Note:** This module was ported from Gleam to pure Elixir in v0.53.0.
-  > The API remains unchanged.
+
   """
 
   alias Yog.Model

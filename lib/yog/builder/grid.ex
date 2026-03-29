@@ -38,8 +38,7 @@ defmodule Yog.Builder.Grid do
   - `always/0` - Always allow movement
   - `including/1` - Allow movement into any of the specified values
 
-  > **Migration Note:** This module was ported from Gleam to pure Elixir in v0.53.0.
-  > The API remains unchanged.
+
   """
 
   alias Yog.Builder.GridGraph

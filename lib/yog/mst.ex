@@ -32,8 +32,7 @@ defmodule Yog.MST do
   - [Wikipedia: Minimum Spanning Tree](https://en.wikipedia.org/wiki/Minimum_spanning_tree)
   - [CP-Algorithms: MST](https://cp-algorithms.com/graph/mst_kruskal.html)
 
-  > **Migration Note:** This module was ported from Gleam to pure Elixir in v0.53.0.
-  > The API remains unchanged.
+
   """
 
   alias Yog.DisjointSet

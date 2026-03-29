@@ -25,8 +25,7 @@ defmodule Yog.Health do
       # High assortativity = nodes cluster with similar nodes
       assort = Yog.Health.assortativity(graph)
 
-  > **Migration Note:** This module was ported from Gleam to pure Elixir in v0.53.0.
-  > The API remains unchanged.
+
   """
 
   alias Yog.Model
