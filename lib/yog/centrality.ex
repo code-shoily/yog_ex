@@ -541,39 +541,10 @@ defmodule Yog.Centrality do
   @spec katz(Yog.graph(), keyword()) :: centrality_scores()
   def katz(graph, opts \\ []) do
     alpha = Keyword.fetch!(opts, :alpha)
-    beta = Keyword.fetch!(opts, :beta)
-    max_iterations = Keyword.get(opts, :max_iterations, 100)
-    tolerance = Keyword.get(opts, :tolerance, 0.0001)
+    beta = Keyword.get(opts, :beta, 1.0)
 
-    nodes = Model.all_nodes(graph)
-    n = length(nodes)
-
-    if n <= 0 do
-      %{}
-    else
-      # Precompute neighbors map
-      in_neighbors_map =
-        Enum.reduce(nodes, %{}, fn id, acc ->
-          # For Katz, we use in-neighbors (predecessors in directed graphs)
-          Map.put(acc, id, get_in_neighbor_ids(graph, id))
-        end)
-
-      initial_scores =
-        Enum.reduce(nodes, %{}, fn id, acc ->
-          Map.put(acc, id, beta)
-        end)
-
-      iterate_katz(
-        nodes,
-        initial_scores,
-        alpha,
-        beta,
-        max_iterations,
-        tolerance,
-        0,
-        in_neighbors_map
-      )
-    end
+    # Katz is Alpha Centrality where the 'initial' (exogenous) vector is beta
+    alpha(graph, Keyword.merge(opts, alpha: alpha, initial: beta))
   end
 
   @doc """
@@ -609,30 +580,18 @@ defmodule Yog.Centrality do
   """
   @spec alpha(Yog.graph(), keyword()) :: centrality_scores()
   def alpha(graph, opts \\ []) do
-    alpha = Keyword.fetch!(opts, :alpha)
-    initial = Keyword.fetch!(opts, :initial)
-    max_iterations = Keyword.get(opts, :max_iterations, 100)
-    tolerance = Keyword.get(opts, :tolerance, 0.0001)
+    alpha = Keyword.get(opts, :alpha, 0.1)
+    max_iter = Keyword.get(opts, :max_iterations, 100)
+    tol = Keyword.get(opts, :tolerance, 1.0e-6)
 
     nodes = Model.all_nodes(graph)
-    n = length(nodes)
 
-    if n <= 0 do
-      %{}
-    else
-      # Precompute neighbors map
-      in_neighbors_map =
-        Enum.reduce(nodes, %{}, fn id, acc ->
-          Map.put(acc, id, get_in_neighbor_ids(graph, id))
-        end)
+    initial_scores =
+      opts
+      |> Keyword.get(:initial, 1.0)
+      |> normalize_initial_scores(graph, nodes)
 
-      initial_scores =
-        Enum.reduce(nodes, %{}, fn id, acc ->
-          Map.put(acc, id, initial)
-        end)
-
-      iterate_alpha(nodes, initial_scores, alpha, max_iterations, tolerance, 0, in_neighbors_map)
-    end
+    iterate_alpha(graph, nodes, initial_scores, initial_scores, alpha, max_iter, tol)
   end
 
   @doc """
@@ -839,9 +798,7 @@ defmodule Yog.Centrality do
         Map.put(acc, node, new_rank)
       end)
 
-    l1_norm = calculate_l1_norm(ranks, new_ranks, nodes)
-
-    if l1_norm < tolerance do
+    if Yog.Utils.norm_diff(ranks, new_ranks, :l1) < tolerance do
       new_ranks
     else
       iterate_pagerank(
@@ -857,15 +814,6 @@ defmodule Yog.Centrality do
         sinks
       )
     end
-  end
-
-  defp calculate_l1_norm(old_ranks, new_ranks, nodes) do
-    Enum.reduce(nodes, 0.0, fn node, sum ->
-      old_val = Map.get(old_ranks, node, 0.0)
-      new_val = Map.get(new_ranks, node, 0.0)
-      diff = abs(new_val - old_val)
-      sum + diff
-    end)
   end
 
   # Eigenvector centrality iteration
@@ -904,26 +852,12 @@ defmodule Yog.Centrality do
       end
 
     # Check convergence (L2 distance from previous)
-    diff_sum =
-      Enum.reduce(nodes, 0.0, fn node, acc ->
-        old_val = Map.get(scores, node, 0.0)
-        new_val = Map.get(normalized_scores, node, 0.0)
-        acc + :math.pow(new_val - old_val, 2)
-      end)
-
-    diff_norm = :math.sqrt(diff_sum)
+    diff_norm = Yog.Utils.norm_diff(scores, normalized_scores, :l2)
 
     # Anti-oscillation (check if we are in a 2-cycle)
     is_oscillating =
       if map_size(prev_prev) > 0 do
-        p_diff_sum =
-          Enum.reduce(nodes, 0.0, fn node, acc ->
-            p_val = Map.get(prev_prev, node, 0.0)
-            n_val = Map.get(normalized_scores, node, 0.0)
-            acc + :math.pow(n_val - p_val, 2)
-          end)
-
-        :math.sqrt(p_diff_sum) < tolerance
+        Yog.Utils.norm_diff(prev_prev, normalized_scores, :l2) < tolerance
       else
         false
       end
@@ -943,88 +877,62 @@ defmodule Yog.Centrality do
     end
   end
 
-  # Katz centrality iteration
-  defp iterate_katz(_nodes, scores, _alpha, _beta, max_iterations, _tolerance, iter, _in_map)
-       when iter >= max_iterations do
-    scores
+  defp normalize_initial_scores(val, _graph, nodes) when is_number(val) do
+    val_float = val / 1.0
+    Map.new(nodes, fn node -> {node, val_float} end)
   end
 
-  defp iterate_katz(nodes, scores, alpha, beta, max_iterations, tolerance, iter, in_map) do
-    new_scores =
-      Enum.reduce(nodes, %{}, fn node, acc ->
-        neighbor_sum =
-          Map.get(in_map, node, [])
-          |> Enum.reduce(0.0, fn neighbor, sum ->
-            neighbor_score = Map.get(scores, neighbor, 0.0)
-            sum + neighbor_score
-          end)
-
-        new_val = alpha * neighbor_sum + beta
-        Map.put(acc, node, new_val)
-      end)
-
-    l2_diff = calculate_l2_diff(scores, new_scores, nodes)
-
-    if l2_diff < tolerance do
-      new_scores
-    else
-      iterate_katz(nodes, new_scores, alpha, beta, max_iterations, tolerance, iter + 1, in_map)
-    end
+  defp normalize_initial_scores(map, _graph, nodes) when is_map(map) do
+    Enum.reduce(nodes, map, fn node, acc ->
+      Map.put_new(acc, node, 1.0)
+    end)
   end
 
   # Alpha centrality iteration
-  defp iterate_alpha(_nodes, scores, _alpha, max_iterations, _tolerance, iter, _in_map)
-       when iter >= max_iterations do
-    scores
-  end
+  defp iterate_alpha(_graph, _nodes, scores, _initial, _alpha, 0, _tol), do: scores
 
-  defp iterate_alpha(nodes, scores, alpha, max_iterations, tolerance, iter, in_map) do
+  defp iterate_alpha(graph, nodes, scores, initial_scores, alpha, iterations, tol) do
     new_scores =
       Enum.reduce(nodes, %{}, fn node, acc ->
-        neighbor_sum =
-          Map.get(in_map, node, [])
-          |> Enum.reduce(0.0, fn neighbor, sum ->
-            neighbor_score = Map.get(scores, neighbor, 0.0)
-            sum + neighbor_score
+        neighbor_influence =
+          Model.predecessors(graph, node)
+          |> Enum.reduce(0.0, fn {pred, _weight}, sum ->
+            sum + Map.get(scores, pred, 0.0)
           end)
 
-        # Alpha centrality iterative step: c = alpha * A * c + e
-        # where e is the initial values/beta
-        new_val = alpha * neighbor_sum + Map.get(scores, node, 0.0)
-        Map.put(acc, node, new_val)
+        e_i = Map.get(initial_scores, node, 0.0)
+        Map.put(acc, node, alpha * neighbor_influence + e_i)
       end)
 
-    l2_diff = calculate_l2_diff(scores, new_scores, nodes)
-
-    if l2_diff < tolerance do
+    if converged?(scores, new_scores, nodes, tol) do
       new_scores
     else
-      iterate_alpha(nodes, new_scores, alpha, max_iterations, tolerance, iter + 1, in_map)
+      iterate_alpha(graph, nodes, new_scores, initial_scores, alpha, iterations - 1, tol)
     end
   end
 
-  defp calculate_l2_diff(old_scores, new_scores, nodes) do
-    sum =
-      Enum.reduce(nodes, 0.0, fn node, acc ->
-        v1 = Map.get(old_scores, node, 0.0)
-        v2 = Map.get(new_scores, node, 0.0)
-        acc + :math.pow(v2 - v1, 2)
-      end)
-
-    :math.sqrt(sum)
+  # Standardized L1 Norm convergence check
+  defp converged?(old_scores, new_scores, _nodes, tolerance) do
+    Yog.Utils.norm_diff(old_scores, new_scores, :l1) < tolerance
   end
 
   defp get_in_neighbor_ids(graph, node) do
-    %Yog.Graph{kind: kind} = graph
+    %Yog.Graph{kind: kind, in_edges: in_edges, out_edges: out_edges} = graph
 
     case kind do
       :undirected ->
-        Model.neighbors(graph, node)
-        |> Enum.map(fn {id, _} -> id end)
+        # Direct map access avoids intermediate list from Model.neighbors
+        case Map.fetch(out_edges, node) do
+          {:ok, inner} -> Map.keys(inner)
+          :error -> []
+        end
 
       :directed ->
-        Model.predecessors(graph, node)
-        |> Enum.map(fn {id, _} -> id end)
+        # Direct map access avoids intermediate list from Model.predecessors
+        case Map.fetch(in_edges, node) do
+          {:ok, inner} -> Map.keys(inner)
+          :error -> []
+        end
     end
   end
 
