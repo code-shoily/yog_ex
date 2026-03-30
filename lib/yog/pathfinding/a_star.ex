@@ -239,17 +239,28 @@ defmodule Yog.Pathfinding.AStar do
         add \\ &Kernel.+/2,
         compare \\ &Yog.Utils.compare/2
       ) do
-    # Priority queue: {f_score, g_score, node, path}
+    # Priority queue: {f_score, g_score, node}
     # f(n) = g(n) + h(n)
+    # Predecessors map stored separately for O(1) path tracking
     h0 = heuristic.(from, to)
 
     initial_queue =
-      PQ.new(fn {f1, _, _, _}, {f2, _, _, _} -> compare.(f1, f2) != :gt end)
-      |> PQ.push({add.(zero, h0), zero, from, [from]})
+      PQ.new(fn {f1, _, _}, {f2, _, _} -> compare.(f1, f2) != :gt end)
+      |> PQ.push({add.(zero, h0), zero, from})
 
     initial_g_scores = %{from => zero}
+    initial_predecessors = %{}
 
-    do_a_star(graph, initial_queue, to, add, compare, heuristic, initial_g_scores)
+    do_a_star(
+      graph,
+      initial_queue,
+      to,
+      add,
+      compare,
+      heuristic,
+      initial_g_scores,
+      initial_predecessors
+    )
   end
 
   @doc """
@@ -388,28 +399,30 @@ defmodule Yog.Pathfinding.AStar do
   end
 
   # Main A* implementation for materialized graphs
-  defp do_a_star(graph, queue, to, add, compare, heuristic, g_scores) do
+  defp do_a_star(graph, queue, to, add, compare, heuristic, g_scores, predecessors) do
     case PQ.pop(queue) do
       :error ->
         :error
 
-      {:ok, {_f, g, node, path}, rest} ->
+      {:ok, {_f, g, node}, rest} ->
         key = node
 
         # Check if this entry is outdated
         case Map.fetch(g_scores, key) do
           {:ok, best_g} ->
             if compare.(g, best_g) == :gt do
-              do_a_star(graph, rest, to, add, compare, heuristic, g_scores)
+              do_a_star(graph, rest, to, add, compare, heuristic, g_scores, predecessors)
             else
               if node == to do
-                {:ok, Path.new(Enum.reverse(path), g, :a_star)}
+                path = reconstruct_path(predecessors, to, [to])
+                {:ok, Path.new(path, g, :a_star)}
               else
                 # Expand neighbors
                 successors = Model.successors(graph, node)
 
-                {new_queue, new_g_scores} =
-                  Enum.reduce(successors, {rest, g_scores}, fn {neighbor, cost}, {q, gs} ->
+                {new_queue, new_g_scores, new_predecessors} =
+                  Enum.reduce(successors, {rest, g_scores, predecessors}, fn {neighbor, cost},
+                                                                             {q, gs, preds} ->
                     new_g = add.(g, cost)
                     neighbor_key = neighbor
 
@@ -418,29 +431,48 @@ defmodule Yog.Pathfinding.AStar do
                         if compare.(new_g, existing_g) == :lt do
                           h = heuristic.(neighbor, to)
                           f = add.(new_g, h)
-                          new_q = PQ.push(q, {f, new_g, neighbor, [neighbor | path]})
+                          new_q = PQ.push(q, {f, new_g, neighbor})
                           new_gs = Map.put(gs, neighbor_key, new_g)
-                          {new_q, new_gs}
+                          new_preds = Map.put(preds, neighbor, node)
+                          {new_q, new_gs, new_preds}
                         else
-                          {q, gs}
+                          {q, gs, preds}
                         end
 
                       :error ->
                         h = heuristic.(neighbor, to)
                         f = add.(new_g, h)
-                        new_q = PQ.push(q, {f, new_g, neighbor, [neighbor | path]})
+                        new_q = PQ.push(q, {f, new_g, neighbor})
                         new_gs = Map.put(gs, neighbor_key, new_g)
-                        {new_q, new_gs}
+                        new_preds = Map.put(preds, neighbor, node)
+                        {new_q, new_gs, new_preds}
                     end
                   end)
 
-                do_a_star(graph, new_queue, to, add, compare, heuristic, new_g_scores)
+                do_a_star(
+                  graph,
+                  new_queue,
+                  to,
+                  add,
+                  compare,
+                  heuristic,
+                  new_g_scores,
+                  new_predecessors
+                )
               end
             end
 
           :error ->
-            do_a_star(graph, rest, to, add, compare, heuristic, g_scores)
+            do_a_star(graph, rest, to, add, compare, heuristic, g_scores, predecessors)
         end
+    end
+  end
+
+  # Reconstruct path by backtracking through predecessors
+  defp reconstruct_path(predecessors, node, acc) do
+    case Map.get(predecessors, node) do
+      nil -> acc
+      parent -> reconstruct_path(predecessors, parent, [parent | acc])
     end
   end
 
