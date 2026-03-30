@@ -30,7 +30,7 @@ defmodule Yog.Graph do
   - **Inspect**: Compact representation showing graph type and statistics
   """
 
-  @type node_id :: integer()
+  @type node_id :: term()
   @type kind :: :directed | :undirected
 
   @type t :: %__MODULE__{
@@ -60,6 +60,15 @@ defmodule Yog.Graph do
   Returns the total number of edges in the graph.
 
   For undirected graphs, this counts each edge once (not twice).
+
+  ## Performance Note
+
+  This function traverses all nodes' outgoing edges, making it O(V) where V is
+  the number of vertices. If you need the edge count multiple times, consider
+  caching the result:
+
+      edge_count = Yog.Graph.edge_count(graph)
+      # Use edge_count in subsequent calculations...
   """
   @spec edge_count(t()) :: non_neg_integer()
   def edge_count(%__MODULE__{} = graph) do
