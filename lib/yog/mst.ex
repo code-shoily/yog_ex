@@ -3,7 +3,7 @@ defmodule Yog.MST do
   Minimum Spanning Tree (MST) algorithms for finding optimal network connections.
 
   A [Minimum Spanning Tree](https://en.wikipedia.org/wiki/Minimum_spanning_tree) connects all nodes
-  in a weighted undirected graph with the minimum possible total edge weight. MSTs have
+  in a weighted **undirected** graph with the minimum possible total edge weight. MSTs have
   applications in network design, clustering, and optimization problems.
 
   ## Available Algorithms
@@ -12,6 +12,21 @@ defmodule Yog.MST do
   |-----------|----------|----------|
   | [Kruskal's](https://en.wikipedia.org/wiki/Kruskal%27s_algorithm) | `kruskal/2` | Sparse graphs, edge lists |
   | [Prim's](https://en.wikipedia.org/wiki/Prim%27s_algorithm) | `prim/2` | Dense graphs, growing from a start node |
+
+  ## Important: Undirected Graphs Only
+
+  MST algorithms are **only defined for undirected graphs**. Passing a directed graph
+  will return `{:error, :undirected_only}`.
+
+  ### What About Directed Graphs?
+
+  For directed graphs, the equivalent problem is the **Minimum Spanning Arborescence** (MSA),
+  also known as the **Minimum Cost Arborescence** or **Optimum Branching**. This finds a
+  directed tree (arborescence) rooted at a specific node that reaches all other nodes
+  with minimum total weight.
+
+  The MSA problem is solved by **Edmonds' algorithm** (also called Chu-Liu/Edmonds algorithm),
+  which is not currently implemented in this module.
 
   ## Properties of MSTs
 
@@ -31,6 +46,7 @@ defmodule Yog.MST do
 
   - [Wikipedia: Minimum Spanning Tree](https://en.wikipedia.org/wiki/Minimum_spanning_tree)
   - [CP-Algorithms: MST](https://cp-algorithms.com/graph/mst_kruskal.html)
+  - [Wikipedia: Edmonds' Algorithm](https://en.wikipedia.org/wiki/Edmonds%27_algorithm) (for directed graphs)
 
 
   """
@@ -84,7 +100,7 @@ defmodule Yog.MST do
       iex> Enum.reduce(mst_edges, 0, fn e, acc -> acc + e.weight end)
       3
   """
-  @spec kruskal(keyword()) :: [edge()]
+  @spec kruskal(keyword()) :: [edge()] | {:error, :undirected_only}
   def kruskal(opts) when is_list(opts) do
     graph = Keyword.fetch!(opts, :in)
     compare = opts[:compare] || (&Yog.Utils.compare/2)
@@ -116,8 +132,15 @@ defmodule Yog.MST do
       iex> length(mst_edges)
       2
   """
-  @spec kruskal(Yog.graph(), (term(), term() -> :lt | :eq | :gt)) :: [edge()]
-  def kruskal(graph, compare \\ &Yog.Utils.compare/2) do
+  @spec kruskal(Yog.graph(), (term(), term() -> :lt | :eq | :gt)) ::
+          [edge()] | {:error, :undirected_only}
+  def kruskal(graph, compare \\ &Yog.Utils.compare/2)
+
+  def kruskal(%Yog.Graph{kind: :directed}, _compare) do
+    {:error, :undirected_only}
+  end
+
+  def kruskal(graph, compare) do
     edges = extract_edges(graph)
     sorted_edges = Enum.sort(edges, fn a, b -> compare.(a.weight, b.weight) == :lt end)
 
@@ -165,28 +188,11 @@ defmodule Yog.MST do
       iex> Enum.reduce(mst_edges, 0, fn e, acc -> acc + e.weight end)
       3
   """
-  @spec prim(keyword()) :: [edge()]
+  @spec prim(keyword()) :: [edge()] | {:error, :undirected_only}
   def prim(opts) when is_list(opts) do
     graph = Keyword.fetch!(opts, :in)
     compare = opts[:compare] || (&Yog.Utils.compare/2)
-
-    node_ids = Model.all_nodes(graph)
-
-    case node_ids do
-      [] ->
-        []
-
-      [start | _] ->
-        initial_edges = get_all_edges_from_node(graph, start)
-
-        initial_pq =
-          PQ.new(fn a, b -> compare.(a.weight, b.weight) == :lt end)
-          |> push_all(initial_edges)
-
-        initial_visited = MapSet.new([start])
-
-        do_prim(graph, initial_pq, initial_visited, [], compare)
-    end
+    prim(graph, compare)
   end
 
   @doc """
@@ -214,8 +220,15 @@ defmodule Yog.MST do
       iex> length(mst_edges)
       2
   """
-  @spec prim(Yog.graph(), (term(), term() -> :lt | :eq | :gt)) :: [edge()]
-  def prim(graph, compare \\ &Yog.Utils.compare/2) do
+  @spec prim(Yog.graph(), (term(), term() -> :lt | :eq | :gt)) ::
+          [edge()] | {:error, :undirected_only}
+  def prim(graph, compare \\ &Yog.Utils.compare/2)
+
+  def prim(%Yog.Graph{kind: :directed}, _compare) do
+    {:error, :undirected_only}
+  end
+
+  def prim(graph, compare) do
     node_ids = Model.all_nodes(graph)
 
     case node_ids do
