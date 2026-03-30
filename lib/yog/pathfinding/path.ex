@@ -196,47 +196,6 @@ defmodule Yog.Pathfinding.Path do
   end
 
   @doc """
-  Converts the path to a legacy tuple format `{:path, nodes, weight}`.
-
-  ## Examples
-
-      iex> path = Yog.Pathfinding.Path.new([1, 2, 3], 10)
-      iex> Yog.Pathfinding.Path.to_tuple(path)
-      {:path, [1, 2, 3], 10}
-  """
-  @spec to_tuple(t()) :: {:path, [Yog.Model.node_id()], any()}
-  def to_tuple(%__MODULE__{nodes: nodes, weight: weight}) do
-    {:path, nodes, weight}
-  end
-
-  @doc """
-  Backward compatibility: convert from legacy map format.
-  """
-  @spec from_map(map()) :: t()
-  def from_map(%{nodes: n, weight: w} = map) do
-    algorithm = Map.get(map, :algorithm, :unknown)
-    metadata = Map.get(map, :metadata, %{})
-
-    %__MODULE__{
-      nodes: n,
-      weight: w,
-      algorithm: algorithm,
-      metadata: metadata
-    }
-  end
-
-  @doc """
-  Convert to legacy map format.
-  """
-  @spec to_map(t()) :: map()
-  def to_map(%__MODULE__{nodes: nodes, weight: weight}) do
-    %{
-      nodes: nodes,
-      weight: weight
-    }
-  end
-
-  @doc """
   Checks if a node is part of the path.
 
   ## Examples
