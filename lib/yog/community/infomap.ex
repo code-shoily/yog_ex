@@ -215,20 +215,33 @@ defmodule Yog.Community.Infomap do
 
         # Handle case where node has no outgoing edges (dangling node)
         # Guard against overflow from extreme PageRank values
-        if total_weight > 0.0 and u_pr < 1.0e200 and is_number(u_pr) do
-          contribution_per_weight = min(u_pr * (1.0 - alpha) / total_weight, 1.0e200)
+        if total_weight > 0.0 and u_pr < 1.0e200 and is_number(u_pr) and u_pr > 0.0 do
+          # Pre-check to prevent overflow: if u_pr/total_weight would be too large, skip
+          ratio = u_pr / total_weight
 
-          Enum.reduce(neighbors, acc, fn {v, weight}, inner_acc ->
-            # Guard against overflow from extreme weight values
-            # Also guard against contribution_per_weight being infinity/NaN
-            if is_number(contribution_per_weight) and contribution_per_weight < 1.0e200 do
-              safe_weight = min(weight, 1.0e100)
-              flow = contribution_per_weight * safe_weight
-              Map.update(inner_acc, v, flow, &(&1 + flow))
-            else
-              inner_acc
-            end
-          end)
+          if is_number(ratio) and ratio < 1.0e200 do
+            contribution_per_weight = min(ratio * (1.0 - alpha), 1.0e200)
+
+            Enum.reduce(neighbors, acc, fn {v, weight}, inner_acc ->
+              # Guard against overflow from extreme weight values
+              # Also guard against contribution_per_weight being infinity/NaN
+              if is_number(contribution_per_weight) and contribution_per_weight < 1.0e200 do
+                safe_weight = min(max(weight, 0.0), 1.0e100)
+                flow = contribution_per_weight * safe_weight
+
+                # Final overflow check
+                if is_number(flow) and flow < 1.0e200 do
+                  Map.update(inner_acc, v, flow, &(&1 + flow))
+                else
+                  inner_acc
+                end
+              else
+                inner_acc
+              end
+            end)
+          else
+            acc
+          end
         else
           # Dangling node: no outgoing flow (handled via dangling_pr)
           acc

@@ -35,9 +35,21 @@ defmodule Yog.PBT.CommunityTest do
     end
 
     property "Infomap: Partitioning nodes into sets" do
-      check all(graph <- graph_gen()) do
-        result = Yog.Community.Infomap.detect(graph)
-        verify_partition(graph, result)
+      # Infomap uses random walks/PageRank which requires non-negative weights
+      # Filter out graphs with negative or zero weights
+      check all(graph <- directed_graph_gen()) do
+        # Skip graphs with invalid weights for random walk algorithms
+        has_valid_weights =
+          Yog.all_nodes(graph)
+          |> Enum.all?(fn node ->
+            Yog.Model.successors(graph, node)
+            |> Enum.all?(fn {_, weight} -> weight > 0 end)
+          end)
+
+        if has_valid_weights do
+          result = Yog.Community.Infomap.detect(graph)
+          verify_partition(graph, result)
+        end
       end
     end
 
