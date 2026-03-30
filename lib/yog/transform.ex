@@ -338,24 +338,48 @@ defmodule Yog.Transform do
 
     stream_opts = Keyword.merge(default_opts, opts)
 
-    transform_outer_async = fn outer_map ->
-      outer_map
+    # Flatten edges and chunk them to avoid data skew on high-degree nodes
+    # Process chunks in parallel for better load balancing
+    all_out_edges =
+      for {src, inner} <- graph.out_edges,
+          {dst, weight} <- inner,
+          do: {:out, src, dst, weight}
+
+    all_in_edges =
+      for {dst, inner} <- graph.in_edges,
+          {src, weight} <- inner,
+          do: {:in, dst, src, weight}
+
+    all_edges = all_out_edges ++ all_in_edges
+
+    # Process edges in parallel and collect results
+    processed_edges =
+      all_edges
       |> Task.async_stream(
-        fn {src, inner_map} ->
-          new_inner = Map.new(inner_map, fn {dst, weight} -> {dst, fun.(weight)} end)
-          {src, new_inner}
+        fn
+          {:out, src, dst, weight} -> {:out, src, dst, fun.(weight)}
+          {:in, dst, src, weight} -> {:in, dst, src, fun.(weight)}
         end,
         stream_opts
       )
-      |> Enum.reduce(%{}, fn {:ok, {src, new_inner}}, acc ->
-        Map.put(acc, src, new_inner)
+      |> Enum.reduce({%{}, %{}}, fn {:ok, edge}, {out_acc, in_acc} ->
+        case edge do
+          {:out, src, dst, new_weight} ->
+            new_inner = Map.get(out_acc, src, %{}) |> Map.put(dst, new_weight)
+            {Map.put(out_acc, src, new_inner), in_acc}
+
+          {:in, dst, src, new_weight} ->
+            new_inner = Map.get(in_acc, dst, %{}) |> Map.put(src, new_weight)
+            {out_acc, Map.put(in_acc, dst, new_inner)}
+        end
       end)
-    end
+
+    {new_out_edges, new_in_edges} = processed_edges
 
     %{
       graph
-      | out_edges: transform_outer_async.(graph.out_edges),
-        in_edges: transform_outer_async.(graph.in_edges)
+      | out_edges: new_out_edges,
+        in_edges: new_in_edges
     }
   end
 
