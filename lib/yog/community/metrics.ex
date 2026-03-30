@@ -8,6 +8,9 @@ defmodule Yog.Community.Metrics do
   - Graph and community density
   """
 
+  alias Yog.Community.Result
+  alias Yog.Model
+
   @doc """
   Calculates modularity for a given community partition.
 
@@ -28,62 +31,64 @@ defmodule Yog.Community.Metrics do
       iex> is_float(q)
       true
   """
-  def modularity(graph, communities, opts \\ []) do
-    # Modularity formula: Q = (1/2m) * Σ_ij [A_ij - γ(k_i * k_j / 2m)] * δ(c_i, c_j)
-    # where γ is the resolution parameter.
-    # where m = number of edges, A = adjacency matrix, k = degree, c = community, δ = kronecker delta
 
-    edge_count = Yog.Model.edge_count(graph)
+  def modularity(graph, communities, opts \\ [])
+
+  def modularity(graph, %Result{} = communities, opts) do
+    modularity(graph, %{assignments: communities.assignments}, opts)
+  end
+
+  def modularity(graph, communities, opts) do
+    # Formula: Q = Σ_c [ (L_c/m) - γ*(k_c/2m)² ]
+    # where L_c = internal edges in community c, k_c = sum of degrees in c
+
+    edge_count = Model.edge_count(graph)
 
     if edge_count == 0 do
       0.0
     else
-      m = edge_count
-      # 2m for undirected
+      m = edge_count / 1.0
       m2 = 2 * m
       gamma = Keyword.get(opts, :resolution, 1.0)
 
-      nodes = Yog.all_nodes(graph)
-
-      # Calculate weighted degrees (sum of edge weights)
-      degrees =
-        Map.new(nodes, fn node ->
-          degree =
-            Yog.Model.successors(graph, node)
-            |> Enum.reduce(0, fn {_neighbor, weight}, acc -> acc + weight end)
-
-          {node, degree}
-        end)
-
-      # Build edge lookup for O(1) edge existence checks
-      edge_set = build_edge_set(graph)
-
-      # Group nodes by community
+      # Build community -> nodes mapping
       community_nodes =
         Enum.reduce(communities.assignments, %{}, fn {node, comm}, acc ->
-          current = Map.get(acc, comm, [])
-          Map.put(acc, comm, [node | current])
+          Map.update(acc, comm, [node], &[node | &1])
         end)
 
-      # Calculate modularity by summing over all community pairs
-      q =
-        Enum.reduce(community_nodes, 0.0, fn {_, nodes_in_comm}, acc ->
-          # For each pair of nodes in the same community
-          pairs = for i <- nodes_in_comm, j <- nodes_in_comm, do: {i, j}
+      # Calculate modularity using O(E) approach
+      Enum.reduce(community_nodes, 0.0, fn {_, nodes_in_comm}, acc ->
+        # Convert to MapSet for O(1) membership tests
+        node_set = MapSet.new(nodes_in_comm)
 
-          sum_pairs =
-            Enum.reduce(pairs, 0.0, fn {i, j}, sum ->
-              a_ij = if edge_exists_fast?(edge_set, i, j), do: 1, else: 0
-              k_i = degrees[i] || 0
-              k_j = degrees[j] || 0
-              expected = gamma * k_i * k_j / m2
-              sum + (a_ij - expected)
-            end)
+        # Count internal edges and sum degrees
+        {internal_edges, degree_sum} =
+          Enum.reduce(nodes_in_comm, {0, 0}, fn node, {int_acc, deg_acc} ->
+            successors = Model.successors(graph, node)
+            degree = Enum.reduce(successors, 0, fn {_, w}, sum -> sum + w end)
 
-          acc + sum_pairs
-        end)
+            # Count internal edges (weighted)
+            internal =
+              Enum.reduce(successors, 0, fn {neighbor, weight}, sum ->
+                if MapSet.member?(node_set, neighbor) do
+                  sum + weight
+                else
+                  sum
+                end
+              end)
 
-      q / m2
+            {int_acc + internal, deg_acc + degree}
+          end)
+
+        # Internal edges counted twice (once per endpoint)
+        internal_edges = internal_edges / 2.0
+
+        # Add contribution: (L_c/m) - γ*(k_c/2m)²
+        term1 = internal_edges / m
+        term2 = gamma * :math.pow(degree_sum / m2, 2)
+        acc + (term1 - term2)
+      end)
     end
   end
 
@@ -91,6 +96,8 @@ defmodule Yog.Community.Metrics do
   Counts the total number of triangles in the graph.
 
   A triangle is a set of three nodes where each pair is connected.
+
+  Uses neighbor intersection algorithm: O(Σ deg(v)²) instead of O(V³).
 
   ## Examples
 
@@ -106,20 +113,46 @@ defmodule Yog.Community.Metrics do
   """
   @spec count_triangles(Yog.graph()) :: integer()
   def count_triangles(graph) do
+    # For each edge (u,v), count |N(u) ∩ N(v)|
+    # Each triangle counted 3 times (once per edge), so divide by 3
+
     nodes = Yog.all_nodes(graph)
 
-    triangles =
-      for i <- nodes,
-          j <- nodes,
-          k <- nodes,
-          i < j,
-          j < k,
-          edge_exists?(graph, i, j),
-          edge_exists?(graph, j, k),
-          edge_exists?(graph, i, k),
-          do: 1
+    # Pre-compute neighbor MapSets for O(1) intersection
+    neighbor_sets =
+      Map.new(nodes, fn node ->
+        neighbors =
+          Model.successors(graph, node)
+          |> Enum.map(fn {n, _} -> n end)
+          |> MapSet.new()
 
-    length(triangles)
+        {node, neighbors}
+      end)
+
+    # Count triangles via neighbor intersection
+    triangles =
+      Enum.reduce(nodes, 0, fn u, acc ->
+        u_neighbors = Map.get(neighbor_sets, u)
+
+        # Only consider neighbors v > u to avoid double counting
+        u_neighbors
+        |> Enum.filter(&(&1 > u))
+        |> Enum.reduce(acc, fn v, inner_acc ->
+          v_neighbors = Map.get(neighbor_sets, v)
+
+          # Count common neighbors w > v to ensure each triangle counted once
+          common =
+            v_neighbors
+            |> Enum.filter(fn w ->
+              w > v and MapSet.member?(u_neighbors, w)
+            end)
+            |> length()
+
+          inner_acc + common
+        end)
+      end)
+
+    triangles
   end
 
   @doc """
@@ -141,17 +174,37 @@ defmodule Yog.Community.Metrics do
   def triangles_per_node(graph) do
     nodes = Yog.all_nodes(graph)
 
-    Map.new(nodes, fn node ->
-      neighbors = Yog.Model.neighbor_ids(graph, node)
+    # Pre-compute ordered neighbor lists
+    neighbor_sets =
+      Map.new(nodes, fn node ->
+        neighbors =
+          Model.successors(graph, node)
+          |> Enum.map(fn {n, _} -> n end)
+          |> MapSet.new()
 
+        {node, neighbors}
+      end)
+
+    # Count triangles per node
+    Enum.reduce(nodes, %{}, fn node, acc ->
+      neighbors = Map.get(neighbor_sets, node)
+      neighbor_list = MapSet.to_list(neighbors)
+
+      # Count pairs of neighbors that are connected
       count =
-        for i <- neighbors,
-            j <- neighbors,
-            i < j,
-            edge_exists?(graph, i, j),
-            do: 1
+        neighbor_list
+        |> Enum.reduce(0, fn i, c1 ->
+          i_neighbors = Map.get(neighbor_sets, i)
 
-      {node, length(count)}
+          neighbor_list
+          |> Enum.filter(&(&1 > i))
+          |> Enum.count(fn j ->
+            MapSet.member?(i_neighbors, j)
+          end)
+          |> Kernel.+(c1)
+        end)
+
+      Map.put(acc, node, count)
     end)
   end
 
@@ -176,22 +229,29 @@ defmodule Yog.Community.Metrics do
   """
   @spec clustering_coefficient(Yog.graph(), Yog.node_id()) :: float()
   def clustering_coefficient(graph, node) do
-    neighbors = Yog.Model.neighbor_ids(graph, node)
+    neighbors = Model.neighbor_ids(graph, node)
     k = length(neighbors)
 
     if k < 2 do
       0.0
     else
-      # Count edges between neighbors
+      neighbor_set = MapSet.new(neighbors)
+
       neighbor_edges =
-        for i <- neighbors,
-            j <- neighbors,
-            i < j,
-            edge_exists?(graph, i, j),
-            do: 1
+        Enum.reduce(neighbors, 0, fn i, acc ->
+          # Count neighbors j > i to avoid double counting
+          i_neighbors = Model.neighbor_ids(graph, i)
+
+          count =
+            Enum.count(i_neighbors, fn j ->
+              j > i and MapSet.member?(neighbor_set, j)
+            end)
+
+          acc + count
+        end)
 
       # C = 2 * E / (k * (k - 1)) for undirected
-      2.0 * length(neighbor_edges) / (k * (k - 1))
+      2.0 * neighbor_edges / (k * (k - 1))
     end
   end
 
@@ -217,8 +277,8 @@ defmodule Yog.Community.Metrics do
     if nodes == [] do
       0.0
     else
-      coefficients = Enum.map(nodes, fn node -> clustering_coefficient(graph, node) end)
-      Enum.sum(coefficients) / length(coefficients)
+      total = Enum.sum(Enum.map(nodes, fn node -> clustering_coefficient(graph, node) end))
+      total / length(nodes)
     end
   end
 
@@ -233,15 +293,14 @@ defmodule Yog.Community.Metrics do
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
       ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
       iex> d = Yog.Community.Metrics.density(graph)
       iex> is_float(d)
       true
   """
   @spec density(Yog.graph()) :: float()
   def density(graph) do
-    n = Yog.Model.node_count(graph)
-    m = Yog.Model.edge_count(graph)
+    n = Model.node_count(graph)
+    m = Model.edge_count(graph)
 
     if n < 2 do
       0.0
@@ -272,18 +331,22 @@ defmodule Yog.Community.Metrics do
     if n < 2 do
       0.0
     else
-      # Count edges within the community
-      internal_edges =
-        for i <- node_list,
-            j <- node_list,
-            i < j,
-            edge_exists?(graph, i, j),
-            do: 1
+      node_set = nodes
 
-      m = length(internal_edges)
+      internal_edges =
+        Enum.reduce(node_list, 0, fn i, acc ->
+          successors = Model.successors(graph, i)
+
+          count =
+            Enum.count(successors, fn {j, _} ->
+              j > i and MapSet.member?(node_set, j)
+            end)
+
+          acc + count
+        end)
 
       # Density = 2m / (n * (n - 1))
-      2.0 * m / (n * (n - 1))
+      2.0 * internal_edges / (n * (n - 1))
     end
   end
 
@@ -301,7 +364,11 @@ defmodule Yog.Community.Metrics do
       iex> is_float(avg_cd)
       true
   """
-  def average_community_density(graph, communities) do
+  def average_community_density(graph, %Result{} = communities) do
+    average_community_density(graph, %{assignments: communities.assignments})
+  end
+
+  def average_community_density(graph, %{assignments: _} = communities) do
     # Calculate for each community and average
     # Convert assignments map to dictionary (community_id -> set of nodes)
     community_dict =
@@ -319,34 +386,5 @@ defmodule Yog.Community.Metrics do
         Enum.sum(densities) / length(densities)
       end
     end)
-  end
-
-  # ============================================================
-  # Private Helpers
-  # ============================================================
-
-  # Build a MapSet of all edges for O(1) lookup
-  defp build_edge_set(graph) do
-    nodes = Yog.all_nodes(graph)
-
-    Enum.reduce(nodes, MapSet.new(), fn node, acc ->
-      neighbors = Yog.Model.neighbor_ids(graph, node)
-
-      Enum.reduce(neighbors, acc, fn neighbor, inner_acc ->
-        # Store both directions for undirected graphs
-        MapSet.put(inner_acc, {node, neighbor})
-      end)
-    end)
-  end
-
-  # Fast O(1) edge existence check using pre-built MapSet
-  defp edge_exists_fast?(edge_set, i, j) do
-    MapSet.member?(edge_set, {i, j})
-  end
-
-  # Original O(deg) edge check for functions that don't use pre-built set
-  defp edge_exists?(graph, i, j) do
-    neighbors = Yog.Model.neighbor_ids(graph, i)
-    j in neighbors
   end
 end
