@@ -169,9 +169,10 @@ defmodule Yog.Community.Louvain do
 
     # Calculate modularity
     normalized_assignments = normalize_assignments(new_state.assignments)
-
     communities = Result.new(normalized_assignments)
 
+    # Note: Metrics.modularity/2 is O(E). For large graphs, this could be optimized
+    # to O(C) by calculating directly from state.community_totals
     q = Metrics.modularity(graph, Result.to_map(communities))
     new_history = [q | mod_history]
 
@@ -190,15 +191,14 @@ defmodule Yog.Community.Louvain do
     end
   end
 
+  # Single recursive function for hierarchical Louvain (consolidates duplicate logic)
   defp do_louvain_hierarchical(graph, state, levels, phase, options) do
     # Phase 1: Local optimization
     {improved, new_state} = phase1_local_optimize(graph, state, options)
 
     # Save current level
     normalized_assignments = normalize_assignments(new_state.assignments)
-
     current_communities = Result.new(normalized_assignments)
-
     new_levels = [current_communities | levels]
 
     # Check for convergence
@@ -210,51 +210,10 @@ defmodule Yog.Community.Louvain do
     else
       # Phase 2: Aggregation
       aggregated = phase2_aggregate(graph, new_state.assignments)
-
-      # Rebuild state and continue
       aggregated_state = rebuild_state(aggregated)
 
-      do_louvain_hierarchical_recursive(
-        aggregated,
-        aggregated_state,
-        new_levels,
-        phase + 1,
-        options
-      )
-    end
-  end
-
-  defp do_louvain_hierarchical_recursive(graph, state, levels, phase, options) do
-    # Phase 1: Local optimization
-    {improved, new_state} = phase1_local_optimize(graph, state, options)
-
-    # Save current level
-    normalized_assignments = normalize_assignments(new_state.assignments)
-
-    current_communities = Result.new(normalized_assignments)
-
-    new_levels = [current_communities | levels]
-
-    # Check for convergence
-    num_comms = count_unique_communities(new_state.assignments)
-
-    if not improved or phase >= options.max_iterations or num_comms <= 1 do
-      # Converged
-      Dendrogram.new(Enum.reverse(new_levels), [])
-    else
-      # Phase 2: Aggregation
-      aggregated = phase2_aggregate(graph, new_state.assignments)
-
-      # Rebuild state and continue
-      aggregated_state = rebuild_state(aggregated)
-
-      do_louvain_hierarchical_recursive(
-        aggregated,
-        aggregated_state,
-        new_levels,
-        phase + 1,
-        options
-      )
+      # Recurse with aggregated graph (same function, no duplication)
+      do_louvain_hierarchical(aggregated, aggregated_state, new_levels, phase + 1, options)
     end
   end
 
@@ -279,26 +238,30 @@ defmodule Yog.Community.Louvain do
   end
 
   defp do_phase1_pass(graph, state, nodes, options) do
-    # Shuffle nodes for randomization
-    shuffled = shuffle(nodes, options.seed + map_size(state.assignments))
+    # Shuffle nodes for randomization - O(V) Fisher-Yates
+    shuffled = Yog.Utils.fisher_yates(nodes, options.seed + map_size(state.assignments))
 
     Enum.reduce(shuffled, {state, false}, fn node, {current_state, any_improved} ->
       current_comm = Map.get(current_state.assignments, node, node)
       node_weight = Map.get(current_state.node_weights, node, 0.0)
 
-      # Get neighbor communities
-      neighbor_comms = get_neighbor_communities(graph, current_state, node)
+      # Pre-calculate neighbor weights per community in O(deg(node))
+      # This avoids O(k^2) scan when evaluating each neighbor community
+      neighbor_weights = calculate_neighbor_weights_by_comm(graph, current_state, node)
+      neighbor_comms = Map.keys(neighbor_weights)
 
-      # Find best community
+      # Find best community using pre-calculated weights
       {best_comm, best_gain} =
         Enum.reduce(neighbor_comms, {current_comm, 0.0}, fn neighbor_comm, {best_c, best_g} ->
+          ki_in_comm = Map.get(neighbor_weights, neighbor_comm, 0.0)
+
           gain =
-            calculate_modularity_gain(
-              graph,
+            calculate_modularity_gain_fast(
               node,
               current_comm,
               neighbor_comm,
               node_weight,
+              ki_in_comm,
               current_state,
               options.resolution
             )
@@ -320,35 +283,37 @@ defmodule Yog.Community.Louvain do
     end)
   end
 
-  defp get_neighbor_communities(graph, state, node) do
+  # Pre-calculate total edge weight from node to each neighbor community
+  # Returns %{community_id => total_weight} in O(degree) time
+  defp calculate_neighbor_weights_by_comm(graph, state, node) do
     neighbors = Yog.Model.successors(graph, node)
 
-    Enum.reduce(neighbors, MapSet.new(), fn {neighbor_id, _}, acc ->
+    Enum.reduce(neighbors, %{}, fn {neighbor_id, weight}, acc ->
       comm = Map.get(state.assignments, neighbor_id, neighbor_id)
-      MapSet.put(acc, comm)
+      Map.update(acc, comm, weight, &(&1 + weight))
     end)
-    |> MapSet.to_list()
   end
 
-  defp calculate_modularity_gain(
-         _graph,
+  # Fast modularity gain using pre-calculated ki_in_community
+  defp calculate_modularity_gain_fast(
          _node,
          current_comm,
          target_comm,
          _node_weight,
+         _ki_in_target,
          _state,
-         _resolution
+         _gamma
        )
        when current_comm == target_comm do
     0.0
   end
 
-  defp calculate_modularity_gain(
-         graph,
-         node,
+  defp calculate_modularity_gain_fast(
+         _node,
          current_comm,
          target_comm,
          node_weight,
+         ki_in_target,
          state,
          gamma
        ) do
@@ -360,33 +325,17 @@ defmodule Yog.Community.Louvain do
     else
       two_m_sq = 2.0 * m * m
 
-      # Gain of adding to target community
-      ki_in_target = calculate_ki_in(graph, state, node, target_comm)
+      # Gain of adding to target community (use pre-calculated ki_in_target)
       sigma_tot_target = Map.get(state.community_totals, target_comm, 0.0)
-      delta_q_add = ki_in_target / m - gamma * (sigma_tot_target * ki / two_m_sq)
 
-      # Gain of leaving current community
-      ki_in_current = calculate_ki_in(graph, state, node, current_comm)
+      # Gain of leaving current community side-effects
       sigma_tot_current = Map.get(state.community_totals, current_comm, 0.0)
-      sigma_tot_c_minus_i = sigma_tot_current - ki
-      delta_q_remove = ki_in_current / m - gamma * (sigma_tot_c_minus_i * ki / two_m_sq)
 
-      delta_q_add - delta_q_remove
+      # Delta Q = ki_in_target/m - gamma * sigma_tot_target * ki / (2m^2)
+      #         - gamma * (sigma_tot_current - ki) * ki / (2m^2)
+      ki_in_target / m - gamma * sigma_tot_target * ki / two_m_sq -
+        gamma * (sigma_tot_current - ki) * ki / two_m_sq
     end
-  end
-
-  defp calculate_ki_in(graph, state, node, target_comm) do
-    successors = Yog.Model.successors(graph, node)
-
-    Enum.reduce(successors, 0.0, fn {neighbor, weight}, acc ->
-      neighbor_comm = Map.get(state.assignments, neighbor, neighbor)
-
-      if neighbor_comm == target_comm do
-        acc + weight
-      else
-        acc
-      end
-    end)
   end
 
   defp move_node(state, node, from_comm, to_comm, node_weight) do
@@ -416,8 +365,11 @@ defmodule Yog.Community.Louvain do
         acc + weight_sum
       end)
 
-    # Divide by 2 for undirected graphs (each edge counted twice)
-    total / 2.0
+    # Only divide by 2 for undirected graphs (each edge counted twice)
+    case graph.kind do
+      :undirected -> total / 2.0
+      :directed -> total
+    end
   end
 
   defp calculate_node_weights(graph) do
@@ -492,30 +444,32 @@ defmodule Yog.Community.Louvain do
   defp aggregate_edges(original_graph, new_graph, assignments) do
     nodes = Yog.all_nodes(original_graph)
 
-    Enum.reduce(nodes, new_graph, fn u, g ->
-      comm_u = Map.get(assignments, u, u)
-      successors = Yog.Model.successors(original_graph, u)
+    # Step 1: Accumulate weights in a Map %{{u_comm, v_comm} => weight}
+    # This avoids per-edge graph operations - uses O(1) Map operations instead
+    edge_weights =
+      Enum.reduce(nodes, %{}, fn u, acc ->
+        comm_u = Map.get(assignments, u, u)
 
-      Enum.reduce(successors, g, fn {v, weight}, g2 ->
-        comm_v = Map.get(assignments, v, v)
+        Enum.reduce(Yog.Model.successors(original_graph, u), acc, fn {v, weight}, inner_acc ->
+          comm_v = Map.get(assignments, v, v)
 
-        # For undirected graphs, only process each edge once (comm_u <= comm_v)
-        # For self-loops (comm_u == comm_v), always add
-        if comm_u == comm_v or comm_u < comm_v do
-          add_or_update_edge(g2, comm_u, comm_v, weight)
-        else
-          g2
-        end
+          # For undirected graphs, use stable key {min, max} to avoid double-counting
+          # Self-loops naturally handled (comm_u == comm_v)
+          edge_key =
+            if original_graph.kind == :undirected and comm_u > comm_v do
+              {comm_v, comm_u}
+            else
+              {comm_u, comm_v}
+            end
+
+          Map.update(inner_acc, edge_key, weight, &(&1 + weight))
+        end)
       end)
-    end)
-  end
 
-  defp add_or_update_edge(graph, u, v, weight) do
-    # Use combine function to handle both new and existing edges in one operation
-    case Yog.Model.add_edge_with_combine(graph, u, v, weight, &Kernel.+/2) do
-      {:ok, new_graph} -> new_graph
-      {:error, _} -> graph
-    end
+    # Step 2: Bulk add all accumulated edges to the new graph
+    Enum.reduce(edge_weights, new_graph, fn {{u, v}, weight}, g ->
+      Yog.Model.add_edge_ensure(g, u, v, weight, default: nil)
+    end)
   end
 
   defp rebuild_state(aggregated_graph) do
@@ -531,21 +485,5 @@ defmodule Yog.Community.Louvain do
       community_totals: calculate_community_totals(new_assignments, node_weights),
       total_weight: total_weight
     }
-  end
-
-  defp shuffle(items, seed) do
-    # Deterministic shuffle using LCG parameters (same as glibc)
-    a = 1_103_515_245
-    c = 12_345
-    m = 2_147_483_648
-
-    items
-    |> Enum.with_index()
-    |> Enum.map(fn {item, i} ->
-      rand = rem(a * (seed + i) + c, m)
-      {rand, item}
-    end)
-    |> Enum.sort_by(fn {rand, _} -> rand end)
-    |> Enum.map(fn {_, item} -> item end)
   end
 end
