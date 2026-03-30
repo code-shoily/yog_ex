@@ -55,6 +55,10 @@ defmodule Yog.Community.CliquePercolation do
   alias Yog.Community.{Overlapping, Result}
   alias Yog.Property.Clique
 
+  # Maximum number of k-cliques to process before raising an error
+  # Prevents memory exhaustion on graphs with large maximal cliques
+  @max_k_cliques 100_000
+
   @typedoc "Options for Clique Percolation Method"
   @type cpm_options :: %{k: integer()}
 
@@ -112,7 +116,16 @@ defmodule Yog.Community.CliquePercolation do
     maximal_cliques = Clique.all_maximal_cliques(graph)
 
     # 2. Extract all k-cliques from maximal cliques
-    k_cliques =
+
+    estimated_cliques = estimate_k_cliques(maximal_cliques, k)
+
+    if estimated_cliques > @max_k_cliques do
+      raise ArgumentError,
+            "CPM would generate too many k-cliques (#{estimated_cliques} > #{@max_k_cliques}). " <>
+              "Try increasing k (current: #{k}) or using a different algorithm."
+    end
+
+    k_cliques_list =
       maximal_cliques
       |> Enum.flat_map(fn clique ->
         clique_list = MapSet.to_list(clique)
@@ -120,55 +133,47 @@ defmodule Yog.Community.CliquePercolation do
         if length(clique_list) < k do
           []
         else
-          combinations(clique_list, k)
-          |> Enum.map(&MapSet.new/1)
+          combinations_to_mapsets(clique_list, k)
         end
       end)
       |> Enum.uniq()
 
-    # 3. Build adjacency between k-cliques
-    # Two k-cliques are adjacent if they share k-1 nodes
-    clique_adj =
-      k_cliques
-      |> Enum.with_index()
-      |> Map.new(fn {c1, i} ->
-        neighbors =
-          k_cliques
-          |> Enum.with_index()
-          |> Enum.reduce([], fn {c2, j}, acc ->
-            if i < j and MapSet.size(MapSet.intersection(c1, c2)) == k - 1 do
-              [j | acc]
-            else
-              acc
-            end
+    k_cliques = List.to_tuple(k_cliques_list)
+    num_cliques = tuple_size(k_cliques)
+
+    # Handle edge case: no k-cliques found
+    if num_cliques == 0 do
+      Overlapping.new(%{})
+    else
+      # 3. Build adjacency between k-cliques
+
+      clique_adj = build_clique_adjacency_indexed(k_cliques, num_cliques, k)
+
+      # 4. Find connected components of cliques
+      clique_components = find_clique_components(clique_adj, num_cliques)
+
+      # 5. Build node-to-communities memberships from clique components
+
+      memberships =
+        clique_components
+        |> Enum.with_index()
+        |> Enum.reduce(%{}, fn {component, comm_id}, acc ->
+          # Get all nodes in this component
+          component_nodes =
+            component
+            |> Enum.reduce(MapSet.new(), fn clique_idx, nodes_acc ->
+              clique = elem(k_cliques, clique_idx)
+              MapSet.union(nodes_acc, clique)
+            end)
+
+          # Add this community to each node's membership list
+          Enum.reduce(component_nodes, acc, fn node, inner_acc ->
+            Map.update(inner_acc, node, [comm_id], fn communities -> [comm_id | communities] end)
           end)
-
-        {i, neighbors}
-      end)
-
-    # 4. Find connected components of cliques
-    clique_components = find_clique_components(clique_adj, length(k_cliques))
-
-    # 5. Build node-to-communities memberships from clique components
-    memberships =
-      clique_components
-      |> Enum.with_index()
-      |> Enum.reduce(%{}, fn {component, comm_id}, acc ->
-        # Get all nodes in this component
-        component_nodes =
-          component
-          |> Enum.reduce(MapSet.new(), fn clique_idx, nodes_acc ->
-            clique = Enum.at(k_cliques, clique_idx, MapSet.new())
-            MapSet.union(nodes_acc, clique)
-          end)
-
-        # Add this community to each node's membership list
-        Enum.reduce(component_nodes, acc, fn node, inner_acc ->
-          Map.update(inner_acc, node, [comm_id], fn communities -> [comm_id | communities] end)
         end)
-      end)
 
-    Overlapping.new(memberships)
+      Overlapping.new(memberships)
+    end
   end
 
   @doc """
@@ -191,6 +196,37 @@ defmodule Yog.Community.CliquePercolation do
   # HELPER FUNCTIONS
   # =============================================================================
 
+  # Estimate total number of k-cliques before generation
+  defp estimate_k_cliques(maximal_cliques, k) do
+    Enum.reduce(maximal_cliques, 0, fn clique, acc ->
+      n = MapSet.size(clique)
+
+      if n < k do
+        acc
+      else
+        # C(n, k) = n! / (k! * (n-k)!)
+        acc + comb(n, k)
+      end
+    end)
+  end
+
+  defp comb(n, k) when k > n, do: 0
+  defp comb(_n, 0), do: 1
+  defp comb(n, k) when k > div(n, 2), do: comb(n, n - k)
+
+  defp comb(n, k) do
+    Enum.reduce(1..k, 1, fn i, acc ->
+      (acc * (n - k + i)) |> div(i)
+    end)
+  end
+
+  # Generate MapSets directly without intermediate list allocations
+  defp combinations_to_mapsets(items, k) do
+    items
+    |> combinations(k)
+    |> Enum.map(&MapSet.new/1)
+  end
+
   # Generate all k-combinations of a list
   defp combinations(_items, 0), do: [[]]
   defp combinations([], _k), do: []
@@ -203,6 +239,43 @@ defmodule Yog.Community.CliquePercolation do
     without_first = combinations(rest, k)
 
     with_first ++ without_first
+  end
+
+  # Build clique adjacency using inverted index for O(C) instead of O(C^2)
+  defp build_clique_adjacency_indexed(k_cliques_tuple, num_cliques, k) do
+    # Build inverted index: (k-1)-subclique -> list of clique indices containing it
+    inverted_index =
+      Enum.reduce(0..(num_cliques - 1), %{}, fn i, acc ->
+        clique = elem(k_cliques_tuple, i)
+        clique_list = MapSet.to_list(clique)
+
+        # Generate all (k-1)-subsets
+        subcliques = combinations(clique_list, k - 1)
+
+        Enum.reduce(subcliques, acc, fn subclique, inner_acc ->
+          sub_key = MapSet.new(subclique)
+          Map.update(inner_acc, sub_key, [i], &[i | &1])
+        end)
+      end)
+
+    # Build adjacency: two cliques are adjacent if they share a (k-1)-subclique
+    Enum.reduce(0..(num_cliques - 1), %{}, fn i, acc ->
+      clique = elem(k_cliques_tuple, i)
+      clique_list = MapSet.to_list(clique)
+      subcliques = combinations(clique_list, k - 1)
+
+      # Find all neighbors via shared (k-1)-subcliques
+      neighbors =
+        subcliques
+        |> Enum.flat_map(fn subclique ->
+          sub_key = MapSet.new(subclique)
+          Map.get(inverted_index, sub_key, [])
+        end)
+        |> Enum.uniq()
+        |> Enum.reject(&(&1 == i))
+
+      Map.put(acc, i, neighbors)
+    end)
   end
 
   # Find connected components in clique adjacency graph
