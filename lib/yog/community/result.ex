@@ -21,7 +21,7 @@ defmodule Yog.Community.Result do
   """
 
   @type node_id :: Yog.Model.node_id()
-  @type community_id :: integer()
+  @type community_id :: any()
 
   @enforce_keys [:assignments, :num_communities]
   defstruct [:assignments, :num_communities, metadata: %{}]
@@ -45,12 +45,27 @@ defmodule Yog.Community.Result do
   end
 
   @doc """
-  Creates a community result with explicit metadata.
+  Creates a community result with explicit metadata and optional pre-computed values.
+
+  ## Options
+
+  - `:num_communities` - Pre-computed community count to avoid re-scanning
+
+  ## Examples
+
+      iex> result = Yog.Community.Result.new(%{1 => 0, 2 => 0, 3 => 1}, %{}, num_communities: 2)
+      iex> result.num_communities
+      2
   """
-  @spec new(%{node_id() => community_id()}, map()) :: t()
-  def new(assignments, metadata) when is_map(assignments) and is_map(metadata) do
-    result = new(assignments)
-    %{result | metadata: metadata}
+  @spec new(%{node_id() => community_id()}, map(), keyword()) :: t()
+  def new(assignments, metadata, opts \\ []) when is_map(assignments) and is_map(metadata) do
+    num =
+      case Keyword.get(opts, :num_communities) do
+        nil -> assignments |> Map.values() |> Enum.uniq() |> length()
+        n -> n
+      end
+
+    %__MODULE__{assignments: assignments, num_communities: num, metadata: metadata}
   end
 
   @doc """
