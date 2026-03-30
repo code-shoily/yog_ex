@@ -158,7 +158,8 @@ defmodule Yog.Pathfinding.Johnson do
   # Step 1 & 2: Compute potentials h(v) using Bellman-Ford from temporary source
   defp compute_potentials(graph, nodes, zero, add, compare) do
     # Create temporary source with 0-weight edges to all nodes
-    temp_source = :__johnson_temp_source__
+    # Using make_ref() ensures no collision with user node IDs
+    temp_source = make_ref()
 
     # Initialize distances: temp_source = 0, others = nil (infinity)
     initial_distances = %{temp_source => zero}
