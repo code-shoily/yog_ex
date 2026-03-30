@@ -62,6 +62,7 @@ defmodule Yog.Flow.MinCut do
 
   alias Yog.Flow.MinCutResult
   alias Yog.Model
+  alias Yog.PriorityQueue
   alias Yog.Transform
 
   @doc """
@@ -71,7 +72,7 @@ defmodule Yog.Flow.MinCut do
   an s-t min-cut in a phase using Maximum Adjacency Search and then contracts
   the nodes s and t. The global minimum cut is the minimum of all phase cuts.
 
-  **Time Complexity:** O(V³)
+  **Time Complexity:** O(V³) (O(V² log V) with priority queue optimization)
 
   ## Examples
 
@@ -147,52 +148,66 @@ defmodule Yog.Flow.MinCut do
   end
 
   # Maximum Adjacency Search finds s and t nodes (last two added to search set)
+  # Uses a max-priority queue for O(log V) extraction instead of O(V) linear scan
   defp min_cut_phase(graph) do
-    [v0 | rest] = Model.all_nodes(graph)
-    # Start MAS: keep remaining as a list to avoid O(V) conversion in loops
+    nodes = Model.all_nodes(graph)
+    [v0 | rest] = nodes
+
+    # Build initial distances from v0
     dists = Model.neighbors(graph, v0) |> Map.new()
-    in_s = MapSet.new([v0])
 
-    do_mas(graph, in_s, rest, dists, nil, v0)
-  end
-
-  # Optimized MAS: No MapSet.to_list in the recursion
-  defp do_mas(_graph, _in_s, [], _dists, prev_s, current_t) when is_nil(prev_s) do
-    # Single node case - no previous node exists
-    {current_t, current_t}
-  end
-
-  defp do_mas(_graph, _in_s, [], _dists, prev_s, current_t) do
-    {prev_s, current_t}
-  end
-
-  defp do_mas(graph, in_s, remaining, dists, _prev_s, current_t) do
-    # find_max_dist is O(remaining)
-    {next, _w} = find_max_dist(remaining, dists)
-
-    new_in_s = MapSet.put(in_s, next)
-    # List.delete is O(V) but only happens once per iteration
-    new_remaining = List.delete(remaining, next)
-
-    next_neighbors = Model.neighbors(graph, next)
-
-    new_dists =
-      Enum.reduce(next_neighbors, dists, fn {v, w}, acc ->
-        if MapSet.member?(new_in_s, v) do
-          acc
-        else
-          Map.update(acc, v, w, &(&1 + w))
-        end
+    # Build max-priority queue with remaining nodes
+    # Comparator: max-heap by distance (higher distance = higher priority)
+    pq =
+      Enum.reduce(rest, PriorityQueue.new(fn a, b -> a >= b end), fn node, acc ->
+        dist = Map.get(dists, node, 0)
+        PriorityQueue.push(acc, {dist, node})
       end)
 
-    do_mas(graph, new_in_s, new_remaining, new_dists, current_t, next)
+    in_s = MapSet.new([v0])
+
+    do_mas_pq(graph, in_s, pq, dists, nil, v0)
   end
 
-  defp find_max_dist([first | rest], dists) do
-    Enum.reduce(rest, {first, Map.get(dists, first, 0)}, fn node, {best_id, best_w} ->
-      w = Map.get(dists, node, 0)
-      if w > best_w, do: {node, w}, else: {best_id, best_w}
-    end)
+  # MAS with priority queue: O(V log V) instead of O(V²)
+  defp do_mas_pq(graph, in_s, pq, dists, prev_s, current_t) do
+    case PriorityQueue.pop(pq) do
+      :error ->
+        # PQ empty - return last two nodes added
+        if is_nil(prev_s), do: {current_t, current_t}, else: {prev_s, current_t}
+
+      {:ok, {_dist, next}, rest_pq} ->
+        # Skip stale entries (nodes already in S)
+        if MapSet.member?(in_s, next) do
+          do_mas_pq(graph, in_s, rest_pq, dists, prev_s, current_t)
+        else
+          new_in_s = MapSet.put(in_s, next)
+
+          next_neighbors = Model.neighbors(graph, next)
+
+          # Update distances and priority queue
+          {new_dists, new_pq} =
+            Enum.reduce(next_neighbors, {dists, rest_pq}, fn {v, w}, {d_acc, pq_acc} ->
+              if MapSet.member?(new_in_s, v) do
+                {d_acc, pq_acc}
+              else
+                old_dist = Map.get(d_acc, v, 0)
+                new_dist = old_dist + w
+
+                # Update distance map
+                new_d_acc = Map.put(d_acc, v, new_dist)
+
+                # For priority queue, we push the updated entry
+                # Old entries will be skipped when popped (stale check via in_s)
+                new_pq_acc = PriorityQueue.push(pq_acc, {new_dist, v})
+
+                {new_d_acc, new_pq_acc}
+              end
+            end)
+
+          do_mas_pq(graph, new_in_s, new_pq, new_dists, current_t, next)
+        end
+    end
   end
 
   defp phase_cut_weight(graph, t) do
