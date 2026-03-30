@@ -7,7 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.90.0] - Unreleased
 
+This release mostly focuses on internal optimizations, mostly around community and centrality modules.
+
+### Added
+
+- Two functions in `Utils` - `fisher_yates` and `norm_diff`
+- **Flow Algorithms**: Added `calculate/3` convenience wrapper for standard integer max flow computations.
+- **Connectivity**: Added `counts_estimate/2` using HyperLogLog for O(V) memory reachability counting on large graphs (vs O(V²) for exact counts).
+
+### Changed
+
+- **MinCut Algorithm**
+  - MAS now uses priority queue for O(V log V) per phase (was O(V²)).
+  - Returns `MinCutResult` struct with actual node partitions (was plain map with counts).
+- **MaxFlow Algorithm**
+  - Tail-recursive Edmonds-Karp to prevent stack overflow on large graphs.
+  - BFS uses `:queue` module for O(1) enqueue/dequeue (was O(N) list append).
+  - Bottleneck capacity tracked during BFS discovery (single pass vs two passes).
+  - Direct graph struct construction for residual graphs (faster bulk reconstruction).
+
 ### Breaking
+
 - Remove `implicity_dijkstra` function from `Yog.Traversal`
 - Remove `from_tuple` from `Yog.Pathfinding.Path` module - we have converted all tuple based data structure from path and will no longer be needing this.
 - Change data type of `Yog.DisjointSet` from tuple to struct
