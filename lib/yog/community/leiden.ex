@@ -314,8 +314,12 @@ defmodule Yog.Community.Leiden do
   end
 
   defp do_phase1_pass(graph, state, nodes, options) do
-    # Shuffle nodes for randomization
-    shuffled = shuffle(nodes, options.seed + map_size(state.assignments))
+    # Shuffle nodes for randomization - use iteration-specific seed
+    shuffled =
+      Yog.Utils.fisher_yates(
+        nodes,
+        options.seed + map_size(state.assignments) + options.max_iterations
+      )
 
     Enum.reduce(shuffled, {state, false}, fn node, {current_state, any_improved} ->
       current_comm = Map.get(current_state.assignments, node, node)
@@ -361,6 +365,7 @@ defmodule Yog.Community.Leiden do
   defp phase15_refinement(graph, state) do
     # Refinement: ensure communities are well-connected
     # For each community, check if it's connected and split if necessary
+    # Uses memory-efficient adjacency map instead of subgraph extraction
 
     communities = get_community_nodes(state.assignments)
 
@@ -368,9 +373,9 @@ defmodule Yog.Community.Leiden do
       if MapSet.size(nodes) <= 1 do
         current_state
       else
-        # Check if community is well-connected
-        subgraph = extract_subgraph(graph, nodes)
-        components = find_connected_components(subgraph, nodes)
+        # Build adjacency map for this community (memory efficient)
+        adjacency = build_community_adjacency(graph, nodes)
+        components = find_connected_components(adjacency, nodes)
 
         if length(components) > 1 do
           # Split into connected components
@@ -382,31 +387,24 @@ defmodule Yog.Community.Leiden do
     end)
   end
 
-  defp extract_subgraph(original, nodes) do
+  # Memory-efficient connectivity check without building subgraph
+  # Returns adjacency map for nodes within the community
+  defp build_community_adjacency(original, nodes) do
     node_list = MapSet.to_list(nodes)
-    subgraph = Yog.undirected()
 
-    # Add nodes with nil data
-    subgraph_with_nodes =
-      Enum.reduce(node_list, subgraph, fn node, g ->
-        Yog.add_node(g, node, nil)
-      end)
+    Enum.reduce(node_list, %{}, fn u, adj ->
+      # Get neighbors that are also in the community
+      neighbors_in_comm =
+        original
+        |> Model.successors(u)
+        |> Enum.filter(fn {v, _weight} -> MapSet.member?(nodes, v) end)
+        |> Enum.map(fn {v, _weight} -> v end)
 
-    # Add edges within the node set
-    Enum.reduce(node_list, subgraph_with_nodes, fn u, g ->
-      successors = Model.successors(original, u)
-
-      Enum.reduce(successors, g, fn {v, weight}, g2 ->
-        if MapSet.member?(nodes, v) and u < v do
-          Model.add_edge_ensure(g2, u, v, weight, default: nil)
-        else
-          g2
-        end
-      end)
+      Map.put(adj, u, neighbors_in_comm)
     end)
   end
 
-  defp find_connected_components(subgraph, nodes) do
+  defp find_connected_components(adjacency, nodes) do
     node_list = MapSet.to_list(nodes)
     visited = MapSet.new()
 
@@ -415,7 +413,7 @@ defmodule Yog.Community.Leiden do
         if MapSet.member?(visited_acc, node) do
           {visited_acc, comps}
         else
-          component = bfs_component(subgraph, node, visited_acc)
+          component = bfs_component_adj(adjacency, node, visited_acc)
           new_visited = MapSet.union(visited_acc, component)
           {new_visited, [component | comps]}
         end
@@ -424,28 +422,38 @@ defmodule Yog.Community.Leiden do
     components
   end
 
-  defp bfs_component(graph, start, initial_visited) do
-    do_bfs(graph, [start], MapSet.put(initial_visited, start), MapSet.new())
+  # BFS using adjacency map instead of graph struct (memory efficient)
+  defp bfs_component_adj(adjacency, start, initial_visited) do
+    # Skip if start node already visited
+    if MapSet.member?(initial_visited, start) do
+      MapSet.new()
+    else
+      do_bfs_component_adj(
+        adjacency,
+        [start],
+        MapSet.put(initial_visited, start),
+        MapSet.new([start])
+      )
+    end
   end
 
-  defp do_bfs(_graph, [], _visited, component), do: component
+  defp do_bfs_component_adj(_adjacency, [], _blocked, component), do: component
 
-  defp do_bfs(graph, [node | rest], visited, component) do
-    neighbors =
-      Model.successors(graph, node)
-      |> Enum.reduce([], fn {n, _weight}, acc ->
-        if MapSet.member?(visited, n) do
-          acc
+  defp do_bfs_component_adj(adjacency, [current | queue], blocked, component) do
+    neighbors = Map.get(adjacency, current, [])
+
+    {new_queue, new_blocked, new_component} =
+      Enum.reduce(neighbors, {queue, blocked, component}, fn neighbor, {q, b, c} ->
+        if MapSet.member?(b, neighbor) do
+          # Already visited or blocked, skip
+          {q, b, c}
         else
-          [n | acc]
+          # credo:disable-for-this-file Credo.Check.Refactor.AppendSingleItem
+          {q ++ [neighbor], MapSet.put(b, neighbor), MapSet.put(c, neighbor)}
         end
       end)
 
-    new_visited = Enum.reduce(neighbors, visited, fn n, v -> MapSet.put(v, n) end)
-    new_component = MapSet.put(component, node)
-    new_queue = rest ++ neighbors
-
-    do_bfs(graph, new_queue, new_visited, new_component)
+    do_bfs_component_adj(adjacency, new_queue, new_blocked, new_component)
   end
 
   defp split_community(state, components) when length(components) <= 1 do
@@ -589,8 +597,11 @@ defmodule Yog.Community.Leiden do
         acc + weight_sum
       end)
 
-    # Divide by 2 for undirected graphs (each edge counted twice)
-    total / 2.0
+    # Only divide by 2 for undirected graphs (each edge counted twice)
+    case graph.kind do
+      :undirected -> total / 2.0
+      :directed -> total
+    end
   end
 
   defp calculate_node_weights(graph) do
@@ -665,36 +676,32 @@ defmodule Yog.Community.Leiden do
   defp aggregate_edges(original_graph, new_graph, assignments) do
     nodes = Yog.all_nodes(original_graph)
 
-    Enum.reduce(nodes, new_graph, fn u, g ->
-      comm_u = Map.get(assignments, u, u)
-      successors = Model.successors(original_graph, u)
+    # Step 1: Accumulate weights in a Map %{{u_comm, v_comm} => weight}
+    # This avoids O(degree) search for each edge - uses O(1) Map operations instead
+    edge_weights =
+      Enum.reduce(nodes, %{}, fn u, acc ->
+        comm_u = Map.get(assignments, u, u)
 
-      Enum.reduce(successors, g, fn {v, weight}, g2 ->
-        comm_v = Map.get(assignments, v, v)
+        Enum.reduce(Model.successors(original_graph, u), acc, fn {v, weight}, inner_acc ->
+          comm_v = Map.get(assignments, v, v)
 
-        # For undirected graphs, only process each edge once (comm_u <= comm_v)
-        # For self-loops (comm_u == comm_v), always add
-        if comm_u == comm_v or comm_u < comm_v do
-          add_or_update_edge(g2, comm_u, comm_v, weight)
-        else
-          g2
-        end
+          # For undirected graphs, use stable key {min, max} to avoid double-counting
+          # Self-loops naturally handled (comm_u == comm_v)
+          edge_key =
+            if original_graph.kind == :undirected and comm_u > comm_v do
+              {comm_v, comm_u}
+            else
+              {comm_u, comm_v}
+            end
+
+          Map.update(inner_acc, edge_key, weight, &(&1 + weight))
+        end)
       end)
+
+    # Step 2: Bulk add all accumulated edges to the new graph
+    Enum.reduce(edge_weights, new_graph, fn {{u, v}, weight}, g ->
+      Model.add_edge_ensure(g, u, v, weight, default: nil)
     end)
-  end
-
-  defp add_or_update_edge(graph, u, v, weight) do
-    # Check if edge already exists
-    successors = Model.successors(graph, u)
-
-    case Enum.find(successors, fn {node, _} -> node == v end) do
-      {_, existing_weight} ->
-        new_weight = existing_weight + weight
-        Model.add_edge_ensure(graph, u, v, new_weight, default: nil)
-
-      nil ->
-        Model.add_edge_ensure(graph, u, v, weight, default: nil)
-    end
   end
 
   defp rebuild_state(aggregated_graph) do
@@ -710,21 +717,5 @@ defmodule Yog.Community.Leiden do
       community_totals: calculate_community_totals(new_assignments, node_weights),
       total_weight: total_weight
     }
-  end
-
-  defp shuffle(items, seed) do
-    # Deterministic shuffle using LCG parameters (same as glibc)
-    a = 1_103_515_245
-    c = 12_345
-    m = 2_147_483_648
-
-    items
-    |> Enum.with_index()
-    |> Enum.map(fn {item, i} ->
-      rand = rem(a * (seed + i) + c, m)
-      {rand, item}
-    end)
-    |> Enum.sort_by(fn {rand, _} -> rand end)
-    |> Enum.map(fn {_, item} -> item end)
   end
 end
