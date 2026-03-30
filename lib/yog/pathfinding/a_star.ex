@@ -120,33 +120,53 @@ defmodule Yog.Pathfinding.AStar do
     implicit_a_star(from, successors, is_goal, heuristic, zero, add, compare)
   end
 
-  # @doc """
-  # Implicit A* with key function using keyword options.
+  @doc """
+  Implicit A* with key function using keyword options.
 
-  # ## Options
+  ## Options
 
-  #   * `:from` - Starting state
-  #   * `:successors_with_cost` - Function returning neighbors with costs
-  #   * `:visited_by` - Function to extract a key for visited tracking
-  #   * `:is_goal` - Function to check if a state is the goal
-  #   * `:zero` - Identity value for the weight type
-  #   * `:add` - Function to add two weights
-  #   * `:compare` - Function to compare weights
-  #   * `:heuristic` - Function estimating cost to goal: `fn(state) -> cost`
-  # """
-  # @spec implicit_a_star_by(keyword()) :: {:ok, any()} | :error
-  # def implicit_a_star_by(opts) do
-  #   from = Keyword.fetch!(opts, :from)
-  #   successors = Keyword.fetch!(opts, :successors_with_cost)
-  #   visited_by = Keyword.fetch!(opts, :visited_by)
-  #   is_goal = Keyword.fetch!(opts, :is_goal)
-  #   zero = opts[:zero] || 0
-  #   add = opts[:add] || (&Kernel.+/2)
-  #   compare = opts[:compare] || (&Yog.Utils.compare/2)
-  #   heuristic = Keyword.fetch!(opts, :heuristic)
+    * `:from` - Starting state
+    * `:successors_with_cost` - Function returning neighbors with costs
+    * `:visited_by` - Function to extract a key for visited tracking
+    * `:is_goal` - Function to check if a state is the goal
+    * `:zero` - Identity value for the weight type
+    * `:add` - Function to add two weights
+    * `:compare` - Function to compare weights
+    * `:heuristic` - Function estimating cost to goal: `fn(state) -> cost`
 
-  #   implicit_a_star_by(from, successors, visited_by, is_goal, heuristic, zero, add, compare)
-  # end
+  ## Examples
+
+      iex> successors = fn {x, y, _dir} ->
+      ...>   next = []
+      ...>   next = if x < 3, do: [{{x + 1, y, :east}, 1} | next], else: next
+      ...>   next = if y < 3, do: [{{x, y + 1, :south}, 1} | next], else: next
+      ...>   next
+      ...> end
+      iex> key_fn = fn {x, y, _dir} -> {x, y} end
+      iex> h = fn {x, y, _} -> (3 - x) + (3 - y) end
+      iex> goal_fn = fn {x, y, _} -> x == 3 and y == 3 end
+      iex> Yog.Pathfinding.AStar.implicit_a_star_by(
+      ...>   from: {0, 0, :north},
+      ...>   successors_with_cost: successors,
+      ...>   visited_by: key_fn,
+      ...>   is_goal: goal_fn,
+      ...>   heuristic: h
+      ...> )
+      {:ok, 6}
+  """
+  @spec implicit_a_star_by(keyword()) :: {:ok, any()} | :error
+  def implicit_a_star_by(opts) do
+    from = Keyword.fetch!(opts, :from)
+    successors = Keyword.fetch!(opts, :successors_with_cost)
+    visited_by = Keyword.fetch!(opts, :visited_by)
+    is_goal = Keyword.fetch!(opts, :is_goal)
+    zero = opts[:zero] || 0
+    add = opts[:add] || (&Kernel.+/2)
+    compare = opts[:compare] || (&Yog.Utils.compare/2)
+    heuristic = Keyword.fetch!(opts, :heuristic)
+
+    implicit_a_star_by(from, successors, visited_by, is_goal, heuristic, zero, add, compare)
+  end
 
   # ============================================================
   # Direct API
@@ -342,18 +362,23 @@ defmodule Yog.Pathfinding.AStar do
 
   ## Examples
 
-      iex> #successors = fn {x, y, _dir} -> [{{x + 1, y, :east}, 1}, {{x, y + 1, :south}, 1}] end
-      iex> #key_fn = fn {x, y, _dir} -> {x, y} end
-      iex> #h = fn {x, y, _} -> (10 - x) + (10 - y) end
-      iex> #goal_fn = fn {x, y, _} -> x == 10 and y == 10 end
-      iex> #Yog.Pathfinding.AStar.implicit_a_star_by(
-      ...> #  {0, 0, :north},
-      ...> #  successors,
-      ...> #  key_fn,
-      ...> #  goal_fn,
-      ...> #  h
-      ...> #)
-      ...> # {:ok, 20}
+      iex> successors = fn {x, y, _dir} ->
+      ...>   next = []
+      ...>   next = if x < 10, do: [{{x + 1, y, :east}, 1} | next], else: next
+      ...>   next = if y < 10, do: [{{x, y + 1, :south}, 1} | next], else: next
+      ...>   next
+      ...> end
+      iex> key_fn = fn {x, y, _dir} -> {x, y} end
+      iex> h = fn {x, y, _} -> (10 - x) + (10 - y) end
+      iex> goal_fn = fn {x, y, _} -> x == 10 and y == 10 end
+      iex> Yog.Pathfinding.AStar.implicit_a_star_by(
+      ...>   {0, 0, :north},
+      ...>   successors,
+      ...>   key_fn,
+      ...>   goal_fn,
+      ...>   h
+      ...> )
+      {:ok, 20}
   """
   @spec implicit_a_star_by(
           state,
