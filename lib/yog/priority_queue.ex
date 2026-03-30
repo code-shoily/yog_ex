@@ -42,12 +42,12 @@ defmodule Yog.PriorityQueue do
 
   defmodule Node do
     @moduledoc false
-    defstruct [:value, :compare_fn, children: []]
+    defstruct [:value, :compare_fn, children: [], size: 1]
   end
 
   defmodule Empty do
     @moduledoc false
-    defstruct [:compare_fn]
+    defstruct [:compare_fn, size: 0]
   end
 
   @type compare_fn :: (any(), any() -> boolean())
@@ -69,10 +69,10 @@ defmodule Yog.PriorityQueue do
       true
   """
   @spec new() :: t()
-  def new, do: %Empty{compare_fn: fn a, b -> a <= b end}
+  def new, do: %Empty{compare_fn: fn a, b -> a <= b end, size: 0}
 
   @spec new(compare_fn()) :: t()
-  def new(compare_fn), do: %Empty{compare_fn: compare_fn}
+  def new(compare_fn), do: %Empty{compare_fn: compare_fn, size: 0}
 
   @doc """
   Checks if the priority queue is empty.
@@ -192,13 +192,14 @@ defmodule Yog.PriorityQueue do
       2
   """
   @spec size(t()) :: non_neg_integer()
-  def size(%Empty{}), do: 0
-  def size(%Node{children: c}), do: 1 + Enum.reduce(c, 0, fn child, acc -> acc + size(child) end)
+  def size(%Empty{size: s}), do: s
+  def size(%Node{size: s}), do: s
 
   # Private functions
 
   defp node(value, children, compare_fn) do
-    %Node{value: value, children: children, compare_fn: compare_fn}
+    total_size = 1 + Enum.reduce(children, 0, fn %Node{size: s}, acc -> acc + s end)
+    %Node{value: value, children: children, compare_fn: compare_fn, size: total_size}
   end
 
   defp merge(h, %Empty{}, _cmp), do: h
@@ -216,7 +217,7 @@ defmodule Yog.PriorityQueue do
     end
   end
 
-  defp combine([], cmp), do: %Empty{compare_fn: cmp}
+  defp combine([], cmp), do: %Empty{compare_fn: cmp, size: 0}
   defp combine([h], _cmp), do: h
 
   defp combine([h1, h2 | rest], cmp) do
