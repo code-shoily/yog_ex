@@ -134,7 +134,6 @@ defmodule Yog.Community do
   """
   @spec largest(communities()) :: {:ok, community_id()} | :error
   def largest(%Result{} = communities) do
-    # YOG-FAC-002: Single-pass reduction to find max-sized community
     communities.assignments
     |> Enum.reduce({%{}, {nil, 0}}, fn {_node, comm}, {counts, {max_c, max_s}} ->
       new_count = Map.get(counts, comm, 0) + 1
@@ -198,7 +197,6 @@ defmodule Yog.Community do
   @spec merge(communities() | map(), source: community_id(), target: community_id()) ::
           communities() | map()
   def merge(%Result{} = communities, source: source, target: target) do
-    # YOG-FAC-003: Only decrement num_communities if source exists
     source_exists =
       Enum.any?(communities.assignments, fn {_node, comm} -> comm == source end)
 
@@ -232,7 +230,6 @@ defmodule Yog.Community do
 
   # Legacy map support
   def merge(%{assignments: _, num_communities: _} = communities, source: source, target: target) do
-    # YOG-FAC-003: Only decrement num_communities if source exists
     source_exists =
       Enum.any?(communities.assignments, fn {_node, comm} -> comm == source end)
 
@@ -330,7 +327,6 @@ defmodule Yog.Community do
       true
   """
   def modularity(graph, %Result{} = communities, opts \\ []) do
-    # YOG-FAC-004: Metrics module now supports Result struct natively
     Metrics.modularity(graph, communities, opts)
   end
 
@@ -478,7 +474,6 @@ defmodule Yog.Community do
   """
   @spec average_community_density(Yog.graph(), communities()) :: float()
   def average_community_density(graph, %Result{} = communities) do
-    # YOG-FAC-004: Metrics module now supports Result struct natively
     Metrics.average_community_density(graph, communities)
   end
 end
