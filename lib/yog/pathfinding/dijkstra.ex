@@ -424,113 +424,100 @@ defmodule Yog.Pathfinding.Dijkstra do
   end
 
   # Main Dijkstra implementation
-  # Returns :error | {path, weight} if return_path=true
-  # Returns :error | {path, weight, distances} if return_path=false
-  defp do_dijkstra(graph, from, to, zero, add, compare, return_path) do
+  # Returns :error | {path, weight} if to is specified
+  # Returns :error | {[], zero, distances} if to is nil (single source distances)
+  defp do_dijkstra(graph, from, to, zero, add, compare, _return_path) do
+    # Unified implementation using predecessor map for path reconstruction
     initial_queue =
-      if return_path do
-        PQ.new(fn {d1, _, _}, {d2, _, _} -> compare.(d1, d2) != :gt end)
-        |> PQ.push({zero, from, [from]})
-      else
-        PQ.new(fn {d1, _}, {d2, _} -> compare.(d1, d2) != :gt end)
-        |> PQ.push({zero, from})
-      end
+      PQ.new(fn {d1, _}, {d2, _} -> compare.(d1, d2) != :gt end)
+      |> PQ.push({zero, from})
 
     initial_distances = %{from => zero}
+    initial_predecessors = %{}
 
-    if return_path do
-      do_dijkstra_loop_with_path(graph, initial_queue, to, add, compare, initial_distances)
-    else
-      do_dijkstra_loop_no_path(graph, initial_queue, add, compare, initial_distances)
-    end
+    do_dijkstra_loop(
+      graph,
+      initial_queue,
+      to,
+      add,
+      compare,
+      initial_distances,
+      initial_predecessors
+    )
   end
 
-  defp do_dijkstra_loop_with_path(graph, queue, to, add, compare, distances) do
+  defp do_dijkstra_loop(graph, queue, to, add, compare, distances, predecessors) do
     case PQ.pop(queue) do
       :error ->
-        :error
-
-      {:ok, {dist, node, path}, rest} ->
-        current_best = Map.get(distances, node)
-
-        if current_best != nil and compare.(dist, current_best) == :gt do
-          do_dijkstra_loop_with_path(graph, rest, to, add, compare, distances)
+        if to do
+          :error
         else
-          if node == to do
-            {Enum.reverse(path), dist}
-          else
-            successors = Model.successors(graph, node)
-
-            {new_queue, new_distances} =
-              Enum.reduce(successors, {rest, distances}, fn {neighbor, weight}, {q, d} ->
-                new_dist = add.(dist, weight)
-
-                case Map.fetch(d, neighbor) do
-                  {:ok, current} ->
-                    if compare.(new_dist, current) == :lt do
-                      new_q = PQ.push(q, {new_dist, neighbor, [neighbor | path]})
-                      new_d = Map.put(d, neighbor, new_dist)
-                      {new_q, new_d}
-                    else
-                      {q, d}
-                    end
-
-                  :error ->
-                    new_q = PQ.push(q, {new_dist, neighbor, [neighbor | path]})
-                    new_d = Map.put(d, neighbor, new_dist)
-                    {new_q, new_d}
-                end
-              end)
-
-            do_dijkstra_loop_with_path(graph, new_queue, to, add, compare, new_distances)
-          end
+          # For single source distances, return the distances map
+          # The zero value is the distance of the source node (which is always present)
+          zero_val = zero_from_distances(distances)
+          {[], zero_val, distances}
         end
-    end
-  end
-
-  defp do_dijkstra_loop_no_path(graph, queue, add, compare, distances) do
-    case PQ.pop(queue) do
-      :error ->
-        # For single source distances, return empty path and weight info
-        # The distances map is what matters
-        {[], zero_from_somewhere(distances, add), distances}
 
       {:ok, {dist, node}, rest} ->
         current_best = Map.get(distances, node)
 
         if current_best != nil and compare.(dist, current_best) == :gt do
-          do_dijkstra_loop_no_path(graph, rest, add, compare, distances)
+          # Outdated entry, skip
+          do_dijkstra_loop(graph, rest, to, add, compare, distances, predecessors)
         else
-          successors = Model.successors(graph, node)
+          # Check if we reached the target
+          if node == to do
+            extract_result(distances, predecessors, to, dist)
+          else
+            successors = Model.successors(graph, node)
 
-          {new_queue, new_distances} =
-            Enum.reduce(successors, {rest, distances}, fn {neighbor, weight}, {q, d} ->
-              new_dist = add.(dist, weight)
+            {new_queue, new_distances, new_predecessors} =
+              Enum.reduce(successors, {rest, distances, predecessors}, fn {neighbor, weight},
+                                                                          {q, d, p} ->
+                new_dist = add.(dist, weight)
 
-              case Map.fetch(d, neighbor) do
-                {:ok, current} ->
-                  if compare.(new_dist, current) == :lt do
+                case Map.fetch(d, neighbor) do
+                  {:ok, current} ->
+                    if compare.(new_dist, current) == :lt do
+                      new_q = PQ.push(q, {new_dist, neighbor})
+                      new_d = Map.put(d, neighbor, new_dist)
+                      new_p = Map.put(p, neighbor, node)
+                      {new_q, new_d, new_p}
+                    else
+                      {q, d, p}
+                    end
+
+                  :error ->
                     new_q = PQ.push(q, {new_dist, neighbor})
                     new_d = Map.put(d, neighbor, new_dist)
-                    {new_q, new_d}
-                  else
-                    {q, d}
-                  end
+                    new_p = Map.put(p, neighbor, node)
+                    {new_q, new_d, new_p}
+                end
+              end)
 
-                :error ->
-                  new_q = PQ.push(q, {new_dist, neighbor})
-                  new_d = Map.put(d, neighbor, new_dist)
-                  {new_q, new_d}
-              end
-            end)
-
-          do_dijkstra_loop_no_path(graph, new_queue, add, compare, new_distances)
+            do_dijkstra_loop(graph, new_queue, to, add, compare, new_distances, new_predecessors)
+          end
         end
     end
   end
 
-  defp zero_from_somewhere(distances, _add) do
-    # Try to get zero from the distances map
+  # Extract the result: either a path to target or all distances
+  defp extract_result(_distances, _predecessors, nil, _dist), do: {[], 0, %{}}
+
+  defp extract_result(_distances, predecessors, target, dist) do
+    path = reconstruct_path(predecessors, target, [target])
+    {path, dist}
+  end
+
+  # Reconstruct path by backtracking through predecessors
+  defp reconstruct_path(predecessors, node, acc) do
+    case Map.get(predecessors, node) do
+      nil -> acc
+      parent -> reconstruct_path(predecessors, parent, [parent | acc])
+    end
+  end
+
+  defp zero_from_distances(distances) do
     case Map.values(distances) do
       [z | _] -> z
       [] -> 0
