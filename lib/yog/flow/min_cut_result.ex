@@ -111,14 +111,11 @@ defmodule Yog.Flow.MinCutResult do
   """
   @spec extract_cut_edges(t(), Yog.graph()) :: [{Yog.Model.node_id(), Yog.Model.node_id()}]
   def extract_cut_edges(%__MODULE__{source_side: source_side, sink_side: sink_side}, graph) do
-    Enum.flat_map(source_side, fn src ->
-      edges_from_src = Yog.Model.successors(graph, src)
-
-      Enum.filter(edges_from_src, fn {dst, _weight} ->
-        MapSet.member?(sink_side, dst)
-      end)
-      |> Enum.map(fn {dst, _weight} -> {src, dst} end)
-    end)
+    for src <- source_side,
+        {dst, _weight} <- Yog.Model.successors(graph, src),
+        MapSet.member?(sink_side, dst) do
+      {src, dst}
+    end
   end
 
   @doc """

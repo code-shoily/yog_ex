@@ -51,7 +51,7 @@ defmodule Yog.Flow.MinCut do
         ])
 
       result = Yog.Flow.MinCut.global_min_cut(graph)
-      # => %{weight: 6, group_a_size: 1, group_b_size: 3}
+      # => %Yog.Flow.MinCutResult{cut_value: 6, source_side: MapSet.new([4]), sink_side: MapSet.new([1, 2, 3])}
 
   ## References
 
@@ -60,19 +60,9 @@ defmodule Yog.Flow.MinCut do
   - [CP-Algorithms: Stoer-Wagner](https://cp-algorithms.com/graph/stoer_wagner.html)
   """
 
+  alias Yog.Flow.MinCutResult
   alias Yog.Model
   alias Yog.Transform
-
-  @typedoc """
-  Result of a global minimum cut computation.
-
-  Contains the cut weight and the sizes of the two partitions.
-  """
-  @type min_cut :: %{
-          weight: integer(),
-          group_a_size: integer(),
-          group_b_size: integer()
-        }
 
   @doc """
   Finds the global minimum cut of an undirected weighted graph.
@@ -93,75 +83,95 @@ defmodule Yog.Flow.MinCut do
       ...>   |> Yog.add_node(3, "C")
       ...>   |> Yog.add_edges([{1, 2, 5}, {2, 3, 3}, {1, 3, 2}])
       iex> result = Yog.Flow.MinCut.global_min_cut(graph)
-      iex> result.weight
+      iex> result.cut_value
       5
-      iex> (result.group_a_size + result.group_b_size) == 3
-      true
+      iex> MapSet.size(result.source_side) + MapSet.size(result.sink_side)
+      3
 
   ## Notes
 
   - The graph must be undirected
   - Edge weights must be integers
+  - Returns a `Yog.Flow.MinCutResult` struct with the actual node partitions
   """
-  @spec global_min_cut(Yog.graph()) :: min_cut()
+  @spec global_min_cut(Yog.graph()) :: MinCutResult.t()
   def global_min_cut(graph) do
     nodes = Model.all_nodes(graph)
 
     case length(nodes) do
       n when n <= 1 ->
-        %{weight: 0, group_a_size: n, group_b_size: 0}
+        MinCutResult.new(MapSet.new(nodes), MapSet.new(), 0)
 
-      n ->
-        sizes = Map.new(nodes, fn id -> {id, 1} end)
-        do_stoer_wagner(graph, sizes, n, nil)
+      _n ->
+        # Track actual partitions: node_id => MapSet of original IDs
+        partitions = Map.new(nodes, fn id -> {id, MapSet.new([id])} end)
+        # Get the full set of original nodes once
+        all_original = MapSet.new(nodes)
+
+        do_stoer_wagner(graph, partitions, all_original, nil)
     end
   end
 
-  defp do_stoer_wagner(graph, sizes, total_size, best_cut) do
+  defp do_stoer_wagner(graph, partitions, all_original, best_cut) do
+    # Stoer-Wagner terminates when only one node remains
     if map_size(graph.nodes) <= 1 do
       best_cut
     else
       {s, t} = min_cut_phase(graph)
       cut_weight = phase_cut_weight(graph, t)
 
+      # t_nodes represents one side of the cut
+      t_nodes = Map.fetch!(partitions, t)
+
       new_best =
-        if is_nil(best_cut) or cut_weight < best_cut.weight do
-          %{
-            weight: cut_weight,
-            group_a_size: Map.fetch!(sizes, t),
-            group_b_size: total_size - Map.fetch!(sizes, t)
-          }
+        if is_nil(best_cut) or cut_weight < best_cut.cut_value do
+          MinCutResult.new(
+            t_nodes,
+            MapSet.difference(all_original, t_nodes),
+            cut_weight
+          )
         else
           best_cut
         end
 
+      # Contract s and t: merge t_nodes into s_nodes
       new_graph = Transform.contract(graph, s, t, &+/2)
 
-      new_sizes =
-        sizes
-        |> Map.put(s, Map.fetch!(sizes, s) + Map.fetch!(sizes, t))
+      new_partitions =
+        partitions
+        |> Map.put(s, MapSet.union(Map.fetch!(partitions, s), t_nodes))
         |> Map.delete(t)
 
-      do_stoer_wagner(new_graph, new_sizes, total_size, new_best)
+      do_stoer_wagner(new_graph, new_partitions, all_original, new_best)
     end
   end
 
   # Maximum Adjacency Search finds s and t nodes (last two added to search set)
   defp min_cut_phase(graph) do
-    ids = Map.keys(graph.nodes)
-    [v0 | remaining] = ids
+    [v0 | rest] = Model.all_nodes(graph)
+    # Start MAS: keep remaining as a list to avoid O(V) conversion in loops
     dists = Model.neighbors(graph, v0) |> Map.new()
     in_s = MapSet.new([v0])
 
-    do_mas(graph, in_s, remaining, dists, nil, v0)
+    do_mas(graph, in_s, rest, dists, nil, v0)
   end
 
-  defp do_mas(_graph, _in_s, [], _dists, s, t), do: {s, t}
+  # Optimized MAS: No MapSet.to_list in the recursion
+  defp do_mas(_graph, _in_s, [], _dists, prev_s, current_t) when is_nil(prev_s) do
+    # Single node case - no previous node exists
+    {current_t, current_t}
+  end
+
+  defp do_mas(_graph, _in_s, [], _dists, prev_s, current_t) do
+    {prev_s, current_t}
+  end
 
   defp do_mas(graph, in_s, remaining, dists, _prev_s, current_t) do
+    # find_max_dist is O(remaining)
     {next, _w} = find_max_dist(remaining, dists)
 
     new_in_s = MapSet.put(in_s, next)
+    # List.delete is O(V) but only happens once per iteration
     new_remaining = List.delete(remaining, next)
 
     next_neighbors = Model.neighbors(graph, next)
@@ -181,12 +191,7 @@ defmodule Yog.Flow.MinCut do
   defp find_max_dist([first | rest], dists) do
     Enum.reduce(rest, {first, Map.get(dists, first, 0)}, fn node, {best_id, best_w} ->
       w = Map.get(dists, node, 0)
-
-      if w > best_w do
-        {node, w}
-      else
-        {best_id, best_w}
-      end
+      if w > best_w, do: {node, w}, else: {best_id, best_w}
     end)
   end
 
