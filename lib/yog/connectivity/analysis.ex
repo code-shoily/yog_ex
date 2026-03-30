@@ -60,13 +60,13 @@ defmodule Yog.Connectivity.Analysis do
       |> Map.update!(:time, &(&1 + 1))
 
     neighbors = Model.successor_ids(graph, node)
-    children_count = init_counter(0)
 
-    state_after_neighbors =
-      Enum.reduce(neighbors, state, fn neighbor, acc_state ->
+    # Use a tuple {state, children_count} to track state and counter functionally
+    {state_after_neighbors, children_count} =
+      Enum.reduce(neighbors, {state, 0}, fn neighbor, {acc_state, count} ->
         case Map.fetch(acc_state.disc, neighbor) do
           :error ->
-            increment_counter(children_count)
+            new_count = count + 1
 
             new_state =
               Map.update!(acc_state, :parent, &Map.put(&1, neighbor, node))
@@ -93,35 +93,23 @@ defmodule Yog.Connectivity.Analysis do
                 new_state
               end
 
-            new_state
+            {new_state, new_count}
 
           {:ok, _} ->
             if Map.get(acc_state.parent, node) != neighbor do
               new_low = min(Map.fetch!(acc_state.low, node), Map.fetch!(acc_state.disc, neighbor))
-              Map.update!(acc_state, :low, &Map.put(&1, node, new_low))
+              new_state = Map.update!(acc_state, :low, &Map.put(&1, node, new_low))
+              {new_state, count}
             else
-              acc_state
+              {acc_state, count}
             end
         end
       end)
 
-    if Map.get(state_after_neighbors.parent, node) == nil and get_counter(children_count) > 1 do
+    if Map.get(state_after_neighbors.parent, node) == nil and children_count > 1 do
       Map.update!(state_after_neighbors, :articulation_points, &MapSet.put(&1, node))
     else
       state_after_neighbors
     end
-  end
-
-  defp init_counter(initial) do
-    key = make_ref()
-    Process.put(key, initial)
-    key
-  end
-
-  defp get_counter(key), do: Process.get(key)
-
-  defp increment_counter(key) do
-    current = Process.get(key)
-    Process.put(key, current + 1)
   end
 end
