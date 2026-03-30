@@ -408,7 +408,8 @@ defmodule Yog.Traversal do
   defdelegate topological_sort(graph), to: Sort
 
   @doc """
-  Performs a lexicographically smallest topological sort.
+  Performs a lexicographically smallest topological sort. Compares by node_data. Breaks tie
+  by ID.
 
   ## Example
 

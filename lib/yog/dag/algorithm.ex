@@ -150,7 +150,8 @@ defmodule Yog.DAG.Algorithm do
       ...>   |> Yog.add_edge_ensure(:b, :c, 2)
       ...> )
       iex> {:ok, path} = Yog.DAG.Algorithm.shortest_path(dag, :a, :c)
-      iex> {:path, [:a, :b, :c], 5} = path
+      iex> path.nodes == [:a, :b, :c] and path.weight == 5
+      true
   """
   @spec shortest_path(Yog.DAG.t(), Yog.node_id(), Yog.node_id()) ::
           {:ok, PathUtils.path(any())} | :error
