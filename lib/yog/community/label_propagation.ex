@@ -108,17 +108,6 @@ defmodule Yog.Community.LabelPropagation do
     end
   end
 
-  @doc """
-  Shuffles a list randomly (utility function).
-  """
-  @spec shuffle([any()]) :: [any()]
-  def shuffle(list) do
-    list
-    |> Enum.with_index()
-    |> Enum.sort_by(fn {_, i} -> :erlang.phash2(i) end)
-    |> Enum.map(fn {elem, _} -> elem end)
-  end
-
   # ============================================================
   # Private Helpers
   # ============================================================
@@ -126,8 +115,8 @@ defmodule Yog.Community.LabelPropagation do
   defp propagate_labels(_graph, _nodes, labels, 0, _seed), do: labels
 
   defp propagate_labels(graph, nodes, labels, iterations_remaining, seed) do
-    # Shuffle node order for this iteration
-    shuffled_nodes = seeded_shuffle(nodes, iterations_remaining + seed)
+    # Shuffle node order for this iteration - O(V) Fisher-Yates
+    shuffled_nodes = Yog.Utils.fisher_yates(nodes, iterations_remaining + seed)
 
     # Update labels
     {new_labels, changed} =
@@ -140,10 +129,12 @@ defmodule Yog.Community.LabelPropagation do
           # Get neighbor labels
           neighbor_labels = Enum.map(neighbors, fn n -> acc_labels[n] end)
 
-          # Find most frequent label
-          most_frequent = most_frequent_label(neighbor_labels)
-
           current_label = acc_labels[node]
+
+          # Find most frequent label with tie-breaking logic:
+          # - If current label is tied for majority, keep it (prevents oscillation)
+          # - Otherwise use randomized tie-breaker (prevents lexicographical bias)
+          most_frequent = most_frequent_label(neighbor_labels, current_label, seed)
 
           if most_frequent != current_label do
             {Map.put(acc_labels, node, most_frequent), true}
@@ -165,28 +156,32 @@ defmodule Yog.Community.LabelPropagation do
     Yog.Model.neighbor_ids(graph, node)
   end
 
-  defp most_frequent_label(labels) do
-    # Count frequency of each label
-    frequencies = Enum.frequencies(labels)
-
-    # Find maximum frequency
-    max_count = frequencies |> Map.values() |> Enum.max()
+  # Single-pass frequency count with current label preference and randomized tie-break
+  # Returns {most_frequent_label, max_count} or nil if empty
+  defp most_frequent_label(neighbor_labels, current_label, seed) do
+    # Single-pass: count frequencies while tracking max
+    {freqs, max_count} =
+      Enum.reduce(neighbor_labels, {%{}, 0}, fn label, {acc, max_so_far} ->
+        new_count = Map.get(acc, label, 0) + 1
+        new_max = max(max_so_far, new_count)
+        {Map.put(acc, label, new_count), new_max}
+      end)
 
     # Get all labels with max frequency
     candidates =
-      Enum.filter(frequencies, fn {_, count} -> count == max_count end)
+      Enum.filter(freqs, fn {_, count} -> count == max_count end)
       |> Enum.map(fn {label, _} -> label end)
 
-    # If tie, choose randomly (deterministically by sorting and picking first)
-    # This is a simplification - true random would use :rand.uniform
-    Enum.min(candidates)
-  end
-
-  defp seeded_shuffle(list, seed) do
-    # Deterministic shuffle based on seed
-    list
-    |> Enum.with_index()
-    |> Enum.sort_by(fn {elem, i} -> :erlang.phash2({elem, i, seed}) end)
-    |> Enum.map(fn {elem, _} -> elem end)
+    # If current label is tied for max, keep it (prevents oscillation)
+    if current_label in candidates do
+      current_label
+    else
+      # Randomized tie-breaker using seed for determinism
+      # Hash each candidate with seed and pick minimum hash
+      candidates
+      |> Enum.map(fn label -> {:erlang.phash2({label, seed}), label} end)
+      |> Enum.min_by(fn {hash, _} -> hash end)
+      |> elem(1)
+    end
   end
 end
