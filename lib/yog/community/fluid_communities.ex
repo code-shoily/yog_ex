@@ -17,7 +17,7 @@ defmodule Yog.Community.FluidCommunities do
   2. **Iterate** until convergence or max iterations:
      - Shuffle nodes randomly
      - For each node: join the community with highest fluid density in neighborhood
-     - Density decreases as community size increases (density = 1 / size)
+     - Density decreases as community size increases (density = weight / size)
   3. **Normalize** community IDs to be contiguous
 
   ## When to Use
@@ -128,7 +128,7 @@ defmodule Yog.Community.FluidCommunities do
 
       _ ->
         # Select k initial seed nodes
-        shuffled_nodes = shuffle(all_nodes, options.seed)
+        shuffled_nodes = Yog.Utils.fisher_yates(all_nodes, options.seed)
         initial_nodes = Enum.take(shuffled_nodes, k)
 
         # Initialize assignments and sizes
@@ -139,7 +139,18 @@ defmodule Yog.Community.FluidCommunities do
             {Map.put(asgn, node, i), Map.put(sz, i, 1)}
           end)
 
-        do_fluid(graph, all_nodes, assignments, sizes, options.max_iterations, options.seed + 1)
+        # Shuffle once at start using O(V) Fisher-Yates
+        shuffled = Yog.Utils.fisher_yates(all_nodes, options.seed)
+
+        do_fluid(
+          graph,
+          all_nodes,
+          assignments,
+          sizes,
+          options.max_iterations,
+          shuffled,
+          options.seed + 1
+        )
     end
   end
 
@@ -147,18 +158,16 @@ defmodule Yog.Community.FluidCommunities do
   # FLUID PROPAGATION
   # =============================================================================
 
-  defp do_fluid(_graph, nodes, assignments, sizes, iters, _seed) when iters <= 0 do
+  defp do_fluid(_graph, nodes, assignments, sizes, iters, _shuffled, _seed)
+       when iters <= 0 do
     normalize_communities(nodes, assignments, sizes)
   end
 
-  defp do_fluid(graph, nodes, assignments, sizes, iters, seed) do
-    shuffled = shuffle(nodes, seed)
-    next_seed = seed + 1
-
+  defp do_fluid(graph, nodes, assignments, sizes, iters, shuffled, seed) do
     {new_assignments, new_sizes, changed, final_seed} =
-      Enum.reduce(shuffled, {assignments, sizes, false, next_seed}, fn node,
-                                                                       {curr_asgn, curr_sizes,
-                                                                        has_changed, current_seed} ->
+      Enum.reduce(shuffled, {assignments, sizes, false, seed}, fn node,
+                                                                  {curr_asgn, curr_sizes,
+                                                                   has_changed, current_seed} ->
         current_com = Map.get(curr_asgn, node)
 
         # Check if node can move (not the last member of its community)
@@ -175,52 +184,18 @@ defmodule Yog.Community.FluidCommunities do
           end
 
         if can_move do
-          # Calculate density sums for neighbor communities
-          density_sums =
-            Model.successors(graph, node)
-            |> Enum.reduce(%{}, fn {neighbor_id, _weight}, densities ->
-              case Map.get(curr_asgn, neighbor_id) do
-                nil ->
-                  densities
+          # Single-pass: find max density community without intermediate Map
+          # Incorporates edge weights: density = weight / community_size
+          {best_c, new_seed, found} =
+            find_max_density_community(
+              graph,
+              node,
+              curr_asgn,
+              curr_sizes,
+              current_seed
+            )
 
-                neighbor_com ->
-                  com_size = Map.get(curr_sizes, neighbor_com, 1)
-                  # Fluid density = 1 / community_size
-                  density = 1.0 / com_size
-                  existing = Map.get(densities, neighbor_com, 0.0)
-                  Map.put(densities, neighbor_com, existing + density)
-              end
-            end)
-
-          if map_size(density_sums) == 0 do
-            # No assigned neighbors
-            {curr_asgn, curr_sizes, has_changed, current_seed}
-          else
-            # Find communities with max density sum
-            {best_com_candidates, _max_d} =
-              Enum.reduce(density_sums, {[], -1.0}, fn {c, d_sum}, {best_coms, max_d} ->
-                cond do
-                  d_sum > max_d -> {[c], d_sum}
-                  d_sum == max_d -> {[c | best_coms], max_d}
-                  true -> {best_coms, max_d}
-                end
-              end)
-
-            # Tie breaking with random selection
-            {best_c, new_seed} =
-              case best_com_candidates do
-                [single] ->
-                  {single, current_seed}
-
-                multi ->
-                  # LCG: simple deterministic pseudo-random
-                  r = rem(1_103_515_245 * current_seed + 12_345, 2_147_483_648)
-                  r_pos = abs(r)
-                  idx = rem(r_pos, length(multi))
-                  chosen = Enum.at(multi, idx, 0)
-                  {chosen, current_seed + 1}
-              end
-
+          if found do
             changing =
               case current_com do
                 nil -> true
@@ -250,6 +225,9 @@ defmodule Yog.Community.FluidCommunities do
             else
               {curr_asgn, curr_sizes, has_changed, new_seed}
             end
+          else
+            # No assigned neighbors found - will be handled in fallback
+            {curr_asgn, curr_sizes, has_changed, new_seed}
           end
         else
           {curr_asgn, curr_sizes, has_changed, current_seed}
@@ -257,9 +235,92 @@ defmodule Yog.Community.FluidCommunities do
       end)
 
     if changed do
-      do_fluid(graph, nodes, new_assignments, new_sizes, iters - 1, final_seed)
+      do_fluid(graph, nodes, new_assignments, new_sizes, iters - 1, shuffled, final_seed)
     else
-      normalize_communities(nodes, new_assignments, sizes)
+      # Fallback: assign any unassigned nodes (disconnected component handling)
+      assignments_with_fallback = assign_unassigned_nodes(nodes, new_assignments, new_sizes)
+      normalize_communities(nodes, assignments_with_fallback, new_sizes)
+    end
+  end
+
+  # Single-pass reduction to find max density community without intermediate Map
+  # Returns {best_community, new_seed, found?}
+  defp find_max_density_community(graph, node, assignments, sizes, seed) do
+    Model.successors(graph, node)
+    |> Enum.reduce({nil, -1.0, nil, seed}, fn {neighbor_id, weight},
+                                              {best_c, max_d, tie_candidates, current_seed} ->
+      case Map.get(assignments, neighbor_id) do
+        nil ->
+          {best_c, max_d, tie_candidates, current_seed}
+
+        neighbor_com ->
+          com_size = Map.get(sizes, neighbor_com, 1)
+          # Weighted density: weight / community_size
+          density = weight / com_size
+
+          cond do
+            density > max_d ->
+              # New max found
+              {neighbor_com, density, [neighbor_com], current_seed}
+
+            density == max_d ->
+              # Tie - accumulate candidates
+              {best_c, max_d, [neighbor_com | tie_candidates || []], current_seed}
+
+            true ->
+              {best_c, max_d, tie_candidates, current_seed}
+          end
+      end
+    end)
+    |> case do
+      {nil, _, _, new_seed} ->
+        # No assigned neighbors found
+        {nil, new_seed, false}
+
+      {best_c, _, nil, new_seed} ->
+        # Single best community
+        {best_c, new_seed, true}
+
+      {best_c, _, candidates, new_seed} ->
+        # Tie-breaking with random selection
+        unique_candidates = Enum.uniq([best_c | candidates])
+
+        {chosen, updated_seed} =
+          case unique_candidates do
+            [single] ->
+              {single, new_seed}
+
+            multi ->
+              # LCG: simple deterministic pseudo-random
+              r = rem(1_103_515_245 * new_seed + 12_345, 2_147_483_648)
+              r_pos = abs(r)
+              idx = rem(r_pos, length(multi))
+              chosen = Enum.at(multi, idx, 0)
+              {chosen, new_seed + 1}
+          end
+
+        {chosen, updated_seed, true}
+    end
+  end
+
+  # Fallback: assign unassigned nodes to their own communities or nearest seed
+  defp assign_unassigned_nodes(nodes, assignments, _sizes) do
+    # Find unassigned nodes
+    unassigned = Enum.filter(nodes, fn n -> Map.get(assignments, n) == nil end)
+
+    if unassigned == [] do
+      assignments
+    else
+      # Get max existing community ID
+      max_comm =
+        assignments
+        |> Map.values()
+        |> Enum.max(fn -> -1 end)
+
+      # Assign each unassigned node to a new community
+      Enum.reduce(Enum.with_index(unassigned), assignments, fn {node, idx}, acc ->
+        Map.put(acc, node, max_comm + idx + 1)
+      end)
     end
   end
 
@@ -268,7 +329,7 @@ defmodule Yog.Community.FluidCommunities do
   # =============================================================================
 
   defp normalize_communities(nodes, assignments, sizes) do
-    # Re-index community IDs to be contiguous from 0
+    # Re-index community IDs to be contiguous
     active_communities =
       sizes
       |> Enum.filter(fn {_, size} -> size > 0 end)
@@ -290,22 +351,5 @@ defmodule Yog.Community.FluidCommunities do
       end)
 
     Result.new(new_assignments)
-  end
-
-  # Deterministic shuffle using Linear Congruential Generator
-  defp shuffle(list, seed) do
-    # LCG parameters (same as glibc)
-    a = 1_103_515_245
-    c = 12_345
-    m = 2_147_483_648
-
-    list
-    |> Enum.with_index()
-    |> Enum.map(fn {item, i} ->
-      rand = rem(a * (seed + i) + c, m)
-      {rand, item}
-    end)
-    |> Enum.sort_by(fn {rand, _} -> rand end)
-    |> Enum.map(fn {_, item} -> item end)
   end
 end
