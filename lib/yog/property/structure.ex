@@ -271,29 +271,92 @@ defmodule Yog.Property.Structure do
   # Helpers
   defp mcs_ordering(graph) do
     nodes = Model.all_nodes(graph)
-    weights = Map.new(nodes, fn id -> {id, 0} end)
-    do_mcs(graph, weights, [], MapSet.new(nodes))
+    n = length(nodes)
+
+    if n == 0 do
+      []
+    else
+      # Initialize bucket queue: weight -> set of nodes
+      # Max possible weight is n-1, so we use a map with empty sets
+      buckets = %{0 => MapSet.new(nodes)}
+      weights = Map.new(nodes, fn id -> {id, 0} end)
+
+      do_mcs(graph, weights, [], MapSet.new(nodes), buckets, 0)
+    end
   end
 
-  defp do_mcs(_graph, _weights, order, remaining) when remaining == %MapSet{} do
+  defp do_mcs(_graph, _weights, order, remaining, _buckets, _max_weight)
+       when remaining == %MapSet{} do
     Enum.reverse(order)
   end
 
-  defp do_mcs(graph, weights, order, remaining) do
-    v = Enum.max_by(remaining, fn node -> Map.get(weights, node) end)
+  defp do_mcs(graph, weights, order, remaining, buckets, max_weight) do
+    # Find the node with maximum weight using bucket queue
+    # Decrease max_weight if current bucket is empty
+    {v, new_buckets, new_max_weight} =
+      pop_max_weight_node(buckets, max_weight)
 
     neighbors = Model.neighbor_ids(graph, v)
 
-    new_weights =
-      Enum.reduce(neighbors, weights, fn u, acc ->
+    {new_weights, new_buckets2, updated_max_weight} =
+      Enum.reduce(neighbors, {weights, new_buckets, new_max_weight}, fn u,
+                                                                        {w_acc, b_acc, max_w_acc} ->
         if MapSet.member?(remaining, u) do
-          Map.update!(acc, u, &(&1 + 1))
+          old_weight = Map.get(w_acc, u)
+          new_weight = old_weight + 1
+
+          # Update weights map
+          w_acc2 = Map.put(w_acc, u, new_weight)
+
+          # Move node from old bucket to new bucket
+          old_bucket = Map.get(b_acc, old_weight)
+          new_bucket = Map.get(b_acc, new_weight) || MapSet.new()
+
+          b_acc2 =
+            b_acc
+            |> Map.put(old_weight, MapSet.delete(old_bucket, u))
+            |> Map.put(new_weight, MapSet.put(new_bucket, u))
+
+          # Update max weight if necessary
+          max_w_acc2 = max(max_w_acc, new_weight)
+
+          {w_acc2, b_acc2, max_w_acc2}
         else
-          acc
+          {w_acc, b_acc, max_w_acc}
         end
       end)
 
-    do_mcs(graph, new_weights, [v | order], MapSet.delete(remaining, v))
+    do_mcs(
+      graph,
+      new_weights,
+      [v | order],
+      MapSet.delete(remaining, v),
+      new_buckets2,
+      updated_max_weight
+    )
+  end
+
+  # Pop a node with maximum weight from the bucket queue
+  defp pop_max_weight_node(_buckets, max_weight) when max_weight < 0 do
+    # Should not happen if implementation is correct, but handle gracefully
+    raise "Bucket queue empty - no more nodes to process"
+  end
+
+  defp pop_max_weight_node(buckets, max_weight) do
+    case Map.get(buckets, max_weight) do
+      nil ->
+        pop_max_weight_node(buckets, max_weight - 1)
+
+      set ->
+        if MapSet.size(set) == 0 do
+          pop_max_weight_node(buckets, max_weight - 1)
+        else
+          node = Enum.at(MapSet.to_list(set), 0)
+          new_set = MapSet.delete(set, node)
+          new_buckets = Map.put(buckets, max_weight, new_set)
+          {node, new_buckets, max_weight}
+        end
+    end
   end
 
   defp peo?(graph, order) do
