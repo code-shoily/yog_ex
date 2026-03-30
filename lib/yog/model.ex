@@ -1030,6 +1030,9 @@ defmodule Yog.Model do
       end
     else
       # For undirected graphs, deduplicate by only taking edges where from <= to
+      # NOTE: This relies on Erlang term ordering. For complex types (structs/maps),
+      # the ordering is valid but may be semantically arbitrary. Ensure consistent
+      # node ID types to avoid unexpected edge ordering.
       for {from, dests} <- out_edges,
           {to, weight} <- dests,
           from <= to do
