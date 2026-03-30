@@ -48,4 +48,85 @@ defmodule Yog.Utils do
   def compare(a, b) when a < b, do: :lt
   def compare(a, b) when a > b, do: :gt
   def compare(_, _), do: :eq
+
+  @doc """
+  Calculates the difference (distance) between two vectors (maps of scores)
+  using the specified norm type.
+
+  Supported types:
+  - `:l1`  - Manhattan Distance (Sum of absolute differences)
+  - `:l2`  - Euclidean Distance (Square root of sum of squares)
+  - `:max` - Chebyshev Distance (Maximum absolute difference)
+  """
+  @spec norm_diff(map(), map(), :l1 | :l2 | :max) :: float()
+  def norm_diff(m1, m2, type) do
+    case type do
+      :l1 ->
+        Enum.reduce(m1, 0.0, fn {k, v1}, acc ->
+          acc + abs(v1 - Map.get(m2, k, 0.0))
+        end)
+
+      :l2 ->
+        sum_sq =
+          Enum.reduce(m1, 0.0, fn {k, v1}, acc ->
+            acc + :math.pow(v1 - Map.get(m2, k, 0.0), 2)
+          end)
+
+        :math.sqrt(sum_sq)
+
+      :max ->
+        Enum.reduce(m1, 0.0, fn {k, v1}, acc ->
+          max(acc, abs(v1 - Map.get(m2, k, 0.0)))
+        end)
+    end
+  end
+
+  @doc """
+  Fisher-Yates shuffle: O(n) unbiased shuffling.
+
+  Uses Erlang's :array for efficient mutable-style operations.
+  Deterministic when given a seed (for reproducibility).
+
+  ## Examples
+
+      iex> Yog.Utils.fisher_yates([1, 2, 3, 4, 5], 42)
+      [3, 5, 1, 4, 2]
+
+      iex> Yog.Utils.fisher_yates([], 123)
+      []
+  """
+  @spec fisher_yates([a], integer()) :: [a] when a: var
+  def fisher_yates(list, seed \\ :rand.uniform(1_000_000)) do
+    n = length(list)
+
+    if n <= 1 do
+      list
+    else
+      # Convert to array for O(1) random access
+      arr = :array.from_list(list)
+
+      # LCG parameters for deterministic randomness
+      a = 1_103_515_245
+      c = 12_345
+      m = 2_147_483_648
+
+      # Fisher-Yates: swap each element with a random later element
+      {shuffled_arr, _final_seed} =
+        Enum.reduce(0..(n - 2), {arr, seed}, fn i, {arr_acc, current_seed} ->
+          # Generate random index j in [i, n-1]
+          next_seed = rem(a * current_seed + c, m)
+          j = i + rem(next_seed, n - i)
+
+          # Swap elements at i and j
+          val_i = :array.get(i, arr_acc)
+          val_j = :array.get(j, arr_acc)
+          arr_acc = :array.set(i, val_j, arr_acc)
+          arr_acc = :array.set(j, val_i, arr_acc)
+
+          {arr_acc, next_seed}
+        end)
+
+      :array.to_list(shuffled_arr)
+    end
+  end
 end
