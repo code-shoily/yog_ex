@@ -182,37 +182,26 @@ defmodule Yog.Operation do
   # ============= Composition & Joins =============
 
   @doc """
-  Combines two graphs assuming they are separate entities with automatic re-indexing.
+  Computes the disjoint union of two graphs.
 
-  The second graph's node IDs are shifted by the order of the first graph,
-  ensuring no ID collisions.
+  Unlike a simple join, this function guarantees that nodes from Graph A
+  and Graph B remain distinct by tagging their IDs, even if they share
+  the same original ID.
 
-  ## Examples
-
-      iex> g1 = Yog.undirected()
-      ...> |> Yog.add_node(0, nil)
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
-      iex> g2 = Yog.undirected()
-      ...> |> Yog.add_node(0, nil)
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
-      iex> combined = Yog.Operation.disjoint_union(g1, g2)
-      iex> # g1 has nodes 0,1; g2 nodes are re-indexed to 2,3
-      ...> Yog.Model.order(combined)
-      4
+  ## Example
+      iex> g1 = Yog.directed() |> Yog.add_node("root", "Data A")
+      iex> g2 = Yog.directed() |> Yog.add_node("root", "Data B")
+      iex> union = Yog.Operation.disjoint_union(g1, g2)
+      iex> Yog.Model.node_count(union)
+      2
+      iex> Yog.Model.node(union, {0, "root"})
+      "Data A"
   """
   @spec disjoint_union(Yog.graph(), Yog.graph()) :: Yog.graph()
-  def disjoint_union(base, other) do
-    base_ids = Model.all_nodes(base)
-    offset = if base_ids == [], do: 0, else: Enum.max(base_ids) + 1
-
-    other_ids = Model.all_nodes(other)
-    min_other = if other_ids == [], do: 0, else: Enum.min(other_ids)
-
-    shift = offset - min_other
-    reindexed_other = shift_node_ids(other, shift)
-    union(base, reindexed_other)
+  def disjoint_union(graph_a, graph_b) do
+    Yog.Graph.new(graph_a.kind)
+    |> add_tagged_component(graph_a, 0)
+    |> add_tagged_component(graph_b, 1)
   end
 
   @doc """
@@ -499,77 +488,34 @@ defmodule Yog.Operation do
 
   # ============= Helper Functions =============
 
-  # Shifts all node IDs in a graph by a given offset
-  defp shift_node_ids(%Yog.Graph{} = graph, offset) do
-    # Create ID mapping
-    id_mapping =
-      Map.keys(graph.nodes)
-      |> Enum.reduce(%{}, fn node, acc ->
-        Map.put(acc, node, node + offset)
+  # Reindex edges with
+  defp add_tagged_component(target_graph, source_graph, tag) do
+    target_graph =
+      Enum.reduce(Model.all_nodes(source_graph), target_graph, fn node_id, acc ->
+        data = Model.node(source_graph, node_id)
+        Model.add_node(acc, {tag, node_id}, data)
       end)
 
-    # Map nodes to new IDs
-    new_nodes = Map.new(graph.nodes, fn {id, data} -> {Map.get(id_mapping, id, id), data} end)
-
-    # Map out_edges
-    new_out_edges =
-      Map.new(graph.out_edges, fn {src, targets} ->
-        new_src = Map.get(id_mapping, src, src)
-
-        new_targets =
-          Map.new(targets, fn {dst, weight} -> {Map.get(id_mapping, dst, dst), weight} end)
-
-        {new_src, new_targets}
-      end)
-
-    # Map in_edges
-    new_in_edges =
-      Map.new(graph.in_edges, fn {dst, sources} ->
-        new_dst = Map.get(id_mapping, dst, dst)
-
-        new_sources =
-          Map.new(sources, fn {src, weight} -> {Map.get(id_mapping, src, src), weight} end)
-
-        {new_dst, new_sources}
-      end)
-
-    %{graph | nodes: new_nodes, out_edges: new_out_edges, in_edges: new_in_edges}
+    Enum.reduce(Model.all_edges(source_graph), target_graph, fn {u, v, data}, acc ->
+      Model.add_edge!(acc, {tag, u}, {tag, v}, data)
+    end)
   end
 
   # Finds all nodes within distance k from a source node using BFS
   defp nodes_within_distance(graph, src, max_dist) do
-    bfs_distances(graph, [src], %{src => 0}, max_dist)
-  end
-
-  defp bfs_distances(_graph, [], distances, _max_dist) do
-    Map.keys(distances)
-  end
-
-  defp bfs_distances(graph, [current | rest], distances, max_dist) do
-    current_dist = Map.get(distances, current, max_dist + 1)
-
-    if current_dist >= max_dist do
-      bfs_distances(graph, rest, distances, max_dist)
-    else
-      neighbors = Model.successor_ids(graph, current)
-
-      {new_queue, new_distances} =
-        Enum.reduce(neighbors, {rest, distances}, fn neighbor, {q, dists} ->
-          if Map.has_key?(dists, neighbor) do
-            {q, dists}
-          else
-            new_dist = current_dist + 1
-
-            if new_dist <= max_dist do
-              {[neighbor | q], Map.put(dists, neighbor, new_dist)}
-            else
-              {q, dists}
-            end
-          end
-        end)
-
-      bfs_distances(graph, new_queue, new_distances, max_dist)
-    end
+    Yog.Traversal.fold_walk(
+      over: graph,
+      from: src,
+      using: :breadth_first,
+      initial: [],
+      with: fn acc, node_id, meta ->
+        if meta.depth <= max_dist do
+          {:continue, [node_id | acc]}
+        else
+          {:stop, acc}
+        end
+      end
+    )
   end
 
   # Computes the degree sequence of a graph
@@ -598,9 +544,7 @@ defmodule Yog.Operation do
     try_mapping(first, second, first_nodes, second_nodes, %{})
   end
 
-  defp try_mapping(_first, _second, [], _available, _mapping) do
-    true
-  end
+  defp try_mapping(_first, _second, [], _available, _mapping), do: true
 
   defp try_mapping(first, second, [src | rest], available, mapping) do
     src_in = length(Model.predecessors(first, src))
@@ -662,6 +606,4 @@ defmodule Yog.Operation do
 
     inconsistent_edges == 0 && inconsistent_incoming == 0
   end
-
-  # mapping_valid? checks omitted from patch for brevity as they are unchanged but use has_edge? internally if needed.
 end
