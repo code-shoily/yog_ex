@@ -147,7 +147,8 @@ defmodule Yog.Pathfinding.FloydWarshall do
   @doc """
   Detects whether the graph contains a negative cycle.
 
-  More efficient than running the full algorithm if you only need cycle detection.
+  More efficient than running the full algorithm - returns early as soon as
+  a negative cycle is detected during the k iterations.
   """
   @spec detect_negative_cycle?(
           Yog.graph(),
@@ -161,10 +162,38 @@ defmodule Yog.Pathfinding.FloydWarshall do
         add \\ &Kernel.+/2,
         compare \\ &Yog.Utils.compare/2
       ) do
-    case floyd_warshall(graph, zero, add, compare) do
-      {:error, :negative_cycle} -> true
-      {:ok, _} -> false
-    end
+    nodes = Model.all_nodes(graph)
+    initial_dist = initialize_distances(nodes, graph, zero)
+
+    # Early-exit Floyd-Warshall: stop as soon as any dist[i][i] < 0
+    result =
+      Enum.reduce_while(nodes, initial_dist, fn k, acc_dist ->
+        # Perform the k-th iteration of Floyd-Warshall
+        new_dist =
+          Enum.reduce(nodes, acc_dist, fn i, acc_dist_i ->
+            Enum.reduce(nodes, acc_dist_i, fn j, acc_dist_j ->
+              relax_via_intermediate(i, j, k, acc_dist_j, add, compare)
+            end)
+          end)
+
+        # Check for negative cycle after this k iteration
+        # A negative cycle exists if any node has negative distance to itself
+        has_negative =
+          Enum.any?(nodes, fn i ->
+            case Map.fetch(new_dist, {i, i}) do
+              {:ok, d} -> compare_weights(d, zero, compare) == :lt
+              :error -> false
+            end
+          end)
+
+        if has_negative do
+          {:halt, :negative_cycle}
+        else
+          {:cont, new_dist}
+        end
+      end)
+
+    result == :negative_cycle
   end
 
   # Initialize distance matrix with direct edge weights
