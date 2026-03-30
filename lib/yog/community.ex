@@ -26,6 +26,14 @@ defmodule Yog.Community do
   - `Dendrogram` - Hierarchical community structure with multiple levels
   - `CommunityId` - Integer identifier for a community
 
+  ## Performance Notes
+
+  For frequent community-level queries, use `to_dict/1` to convert the
+  assignments map to a community-centric structure (community_id -> nodes).
+  Functions like `sizes/1`, `nodes_in/2`, and `largest/1` perform O(V) scans;
+  `to_dict/1` performs a single O(V) conversion that enables O(1) lookups
+  for all subsequent community operations.
+
   ## Examples
 
       # Create a graph with clear community structure (two cliques connected by a bridge)
@@ -87,7 +95,12 @@ defmodule Yog.Community do
   Converts community assignments to a dictionary mapping community IDs to sets of node IDs.
 
   This is useful when you need to iterate over all nodes in each community
-  rather than looking up the community for each node.
+  rather than looking up the community for each node. This performs a single
+  O(V) scan and produces a structure optimized for community-level queries.
+
+  > **Performance Tip**: Use this function before making multiple community-level
+  > queries. Functions like `sizes/1`, `nodes_in/2`, and `largest/1` each perform
+  > O(V) scans. Converting once with `to_dict/1` enables O(1) lookups thereafter.
 
   ## Examples
 
@@ -108,6 +121,11 @@ defmodule Yog.Community do
 
   Returns `:error` if there are no communities (empty graph or no assignments).
 
+  ## Performance
+
+  This function performs a single-pass O(V) reduction. For repeated queries,
+  consider using `to_dict/1` first.
+
   ## Examples
 
       iex> communities = Yog.Community.Result.new(%{1 => 0, 2 => 0, 3 => 0, 4 => 1})
@@ -116,19 +134,31 @@ defmodule Yog.Community do
   """
   @spec largest(communities()) :: {:ok, community_id()} | :error
   def largest(%Result{} = communities) do
-    communities
-    |> sizes()
-    |> Enum.to_list()
-    |> Enum.sort_by(fn {_, size} -> size end, :desc)
-    |> List.first()
+    # YOG-FAC-002: Single-pass reduction to find max-sized community
+    communities.assignments
+    |> Enum.reduce({%{}, {nil, 0}}, fn {_node, comm}, {counts, {max_c, max_s}} ->
+      new_count = Map.get(counts, comm, 0) + 1
+      new_counts = Map.put(counts, comm, new_count)
+
+      if new_count > max_s do
+        {new_counts, {comm, new_count}}
+      else
+        {new_counts, {max_c, max_s}}
+      end
+    end)
     |> case do
-      nil -> :error
-      {community_id, _} -> {:ok, community_id}
+      {_, {nil, _}} -> :error
+      {_, {comm, _}} -> {:ok, comm}
     end
   end
 
   @doc """
   Returns a dictionary mapping community IDs to their sizes (number of nodes).
+
+  ## Performance
+
+  This function performs a single O(V) scan. For repeated queries,
+  consider using `to_dict/1` first.
 
   ## Examples
 
@@ -168,6 +198,10 @@ defmodule Yog.Community do
   @spec merge(communities() | map(), source: community_id(), target: community_id()) ::
           communities() | map()
   def merge(%Result{} = communities, source: source, target: target) do
+    # YOG-FAC-003: Only decrement num_communities if source exists
+    source_exists =
+      Enum.any?(communities.assignments, fn {_node, comm} -> comm == source end)
+
     new_assignments =
       Enum.reduce(communities.assignments, communities.assignments, fn
         {node, ^source}, acc ->
@@ -178,10 +212,15 @@ defmodule Yog.Community do
       end)
 
     num_communities =
-      if source == target do
-        communities.num_communities
-      else
-        communities.num_communities - 1
+      cond do
+        source == target ->
+          communities.num_communities
+
+        source_exists ->
+          communities.num_communities - 1
+
+        true ->
+          communities.num_communities
       end
 
     %Result{
@@ -193,6 +232,10 @@ defmodule Yog.Community do
 
   # Legacy map support
   def merge(%{assignments: _, num_communities: _} = communities, source: source, target: target) do
+    # YOG-FAC-003: Only decrement num_communities if source exists
+    source_exists =
+      Enum.any?(communities.assignments, fn {_node, comm} -> comm == source end)
+
     new_assignments =
       Enum.reduce(communities.assignments, communities.assignments, fn
         {node, ^source}, acc ->
@@ -203,10 +246,15 @@ defmodule Yog.Community do
       end)
 
     num_communities =
-      if source == target do
-        communities.num_communities
-      else
-        communities.num_communities - 1
+      cond do
+        source == target ->
+          communities.num_communities
+
+        source_exists ->
+          communities.num_communities - 1
+
+        true ->
+          communities.num_communities
       end
 
     %{
@@ -217,6 +265,11 @@ defmodule Yog.Community do
 
   @doc """
   Returns all nodes belonging to a specific community.
+
+  ## Performance
+
+  This function performs an O(V) scan. For repeated queries or checking
+  multiple communities, use `to_dict/1` first for O(1) lookups.
 
   ## Examples
 
@@ -277,7 +330,8 @@ defmodule Yog.Community do
       true
   """
   def modularity(graph, %Result{} = communities, opts \\ []) do
-    Metrics.modularity(graph, Result.to_map(communities), opts)
+    # YOG-FAC-004: Metrics module now supports Result struct natively
+    Metrics.modularity(graph, communities, opts)
   end
 
   @doc """
@@ -416,7 +470,6 @@ defmodule Yog.Community do
       iex> graph = Yog.undirected()
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_node(3, nil)
       ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
       iex> communities = Yog.Community.Result.new(%{1 => 0, 2 => 0, 3 => 0})
       iex> avg_cd = Yog.Community.average_community_density(graph, communities)
@@ -425,6 +478,7 @@ defmodule Yog.Community do
   """
   @spec average_community_density(Yog.graph(), communities()) :: float()
   def average_community_density(graph, %Result{} = communities) do
-    Metrics.average_community_density(graph, Result.to_map(communities))
+    # YOG-FAC-004: Metrics module now supports Result struct natively
+    Metrics.average_community_density(graph, communities)
   end
 end
