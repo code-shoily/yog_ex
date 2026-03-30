@@ -46,7 +46,7 @@ defmodule Yog.Flow.MaxFlow do
           {3, 4, 10}
         ])
 
-      result = Yog.Flow.MaxFlow.edmonds_karp_int(graph, 1, 4)
+      result = Yog.Flow.MaxFlow.calculate(graph, 1, 4)
       # => %MaxFlowResult{max_flow: 15, residual_graph: ..., source: 1, sink: 4}
 
   ## References
@@ -59,7 +59,6 @@ defmodule Yog.Flow.MaxFlow do
   alias Yog.Flow.MaxFlowResult
   alias Yog.Flow.MinCutResult
   alias Yog.Model
-  alias Yog.Traversal
 
   @typedoc """
   Result of a max flow computation.
@@ -77,6 +76,34 @@ defmodule Yog.Flow.MaxFlow do
   The capacity of the cut equals the max flow by the max-flow min-cut theorem.
   """
   @type min_cut :: MinCutResult.t()
+
+  @doc """
+  Calculates the maximum flow from source to sink using Edmonds-Karp with standard integers.
+
+  This is a convenience wrapper around `edmonds_karp/8` that uses default
+  integer arithmetic operations.
+
+  ## Parameters
+
+  - `graph` - The flow network with edge capacities
+  - `source` - Source node ID where flow originates
+  - `sink` - Sink node ID where flow terminates
+
+  ## Examples
+
+      iex> {:ok, graph} = Yog.directed()
+      ...>   |> Yog.add_node(1, "s")
+      ...>   |> Yog.add_node(2, "a")
+      ...>   |> Yog.add_node(3, "t")
+      ...>   |> Yog.add_edges([{1, 2, 10}, {2, 3, 5}])
+      iex> result = Yog.Flow.MaxFlow.calculate(graph, 1, 3)
+      iex> result.max_flow
+      5
+  """
+  @spec calculate(Yog.graph(), Yog.node_id(), Yog.node_id()) :: max_flow_result()
+  def calculate(graph, source, sink) do
+    edmonds_karp(graph, source, sink)
+  end
 
   @doc """
   Finds the maximum flow using the Edmonds-Karp algorithm with custom numeric type.
@@ -132,7 +159,7 @@ defmodule Yog.Flow.MaxFlow do
     residual = build_residual_graph(graph, zero)
 
     {max_flow, final_residual} =
-      do_edmonds_karp(residual, source, sink, zero, add, subtract, compare, min_fn)
+      do_edmonds_karp(residual, source, sink, zero, add, subtract, compare, min_fn, zero)
 
     final_residual_graph = residual_to_graph(graph, final_residual)
     MaxFlowResult.new(max_flow, final_residual_graph, source, sink)
@@ -159,28 +186,49 @@ defmodule Yog.Flow.MaxFlow do
   end
 
   # Convert internal residual map back to a Yog.Graph structure
+  # Direct construction is faster than using Model.add_edge for bulk operations
   defp residual_to_graph(original_graph, residual_map) do
-    empty_graph =
-      Model.all_nodes(original_graph)
-      |> Enum.reduce(Yog.Graph.new(:directed), fn node, g ->
-        Model.add_node(g, node, Map.get(original_graph.nodes, node))
+    # Build out_edges and in_edges directly from residual map
+    {out_edges, in_edges} =
+      Enum.reduce(residual_map, {%{}, %{}}, fn {u, edges}, {out_acc, in_acc} ->
+        # Collect outgoing edges for u
+        out_for_u =
+          Enum.reduce(edges, %{}, fn {v, cap}, acc ->
+            if cap != 0, do: Map.put(acc, v, cap), else: acc
+          end)
+
+        # Update out_edges
+        new_out = if map_size(out_for_u) > 0, do: Map.put(out_acc, u, out_for_u), else: out_acc
+
+        # Update in_edges (reverse mapping)
+        new_in =
+          Enum.reduce(edges, in_acc, fn {v, cap}, acc ->
+            if cap != 0 do
+              Map.update(acc, v, %{u => cap}, &Map.put(&1, u, cap))
+            else
+              acc
+            end
+          end)
+
+        {new_out, new_in}
       end)
 
-    Enum.reduce(residual_map, empty_graph, fn {u, edges}, g ->
-      Enum.reduce(edges, g, fn {v, cap}, g_acc ->
-        case Model.add_edge(g_acc, u, v, cap) do
-          {:ok, new_g} -> new_g
-          {:error, _} -> g_acc
-        end
-      end)
-    end)
+    # Preserve node metadata from original graph
+    nodes = original_graph.nodes
+
+    %Yog.Graph{
+      kind: :directed,
+      nodes: nodes,
+      out_edges: out_edges,
+      in_edges: in_edges
+    }
   end
 
-  # Edmonds-Karp loop
-  defp do_edmonds_karp(residual, source, sink, zero, add, subtract, compare, min_fn) do
-    case find_augmenting_path(residual, source, sink, zero, compare) do
+  # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity
+  defp do_edmonds_karp(residual, source, sink, zero, add, subtract, compare, min_fn, acc_flow) do
+    case find_augmenting_path(residual, source, sink, zero, compare, min_fn) do
       nil ->
-        {zero, residual}
+        {acc_flow, residual}
 
       {path, bottleneck} ->
         new_residual =
@@ -210,69 +258,90 @@ defmodule Yog.Flow.MaxFlow do
             Map.put(acc, to, Map.put(to_edges, from, new_back))
           end)
 
-        {flow_rest, final_residual} =
-          do_edmonds_karp(new_residual, source, sink, zero, add, subtract, compare, min_fn)
-
-        {add.(bottleneck, flow_rest), final_residual}
+        # TAIL CALL: accumulated flow passed as argument
+        do_edmonds_karp(
+          new_residual,
+          source,
+          sink,
+          zero,
+          add,
+          subtract,
+          compare,
+          min_fn,
+          add.(acc_flow, bottleneck)
+        )
     end
   end
 
-  # Find augmenting path using BFS
-  defp find_augmenting_path(residual, source, sink, zero, compare) do
-    parents =
-      Traversal.Implicit.implicit_fold(
-        from: source,
-        using: :breadth_first,
-        successors_of: fn node ->
-          residual
-          |> Map.get(node, %{})
-          |> Enum.filter(fn {_to, cap} -> compare.(cap, zero) == :gt end)
-          |> Enum.map(fn {to, _} -> to end)
-        end,
-        initial: %{},
-        with: fn acc, node_id, meta ->
-          new_acc = if meta.parent, do: Map.put(acc, node_id, meta.parent), else: acc
+  # Find augmenting path using BFS with bottleneck tracking
+  # Uses :queue for O(1) enqueue/dequeue operations
+  # Returns {path_edges, bottleneck} or nil
+  defp find_augmenting_path(residual, source, sink, zero, compare, min_fn) do
+    # Use Erlang's :queue for O(1) operations
+    queue = :queue.in(source, :queue.new())
 
-          if node_id == sink do
-            {:halt, new_acc}
-          else
-            {:continue, new_acc}
-          end
+    # State tracks parents, bottlenecks, and visited nodes
+    state = %{
+      parents: %{source => nil},
+      bottlenecks: %{source => :infinity},
+      visited: MapSet.new([source])
+    }
+
+    do_bfs(queue, residual, sink, zero, compare, min_fn, state)
+  end
+
+  defp do_bfs(queue, residual, sink, zero, compare, min_fn, state) do
+    case :queue.out(queue) do
+      {:empty, _} ->
+        nil
+
+      {{:value, current}, rest_q} ->
+        if current == sink do
+          # Found sink - reconstruct path and return with bottleneck
+          path_edges = reconstruct_path_edges(state.parents, sink, [])
+          bottleneck = Map.fetch!(state.bottlenecks, sink)
+          {path_edges, bottleneck}
+        else
+          # Process neighbors
+          neighbors = Map.get(residual, current, %{})
+          current_bot = Map.get(state.bottlenecks, current)
+
+          {next_q, next_state} =
+            Enum.reduce(neighbors, {rest_q, state}, fn {to, cap}, {q_acc, s_acc} = acc ->
+              # Skip if already visited or no residual capacity
+              if MapSet.member?(s_acc.visited, to) or compare.(cap, zero) == :eq do
+                acc
+              else
+                # Calculate bottleneck to this neighbor
+                path_bottleneck =
+                  if current_bot == :infinity,
+                    do: cap,
+                    else: min_fn.(current_bot, cap)
+
+                new_q = :queue.in(to, q_acc)
+
+                new_s = %{
+                  s_acc
+                  | parents: Map.put(s_acc.parents, to, current),
+                    bottlenecks: Map.put(s_acc.bottlenecks, to, path_bottleneck),
+                    visited: MapSet.put(s_acc.visited, to)
+                }
+
+                {new_q, new_s}
+              end
+            end)
+
+          # TAIL CALL: continue BFS
+          do_bfs(next_q, residual, sink, zero, compare, min_fn, next_state)
         end
-      )
-
-    if Map.has_key?(parents, sink) or source == sink do
-      path_nodes = reconstruct_path_nodes(parents, sink, [])
-
-      path_edges =
-        path_nodes
-        |> Enum.chunk_every(2, 1, :discard)
-        |> Enum.map(fn [u, v] -> {u, v} end)
-
-      bottleneck = compute_bottleneck(residual, path_edges, zero, compare)
-      {path_edges, bottleneck}
-    else
-      nil
     end
   end
 
-  defp reconstruct_path_nodes(parents, node, acc) do
-    case Map.get(parents, node) do
-      nil -> [node | acc]
-      parent -> reconstruct_path_nodes(parents, parent, [node | acc])
+  defp reconstruct_path_edges(parents, sink, acc) do
+    case Map.fetch!(parents, sink) do
+      nil -> acc
+      parent -> reconstruct_path_edges(parents, parent, [{parent, sink} | acc])
     end
-  end
-
-  # Compute bottleneck (minimum capacity along path)
-  defp compute_bottleneck(residual, path, zero, compare) do
-    Enum.reduce(path, nil, fn {u, v}, acc ->
-      cap = Map.get(residual, u, %{}) |> Map.get(v, zero)
-
-      case acc do
-        nil -> cap
-        current -> if compare.(cap, current) == :lt, do: cap, else: current
-      end
-    end)
   end
 
   @doc """
@@ -317,7 +386,7 @@ defmodule Yog.Flow.MaxFlow do
 
   - `result` - The max flow result from `edmonds_karp/8`
   - `zero` - Zero value for the capacity type
-  - `compare` - Comparison function for capacities (returns true if a <= b)
+  - `compare` - Comparison function for capacities (returns `:lt`, `:eq`, or `:gt`)
 
   ## Examples
 
@@ -326,10 +395,8 @@ defmodule Yog.Flow.MaxFlow do
       ...>   |> Yog.add_node(2, "a")
       ...>   |> Yog.add_node(3, "t")
       ...>   |> Yog.add_edges([{1, 2, 10}, {2, 3, 5}])
-      iex> result = Yog.Flow.MaxFlow.edmonds_karp(
-      ...>   graph, 1, 3, 0, &(&1 + &2), &(&1 - &2), fn a, b -> a <= b end, &min/2
-      ...> )
-      iex> cut = Yog.Flow.MaxFlow.min_cut(result, 0, fn a, b -> a <= b end)
+      iex> result = Yog.Flow.MaxFlow.edmonds_karp(graph, 1, 3)
+      iex> cut = Yog.Flow.MaxFlow.min_cut(result)
       iex> MapSet.member?(cut.source_side, 1)
       true
   """
@@ -346,17 +413,34 @@ defmodule Yog.Flow.MaxFlow do
     MinCutResult.new(source_side, sink_side)
   end
 
+  # BFS to find all nodes reachable from source in residual graph
   defp bfs_reachable_with_compare(residual, source, _all_nodes, zero, compare) do
-    Traversal.Implicit.implicit_fold(
-      from: source,
-      using: :breadth_first,
-      successors_of: fn node ->
-        Model.successors(residual, node)
-        |> Enum.filter(fn {_, cap} -> compare.(cap, zero) != :eq end)
-        |> Enum.map(fn {to, _} -> to end)
-      end,
-      initial: MapSet.new(),
-      with: fn acc, node_id, _meta -> {:continue, MapSet.put(acc, node_id)} end
-    )
+    queue = :queue.in(source, :queue.new())
+    visited = MapSet.new([source])
+    do_reachable_bfs(queue, residual, zero, compare, visited)
+  end
+
+  defp do_reachable_bfs(queue, residual, zero, compare, visited) do
+    case :queue.out(queue) do
+      {:empty, _} ->
+        visited
+
+      {{:value, current}, rest_q} ->
+        neighbors =
+          Model.successors(residual, current)
+          |> Enum.filter(fn {_to, cap} -> compare.(cap, zero) != :eq end)
+          |> Enum.map(fn {to, _} -> to end)
+
+        {next_q, next_visited} =
+          Enum.reduce(neighbors, {rest_q, visited}, fn neighbor, {q_acc, visited_acc} ->
+            if MapSet.member?(visited_acc, neighbor) do
+              {q_acc, visited_acc}
+            else
+              {:queue.in(neighbor, q_acc), MapSet.put(visited_acc, neighbor)}
+            end
+          end)
+
+        do_reachable_bfs(next_q, residual, zero, compare, next_visited)
+    end
   end
 end
