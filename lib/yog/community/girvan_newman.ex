@@ -9,7 +9,7 @@ defmodule Yog.Community.GirvanNewman do
   ## Algorithm
 
   1. **Calculate** edge betweenness centrality for all edges
-  2. **Remove** the edge with highest betweenness
+  2. **Remove** the edge(s) with highest betweenness (batch removal)
   3. **Repeat** until no edges remain
   4. **Record** connected components at each step (hierarchy)
 
@@ -90,7 +90,10 @@ defmodule Yog.Community.GirvanNewman do
         discovery = run_discovery(graph, s)
         edge_dependencies = accumulate_edge_dependencies(discovery)
 
-        Map.merge(acc, edge_dependencies, fn _k, v1, v2 -> v1 + v2 end)
+        # Merge edge_dependencies into acc using Enum.reduce with Map.update
+        Enum.reduce(edge_dependencies, acc, fn {edge, score}, inner_acc ->
+          Map.update(inner_acc, edge, score, &(&1 + score))
+        end)
       end)
 
     # Scale for undirected graphs
@@ -172,7 +175,8 @@ defmodule Yog.Community.GirvanNewman do
   """
   @spec detect_hierarchical(Yog.graph()) :: Dendrogram.t()
   def detect_hierarchical(graph) do
-    do_gn_split(graph, [])
+    initial_comms = find_connected_components(graph)
+    do_gn_split(graph, [initial_comms], initial_comms.num_communities)
   end
 
   # =============================================================================
@@ -211,7 +215,8 @@ defmodule Yog.Community.GirvanNewman do
           {next_q, next_dists, next_sigmas, next_preds} =
             Model.successors(graph, v)
             |> Enum.reduce({rest_q, dists, sigmas, preds}, fn {w, weight}, {q, ds, ss, ps} ->
-              new_dist = d_v + weight
+              weight_float = if is_nil(weight), do: 1.0, else: weight
+              new_dist = d_v + weight_float
 
               case Map.get(ds, w) do
                 nil ->
@@ -285,9 +290,17 @@ defmodule Yog.Community.GirvanNewman do
   # HIERARCHICAL SPLITTING
   # =============================================================================
 
-  defp do_gn_split(graph, levels) do
+  defp do_gn_split(graph, levels, prev_num_comms) do
     current_comms = find_connected_components(graph)
-    new_levels = [current_comms | levels]
+    current_num_comms = current_comms.num_communities
+
+    # Only add level if number of communities increased
+    new_levels =
+      if current_num_comms > prev_num_comms do
+        [current_comms | levels]
+      else
+        levels
+      end
 
     edge_count = count_edges(graph)
 
@@ -304,17 +317,17 @@ defmodule Yog.Community.GirvanNewman do
           |> Map.values()
           |> Enum.max(fn -> 0.0 end)
 
-        edge_to_remove =
-          Enum.find(ebc, fn {_edge, score} -> score == max_val end)
-          |> case do
-            nil -> {0, 0}
-            {{u, v}, _score} -> {u, v}
-          end
+        edges_to_remove =
+          Enum.filter(ebc, fn {_edge, score} -> score == max_val end)
+          |> Enum.map(fn {{u, v}, _score} -> {u, v} end)
 
-        {u, v} = edge_to_remove
-        new_graph = Model.remove_edge(graph, u, v)
+        # Remove all edges with max betweenness
+        new_graph =
+          Enum.reduce(edges_to_remove, graph, fn {u, v}, g ->
+            Model.remove_edge(g, u, v)
+          end)
 
-        do_gn_split(new_graph, new_levels)
+        do_gn_split(new_graph, new_levels, current_num_comms)
       end
     end
   end
