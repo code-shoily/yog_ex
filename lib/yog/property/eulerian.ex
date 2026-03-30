@@ -153,7 +153,9 @@ defmodule Yog.Property.Eulerian do
       Enum.all?(nodes, fn node ->
         inner = Map.get(out_edges, node, %{})
         degree = map_size(inner)
-        adjusted_degree = if Map.has_key?(inner, node), do: degree - 1, else: degree
+        # Self-loops: map_size counts 1 but contributes 2 to degree.
+        # Add 1 to correct the count (parity unchanged since +1 to +2 is even change).
+        adjusted_degree = if Map.has_key?(inner, node), do: degree + 1, else: degree
         rem(adjusted_degree, 2) == 0
       end)
 
@@ -233,13 +235,14 @@ defmodule Yog.Property.Eulerian do
   defp has_eulerian_path_undirected?(graph, nodes) do
     out_edges = graph.out_edges
 
-    # 0 or 2 odd degree nodes (excluding self loops which don't affect parity)
+    # 0 or 2 odd degree nodes
+    # Self-loops: map_size counts 1 but contributes 2 to degree.
+    # Add 1 to correct the count (parity unchanged since +1 to +2 is even change).
     odd_count =
       Enum.count(nodes, fn node ->
         inner = Map.get(out_edges, node, %{})
         degree = map_size(inner)
-        adjusted_degree = if Map.has_key?(inner, node), do: degree - 1, else: degree
-
+        adjusted_degree = if Map.has_key?(inner, node), do: degree + 1, else: degree
         rem(adjusted_degree, 2) == 1
       end)
 
@@ -274,27 +277,37 @@ defmodule Yog.Property.Eulerian do
     end
   end
 
-  # Check if graph is connected (weakly for directed)
+  # Check if all non-isolated nodes are in a single connected component
+  # Isolated nodes (degree 0) are ignored - they don't affect Eulerian property
   defp connected?(graph, nodes) do
-    source = hd(nodes)
-    visited = bfs_visited(graph, source)
-    Enum.all?(nodes, fn n -> n in visited end)
+    # Filter out isolated nodes (nodes with no edges)
+    non_isolated =
+      Enum.reject(nodes, fn node ->
+        Enum.empty?(Model.neighbor_ids(graph, node))
+      end)
+
+    case non_isolated do
+      [] ->
+        # All nodes are isolated - vacuously connected
+        true
+
+      [source | _] ->
+        visited = bfs_visited(graph, source)
+        Enum.all?(non_isolated, fn n -> n in visited end)
+    end
   end
 
   defp bfs_visited(graph, source) do
-    do_bfs(graph, [source], MapSet.new([source]))
-  end
-
-  defp do_bfs(_graph, [], visited), do: MapSet.to_list(visited)
-
-  defp do_bfs(graph, [current | rest], visited) do
-    # For both directed and undirected, consider neighbors in both directions
-    neighbors = Model.neighbor_ids(graph, current)
-
-    new_neighbors = Enum.reject(neighbors, fn n -> MapSet.member?(visited, n) end)
-    new_visited = Enum.reduce(new_neighbors, visited, fn n, acc -> MapSet.put(acc, n) end)
-
-    do_bfs(graph, rest ++ new_neighbors, new_visited)
+    Yog.Traversal.fold_walk(
+      over: graph,
+      from: source,
+      using: :breadth_first,
+      initial: MapSet.new(),
+      with: fn acc, node_id, _meta ->
+        {:continue, MapSet.put(acc, node_id)}
+      end
+    )
+    |> MapSet.to_list()
   end
 
   @doc """
