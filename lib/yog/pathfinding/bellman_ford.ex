@@ -99,6 +99,7 @@ defmodule Yog.Pathfinding.BellmanFord do
     * `:zero` - Identity value for the weight type
     * `:add` - Function to add two weights
     * `:compare` - Function to compare weights
+    * `:max_iterations` - Maximum iterations before giving up (default: 1000)
 
   ## Examples
 
@@ -119,8 +120,9 @@ defmodule Yog.Pathfinding.BellmanFord do
     zero = opts[:zero] || 0
     add = opts[:add] || (&Kernel.+/2)
     compare = opts[:compare] || (&Yog.Utils.compare/2)
+    max_iterations = Keyword.get(opts, :max_iterations, 1000)
 
-    implicit_bellman_ford(from, successors, is_goal, zero, add, compare)
+    implicit_bellman_ford(from, successors, is_goal, zero, add, compare, max_iterations)
   end
 
   @doc """
@@ -214,7 +216,6 @@ defmodule Yog.Pathfinding.BellmanFord do
         compare \\ &Yog.Utils.compare/2
       ) do
     nodes = Model.all_nodes(graph)
-    edges = get_all_edges(graph)
     node_count = length(nodes)
 
     # Initialize distances
@@ -229,12 +230,13 @@ defmodule Yog.Pathfinding.BellmanFord do
         Enum.reduce(1..(node_count - 1), {initial_distances, initial_predecessors}, fn _,
                                                                                        {dist,
                                                                                         pred} ->
-          relax_all_edges(edges, dist, pred, add, compare)
+          relax_all_edges_from_graph(graph, dist, pred, add, compare)
         end)
       end
 
     # Check for negative cycles with one more relaxation
-    {final_distances, _} = relax_all_edges(edges, distances, predecessors, add, compare)
+    {final_distances, _} =
+      relax_all_edges_from_graph(graph, distances, predecessors, add, compare)
 
     if negative_cycle_detected?(nodes, distances, final_distances, compare) do
       {:error, :negative_cycle}
@@ -270,7 +272,6 @@ defmodule Yog.Pathfinding.BellmanFord do
         compare \\ &Yog.Utils.compare/2
       ) do
     nodes = Model.all_nodes(graph)
-    edges = get_all_edges(graph)
     node_count = length(nodes)
 
     initial_distances = %{from => zero}
@@ -279,7 +280,7 @@ defmodule Yog.Pathfinding.BellmanFord do
     {distances, _} =
       Enum.reduce(1..(node_count - 1), {initial_distances, initial_predecessors}, fn _,
                                                                                      {dist, pred} ->
-        relax_all_edges(edges, dist, pred, add, compare)
+        relax_all_edges_from_graph(graph, dist, pred, add, compare)
       end)
 
     distances
@@ -303,7 +304,6 @@ defmodule Yog.Pathfinding.BellmanFord do
         compare \\ &Yog.Utils.compare/2
       ) do
     nodes = Model.all_nodes(graph)
-    edges = get_all_edges(graph)
     node_count = length(nodes)
 
     initial_distances = %{from => zero}
@@ -311,11 +311,11 @@ defmodule Yog.Pathfinding.BellmanFord do
     # Relax |V| - 1 times
     distances =
       Enum.reduce(1..(node_count - 1), initial_distances, fn _, dist ->
-        relax_all_edges_no_pred(edges, dist, add, compare)
+        relax_all_edges_from_graph_no_pred(graph, dist, add, compare)
       end)
 
     # One more relaxation to check for negative cycles
-    final_distances = relax_all_edges_no_pred(edges, distances, add, compare)
+    final_distances = relax_all_edges_from_graph_no_pred(graph, distances, add, compare)
 
     negative_cycle_detected?(nodes, distances, final_distances, compare)
   end
@@ -373,7 +373,8 @@ defmodule Yog.Pathfinding.BellmanFord do
           (state -> boolean),
           cost,
           (cost, cost -> cost),
-          (cost, cost -> :lt | :eq | :gt)
+          (cost, cost -> :lt | :eq | :gt),
+          non_neg_integer()
         ) :: implicit_result(cost)
         when state: var, cost: var
   def implicit_bellman_ford(
@@ -382,15 +383,25 @@ defmodule Yog.Pathfinding.BellmanFord do
         is_goal,
         zero \\ 0,
         add \\ &Kernel.+/2,
-        compare \\ &Yog.Utils.compare/2
+        compare \\ &Yog.Utils.compare/2,
+        max_iterations \\ 1000
       ) do
-    implicit_bellman_ford_by(from, successors, fn x -> x end, is_goal, zero, add, compare)
+    implicit_bellman_ford_by(
+      from,
+      successors,
+      fn x -> x end,
+      is_goal,
+      zero,
+      add,
+      compare,
+      max_iterations
+    )
   end
 
   @doc """
   Implicit Bellman-Ford with a key function for visited state tracking.
 
-  Similar to `implicit_bellman_ford/6`, but uses a key function for visited tracking.
+  Similar to `implicit_bellman_ford/7`, but uses a key function for visited tracking.
 
   ## Parameters
 
@@ -401,6 +412,7 @@ defmodule Yog.Pathfinding.BellmanFord do
     * `zero` - Identity value for the weight type
     * `add` - Function to add two weights
     * `compare` - Function to compare weights
+    * `max_iterations` - Maximum iterations before giving up (default: 1000)
   """
   @spec implicit_bellman_ford_by(
           state,
@@ -409,7 +421,8 @@ defmodule Yog.Pathfinding.BellmanFord do
           (state -> boolean),
           cost,
           (cost, cost -> cost),
-          (cost, cost -> :lt | :eq | :gt)
+          (cost, cost -> :lt | :eq | :gt),
+          non_neg_integer()
         ) :: implicit_result(cost)
         when state: var, cost: var
   def implicit_bellman_ford_by(
@@ -419,44 +432,47 @@ defmodule Yog.Pathfinding.BellmanFord do
         is_goal,
         zero \\ 0,
         add \\ &Kernel.+/2,
-        compare \\ &Yog.Utils.compare/2
+        compare \\ &Yog.Utils.compare/2,
+        max_iterations \\ 1000
       ) do
     # For implicit graphs, we don't know the total node count
     # So we use a limit on iterations and detect when distances stabilize
     initial_distances = %{key_fn.(from) => {from, zero}}
 
-    do_implicit_bellman_ford(successors, key_fn, is_goal, add, compare, initial_distances, 1000)
+    do_implicit_bellman_ford(
+      successors,
+      key_fn,
+      is_goal,
+      add,
+      compare,
+      initial_distances,
+      max_iterations
+    )
   end
 
   # Helper functions
 
-  defp get_all_edges(graph) do
-    nodes = Model.all_nodes(graph)
-
-    Enum.flat_map(nodes, fn u ->
-      successors = Model.successors(graph, u)
-      Enum.map(successors, fn {v, weight} -> {u, v, weight} end)
-    end)
-  end
-
-  # Relax all edges, tracking predecessors
-  defp relax_all_edges(edges, distances, predecessors, add, compare) do
-    Enum.reduce(edges, {distances, predecessors}, fn {u, v, weight}, {dist, pred} ->
+  # Relax all edges directly from graph.out_edges (memory-efficient)
+  # Iterates over graph structure without materializing edge list
+  defp relax_all_edges_from_graph(graph, distances, predecessors, add, compare) do
+    Enum.reduce(graph.out_edges, {distances, predecessors}, fn {u, successors}, {dist, pred} ->
       case Map.fetch(dist, u) do
         {:ok, dist_u} ->
-          new_dist_v = add.(dist_u, weight)
+          Enum.reduce(successors, {dist, pred}, fn {v, weight}, {d, p} ->
+            new_dist_v = add.(dist_u, weight)
 
-          case Map.fetch(dist, v) do
-            {:ok, current_dist_v} ->
-              if compare.(new_dist_v, current_dist_v) == :lt do
-                {Map.put(dist, v, new_dist_v), Map.put(pred, v, u)}
-              else
-                {dist, pred}
-              end
+            case Map.fetch(d, v) do
+              {:ok, current_dist_v} ->
+                if compare.(new_dist_v, current_dist_v) == :lt do
+                  {Map.put(d, v, new_dist_v), Map.put(p, v, u)}
+                else
+                  {d, p}
+                end
 
-            :error ->
-              {Map.put(dist, v, new_dist_v), Map.put(pred, v, u)}
-          end
+              :error ->
+                {Map.put(d, v, new_dist_v), Map.put(p, v, u)}
+            end
+          end)
 
         :error ->
           {dist, pred}
@@ -464,24 +480,26 @@ defmodule Yog.Pathfinding.BellmanFord do
     end)
   end
 
-  # Relax all edges without tracking predecessors
-  defp relax_all_edges_no_pred(edges, distances, add, compare) do
-    Enum.reduce(edges, distances, fn {u, v, weight}, dist ->
+  # Relax all edges without tracking predecessors (memory-efficient)
+  defp relax_all_edges_from_graph_no_pred(graph, distances, add, compare) do
+    Enum.reduce(graph.out_edges, distances, fn {u, successors}, dist ->
       case Map.fetch(dist, u) do
         {:ok, dist_u} ->
-          new_dist_v = add.(dist_u, weight)
+          Enum.reduce(successors, dist, fn {v, weight}, d ->
+            new_dist_v = add.(dist_u, weight)
 
-          case Map.fetch(dist, v) do
-            {:ok, current_dist_v} ->
-              if compare.(new_dist_v, current_dist_v) == :lt do
-                Map.put(dist, v, new_dist_v)
-              else
-                dist
-              end
+            case Map.fetch(d, v) do
+              {:ok, current_dist_v} ->
+                if compare.(new_dist_v, current_dist_v) == :lt do
+                  Map.put(d, v, new_dist_v)
+                else
+                  d
+                end
 
-            :error ->
-              Map.put(dist, v, new_dist_v)
-          end
+              :error ->
+                Map.put(d, v, new_dist_v)
+            end
+          end)
 
         :error ->
           dist
