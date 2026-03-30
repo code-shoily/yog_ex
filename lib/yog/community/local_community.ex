@@ -116,15 +116,30 @@ defmodule Yog.Community.LocalCommunity do
   @spec detect_with(Yog.graph(), [Yog.node_id()], local_options(), (any() -> float())) ::
           MapSet.t(Yog.node_id())
   def detect_with(graph, seeds, options, weight_fn) do
-    initial_s = MapSet.new(seeds)
+    seeds_set = MapSet.new(seeds)
+    initial_s = seeds_set
 
     # Compute initial degrees
     {k_in, k_out} = compute_k_out_in(graph, initial_s, weight_fn)
 
+    {frontier, internal_weights} = initialize_frontier_and_weights(graph, initial_s, weight_fn)
+
     # Start with empty degrees cache
     degrees_cache = %{}
 
-    do_detect(graph, initial_s, k_in, k_out, degrees_cache, options, 0, weight_fn, seeds)
+    do_detect(
+      graph,
+      initial_s,
+      k_in,
+      k_out,
+      frontier,
+      internal_weights,
+      degrees_cache,
+      options,
+      0,
+      weight_fn,
+      seeds_set
+    )
   end
 
   # ============================================================
@@ -132,8 +147,7 @@ defmodule Yog.Community.LocalCommunity do
   # ============================================================
 
   defp compute_k_out_in(graph, s, weight_fn) do
-    MapSet.to_list(s)
-    |> Enum.reduce({0.0, 0.0}, fn node, {k_in_acc, k_out_acc} ->
+    Enum.reduce(s, {0.0, 0.0}, fn node, {k_in_acc, k_out_acc} ->
       Model.successors(graph, node)
       |> Enum.reduce({k_in_acc, k_out_acc}, fn {neighbor_id, w}, {kin, kout} ->
         w_float = weight_fn.(w)
@@ -147,19 +161,82 @@ defmodule Yog.Community.LocalCommunity do
     end)
   end
 
-  # Compute the boundary of S (nodes outside S that are neighbors of S)
-  defp boundary_of(graph, s) do
-    MapSet.to_list(s)
-    |> Enum.reduce(MapSet.new(), fn node, acc ->
+  defp initialize_frontier_and_weights(graph, s, weight_fn) do
+    Enum.reduce(s, {MapSet.new(), %{}}, fn node, {frontier_acc, weights_acc} ->
       Model.successors(graph, node)
-      |> Enum.reduce(acc, fn {neighbor_id, _}, acc2 ->
+      |> Enum.reduce({frontier_acc, weights_acc}, fn {neighbor_id, w}, {front, wacc} ->
+        w_float = weight_fn.(w)
+
         if MapSet.member?(s, neighbor_id) do
-          acc2
+          # Internal edge - update internal weight cache (only for nodes in S)
+          new_wacc = Map.update(wacc, node, w_float, &(&1 + w_float))
+          {front, new_wacc}
         else
-          MapSet.put(acc2, neighbor_id)
+          # External edge - add to frontier AND update internal weight of frontier node
+          new_front = MapSet.put(front, neighbor_id)
+          # The internal weight of neighbor_id is the sum of weights to S
+          new_wacc = Map.update(wacc, neighbor_id, w_float, &(&1 + w_float))
+          {new_front, new_wacc}
         end
       end)
     end)
+  end
+
+  defp update_frontier_on_add(graph, frontier, internal_weights, s, new_node, weight_fn) do
+    # Remove added node from frontier
+    frontier = MapSet.delete(frontier, new_node)
+
+    # Scan neighbors of new_node
+    Model.successors(graph, new_node)
+    |> Enum.reduce({frontier, internal_weights}, fn {neighbor_id, w}, {front, wacc} ->
+      w_float = weight_fn.(w)
+
+      if MapSet.member?(s, neighbor_id) do
+        new_wacc =
+          wacc
+          |> Map.update(new_node, w_float, &(&1 + w_float))
+          |> Map.update(neighbor_id, w_float, &(&1 + w_float))
+
+        {front, new_wacc}
+      else
+        {MapSet.put(front, neighbor_id), wacc}
+      end
+    end)
+  end
+
+  defp update_frontier_on_remove(graph, frontier, internal_weights, s, removed_node, weight_fn) do
+    s_without_node = MapSet.delete(s, removed_node)
+
+    # Scan neighbors of removed_node
+    {new_frontier, new_internal_weights} =
+      Model.successors(graph, removed_node)
+      |> Enum.reduce({frontier, internal_weights}, fn {neighbor_id, w}, {front, wacc} ->
+        w_float = weight_fn.(w)
+
+        if neighbor_id != removed_node and MapSet.member?(s_without_node, neighbor_id) do
+          new_wacc = Map.update(wacc, neighbor_id, 0.0, &(&1 - w_float))
+          {MapSet.put(front, neighbor_id), new_wacc}
+        else
+          {front, wacc}
+        end
+      end)
+
+    # Add removed_node to frontier if it has neighbors in S
+    has_internal_neighbor =
+      Model.successors(graph, removed_node)
+      |> Enum.any?(fn {nid, _} -> MapSet.member?(s_without_node, nid) end)
+
+    final_frontier =
+      if has_internal_neighbor do
+        MapSet.put(new_frontier, removed_node)
+      else
+        new_frontier
+      end
+
+    # Remove internal weights for removed_node
+    final_weights = Map.delete(new_internal_weights, removed_node)
+
+    {final_frontier, final_weights}
   end
 
   defp total_degree(graph, node, cache, weight_fn) do
@@ -176,16 +253,8 @@ defmodule Yog.Community.LocalCommunity do
     end
   end
 
-  # Calculate sum of weights from node to nodes inside S
-  defp w_in_s(graph, node, s, weight_fn) do
-    Model.successors(graph, node)
-    |> Enum.reduce(0.0, fn {neighbor_id, w}, acc ->
-      if MapSet.member?(s, neighbor_id) do
-        acc + weight_fn.(w)
-      else
-        acc
-      end
-    end)
+  defp w_in_s_cached(internal_weights, node) do
+    Map.get(internal_weights, node, 0.0)
   end
 
   defp fitness(k_in, k_out, alpha) do
@@ -200,16 +269,27 @@ defmodule Yog.Community.LocalCommunity do
   end
 
   # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity
-  defp do_detect(graph, s, k_in, k_out, cache, opts, iters, weight_fn, seeds) do
-    bound = boundary_of(graph, s)
+  defp do_detect(
+         graph,
+         s,
+         k_in,
+         k_out,
+         frontier,
+         internal_weights,
+         cache,
+         opts,
+         iters,
+         weight_fn,
+         seeds_set
+       ) do
     current_f = fitness(k_in, k_out, opts.alpha)
 
-    # Find the best ADD operation from boundary
+    # Find the best ADD operation from frontier
     {best_add_op, best_add_f, cache_after_add} =
-      MapSet.to_list(bound)
-      |> Enum.reduce({nil, current_f, cache}, fn node, {best_op, best_f, current_cache} ->
+      Enum.reduce(frontier, {nil, current_f, cache}, fn node, {best_op, best_f, current_cache} ->
         {d, next_cache} = total_degree(graph, node, current_cache, weight_fn)
-        w_in = w_in_s(graph, node, s, weight_fn)
+
+        w_in = w_in_s_cached(internal_weights, node)
 
         new_k_in = k_in + 2.0 * w_in
         new_k_out = k_out + d - 2.0 * w_in
@@ -228,20 +308,19 @@ defmodule Yog.Community.LocalCommunity do
         # Don't remove if it's the last node
         {best_add_op, best_add_f, cache_after_add}
       else
-        MapSet.to_list(s)
-        |> Enum.reduce(
+        Enum.reduce(
+          s,
           {best_add_op, best_add_f, cache_after_add},
           fn node, {best_op_acc, best_f_acc, current_cache} ->
             {d, next_cache} = total_degree(graph, node, current_cache, weight_fn)
-            s_without_node = MapSet.delete(s, node)
-            w_in = w_in_s(graph, node, s_without_node, weight_fn)
+
+            w_in = w_in_s_cached(internal_weights, node)
 
             new_k_in = k_in - 2.0 * w_in
             new_k_out = k_out - d + 2.0 * w_in
             f = fitness(new_k_in, new_k_out, opts.alpha)
 
-            # Never remove a seed node
-            is_seed = node in seeds
+            is_seed = MapSet.member?(seeds_set, node)
 
             if f > best_f_acc and not is_seed do
               {{:remove, node, new_k_in, new_k_out}, f, next_cache}
@@ -260,19 +339,49 @@ defmodule Yog.Community.LocalCommunity do
       {:add, node, nk_in, nk_out} ->
         new_s = MapSet.put(s, node)
 
+        {new_frontier, new_internal_weights} =
+          update_frontier_on_add(graph, frontier, internal_weights, s, node, weight_fn)
+
         if iters >= opts.max_iterations do
           new_s
         else
-          do_detect(graph, new_s, nk_in, nk_out, final_cache, opts, iters + 1, weight_fn, seeds)
+          do_detect(
+            graph,
+            new_s,
+            nk_in,
+            nk_out,
+            new_frontier,
+            new_internal_weights,
+            final_cache,
+            opts,
+            iters + 1,
+            weight_fn,
+            seeds_set
+          )
         end
 
       {:remove, node, nk_in, nk_out} ->
         new_s = MapSet.delete(s, node)
 
+        {new_frontier, new_internal_weights} =
+          update_frontier_on_remove(graph, frontier, internal_weights, s, node, weight_fn)
+
         if iters >= opts.max_iterations do
           new_s
         else
-          do_detect(graph, new_s, nk_in, nk_out, final_cache, opts, iters + 1, weight_fn, seeds)
+          do_detect(
+            graph,
+            new_s,
+            nk_in,
+            nk_out,
+            new_frontier,
+            new_internal_weights,
+            final_cache,
+            opts,
+            iters + 1,
+            weight_fn,
+            seeds_set
+          )
         end
     end
   end
