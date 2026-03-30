@@ -557,4 +557,33 @@ defmodule Yog.MSTTest do
     edge = hd(result)
     assert edge.weight in [1, 2]
   end
+
+  # ============= Directed Graph Tests =============
+
+  test "kruskal_directed_graph_returns_error_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 2)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 3)
+
+    assert MST.kruskal(in: graph, compare: &compare/2) == {:error, :undirected_only}
+    assert MST.kruskal(graph, &compare/2) == {:error, :undirected_only}
+  end
+
+  test "prim_directed_graph_returns_error_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 2)
+
+    assert MST.prim(in: graph, compare: &compare/2) == {:error, :undirected_only}
+    assert MST.prim(graph, &compare/2) == {:error, :undirected_only}
+  end
 end

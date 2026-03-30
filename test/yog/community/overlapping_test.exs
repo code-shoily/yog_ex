@@ -96,15 +96,18 @@ defmodule Yog.Community.OverlappingTest do
   test "to_result converts to standard result" do
     memberships = %{
       1 => [0, 1],
-      2 => [0]
+      2 => [1]
     }
 
     overlapping = Overlapping.new(memberships)
 
     result = Overlapping.to_result(overlapping)
 
+    # Both nodes assigned to different communities → 2 communities
     assert result.num_communities == 2
     assert is_map(result.assignments)
+    assert result.assignments[1] == 0
+    assert result.assignments[2] == 1
   end
 
   test "from_map and to_map roundtrip" do

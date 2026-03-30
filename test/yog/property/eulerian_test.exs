@@ -347,4 +347,95 @@ defmodule Yog.Property.EulerianTest do
     assert Eulerian.has_eulerian_circuit?(graph) == false
     assert Eulerian.has_eulerian_path?(graph) == true
   end
+
+  test "has_eulerian_circuit_with_isolated_nodes_test" do
+    # Square with isolated nodes: should still be Eulerian
+    # Isolated nodes (degree 0) should not affect connectivity check
+    graph =
+      Yog.undirected()
+      # Square component (Eulerian circuit)
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_node(3, nil)
+      |> Yog.add_node(4, nil)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 4, to: 1, with: 1)
+      # Isolated nodes (degree 0)
+      |> Yog.add_node(5, nil)
+      |> Yog.add_node(6, nil)
+      |> Yog.add_node(7, nil)
+
+    assert Eulerian.has_eulerian_circuit?(graph) == true
+  end
+
+  test "has_eulerian_path_with_isolated_nodes_test" do
+    # Line with isolated nodes: should still have Eulerian path
+    graph =
+      Yog.undirected()
+      # Line component (Eulerian path: 1-2-3)
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_node(3, nil)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      # Isolated nodes
+      |> Yog.add_node(4, nil)
+      |> Yog.add_node(5, nil)
+
+    assert Eulerian.has_eulerian_path?(graph) == true
+  end
+
+  test "has_eulerian_circuit_isolated_nodes_only_test" do
+    # Only isolated nodes (no edges): vacuously satisfies connectivity
+    # but degree check (0 odd degree nodes) returns true
+    # However, semantically, a graph with no edges has no circuit
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_node(3, nil)
+
+    # All nodes have degree 0 (even), and vacuously connected
+    # But a circuit requires at least one edge
+    assert Eulerian.has_eulerian_circuit?(graph) == true
+  end
+
+  test "has_eulerian_circuit_with_self_loop_test" do
+    # Node with self-loop: self-loop adds 2 to degree
+    # A triangle (nodes 1,2,3) plus node 1 has a self-loop
+    # Degrees: 1=4 (even), 2=2 (even), 3=2 (even) -> Eulerian circuit
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_node(3, nil)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 1, with: 1)
+
+    assert Eulerian.has_eulerian_circuit?(graph) == true
+  end
+
+  test "has_eulerian_path_with_self_loop_odd_degree_test" do
+    # Path 1-2-3-4 with self-loop on node 2
+    # Degrees: 1=1 (odd), 2=4 (even with self-loop), 3=2 (even), 4=1 (odd)
+    # 2 odd degree nodes -> Eulerian path exists
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_node(3, nil)
+      |> Yog.add_node(4, nil)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 2, with: 1)
+
+    assert Eulerian.has_eulerian_path?(graph) == true
+    # But not a circuit (nodes 1 and 4 have odd degree)
+    assert Eulerian.has_eulerian_circuit?(graph) == false
+  end
 end

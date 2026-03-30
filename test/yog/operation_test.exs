@@ -178,12 +178,12 @@ defmodule Yog.OperationTest do
       assert Yog.Model.order(result) == 4
 
       # Original nodes should still exist
-      assert length(Yog.neighbors(result, 0)) == 1
-      assert length(Yog.neighbors(result, 1)) == 1
+      assert length(Yog.neighbors(result, {0, 0})) == 1
+      assert length(Yog.neighbors(result, {0, 1})) == 1
 
       # Reindexed nodes from g2 should exist (shifted by 2)
-      assert length(Yog.neighbors(result, 2)) == 1
-      assert length(Yog.neighbors(result, 3)) == 1
+      assert length(Yog.neighbors(result, {1, 0})) == 1
+      assert length(Yog.neighbors(result, {1, 1})) == 1
     end
 
     test "combines graphs with different structures" do
