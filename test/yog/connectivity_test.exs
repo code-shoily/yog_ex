@@ -297,6 +297,25 @@ defmodule Yog.ConnectivityTest do
     assert ancestors[:a] == 0
   end
 
+  test "reachability_counts_estimate_linear_test" do
+    # 1 -> 2 -> 3 -> 4 -> 5
+    graph =
+      Yog.directed()
+      |> add_nodes([{1, "1"}, {2, "2"}, {3, "3"}, {4, "4"}, {5, "5"}])
+      |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}, {3, 4, 1}, {4, 5, 1}])
+
+    # counts_estimate uses HyperLogLog with p=10 (~3.25% error)
+    # Allow for some variance while still testing correctness
+    descendants = Connectivity.Reachability.counts_estimate(graph, :descendants)
+
+    # In a chain, descendants should be roughly: 4, 3, 2, 1, 0
+    # With improved HLL (p=10), allow ~15% margin for small counts
+    assert descendants[1] >= 3 and descendants[1] <= 5
+    assert descendants[2] >= 2 and descendants[2] <= 4
+    # Last node has no descendants
+    assert descendants[5] <= 1
+  end
+
   # ============= K-Core & Shell Decomposition Tests =============
 
   test "k_core_decomposition_test" do
