@@ -46,8 +46,6 @@ defmodule Yog.Community.Walktrap do
   - [Pons & Latapy 2006 - Computing communities with random walks](https://doi.org/10.1080/15427951.2007.10129237)
   - [Wikipedia: Walktrap Algorithm](https://en.wikipedia.org/wiki/Walktrap_community)
 
-  > **Migration Note:** Migrated to pure Elixir in v0.53.0. Implements hierarchical
-  > agglomerative clustering based on random walk distances.
   """
 
   alias Yog.Community

@@ -50,8 +50,6 @@ defmodule Yog.Community.FluidCommunities do
 
   - Parés, F., et al. (2017). Fluid Communities: A Competitive, Scalable and Diverse Community Detection Algorithm.
 
-  > **Migration Note:** Migrated to pure Elixir in v0.53.0. Implements fluid density
-  > propagation with random node processing order.
   """
 
   alias Yog.Community.Result

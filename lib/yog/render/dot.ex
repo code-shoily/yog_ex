@@ -87,8 +87,6 @@ defmodule Yog.Render.DOT do
   - [Arrow Styles](https://graphviz.org/doc/info/arrows.html)
   - [Cluster/Subgraph Syntax](https://graphviz.org/docs/attrs/cluster/)
 
-  > **Migration Note:** Enhanced in v0.53.0 with full Gleam parity: subgraphs,
-  > per-element attributes, layout engines, advanced styling options.
   """
 
   # =============================================================================

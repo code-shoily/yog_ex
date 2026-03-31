@@ -48,8 +48,6 @@ defmodule Yog.Community.CliquePercolation do
   - [Palla et al. 2005 - Uncovering overlapping community structure](https://doi.org/10.1038/nature03607)
   - [Wikipedia: Clique Percolation Method](https://en.wikipedia.org/wiki/Clique_percolation_method)
 
-  > **Migration Note:** Migrated to pure Elixir in v0.53.0. Uses existing
-  > Bron-Kerbosch algorithm from Yog.Property.Clique.
   """
 
   alias Yog.Community.{Overlapping, Result}

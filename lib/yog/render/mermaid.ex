@@ -53,8 +53,6 @@ defmodule Yog.Render.Mermaid do
   - [Mermaid Syntax](https://mermaid.js.org/syntax/flowchart.html)
   - [GitHub Mermaid Docs](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-diagrams)
 
-  > **Migration Note:** Enhanced in v0.53.0 with full Gleam parity: all node shapes,
-  > CSS length types, comprehensive styling options.
   """
 
   # =============================================================================

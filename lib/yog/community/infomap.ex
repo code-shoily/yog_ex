@@ -63,8 +63,6 @@ defmodule Yog.Community.Infomap do
   - [Rosvall & Bergstrom 2008 - Maps of information flow](https://doi.org/10.1073/pnas.0706851105)
   - [MapEquation.org](https://www.mapequation.org/)
 
-  > **Migration Note:** Migrated to pure Elixir in v0.53.0. Implements the Map Equation
-  > optimization with PageRank-based flow probabilities.
   """
 
   alias Yog.Community.Result

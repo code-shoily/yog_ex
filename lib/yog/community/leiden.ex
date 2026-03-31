@@ -59,8 +59,6 @@ defmodule Yog.Community.Leiden do
   - [Traag et al. 2019 - From Louvain to Leiden](https://doi.org/10.1038/s41598-019-41695-z)
   - [Wikipedia: Leiden Algorithm](https://en.wikipedia.org/wiki/Leiden_algorithm)
 
-  > **Migration Note:** Migrated to pure Elixir in v0.53.0. Implements the full
-  > Leiden algorithm with refinement step for well-connected communities.
   """
 
   alias Yog.Community.{Dendrogram, Result}

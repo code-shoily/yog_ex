@@ -48,8 +48,6 @@ defmodule Yog.Community.GirvanNewman do
   - [Girvan & Newman 2002 - Community structure in social networks](https://doi.org/10.1073/pnas.122653799)
   - [Wikipedia: Girvan-Newman Algorithm](https://en.wikipedia.org/wiki/Girvan%E2%80%93Newman_algorithm)
 
-  > **Migration Note:** Migrated to pure Elixir in v0.53.0. Implements Brandes'
-  > algorithm for edge betweenness centrality calculation using Yog.PQ priority queue.
   """
 
   alias Yog.Community.{Dendrogram, Result}
