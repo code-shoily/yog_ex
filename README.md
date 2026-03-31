@@ -363,6 +363,23 @@ mix run examples/network_bandwidth.exs
 # etc.
 ```
 
+### Advent of Code Solutions
+
+YogEx is extensively used to solve [Advent of Code](https://adventofcode.com/) challenges. Check out the [Advent of Code repository](https://github.com/code-shoily/advent_of_code) for complete solutions using YogEx:
+
+| Year | Day | Problem | Algorithm Used |
+|------|-----|---------|----------------|
+| 2019 | 18 | [Many-Worlds Interpretation](https://adventofcode.com/2019/day/18) | `Yog.Pathfinding.Dijkstra` with implicit state-space search |
+| 2023 | 10 | [Pipe Maze](https://adventofcode.com/2023/day/10) | `Yog.Builder.Grid` + `Yog.Pathfinding.Dijkstra` |
+| 2023 | 25 | [Snowverload](https://adventofcode.com/2023/day/25) | `Yog.Flow.MinCut` (Stoer-Wagner global min-cut) |
+
+📊 **[Full list of graph-based solutions](https://github.com/code-shoily/advent_of_code/blob/main/wiki/tags/graph.md)** — See all Advent of Code solutions tagged with `graph` that demonstrate real-world usage of YogEx algorithms.
+
+These solutions showcase:
+- **Implicit graph search** — State-space exploration without explicit graph construction
+- **Grid-based pathfinding** — Maze solving with custom connectivity predicates
+- **Network flow algorithms** — Graph partitioning and minimum cut problems
+
 ## Algorithm Selection Guide
 
 Detailed documentation for each algorithm can be found on [HexDocs](https://hexdocs.pm/yog_ex/).
