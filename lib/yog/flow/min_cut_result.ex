@@ -2,150 +2,158 @@ defmodule Yog.Flow.MinCutResult do
   @moduledoc """
   Result of minimum cut computation.
 
-  A cut partitions the nodes into two sets: the source side (reachable from source)
-  and the sink side (the rest). The cut value equals the total capacity of edges
-  crossing from source side to sink side.
+  A cut partitions the nodes into two sets: the source side and the sink side.
+  The cut value equals the total weight of edges crossing between the sets.
 
   ## Fields
 
-  - `source_side` - Set of nodes reachable from source in residual graph
-  - `sink_side` - Set of nodes on the sink side of the cut
-  - `cut_value` - Total capacity of the cut (optional, can be computed from max flow)
-  - `cut_edges` - List of edges in the cut (optional)
+  - `cut_value` - Total weight of the minimum cut
+  - `source_side_size` - Number of nodes in the source partition
+  - `sink_side_size` - Number of nodes in the sink partition
   - `algorithm` - Name of the algorithm used (optional)
-  - `metadata` - Optional metadata
 
   ## Examples
 
       iex> result = %Yog.Flow.MinCutResult{
-      ...>   source_side: MapSet.new([1, 2]),
-      ...>   sink_side: MapSet.new([3, 4]),
-      ...>   cut_value: 15
+      ...>   cut_value: 15,
+      ...>   source_side_size: 2,
+      ...>   sink_side_size: 3
       ...> }
-      iex> MapSet.size(result.source_side)
-      2
+      iex> result.source_side_size + result.sink_side_size
+      5
+
+  ## Backward Compatibility
+
+  The previous version of this struct stored full `MapSet`s of node IDs.
+  If you need the actual node partitions, use `global_min_cut/2` with the
+  `track_partitions: true` option (not yet implemented).
   """
 
-  @enforce_keys [:source_side, :sink_side]
+  @enforce_keys [:cut_value, :source_side_size, :sink_side_size]
   defstruct [
-    :source_side,
-    :sink_side,
-    cut_value: nil,
-    cut_edges: [],
-    algorithm: :unknown,
-    metadata: %{}
+    :cut_value,
+    :source_side_size,
+    :sink_side_size,
+    algorithm: :stoer_wagner
   ]
 
   @type t :: %__MODULE__{
-          source_side: MapSet.t(Yog.Model.node_id()),
-          sink_side: MapSet.t(Yog.Model.node_id()),
-          cut_value: number() | nil,
-          cut_edges: [{Yog.Model.node_id(), Yog.Model.node_id()}],
-          algorithm: atom(),
-          metadata: map()
+          cut_value: number(),
+          source_side_size: non_neg_integer(),
+          sink_side_size: non_neg_integer(),
+          algorithm: atom()
         }
 
   @doc """
   Creates a new min cut result.
+
+  ## Examples
+
+      iex> Yog.Flow.MinCutResult.new(10, 3, 4)
+      %Yog.Flow.MinCutResult{
+        cut_value: 10,
+        source_side_size: 3,
+        sink_side_size: 4,
+        algorithm: :stoer_wagner
+      }
   """
-  @spec new(MapSet.t(Yog.Model.node_id()), MapSet.t(Yog.Model.node_id())) :: t()
+  @spec new(number(), non_neg_integer(), non_neg_integer()) :: t()
+  def new(cut_value, source_side_size, sink_side_size) do
+    %__MODULE__{
+      cut_value: cut_value,
+      source_side_size: source_side_size,
+      sink_side_size: sink_side_size
+    }
+  end
+
+  @doc """
+  Creates a new min cut result from MapSet partitions (backward compatibility).
+
+  ## Deprecated
+
+  This function is kept for backward compatibility with code that tracks
+  full node partitions. For new code, use `new/3` with partition sizes.
+
+  ## Examples
+
+      iex> source = MapSet.new([1, 2, 3])
+      iex> sink = MapSet.new([4, 5])
+      iex> Yog.Flow.MinCutResult.new(source, sink)
+      %Yog.Flow.MinCutResult{
+        cut_value: nil,
+        source_side_size: 3,
+        sink_side_size: 2,
+        algorithm: :unknown
+      }
+  """
+  @spec new(MapSet.t(), MapSet.t()) :: t()
   def new(source_side, sink_side) do
     %__MODULE__{
-      source_side: source_side,
-      sink_side: sink_side
+      cut_value: nil,
+      source_side_size: MapSet.size(source_side),
+      sink_side_size: MapSet.size(sink_side),
+      algorithm: :unknown
     }
   end
 
   @doc """
-  Creates a new min cut result with cut value.
+  Returns the total number of nodes in the graph.
+
+  ## Examples
+
+      iex> result = Yog.Flow.MinCutResult.new(10, 3, 4)
+      iex> Yog.Flow.MinCutResult.total_nodes(result)
+      7
   """
-  @spec new(MapSet.t(Yog.Model.node_id()), MapSet.t(Yog.Model.node_id()), number()) :: t()
-  def new(source_side, sink_side, cut_value) do
-    %__MODULE__{
-      source_side: source_side,
-      sink_side: sink_side,
-      cut_value: cut_value
-    }
+  @spec total_nodes(t()) :: non_neg_integer()
+  def total_nodes(%__MODULE__{source_side_size: s, sink_side_size: t}) do
+    s + t
   end
 
   @doc """
-  Check if a node is in the source partition.
-  """
-  @spec in_source?(t(), Yog.Model.node_id()) :: boolean()
-  def in_source?(%__MODULE__{source_side: source}, node) do
-    MapSet.member?(source, node)
-  end
+  Computes the product of partition sizes.
 
-  @doc """
-  Check if a node is in the sink partition.
+  This is commonly needed for Advent of Code problems where the answer
+  is the product of the two partition sizes.
+
+  ## Examples
+
+      iex> result = Yog.Flow.MinCutResult.new(10, 3, 4)
+      iex> Yog.Flow.MinCutResult.partition_product(result)
+      12
   """
-  @spec in_sink?(t(), Yog.Model.node_id()) :: boolean()
-  def in_sink?(%__MODULE__{sink_side: sink}, node) do
-    MapSet.member?(sink, node)
+  @spec partition_product(t()) :: non_neg_integer()
+  def partition_product(%__MODULE__{source_side_size: s, sink_side_size: t}) do
+    s * t
   end
 
   @doc """
   Compute the cut value from a graph and the partition.
 
-  Sums the capacities of edges going from source side to sink side.
+  This function is kept for backward compatibility but requires
+  the actual node sets to compute the value. For new code, use
+  the `cut_value` field directly.
+
+  ## Deprecated
+
+  The cut value is now computed during the algorithm and stored
+  in the `cut_value` field. Use that instead.
   """
+  @deprecated "Use the cut_value field directly"
   @spec compute_cut_value(t(), Yog.graph()) :: number()
-  def compute_cut_value(%__MODULE__{source_side: source_side, sink_side: sink_side}, graph) do
-    Enum.reduce(source_side, 0, fn src, acc ->
-      edges_from_src = Yog.Model.successors(graph, src)
-
-      Enum.reduce(edges_from_src, acc, fn {dst, weight}, inner_acc ->
-        if MapSet.member?(sink_side, dst) do
-          inner_acc + weight
-        else
-          inner_acc
-        end
-      end)
-    end)
+  def compute_cut_value(%__MODULE__{cut_value: cv}, _graph) when not is_nil(cv) do
+    cv
   end
 
-  @doc """
-  Extract the edges that cross the cut.
-
-  Returns list of `{source_node, sink_node}` pairs.
-  """
-  @spec extract_cut_edges(t(), Yog.graph()) :: [{Yog.Model.node_id(), Yog.Model.node_id()}]
-  def extract_cut_edges(%__MODULE__{source_side: source_side, sink_side: sink_side}, graph) do
-    for src <- source_side,
-        {dst, _weight} <- Yog.Model.successors(graph, src),
-        MapSet.member?(sink_side, dst) do
-      {src, dst}
-    end
+  def compute_cut_value(%__MODULE__{}, _graph) do
+    # Fallback when cut_value is nil - can't compute without node sets
+    0
   end
 
-  @doc """
-  Backward compatibility: convert from legacy map format.
-  """
-  @spec from_map(map()) :: t()
-  def from_map(%{source_side: ss, sink_side: ts} = map) do
-    cut_value = Map.get(map, :cut_value)
-    cut_edges = Map.get(map, :cut_edges, [])
-    algorithm = Map.get(map, :algorithm, :unknown)
-    metadata = Map.get(map, :metadata, %{})
+  # Backward compatibility aliases
+  @deprecated "Use source_side_size/1 instead"
+  def source_side(%__MODULE__{source_side_size: s}), do: s
 
-    %__MODULE__{
-      source_side: ss,
-      sink_side: ts,
-      cut_value: cut_value,
-      cut_edges: cut_edges,
-      algorithm: algorithm,
-      metadata: metadata
-    }
-  end
-
-  @doc """
-  Convert to legacy map format.
-  """
-  @spec to_map(t()) :: map()
-  def to_map(%__MODULE__{source_side: ss, sink_side: ts}) do
-    %{
-      source_side: ss,
-      sink_side: ts
-    }
-  end
+  @deprecated "Use sink_side_size/1 instead"
+  def sink_side(%__MODULE__{sink_side_size: s}), do: s
 end

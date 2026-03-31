@@ -5,7 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.90.0] - Unreleased
+## [Unreleased]
+
+### Changed
+
+- **MinCut Algorithm Performance Optimization**
+  - Complete rewrite of `Yog.Flow.MinCut.global_min_cut/1` for significant performance improvements
+  - Changed partition tracking from `MapSet` of node IDs to integer counts
+    - **Before**: O(n) `MapSet.union/2` and `MapSet.difference/2` on every contraction
+    - **After**: O(1) integer arithmetic (`s_size + t_size`)
+  - Changed `Yog.Flow.MinCutResult` struct to store partition sizes instead of full node sets:
+    - **Before**: `%MinCutResult{source_side: MapSet.t(), sink_side: MapSet.t(), cut_value: number()}`
+    - **After**: `%MinCutResult{cut_value: number(), source_side_size: non_neg_integer(), sink_side_size: non_neg_integer(), algorithm: atom()}`
+  - Uses `Yog.Transform.map_nodes/2` to initialize node weights to 1 (matching Gleam `yog` implementation)
+  - Updated `Yog.Flow.MaxFlow.extract_min_cut/1` and `min_cut/3` to return the new struct format
+  - Added helper functions:
+    - `Yog.Flow.MinCutResult.partition_product/1` - product of partition sizes (common for AOC problems)
+    - `Yog.Flow.MinCutResult.total_nodes/1` - total node count
+
+### Breaking
+
+- `Yog.Flow.MinCutResult` struct fields changed:
+  - Removed: `source_side`, `sink_side` (MapSets)
+  - Added: `source_side_size`, `sink_side_size` (integers)
+- `Yog.Flow.MinCutResult.new/2` now returns struct with sizes computed from MapSets (backward compatibility shim)
+- `Yog.Flow.MinCutResult.compute_cut_value/2` deprecated - use `cut_value` field directly
+
+## [0.90.0] - 2026-03-30
 
 This release mostly focuses on internal optimizations, mostly around community and centrality modules.
 

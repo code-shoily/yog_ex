@@ -24,7 +24,7 @@ defmodule Yog.Flow.MinCutTest do
 
       # In a triangle with equal weights, min cut is 2 (cutting any two edges)
       assert result.cut_value == 2
-      assert MapSet.size(result.source_side) + MapSet.size(result.sink_side) == 3
+      assert result.source_side_size + result.sink_side_size == 3
     end
 
     test "square with diagonal" do
@@ -46,8 +46,8 @@ defmodule Yog.Flow.MinCutTest do
 
       # The minimum cut should cut the weakest edges
       assert result.cut_value == 4
-      assert MapSet.size(result.source_side) >= 1
-      assert MapSet.size(result.sink_side) >= 1
+      assert result.source_side_size >= 1
+      assert result.sink_side_size >= 1
     end
 
     test "two connected cliques" do
@@ -83,8 +83,8 @@ defmodule Yog.Flow.MinCutTest do
 
       # Single edge is the only cut
       assert result.cut_value == 5
-      assert MapSet.size(result.source_side) == 1
-      assert MapSet.size(result.sink_side) == 1
+      assert result.source_side_size == 1
+      assert result.sink_side_size == 1
     end
 
     test "star graph" do
@@ -104,6 +104,12 @@ defmodule Yog.Flow.MinCutTest do
 
       # Min cut is separating one leaf (weight 3)
       assert result.cut_value == 3
+    end
+
+    test "partition_product helper" do
+      result = Yog.Flow.MinCutResult.new(10, 3, 4)
+      assert Yog.Flow.MinCutResult.partition_product(result) == 12
+      assert Yog.Flow.MinCutResult.total_nodes(result) == 7
     end
   end
 end

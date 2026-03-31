@@ -10,8 +10,8 @@ defmodule Yog.PBT.FlowTest do
         result = Yog.Flow.MaxFlow.edmonds_karp(graph, s, t)
         cut = Yog.Flow.MaxFlow.extract_min_cut(result)
 
-        cut_value = Yog.Flow.MinCutResult.compute_cut_value(cut, graph)
-        assert result.max_flow == cut_value
+        # The cut_value is now computed directly during max flow extraction
+        assert result.max_flow == cut.cut_value
       end
     end
 

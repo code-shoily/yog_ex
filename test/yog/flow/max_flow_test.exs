@@ -116,19 +116,15 @@ defmodule Yog.Flow.MaxFlowTest do
       max_flow_result = MaxFlow.edmonds_karp(graph, 1, 4)
       min_cut = MaxFlow.extract_min_cut(max_flow_result)
 
-      # Source side should contain source node (1)
-      assert MapSet.member?(min_cut.source_side, 1)
+      # Cut value should equal max flow
+      assert min_cut.cut_value == 15
 
-      # Sink side should contain sink node (4)
-      assert MapSet.member?(min_cut.sink_side, 4)
+      # Both sides should have at least one node
+      assert min_cut.source_side_size >= 1
+      assert min_cut.sink_side_size >= 1
 
-      # The two sides should be disjoint
-      intersection = MapSet.intersection(min_cut.source_side, min_cut.sink_side)
-      assert MapSet.size(intersection) == 0
-
-      # All nodes should be in one side or the other
-      union = MapSet.union(min_cut.source_side, min_cut.sink_side)
-      assert MapSet.size(union) == 4
+      # Total nodes should be 4
+      assert Yog.Flow.MinCutResult.total_nodes(min_cut) == 4
     end
 
     test "min cut equals max flow" do
@@ -141,9 +137,12 @@ defmodule Yog.Flow.MaxFlowTest do
       max_flow_result = MaxFlow.edmonds_karp(graph, 1, 2)
       min_cut = MaxFlow.extract_min_cut(max_flow_result)
 
-      # For a single edge, source side should be {1}, sink side {2}
-      assert MapSet.equal?(min_cut.source_side, MapSet.new([1]))
-      assert MapSet.equal?(min_cut.sink_side, MapSet.new([2]))
+      # Cut value should equal max flow
+      assert min_cut.cut_value == 7
+
+      # For a single edge, one node on each side
+      assert min_cut.source_side_size == 1
+      assert min_cut.sink_side_size == 1
     end
   end
 end

@@ -51,7 +51,7 @@ defmodule Yog.Flow.MinCut do
         ])
 
       result = Yog.Flow.MinCut.global_min_cut(graph)
-      # => %Yog.Flow.MinCutResult{cut_value: 6, source_side: MapSet.new([4]), sink_side: MapSet.new([1, 2, 3])}
+      # => %Yog.Flow.MinCutResult{cut_value: 6, source_side_size: 1, sink_side_size: 3}
 
   ## References
 
@@ -86,14 +86,14 @@ defmodule Yog.Flow.MinCut do
       iex> result = Yog.Flow.MinCut.global_min_cut(graph)
       iex> result.cut_value
       5
-      iex> MapSet.size(result.source_side) + MapSet.size(result.sink_side)
+      iex> result.source_side_size + result.sink_side_size
       3
 
   ## Notes
 
   - The graph must be undirected
   - Edge weights must be integers
-  - Returns a `Yog.Flow.MinCutResult` struct with the actual node partitions
+  - Returns a `Yog.Flow.MinCutResult` struct with partition sizes
   """
   @spec global_min_cut(Yog.graph()) :: MinCutResult.t()
   def global_min_cut(graph) do
@@ -101,117 +101,147 @@ defmodule Yog.Flow.MinCut do
 
     case length(nodes) do
       n when n <= 1 ->
-        MinCutResult.new(MapSet.new(nodes), MapSet.new(), 0)
+        MinCutResult.new(0, 0, 0)
 
       _n ->
-        # Track actual partitions: node_id => MapSet of original IDs
-        partitions = Map.new(nodes, fn id -> {id, MapSet.new([id])} end)
-        # Get the full set of original nodes once
-        all_original = MapSet.new(nodes)
-
-        do_stoer_wagner(graph, partitions, all_original, nil)
+        # Start every node with a weight of 1 (representing itself)
+        # This tracks how many original nodes have been merged together
+        graph = Transform.map_nodes(graph, fn _ -> 1 end)
+        do_min_cut(graph, nil)
     end
   end
 
-  defp do_stoer_wagner(graph, partitions, all_original, best_cut) do
+  defp do_min_cut(graph, best_cut) do
     # Stoer-Wagner terminates when only one node remains
     if map_size(graph.nodes) <= 1 do
       best_cut
     else
-      {s, t} = min_cut_phase(graph)
-      cut_weight = phase_cut_weight(graph, t)
+      {s, t, cut_weight} = maximum_adjacency_search(graph)
 
-      # t_nodes represents one side of the cut
-      t_nodes = Map.fetch!(partitions, t)
+      # Get the sizes of the merged nodes
+      t_size = Map.get(graph.nodes, t, 1)
+      s_size = Map.get(graph.nodes, s, 1)
+      total_nodes = Enum.sum(Map.values(graph.nodes))
 
-      new_best =
+      current_cut =
         if is_nil(best_cut) or cut_weight < best_cut.cut_value do
           MinCutResult.new(
-            t_nodes,
-            MapSet.difference(all_original, t_nodes),
-            cut_weight
+            cut_weight,
+            t_size,
+            total_nodes - t_size
           )
         else
           best_cut
         end
 
-      # Contract s and t: merge t_nodes into s_nodes
+      # Contract s and t: merge t into s
       new_graph = Transform.contract(graph, s, t, &+/2)
 
-      new_partitions =
-        partitions
-        |> Map.put(s, MapSet.union(Map.fetch!(partitions, s), t_nodes))
-        |> Map.delete(t)
+      # Update s's node count to include t's nodes
+      new_graph = Model.add_node(new_graph, s, s_size + t_size)
 
-      do_stoer_wagner(new_graph, new_partitions, all_original, new_best)
+      do_min_cut(new_graph, current_cut)
     end
   end
 
-  # Maximum Adjacency Search finds s and t nodes (last two added to search set)
-  # Uses a max-priority queue for O(log V) extraction instead of O(V) linear scan
-  defp min_cut_phase(graph) do
+  # Maximum Adjacency Search: finds the two most tightly connected nodes.
+  # Returns {s, t, cut_weight} where:
+  # - s: second-to-last node added
+  # - t: last node added
+  # - cut_weight: accumulated weight in the MAS weights dict for t
+  defp maximum_adjacency_search(graph) do
     nodes = Model.all_nodes(graph)
-    [v0 | rest] = nodes
+    [start | rest] = nodes
 
-    # Build initial distances from v0
-    dists = Model.neighbors(graph, v0) |> Map.new()
+    # Build initial distances from start node
+    initial_dists =
+      Model.neighbors(graph, start)
+      |> Enum.reduce(%{}, fn {neighbor, weight}, acc ->
+        Map.put(acc, neighbor, weight)
+      end)
 
     # Build max-priority queue with remaining nodes
     # Comparator: max-heap by distance (higher distance = higher priority)
     pq =
       Enum.reduce(rest, PriorityQueue.new(fn a, b -> a >= b end), fn node, acc ->
-        dist = Map.get(dists, node, 0)
+        dist = Map.get(initial_dists, node, 0)
         PriorityQueue.push(acc, {dist, node})
       end)
 
-    in_s = MapSet.new([v0])
+    remaining = MapSet.new(rest)
 
-    do_mas_pq(graph, in_s, pq, dists, nil, v0)
+    {final_order, final_weights} =
+      build_mas_order(
+        graph,
+        [start],
+        remaining,
+        initial_dists,
+        pq
+      )
+
+    # The list is built with newest at head
+    [t, s | _] = final_order
+
+    # The true cut weight of t is the accumulated weight in the MAS weights dict
+    cut_weight = Map.get(final_weights, t, 0)
+
+    {s, t, cut_weight}
   end
 
-  # MAS with priority queue: O(V log V) instead of O(V²)
-  defp do_mas_pq(graph, in_s, pq, dists, prev_s, current_t) do
-    case PriorityQueue.pop(pq) do
-      :error ->
-        # PQ empty - return last two nodes added
-        if is_nil(prev_s), do: {current_t, current_t}, else: {prev_s, current_t}
+  # Builds the MAS ordering by greedily adding the most tightly connected node.
+  defp build_mas_order(graph, current_order, remaining, weights, queue) do
+    if MapSet.size(remaining) == 0 do
+      {current_order, weights}
+    else
+      {node, new_queue} = get_next_mas_node(queue, remaining, weights)
+      new_remaining = MapSet.delete(remaining, node)
 
-      {:ok, {_dist, next}, rest_pq} ->
-        # Skip stale entries (nodes already in S)
-        if MapSet.member?(in_s, next) do
-          do_mas_pq(graph, in_s, rest_pq, dists, prev_s, current_t)
-        else
-          new_in_s = MapSet.put(in_s, next)
+      {new_weights, updated_queue} =
+        Model.neighbors(graph, node)
+        |> Enum.reduce({weights, new_queue}, fn {neighbor, weight}, {weights_acc, queue_acc} ->
+          if MapSet.member?(new_remaining, neighbor) do
+            existing_w = Map.get(weights_acc, neighbor, 0)
+            new_w = existing_w + weight
 
-          next_neighbors = Model.neighbors(graph, next)
+            new_weights_acc = Map.put(weights_acc, neighbor, new_w)
+            new_queue_acc = PriorityQueue.push(queue_acc, {new_w, neighbor})
 
-          # Update distances and priority queue
-          {new_dists, new_pq} =
-            Enum.reduce(next_neighbors, {dists, rest_pq}, fn {v, w}, {d_acc, pq_acc} ->
-              if MapSet.member?(new_in_s, v) do
-                {d_acc, pq_acc}
-              else
-                old_dist = Map.get(d_acc, v, 0)
-                new_dist = old_dist + w
+            {new_weights_acc, new_queue_acc}
+          else
+            {weights_acc, queue_acc}
+          end
+        end)
 
-                # Update distance map
-                new_d_acc = Map.put(d_acc, v, new_dist)
-
-                # For priority queue, we push the updated entry
-                # Old entries will be skipped when popped (stale check via in_s)
-                new_pq_acc = PriorityQueue.push(pq_acc, {new_dist, v})
-
-                {new_d_acc, new_pq_acc}
-              end
-            end)
-
-          do_mas_pq(graph, new_in_s, new_pq, new_dists, current_t, next)
-        end
+      build_mas_order(
+        graph,
+        [node | current_order],
+        new_remaining,
+        new_weights,
+        updated_queue
+      )
     end
   end
 
-  defp phase_cut_weight(graph, t) do
-    Model.neighbors(graph, t)
-    |> Enum.reduce(0, fn {_, w}, acc -> acc + w end)
+  defp get_next_mas_node(queue, remaining, weights) do
+    case PriorityQueue.pop(queue) do
+      :error ->
+        # If queue is empty, pick the first node from remaining
+        [node | _] = MapSet.to_list(remaining)
+        {node, queue}
+
+      {:ok, {w, node}, q_rest} ->
+        if MapSet.member?(remaining, node) do
+          # Verify this is the current weight, not a stale entry
+          current_weight = Map.get(weights, node, 0)
+
+          if w == current_weight do
+            {node, q_rest}
+          else
+            get_next_mas_node(q_rest, remaining, weights)
+          end
+        else
+          get_next_mas_node(q_rest, remaining, weights)
+        end
+    end
   end
 end

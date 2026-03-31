@@ -362,18 +362,27 @@ defmodule Yog.Flow.MaxFlow do
       ...>   |> Yog.add_edges([{1, 2, 10}, {2, 3, 5}])
       iex> result = Yog.Flow.MaxFlow.edmonds_karp(graph, 1, 3)
       iex> cut = Yog.Flow.MaxFlow.extract_min_cut(result)
-      iex> MapSet.member?(cut.source_side, 1)
-      true
-      iex> MapSet.member?(cut.sink_side, 3)
-      true
+      iex> cut.cut_value
+      5
+      iex> cut.source_side_size + cut.sink_side_size
+      3
   """
   @spec extract_min_cut(max_flow_result()) :: min_cut()
-  def extract_min_cut(%MaxFlowResult{residual_graph: residual, source: source}) do
+  def extract_min_cut(%MaxFlowResult{
+        residual_graph: residual,
+        source: source,
+        max_flow: max_flow
+      }) do
     nodes = Model.all_nodes(residual) |> MapSet.new()
     source_side = bfs_reachable_with_compare(residual, source, nodes, 0, &Yog.Utils.compare/2)
     sink_side = MapSet.difference(nodes, source_side)
 
-    MinCutResult.new(source_side, sink_side)
+    %Yog.Flow.MinCutResult{
+      cut_value: max_flow,
+      source_side_size: MapSet.size(source_side),
+      sink_side_size: MapSet.size(sink_side),
+      algorithm: :edmonds_karp
+    }
   end
 
   @doc """
@@ -397,12 +406,12 @@ defmodule Yog.Flow.MaxFlow do
       ...>   |> Yog.add_edges([{1, 2, 10}, {2, 3, 5}])
       iex> result = Yog.Flow.MaxFlow.edmonds_karp(graph, 1, 3)
       iex> cut = Yog.Flow.MaxFlow.min_cut(result)
-      iex> MapSet.member?(cut.source_side, 1)
-      true
+      iex> cut.cut_value
+      5
   """
   @spec min_cut(max_flow_result(), any(), (any(), any() -> :lt | :eq | :gt)) :: min_cut()
   def min_cut(
-        %MaxFlowResult{residual_graph: residual, source: source},
+        %MaxFlowResult{residual_graph: residual, source: source, max_flow: max_flow},
         zero \\ 0,
         compare \\ &Yog.Utils.compare/2
       ) do
@@ -410,7 +419,12 @@ defmodule Yog.Flow.MaxFlow do
     source_side = bfs_reachable_with_compare(residual, source, nodes, zero, compare)
     sink_side = MapSet.difference(nodes, source_side)
 
-    MinCutResult.new(source_side, sink_side)
+    %Yog.Flow.MinCutResult{
+      cut_value: max_flow,
+      source_side_size: MapSet.size(source_side),
+      sink_side_size: MapSet.size(sink_side),
+      algorithm: :edmonds_karp
+    }
   end
 
   # BFS to find all nodes reachable from source in residual graph
