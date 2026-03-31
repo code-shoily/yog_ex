@@ -34,33 +34,27 @@ A comprehensive **pure Elixir** graph algorithm and network analysis library pro
 
 ## Features
 
-- **Graph Data Structures**: Directed and undirected graphs with generic node and edge data
-- **Pathfinding Algorithms**: Dijkstra, A*, Bellman-Ford, Floyd-Warshall, Johnson's, and **Implicit Variants** (state-space search)
-- **Maximum Flow**: Highly optimized Edmonds-Karp algorithm with flat dictionary residuals
-- **Graph Generators**: Create classic patterns (complete, cycle, path, star, wheel, bipartite, trees, grids) and random graphs (Erdős-Rényi, Barabási-Albert, Watts-Strogatz)
-- **Graph Traversal**: BFS and DFS with early termination and path finding
-- **Graph Transformations**: Transpose (O(1)!), map, filter, merge, subgraph extraction, edge contraction
-- **Graph Operations**: Union, intersection, difference, Cartesian product, graph power, isomorphism
-- **Graph Serialization & I/O**: First-class support for GraphML, GDF, JSON, LEDA, Pajek, and TGF allowing interoperability with standard tools via `Yog.IO.*`
-- **Graph Visualization**: ASCII, Mermaid, and DOT (Graphviz) rendering
-- **Minimum Spanning Tree**: Kruskal's and Prim's algorithms with Union-Find and Priority Queues
-- **Minimum Cut**: Stoer-Wagner algorithm for global min-cut
-- **Network Health**: Diameter, radius, eccentricity, assortativity, average path length
-- **Centrality Measures**: PageRank, betweenness, closeness, harmonic, eigenvector, Katz, degree
-- **Community Detection**: Louvain, Leiden, Label Propagation, Girvan-Newman, Infomap, Walktrap, Clique Percolation, Local Community, Fluid Communities
-- **Community Metrics**: Modularity, clustering coefficients, density, triangle counts
-- **DAG Operations**: Wrapper for directed acyclic graphs with longest path, LCA, transitive closure/reduction
-- **Topological Sorting**: Kahn's algorithm with lexicographical variant
-- **Strongly Connected Components**: Tarjan's and Kosaraju's algorithms
-- **Maximum Clique**: Bron-Kerbosch algorithm for maximal and all maximal cliques
-- **Connectivity**: Bridge and articulation point detection
-- **Eulerian Paths & Circuits**: Detection and finding using Hierholzer's algorithm
-- **Bipartite Graphs**: Detection, maximum matching, and stable marriage (Gale-Shapley)
-- **Minimum Cost Flow (MCF)**: Global optimization using the robust Network Simplex algorithm
-- **Graph Builders**: Grid builders (regular & toroidal), labeled builders, live/incremental builders
-- **Disjoint Set (Union-Find)**: With path compression and union by rank
-- **Efficient Data Structures**: Pairing heap for priority queues, two-list queue for BFS
-- **Functional Graphs (Experimental)**: Port of Erwig's elegant Inductive Graph Library (FGL) for purely functional recursive traversal
+YogEx provides comprehensive graph algorithms organized into focused modules:
+
+### 🚀 Core Capabilities
+
+**[Pathfinding & Flow](https://hexdocs.pm/yog_ex/Yog.Pathfinding.html)** — Shortest paths (Dijkstra, A*, Bellman-Ford, Floyd-Warshall, Johnson's), maximum flow (Edmonds-Karp), min-cut (Stoer-Wagner), and implicit state-space search for on-demand graphs.
+
+**[Network Analysis](https://hexdocs.pm/yog_ex/Yog.Centrality.html)** — Centrality measures (PageRank, betweenness, closeness, eigenvector, Katz), community detection (Louvain, Leiden, Infomap, Walktrap), and network health metrics.
+
+**[Connectivity & Structure](https://hexdocs.pm/yog_ex/Yog.Connectivity.html)** — SCCs (Tarjan/Kosaraju), bridges, articulation points, K-core decomposition, and reachability analysis with exact and HyperLogLog-based estimation.
+
+**[Graph Operations](https://hexdocs.pm/yog_ex/Yog.Operation.html)** — Union, intersection, difference, Cartesian product, power, isomorphism, and O(1) transpose.
+
+### 🛠️ Developer Experience
+
+**[Generators & Builders](https://hexdocs.pm/yog_ex/Yog.Generator.Classic.html)** — Classic patterns (complete, cycle, grid, Petersen) and random models (Erdős-Rényi, Barabási-Albert, Watts-Strogatz) with labeled and grid builders.
+
+**[I/O & Visualization](https://hexdocs.pm/yog_ex/Yog.IO.GraphML.html)** — GraphML, GDF, Pajek, LEDA, TGF, JSON serialization plus ASCII, DOT, and Mermaid rendering.
+
+**[Functional Graphs](https://hexdocs.pm/yog_ex/Yog.Functional.html)** *(Experimental)* — Pure inductive graph library (FGL) for elegant recursive algorithms.
+
+📖 **[Complete Algorithm Catalog](#algorithm-selection-guide)** — See all 60+ algorithms with time complexities and selection guidance.
 
 ## Installation
 
@@ -398,6 +392,8 @@ Detailed documentation for each algorithm can be found on [HexDocs](https://hexd
 | **Betweenness** | Bridge/gatekeeper detection | O(VE) or O(V³) |
 | **Closeness / Harmonic** | Distance-based importance | O(VE log V) |
 | **Eigenvector / Katz** | Influence based on neighbor centrality | O(V+E) per iter |
+| **Harmonic Centrality** | Distance-based importance (infinite distance handling) | O(VE log V) |
+| **Degree Centrality** | Simple connectivity importance | O(V) |
 | **Louvain** | Modularity optimization, large graphs | O(E log V) |
 | **Leiden** | Quality guarantee, well-connected communities | O(E log V) |
 | **Label Propagation** | Very large graphs, extreme speed | O(E) per iter |
@@ -407,6 +403,41 @@ Detailed documentation for each algorithm can be found on [HexDocs](https://hexd
 | **Clique Percolation** | Overlapping community discovery | O(3^(V/3)) |
 | **Local Community** | Massive/infinite graphs, seed expansion | O(S × E_S) |
 | **Fluid Communities** | Exact `k` partitions, fast | O(E) per iter |
+| **K-Core Decomposition** | Finding core-periphery structure | O(V + E) |
+| **Reachability Counting** | Ancestor/descendant counting | O(V + E) |
+| **Reachability Estimation** | HyperLogLog-based counting (O(V) memory) | O(V + E) |
+
+## Underlying Algorithms & Data Structures
+
+Beyond graph algorithms, YogEx implements several fundamental computer science techniques:
+
+### Probabilistic Data Structures
+
+| Technique | Used In | Purpose |
+|-----------|---------|---------|
+| **HyperLogLog** | `Reachability.counts_estimate/2` | Memory-efficient cardinality estimation (O(V) vs O(V²)) for reachability counting with ~3% error |
+
+### Classic Algorithms
+
+| Algorithm | Used In | Purpose |
+|-----------|---------|---------|
+| **Kahn's Algorithm** | Topological sort, cycle detection | O(V+E) topological ordering and DAG validation |
+| **Union-Find (Disjoint Set)** | Kruskal's MST, cycle detection | O(α(V)) amortized set operations with path compression |
+| **Bron-Kerbosch** | Maximal clique enumeration | Backtracking algorithm for finding all maximal cliques |
+| **Gale-Shapley** | Stable marriage matching | O(n²) stable matching for assignment problems |
+| **Hierholzer's Algorithm** | Eulerian path/circuit | O(E) algorithm for finding Eulerian trails |
+| **Tarjan's Algorithm** | SCCs, bridges, articulation points | O(V+E) single-pass strongly connected components |
+| **Kosaraju's Algorithm** | SCCs (alternative) | O(V+E) two-pass strongly connected components |
+| **Network Simplex** | Minimum cost flow | Specialized simplex for network flow optimization |
+| **Stoer-Wagner** | Global minimum cut | O(V³) algorithm for graph partitioning |
+
+### Data Structures
+
+| Structure | Used In | Purpose |
+|-----------|---------|---------|
+| **Pairing Heap** | `Yog.PriorityQueue` | O(1) insert, O(log n) amortized delete-min for Dijkstra, A*, Prim's |
+| **:queue (Erlang)** | BFS in `MaxFlow`, `Reachability` | O(1) enqueue/dequeue for FIFO operations |
+| **Binary-based HLL** | `Reachability` | 1024-byte fixed-size registers for cardinality estimation |
 
 ## Module Overview
 
@@ -431,16 +462,6 @@ Detailed documentation for each algorithm can be found on [HexDocs](https://hexd
 | `Yog.IO.*` | Serialization to/from GraphML, GDF, JSON, LEDA, Pajek, and TGF |
 | `Yog.DisjointSet` | Union-Find with path compression and union by rank |
 | `Yog.Functional.*` | Experimental pure inductive graphs (FGL) |
-
-## Performance Characteristics
-
-- **Graph storage**: O(V + E)
-- **Transpose**: O(1) — dramatically faster than typical O(E) implementations
-- **Dijkstra/A***: O(V) for visited set and pairing heap
-- **Maximum Flow**: Flat dictionary residuals with O(1) amortized BFS queue operations
-- **Graph Generators**: O(V²) for complete graphs, O(V) or O(VE) for others
-- **Stable Marriage**: O(n²) Gale-Shapley with deterministic proposal ordering
-- **Test Suite**: 1000+ tests including doctests ensuring equivalence to the core Gleam suite
 
 ## Property-Based Testing
 
