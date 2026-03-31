@@ -16,6 +16,13 @@ defmodule Yog.Pathfinding do
   - `Yog.Pathfinding.Matrix` — Distance matrix computation
   - `Yog.Pathfinding.Path` — Path struct for representing results
 
+  ## All-Pairs Functions
+
+  - `all_pairs_shortest_paths_unweighted/1` — Parallel BFS for unweighted graphs
+  - `floyd_warshall/1` — Floyd-Warshall for weighted graphs
+  - `johnson/5` — Johnson's algorithm for sparse graphs with negative weights
+  - `distance_matrix/6` — Distance matrix between specific points of interest
+
   ## Algorithm Selection Guide
 
   | Algorithm | Use When | Time Complexity |
@@ -24,7 +31,8 @@ defmodule Yog.Pathfinding do
   | **A*** | Non-negative weights + good heuristic | O((V+E) log V) |
   | **Bellman-Ford** | Negative weights OR cycle detection | O(VE) |
   | **Bidirectional** | Large graphs, unweighted or uniform weights | O((V+E) log V) |
-  | **Floyd-Warshall** | All-pairs, dense graphs | O(V³) |
+  | **All-Pairs Unweighted** | All-pairs, unweighted graphs (parallel) | O(V² + VE) |
+  | **Floyd-Warshall** | All-pairs, dense weighted graphs | O(V³) |
   | **Johnson's** | All-pairs, sparse graphs, negative weights | O(V² log V + VE) |
   """
 
@@ -224,5 +232,140 @@ defmodule Yog.Pathfinding do
         subtract \\ nil
       ) do
     Matrix.distance_matrix(graph, points, zero, add, compare, subtract)
+  end
+
+  @doc """
+  Computes all-pairs shortest paths in an unweighted graph using parallel BFS.
+
+  Returns a map of `%{source => %{target => distance}}` where distances are the
+  number of edges in the shortest path.
+
+  ## Parameters
+
+  - `graph` - The unweighted graph to analyze
+
+  ## Returns
+
+  - A map from source nodes to distance maps: `%{source => %{target => distance}}`
+  - Each inner map contains distances from the source to all reachable nodes
+  - Distance from a node to itself is always 0
+  - Unreachable nodes have `nil` distance (note: this differs from `floyd_warshall/1`
+    which omits unreachable pairs entirely)
+
+  ## Complexity
+
+  - **Time:** O(V × (V + E)) = O(V² + VE) overall, but parallelized across CPU cores
+  - **Space:** O(V²) for the result matrix
+
+  ## When to Use
+
+  - **Unweighted graphs only** - For weighted graphs, use `floyd_warshall/1` or `johnson/1`
+  - **All-pairs needed** - When you need distances between all node pairs
+  - **Large graphs** - Parallelization makes this efficient on multi-core systems
+
+  ## Algorithm
+
+  1. For each node, run BFS to compute distances to all other nodes
+  2. BFS from each source is parallelized using `Task.async_stream`
+  3. Results are aggregated into a nested map structure
+
+  ## Examples
+
+      # Simple path graph: 1-2-3-4
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_node(4, nil)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
+      iex> distances = Yog.Pathfinding.all_pairs_shortest_paths_unweighted(graph)
+      iex> distances[1][4]
+      3
+      iex> distances[2][4]
+      2
+      iex> distances[1][1]
+      0
+
+      # Directed graph with unreachable nodes
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      iex> distances = Yog.Pathfinding.all_pairs_shortest_paths_unweighted(graph)
+      iex> distances[1][2]
+      1
+      iex> distances[3][1]
+      nil
+
+  ## See Also
+
+  - `floyd_warshall/1` - For weighted graphs (all-pairs)
+  - `johnson/5` - For sparse weighted graphs with negative weights
+  - `distance_matrix/6` - For distances between specific points of interest only
+  """
+  @spec all_pairs_shortest_paths_unweighted(Yog.graph()) :: %{
+          Yog.node_id() => %{Yog.node_id() => non_neg_integer()}
+        }
+  def all_pairs_shortest_paths_unweighted(graph) do
+    nodes = Yog.Model.all_nodes(graph)
+
+    # 1. Determine concurrency based on hardware
+    # We use schedulers_online to ensure we hit every core without overloading
+    parallel_opts = [
+      max_concurrency: System.schedulers_online(),
+      timeout: :infinity,
+      ordered: false
+    ]
+
+    # 2. Parallelize the BFS from every node
+    nodes
+    |> Task.async_stream(
+      fn source ->
+        {source, bfs_distances(graph, source)}
+      end,
+      parallel_opts
+    )
+    |> Enum.reduce(%{}, fn {:ok, {source, dist_map}}, acc ->
+      Map.put(acc, source, dist_map)
+    end)
+  end
+
+  # Standard BFS to find all distances from a single source: O(V + E)
+  defp bfs_distances(graph, source) do
+    # Handle edge case: isolated node (no edges at all)
+    case Yog.Model.successors(graph, source) do
+      [] ->
+        %{source => 0}
+
+      _ ->
+        q = :queue.in({source, 0}, :queue.new())
+        do_bfs_dist(graph, q, %{source => 0})
+    end
+  end
+
+  defp do_bfs_dist(graph, q, visited) do
+    case :queue.out(q) do
+      {:empty, _} ->
+        visited
+
+      {{:value, {curr, dist}}, rest_q} ->
+        # Use Model.successors for proper encapsulation
+        # Returns list of {neighbor, weight} tuples; we only need neighbor IDs for unweighted
+        neighbors = Yog.Model.successors(graph, curr) |> Enum.map(&elem(&1, 0))
+
+        {next_q, next_v} =
+          Enum.reduce(neighbors, {rest_q, visited}, fn nb, {q_acc, v_acc} ->
+            if Map.has_key?(v_acc, nb) do
+              {q_acc, v_acc}
+            else
+              {:queue.in({nb, dist + 1}, q_acc), Map.put(v_acc, nb, dist + 1)}
+            end
+          end)
+
+        do_bfs_dist(graph, next_q, next_v)
+    end
   end
 end

@@ -155,5 +155,185 @@ defmodule Yog.PBT.PathfindingTest do
         end
       end
     end
+
+    property "All-Pairs Unweighted: Self-distances are zero" do
+      check all(
+              nodes <- node_list_gen(1, 15),
+              weights <- weight_list_gen(length(nodes)),
+              graph = build_unweighted_graph(nodes, weights)
+            ) do
+        distances = Yog.Pathfinding.all_pairs_shortest_paths_unweighted(graph)
+
+        for node <- nodes do
+          assert distances[node][node] == 0
+        end
+      end
+    end
+
+    property "All-Pairs Unweighted: Symmetric in undirected graphs" do
+      check all(
+              nodes <- node_list_gen(2, 12),
+              weights <- weight_list_gen(length(nodes)),
+              graph = build_unweighted_graph_undirected(nodes, weights),
+              [s, t] <- StreamData.uniq_list_of(StreamData.member_of(nodes), length: 2)
+            ) do
+        distances = Yog.Pathfinding.all_pairs_shortest_paths_unweighted(graph)
+
+        dist_st = distances[s][t]
+        dist_ts = distances[t][s]
+
+        # In undirected graphs, distance should be symmetric
+        assert dist_st == dist_ts
+      end
+    end
+
+    property "All-Pairs Unweighted: Triangle inequality holds" do
+      check all(
+              nodes <- node_list_gen(3, 12),
+              weights <- weight_list_gen(length(nodes)),
+              graph = build_unweighted_graph(nodes, weights),
+              [a, b, c] <- StreamData.uniq_list_of(StreamData.member_of(nodes), length: 3)
+            ) do
+        distances = Yog.Pathfinding.all_pairs_shortest_paths_unweighted(graph)
+
+        ab = distances[a][b]
+        bc = distances[b][c]
+        ac = distances[a][c]
+
+        # If all paths exist, triangle inequality: d(a,c) <= d(a,b) + d(b,c)
+        if ab != nil and bc != nil and ac != nil do
+          assert ac <= ab + bc
+        end
+      end
+    end
+
+    property "All-Pairs Unweighted: Consistent with BFS single-source" do
+      check all(
+              nodes <- node_list_gen(2, 12),
+              weights <- weight_list_gen(length(nodes)),
+              graph = build_unweighted_graph(nodes, weights),
+              s <- StreamData.member_of(nodes)
+            ) do
+        # Get all-pairs result
+        all_pairs = Yog.Pathfinding.all_pairs_shortest_paths_unweighted(graph)
+
+        # Get BFS result for single source
+        bfs_distances =
+          Yog.Pathfinding.Dijkstra.single_source_distances(
+            graph,
+            s,
+            0,
+            &+/2,
+            &Yog.Utils.compare/2
+          )
+
+        # Should match for all reachable nodes
+        for t <- nodes do
+          ap_dist = all_pairs[s][t]
+          bfs_dist = Map.get(bfs_distances, t)
+
+          case {ap_dist, bfs_dist} do
+            {nil, nil} -> :ok
+            {d, d} when is_integer(d) -> :ok
+            {nil, _} -> flunk("BFS found path but all-pairs didn't for #{s} -> #{t}")
+            {_, nil} -> flunk("All-pairs found path but BFS didn't for #{s} -> #{t}")
+            _ -> flunk("Distance mismatch for #{s} -> #{t}: #{ap_dist} vs #{bfs_dist}")
+          end
+        end
+      end
+    end
+
+    property "All-Pairs Unweighted: Consistent with Floyd-Warshall on unit weights" do
+      check all(
+              nodes <- node_list_gen(2, 10),
+              weights <- weight_list_gen(length(nodes)),
+              graph = build_unweighted_graph(nodes, weights)
+            ) do
+        all_pairs = Yog.Pathfinding.all_pairs_shortest_paths_unweighted(graph)
+
+        fw_res =
+          Yog.Pathfinding.FloydWarshall.floyd_warshall(graph, 0, &+/2, &Yog.Utils.compare/2)
+
+        case fw_res do
+          {:ok, fw_distances} ->
+            for u <- nodes, v <- nodes do
+              ap_dist = all_pairs[u][v]
+              fw_dist = Map.get(fw_distances, {u, v})
+
+              case {ap_dist, fw_dist} do
+                {nil, nil} -> :ok
+                {d, d} when is_integer(d) -> :ok
+                {0, 0} -> :ok
+                _ -> flunk("Mismatch for #{u} -> #{v}: AP=#{ap_dist}, FW=#{fw_dist}")
+              end
+            end
+
+          {:error, :negative_cycle} ->
+            # Skip graphs with negative cycles (shouldn't happen with unit weights anyway)
+            :ok
+        end
+      end
+    end
+
+    property "All-Pairs Unweighted: Reachability is transitive" do
+      check all(
+              nodes <- node_list_gen(3, 12),
+              weights <- weight_list_gen(length(nodes)),
+              graph = build_unweighted_graph(nodes, weights),
+              [a, b, c] <- StreamData.uniq_list_of(StreamData.member_of(nodes), length: 3)
+            ) do
+        distances = Yog.Pathfinding.all_pairs_shortest_paths_unweighted(graph)
+
+        # If a can reach b and b can reach c, then a can reach c
+        ab_reachable = distances[a][b] != nil
+        bc_reachable = distances[b][c] != nil
+        ac_reachable = distances[a][c] != nil
+
+        if ab_reachable and bc_reachable do
+          assert ac_reachable,
+                 "Transitivity violated: #{a} -> #{b} and #{b} -> #{c} but not #{a} -> #{c}"
+        end
+      end
+    end
+  end
+
+  # Helper to build unweighted directed graph (all weights = 1)
+  defp build_unweighted_graph(nodes, edges) do
+    graph = Yog.new(:directed)
+    graph = Enum.reduce(nodes, graph, fn id, g -> Yog.add_node(g, id, nil) end)
+
+    Enum.reduce(edges, graph, fn {from_idx, to_idx, _}, g ->
+      from = Enum.at(nodes, from_idx)
+      to = Enum.at(nodes, to_idx)
+
+      if from != nil and to != nil do
+        case Yog.add_edge(g, from, to, 1) do
+          {:ok, new_g} -> new_g
+          {:error, _} -> g
+        end
+      else
+        g
+      end
+    end)
+  end
+
+  # Helper to build unweighted undirected graph
+  defp build_unweighted_graph_undirected(nodes, edges) do
+    graph = Yog.new(:undirected)
+    graph = Enum.reduce(nodes, graph, fn id, g -> Yog.add_node(g, id, nil) end)
+
+    Enum.reduce(edges, graph, fn {from_idx, to_idx, _}, g ->
+      from = Enum.at(nodes, from_idx)
+      to = Enum.at(nodes, to_idx)
+
+      if from != nil and to != nil do
+        case Yog.add_edge(g, from, to, 1) do
+          {:ok, new_g} -> new_g
+          {:error, _} -> g
+        end
+      else
+        g
+      end
+    end)
   end
 end
