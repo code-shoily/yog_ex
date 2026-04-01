@@ -113,15 +113,15 @@ defmodule Yog.Flow.MinCut do
 
   defp do_min_cut(graph, best_cut) do
     # Stoer-Wagner terminates when only one node remains
-    if map_size(graph.nodes) <= 1 do
+    if Model.node_count(graph) <= 1 do
       best_cut
     else
       {s, t, cut_weight} = maximum_adjacency_search(graph)
 
-      # Get the sizes of the merged nodes
-      t_size = Map.get(graph.nodes, t, 1)
-      s_size = Map.get(graph.nodes, s, 1)
-      total_nodes = Enum.sum(Map.values(graph.nodes))
+      # Get the sizes of the merged nodes (stored as node data by Transform.map_nodes)
+      t_size = Model.node(graph, t) || 1
+      s_size = Model.node(graph, s) || 1
+      total_nodes = Enum.sum(Enum.map(Model.all_nodes(graph), &Model.node(graph, &1)))
 
       current_cut =
         if is_nil(best_cut) or cut_weight < best_cut.cut_value do

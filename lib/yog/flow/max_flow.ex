@@ -188,40 +188,30 @@ defmodule Yog.Flow.MaxFlow do
   # Convert internal residual map back to a Yog.Graph structure
   # Direct construction is faster than using Model.add_edge for bulk operations
   defp residual_to_graph(original_graph, residual_map) do
-    # Build out_edges and in_edges directly from residual map
-    {out_edges, in_edges} =
-      Enum.reduce(residual_map, {%{}, %{}}, fn {u, edges}, {out_acc, in_acc} ->
-        # Collect outgoing edges for u
-        out_for_u =
-          Enum.reduce(edges, %{}, fn {v, cap}, acc ->
-            if cap != 0, do: Map.put(acc, v, cap), else: acc
-          end)
+    # Build residual graph using Model API for protocol compatibility
+    # Start with empty directed graph
+    graph = Model.new(:directed)
 
-        # Update out_edges
-        new_out = if map_size(out_for_u) > 0, do: Map.put(out_acc, u, out_for_u), else: out_acc
-
-        # Update in_edges (reverse mapping)
-        new_in =
-          Enum.reduce(edges, in_acc, fn {v, cap}, acc ->
-            if cap != 0 do
-              Map.update(acc, v, %{u => cap}, &Map.put(&1, u, cap))
-            else
-              acc
-            end
-          end)
-
-        {new_out, new_in}
+    # Add all nodes from original graph with their metadata
+    graph =
+      Enum.reduce(Model.all_nodes(original_graph), graph, fn node, acc ->
+        data = Model.node(original_graph, node)
+        Model.add_node(acc, node, data)
       end)
 
-    # Preserve node metadata from original graph
-    nodes = original_graph.nodes
-
-    %Yog.Graph{
-      kind: :directed,
-      nodes: nodes,
-      out_edges: out_edges,
-      in_edges: in_edges
-    }
+    # Add edges from residual map
+    Enum.reduce(residual_map, graph, fn {u, edges}, acc ->
+      Enum.reduce(edges, acc, fn {v, cap}, inner_acc ->
+        if cap != 0 do
+          case Model.add_edge(inner_acc, u, v, cap) do
+            {:ok, new_graph} -> new_graph
+            {:error, _} -> inner_acc
+          end
+        else
+          inner_acc
+        end
+      end)
+    end)
   end
 
   # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity

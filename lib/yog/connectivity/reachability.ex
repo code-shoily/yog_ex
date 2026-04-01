@@ -130,11 +130,13 @@ defmodule Yog.Connectivity.Reachability do
 
       node_count =
         Enum.reduce(reachable_scc_ids, 0, fn id, acc ->
-          acc + Map.get(condensation.nodes, id).size
+          scc_data = Model.node(condensation, id)
+          acc + scc_data.size
         end)
 
       # Plus nodes in my own SCC minus myself
-      my_scc_size = Map.get(condensation.nodes, scc_id).size
+      my_scc_data = Model.node(condensation, scc_id)
+      my_scc_size = my_scc_data.size
       {node_id, node_count + (my_scc_size - 1)}
     end)
   end

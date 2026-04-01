@@ -148,7 +148,7 @@ defimpl Inspect, for: Yog.DAG do
   import Inspect.Algebra
 
   def inspect(%Yog.DAG{graph: graph}, _opts) do
-    node_count = map_size(graph.nodes)
+    node_count = Yog.Model.node_count(graph)
     edge_count = Yog.Graph.edge_count(graph)
 
     node_str = if node_count == 1, do: "node", else: "nodes"

@@ -174,9 +174,11 @@ defmodule Yog.PBT.PathfindingTest do
       check all(
               nodes <- node_list_gen(2, 12),
               weights <- weight_list_gen(length(nodes)),
-              graph = build_unweighted_graph_undirected(nodes, weights),
-              [s, t] <- StreamData.uniq_list_of(StreamData.member_of(nodes), length: 2)
+              graph = build_unweighted_graph_undirected(nodes, weights)
             ) do
+        # Pick 2 distinct nodes deterministically
+        [s, t] = Enum.take(nodes, 2)
+
         distances = Yog.Pathfinding.all_pairs_shortest_paths_unweighted(graph)
 
         dist_st = distances[s][t]
@@ -191,9 +193,11 @@ defmodule Yog.PBT.PathfindingTest do
       check all(
               nodes <- node_list_gen(3, 12),
               weights <- weight_list_gen(length(nodes)),
-              graph = build_unweighted_graph(nodes, weights),
-              [a, b, c] <- StreamData.uniq_list_of(StreamData.member_of(nodes), length: 3)
+              graph = build_unweighted_graph(nodes, weights)
             ) do
+        # Pick 3 distinct nodes deterministically
+        [a, b, c] = nodes |> Enum.uniq() |> Enum.take(3)
+
         distances = Yog.Pathfinding.all_pairs_shortest_paths_unweighted(graph)
 
         ab = distances[a][b]
@@ -279,9 +283,11 @@ defmodule Yog.PBT.PathfindingTest do
       check all(
               nodes <- node_list_gen(3, 12),
               weights <- weight_list_gen(length(nodes)),
-              graph = build_unweighted_graph(nodes, weights),
-              [a, b, c] <- StreamData.uniq_list_of(StreamData.member_of(nodes), length: 3)
+              graph = build_unweighted_graph(nodes, weights)
             ) do
+        # Pick 3 distinct nodes deterministically
+        [a, b, c] = nodes |> Enum.uniq() |> Enum.take(3)
+
         distances = Yog.Pathfinding.all_pairs_shortest_paths_unweighted(graph)
 
         # If a can reach b and b can reach c, then a can reach c

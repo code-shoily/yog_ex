@@ -452,12 +452,16 @@ defmodule Yog.Pathfinding.BellmanFord do
 
   # Helper functions
 
-  # Relax all edges directly from graph.out_edges (memory-efficient)
-  # Iterates over graph structure without materializing edge list
+  # Relax all edges using Model.successors for protocol compatibility
+  # Only processes edges from nodes that have known distances
   defp relax_all_edges_from_graph(graph, distances, predecessors, add, compare) do
-    Enum.reduce(graph.out_edges, {distances, predecessors}, fn {u, successors}, {dist, pred} ->
+    nodes = Model.all_nodes(graph)
+
+    Enum.reduce(nodes, {distances, predecessors}, fn u, {dist, pred} ->
       case Map.fetch(dist, u) do
         {:ok, dist_u} ->
+          successors = Model.successors(graph, u)
+
           Enum.reduce(successors, {dist, pred}, fn {v, weight}, {d, p} ->
             new_dist_v = add.(dist_u, weight)
 
@@ -480,11 +484,15 @@ defmodule Yog.Pathfinding.BellmanFord do
     end)
   end
 
-  # Relax all edges without tracking predecessors (memory-efficient)
+  # Relax all edges without tracking predecessors (protocol-compatible)
   defp relax_all_edges_from_graph_no_pred(graph, distances, add, compare) do
-    Enum.reduce(graph.out_edges, distances, fn {u, successors}, dist ->
+    nodes = Model.all_nodes(graph)
+
+    Enum.reduce(nodes, distances, fn u, dist ->
       case Map.fetch(dist, u) do
         {:ok, dist_u} ->
+          successors = Model.successors(graph, u)
+
           Enum.reduce(successors, dist, fn {v, weight}, d ->
             new_dist_v = add.(dist_u, weight)
 
