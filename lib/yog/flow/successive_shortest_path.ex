@@ -1,4 +1,4 @@
-defmodule Yog.Flow.NetworkSimplex do
+defmodule Yog.Flow.SuccessiveShortestPath do
   @moduledoc """
   Minimum cost flow algorithms for network flow optimization.
 
@@ -10,9 +10,12 @@ defmodule Yog.Flow.NetworkSimplex do
 
   | Algorithm | Function | Complexity | Best For |
   |-----------|----------|------------|----------|
-  | [Successive Shortest Path](https://en.wikipedia.org/wiki/Minimum-cost_flow_problem) | `min_cost_flow/4` | O(F · E log V) | Small to medium networks |
+  | [Successive Shortest Path](https://en.wikipedia.org/wiki/Minimum-cost_flow_problem) | `min_cost_flow/4` | O(F · (E + V log V)) | Small to medium networks |
 
-  The implementation uses the Successive Shortest Path algorithm.
+  The implementation uses the Successive Shortest Path algorithm with Dijkstra and
+  node potentials (reduced costs). One initial Bellman-Ford pass computes valid
+  potentials; every subsequent shortest-path query runs Dijkstra using
+  `Yog.PriorityQueue` on non-negative reduced costs.
 
   ## Key Concepts
 
@@ -62,7 +65,7 @@ defmodule Yog.Flow.NetworkSimplex do
       # Extract cost from edge data
       get_cost = fn {_, c} -> c end
 
-      case Yog.Flow.NetworkSimplex.min_cost_flow(graph, get_demand, get_capacity, get_cost) do
+      case Yog.Flow.SuccessiveShortestPath.min_cost_flow(graph, get_demand, get_capacity, get_cost) do
         {:ok, result} ->
           IO.puts("Min cost: \#{result.cost}")
           IO.inspect(result.flow)
@@ -139,7 +142,7 @@ defmodule Yog.Flow.NetworkSimplex do
       ...> end
       iex> get_capacity = fn w -> w end
       iex> get_cost = fn _ -> 1 end
-      iex> result = Yog.Flow.NetworkSimplex.min_cost_flow(
+      iex> result = Yog.Flow.SuccessiveShortestPath.min_cost_flow(
       ...>   graph, get_demand, get_capacity, get_cost
       ...> )
       iex> match?({:ok, _} , result) or match?({:error, _}, result)
@@ -201,109 +204,224 @@ defmodule Yog.Flow.NetworkSimplex do
     end
   end
 
-  # Successive Shortest Path algorithm
+  # Successive Shortest Path algorithm with proper residual graph and node potentials
   defp solve_min_cost_flow(nodes, edges, demands) do
-    # Build adjacency with costs
-    adj = build_adjacency(edges)
+    original_edges = MapSet.new(edges, fn {u, v, _, _} -> {u, v} end)
+    {capacities, costs, adj} = build_residual_graph(nodes, edges)
 
-    # Find supply and demand nodes
     supply_nodes = Enum.filter(nodes, fn n -> demands[n] < 0 end)
     demand_nodes = Enum.filter(nodes, fn n -> demands[n] > 0 end)
 
-    # Iteratively find shortest paths and augment flow
-    do_ssp(supply_nodes, demand_nodes, edges, demands, adj, %{}, 0)
+    case initialize_potentials(adj, capacities, costs, nodes) do
+      {:ok, potentials} ->
+        do_ssp(
+          supply_nodes,
+          demand_nodes,
+          demands,
+          adj,
+          capacities,
+          costs,
+          original_edges,
+          %{},
+          0,
+          potentials
+        )
+
+      :negative_cycle ->
+        :infeasible
+    end
   end
 
-  defp build_adjacency(edges) do
-    Enum.reduce(edges, %{}, fn {u, v, _cap, cost}, acc ->
-      Map.update(acc, u, [{v, cost}], fn existing -> [{v, cost} | existing] end)
+  defp build_residual_graph(nodes, edges) do
+    # Initialize adjacency for all nodes
+    adj = Map.new(nodes, fn n -> {n, []} end)
+
+    Enum.reduce(edges, {%{}, %{}, adj}, fn {u, v, cap, cost}, {caps, costs, adj} ->
+      # Forward edge
+      caps = Map.put(caps, {u, v}, cap)
+      costs = Map.put(costs, {u, v}, cost)
+      adj = Map.update!(adj, u, fn existing -> [v | existing] end)
+
+      # Backward edge (initially 0 capacity, negative cost)
+      caps = Map.put(caps, {v, u}, 0)
+      costs = Map.put(costs, {v, u}, -cost)
+      adj = Map.update!(adj, v, fn existing -> [u | existing] end)
+
+      {caps, costs, adj}
     end)
   end
 
-  defp do_ssp(_supply, [], _edges, _demands, _adj, flow, cost) do
+  defp initialize_potentials(adj, capacities, costs, nodes) do
+    # Simulate super-source by initializing all distances to 0
+    dist = Map.new(nodes, fn n -> {n, 0} end)
+    prev = %{}
+
+    # Run |V| iterations of Bellman-Ford
+    {final_dist, _} =
+      Enum.reduce(1..length(nodes), {dist, prev}, fn _, {d, p} ->
+        relax_all_edges(adj, capacities, costs, d, p)
+      end)
+
+    # Check for negative cycles on the |V|-th iteration
+    {after_v, _} = relax_all_edges(adj, capacities, costs, final_dist, prev)
+
+    if any_relaxation?(final_dist, after_v) do
+      :negative_cycle
+    else
+      {:ok, final_dist}
+    end
+  end
+
+  defp relax_all_edges(adj, capacities, costs, dist, prev) do
+    Enum.reduce(adj, {dist, prev}, fn {u, neighbors}, {_d, _p} = acc ->
+      Enum.reduce(neighbors, acc, fn v, {d2, p2} = acc2 ->
+        if capacities[{u, v}] > 0 do
+          edge_cost = costs[{u, v}]
+          new_dist = d2[u] + edge_cost
+
+          if new_dist < d2[v] do
+            {Map.put(d2, v, new_dist), Map.put(p2, v, u)}
+          else
+            acc2
+          end
+        else
+          acc2
+        end
+      end)
+    end)
+  end
+
+  defp any_relaxation?(dist1, dist2) do
+    Enum.any?(dist1, fn {node, val} -> dist2[node] < val end)
+  end
+
+  # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity
+  defp do_ssp(_supply, [], _demands, _adj, _caps, _costs, _orig, flow, cost, _pots) do
     {:ok, flow_to_list(flow), cost}
   end
 
-  defp do_ssp([], _demand, _edges, _demands, _adj, _flow, _cost) do
+  # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity
+  defp do_ssp([], _demand, _demands, _adj, _caps, _costs, _orig, _flow, _cost, _pots) do
     :infeasible
   end
 
-  defp do_ssp(supply_nodes, demand_nodes, edges, demands, adj, flow, cost) do
-    # Find a supply node with remaining supply
+  # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity
+  defp do_ssp(
+         supply_nodes,
+         demand_nodes,
+         demands,
+         adj,
+         capacities,
+         costs,
+         original_edges,
+         flow,
+         cost,
+         potentials
+       ) do
     source = Enum.find(supply_nodes, fn n -> demands[n] < 0 end)
-
-    # Find a demand node with remaining demand
     sink = Enum.find(demand_nodes, fn n -> demands[n] > 0 end)
 
     if source == nil or sink == nil do
       {:ok, flow_to_list(flow), cost}
     else
-      # Find shortest path from source to sink
-      case shortest_path(adj, source, sink) do
+      case shortest_path(adj, capacities, costs, potentials, source, sink) do
         nil ->
           :infeasible
 
-        {path, path_cost} ->
-          # Compute bottleneck
-          source_supply = -demands[source]
-          sink_demand = demands[sink]
-          bottleneck = min(source_supply, sink_demand)
+        {path, path_cost, dist} ->
+          bottleneck = compute_bottleneck(capacities, demands, source, sink, path)
 
-          # Update demands
           new_demands =
             demands
             |> Map.update!(source, &(&1 + bottleneck))
             |> Map.update!(sink, &(&1 - bottleneck))
 
-          # Update flow
-          new_flow = update_flow(flow, path, bottleneck)
-
-          # Update cost
+          {new_flow, new_caps} = augment_flow(flow, capacities, original_edges, path, bottleneck)
           new_cost = cost + path_cost * bottleneck
+          new_potentials = update_potentials(potentials, dist)
 
-          do_ssp(supply_nodes, demand_nodes, edges, new_demands, adj, new_flow, new_cost)
+          do_ssp(
+            supply_nodes,
+            demand_nodes,
+            new_demands,
+            adj,
+            new_caps,
+            costs,
+            original_edges,
+            new_flow,
+            new_cost,
+            new_potentials
+          )
       end
     end
   end
 
-  # Bellman-Ford for shortest path (handles negative costs)
-  defp shortest_path(adj, source, sink) do
-    nodes = Map.keys(adj) |> Enum.uniq()
-    initial_dist = Map.new(nodes, fn n -> {n, :infinity} end)
-    dist = Map.put(initial_dist, source, 0)
+  # Dijkstra with node potentials on residual graph
+  defp shortest_path(adj, capacities, costs, potentials, source, sink) do
+    compare = fn {d1, _}, {d2, _} -> d1 <= d2 end
+    pq = Yog.PriorityQueue.new(compare) |> Yog.PriorityQueue.push({0, source})
+
+    dist = %{source => 0}
     prev = %{}
 
-    # Relax edges
-    {final_dist, final_prev} =
-      Enum.reduce(1..(length(nodes) - 1)//1, {dist, prev}, fn _, {d, p} ->
-        relax_edges(adj, d, p)
-      end)
+    case do_dijkstra(adj, capacities, costs, potentials, source, sink, pq, dist, prev) do
+      nil ->
+        nil
 
-    if final_dist[sink] == :infinity do
-      nil
-    else
-      case reconstruct_path(final_prev, source, sink) do
-        nil -> nil
-        path -> {path, final_dist[sink]}
-      end
+      {path, reduced_dist, final_dist} ->
+        path_cost = reduced_dist - potentials[source] + potentials[sink]
+        {path, path_cost, final_dist}
     end
   end
 
-  defp relax_edges(adj, dist, prev) do
-    Enum.reduce(adj, {dist, prev}, fn {u, neighbors}, {d, _p} = acc ->
-      if d[u] == :infinity do
-        acc
-      else
-        Enum.reduce(neighbors, acc, fn {v, cost}, {d2, p2} = acc2 ->
-          new_dist = d2[u] + cost
+  # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity
+  defp do_dijkstra(adj, caps, costs, pots, source, sink, pq, dist, prev) do
+    case Yog.PriorityQueue.pop(pq) do
+      :error ->
+        nil
 
-          if d2[v] == :infinity or new_dist < d2[v] do
-            {Map.put(d2, v, new_dist), Map.put(p2, v, u)}
+      {:ok, {d, u}, new_pq} ->
+        if u == sink do
+          path = reconstruct_path(prev, source, sink)
+          {path, d, dist}
+        else
+          best_dist = Map.get(dist, u)
+
+          if best_dist != nil and d > best_dist do
+            do_dijkstra(adj, caps, costs, pots, source, sink, new_pq, dist, prev)
           else
-            acc2
+            neighbors = Map.get(adj, u, [])
+
+            {next_pq, next_dist, next_prev} =
+              Enum.reduce(neighbors, {new_pq, dist, prev}, fn v, {pq_acc, dist_acc, prev_acc} ->
+                if caps[{u, v}] > 0 do
+                  reduced_cost = costs[{u, v}] + pots[u] - pots[v]
+                  new_dist = d + reduced_cost
+                  old_dist = Map.get(dist_acc, v)
+
+                  if old_dist == nil or new_dist < old_dist do
+                    {
+                      Yog.PriorityQueue.push(pq_acc, {new_dist, v}),
+                      Map.put(dist_acc, v, new_dist),
+                      Map.put(prev_acc, v, u)
+                    }
+                  else
+                    {pq_acc, dist_acc, prev_acc}
+                  end
+                else
+                  {pq_acc, dist_acc, prev_acc}
+                end
+              end)
+
+            do_dijkstra(adj, caps, costs, pots, source, sink, next_pq, next_dist, next_prev)
           end
-        end)
-      end
+        end
+    end
+  end
+
+  defp update_potentials(potentials, dist) do
+    Enum.reduce(dist, potentials, fn {node, d}, pots ->
+      Map.update!(pots, node, &(&1 + d))
     end)
   end
 
@@ -311,8 +429,9 @@ defmodule Yog.Flow.NetworkSimplex do
     do_reconstruct(prev, sink, [sink], source)
   end
 
+  # Path is already [source, ..., sink] due to prepending parents during backtracking
   defp do_reconstruct(_prev, current, path, target) when current == target do
-    Enum.reverse(path)
+    path
   end
 
   defp do_reconstruct(prev, current, path, target) do
@@ -322,13 +441,37 @@ defmodule Yog.Flow.NetworkSimplex do
     end
   end
 
-  defp update_flow(flow, path, amount) do
+  defp compute_bottleneck(capacities, demands, source, sink, path) do
+    source_supply = -demands[source]
+    sink_demand = demands[sink]
+
+    edge_bottleneck =
+      path_to_edges(path)
+      |> Enum.map(fn {u, v} -> capacities[{u, v}] end)
+      |> Enum.min(fn -> 0 end)
+
+    min(min(source_supply, sink_demand), edge_bottleneck)
+  end
+
+  defp augment_flow(flow, capacities, original_edges, path, amount) do
     edges = path_to_edges(path)
 
-    Enum.reduce(edges, flow, fn {u, v}, acc ->
-      key = {u, v}
-      current = Map.get(acc, key, 0)
-      Map.put(acc, key, current + amount)
+    Enum.reduce(edges, {flow, capacities}, fn {u, v}, {f, c} ->
+      # Decrease forward residual capacity
+      c = Map.update!(c, {u, v}, &(&1 - amount))
+      # Increase backward residual capacity
+      c = Map.update!(c, {v, u}, &(&1 + amount))
+
+      f =
+        if MapSet.member?(original_edges, {u, v}) do
+          # Augmenting along original forward edge
+          Map.update(f, {u, v}, amount, &(&1 + amount))
+        else
+          # Augmenting along backward edge -> reduce flow on original edge {v, u}
+          Map.update!(f, {v, u}, &(&1 - amount))
+        end
+
+      {f, c}
     end)
   end
 

@@ -1,6 +1,6 @@
-defmodule Yog.Flow.NetworkSimplexTest do
+defmodule Yog.Flow.SuccessiveShortestPathTest do
   @moduledoc """
-  Tests for `Yog.Flow.NetworkSimplex` matching Gleam's `yog/flow/network_simplex` module.
+  Tests for `Yog.Flow.SuccessiveShortestPath` matching Gleam's `yog/flow/successive_shortest_path` module.
 
   Note: The get_demand, get_capacity, and get_cost functions work with node/edge data,
   not IDs. In these tests, node data is the string label (e.g., "warehouse") and
@@ -8,9 +8,9 @@ defmodule Yog.Flow.NetworkSimplexTest do
   """
 
   use ExUnit.Case, async: true
-  alias Yog.Flow.NetworkSimplex
+  alias Yog.Flow.SuccessiveShortestPath
 
-  doctest NetworkSimplex
+  doctest SuccessiveShortestPath
 
   describe "min_cost_flow/4" do
     test "returns error for unbalanced demands" do
@@ -31,7 +31,7 @@ defmodule Yog.Flow.NetworkSimplexTest do
       get_cost = fn _weight -> 1 end
 
       assert {:error, :unbalanced_demands} =
-               NetworkSimplex.min_cost_flow(graph, get_demand, get_capacity, get_cost)
+               SuccessiveShortestPath.min_cost_flow(graph, get_demand, get_capacity, get_cost)
     end
 
     test "returns error or result for zero flow" do
@@ -52,7 +52,7 @@ defmodule Yog.Flow.NetworkSimplexTest do
       get_cost = fn _weight -> 5 end
 
       # With zero demands, should either succeed with zero cost or return error
-      case NetworkSimplex.min_cost_flow(graph, get_demand, get_capacity, get_cost) do
+      case SuccessiveShortestPath.min_cost_flow(graph, get_demand, get_capacity, get_cost) do
         {:ok, result} ->
           assert result.cost == 0
           assert result.flow == []
@@ -82,7 +82,7 @@ defmodule Yog.Flow.NetworkSimplexTest do
       get_cost = fn _weight -> 1 end
 
       # Just verify the function doesn't crash and returns a valid result type
-      result = NetworkSimplex.min_cost_flow(graph, get_demand, get_capacity, get_cost)
+      result = SuccessiveShortestPath.min_cost_flow(graph, get_demand, get_capacity, get_cost)
       assert match?({:ok, _}, result) or match?({:error, _}, result)
     end
   end

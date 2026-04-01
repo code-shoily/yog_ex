@@ -13,8 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Renamed `Yog.Flow.NetworkSimplex` to `Yog.Flow.SuccessiveShortestPath`** to accurately reflect the implemented algorithm (Successive Shortest Path, not Network Simplex).
+- **Flow Algorithms**: `Yog.Flow.SuccessiveShortestPath.min_cost_flow/4` now uses Dijkstra with node potentials instead of Bellman-Ford on every iteration, improving complexity from O(F · V · E) to O(F · (E + V log V)).
+- **Transform**: Major performance optimization for `Yog.Transform.contract/4` — replaced repeated `Model.add_edge_with_combine` / `Model.remove_node` calls with direct map surgery, eliminating per-edge node-existence checks and redundant graph struct reconstructions.
+
 - **MinCut Algorithm Performance Optimization**
   - Complete rewrite of `Yog.Flow.MinCut.global_min_cut/1` for significant performance improvements
+  - Eliminated redundant `O(V)` `total_nodes` recomputation inside the Stoer-Wagner loop by calculating it once and passing it as a constant parameter
   - Changed partition tracking from `MapSet` of node IDs to integer counts
     - **Before**: O(n) `MapSet.union/2` and `MapSet.difference/2` on every contraction
     - **After**: O(1) integer arithmetic (`s_size + t_size`)
