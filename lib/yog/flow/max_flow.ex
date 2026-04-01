@@ -190,11 +190,9 @@ defmodule Yog.Flow.MaxFlow do
   defp residual_to_graph(original_graph, residual_map) do
     # Build residual graph using Model API for protocol compatibility
     # Start with empty directed graph
-    graph = Model.new(:directed)
-
     # Add all nodes from original graph with their metadata
     graph =
-      Enum.reduce(Model.all_nodes(original_graph), graph, fn node, acc ->
+      Enum.reduce(Model.all_nodes(original_graph), Model.new(:directed), fn node, acc ->
         data = Model.node(original_graph, node)
         Model.add_node(acc, node, data)
       end)
