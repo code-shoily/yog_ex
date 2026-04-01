@@ -865,38 +865,49 @@ defmodule Yog.Transform do
           Yog.node_id(),
           (term(), term() -> term())
         ) :: Yog.graph()
-  def contract(%Yog.Graph{} = graph, a, b, combine_weight) do
-    b_out = Map.get(graph.out_edges, b, %{})
+  def contract(%Yog.Graph{out_edges: out_edges, in_edges: in_edges} = graph, a, b, combine_weight) do
+    b_in = Map.get(in_edges, b, %{})
+    b_out = Map.get(out_edges, b, %{})
 
-    graph_with_out_edges =
-      Enum.reduce(b_out, graph, fn {neighbor, weight}, acc_g ->
-        if neighbor == a || neighbor == b do
-          acc_g
-        else
-          {:ok, g} = Model.add_edge_with_combine(acc_g, a, neighbor, weight, combine_weight)
-          g
-        end
-      end)
+    a_out = merge_adjacent(Map.get(out_edges, a, %{}), b_out, combine_weight, a, b)
 
-    final_graph =
-      case graph.kind do
-        :undirected ->
-          graph_with_out_edges
+    out_edges =
+      graph.out_edges
+      |> redirect_neighbors(b_in, a, b, combine_weight)
+      |> Map.put(a, a_out)
+      |> Map.delete(b)
 
-        :directed ->
-          b_in = Map.get(graph_with_out_edges.in_edges, b, %{})
+    if graph.kind == :undirected do
+      %{graph | nodes: Map.delete(graph.nodes, b), out_edges: out_edges, in_edges: out_edges}
+    else
+      a_in = merge_adjacent(Map.get(in_edges, a, %{}), b_in, combine_weight, a, b)
+      in_edges = redirect_neighbors(in_edges, b_out, a, b, combine_weight)
+      in_edges = in_edges |> Map.put(a, a_in) |> Map.delete(b)
 
-          Enum.reduce(b_in, graph_with_out_edges, fn {neighbor, weight}, acc_g ->
-            if neighbor == a || neighbor == b do
-              acc_g
-            else
-              {:ok, g} = Model.add_edge_with_combine(acc_g, neighbor, a, weight, combine_weight)
-              g
-            end
-          end)
+      %{graph | nodes: Map.delete(graph.nodes, b), out_edges: out_edges, in_edges: in_edges}
+    end
+  end
+
+  # Merges b's edges into a's adjacency map and removes self-loops
+  defp merge_adjacent(a_edges, b_edges, combine_weight, a, b) do
+    Map.merge(a_edges, b_edges, fn _k, v1, v2 -> combine_weight.(v1, v2) end)
+    |> Map.delete(a)
+    |> Map.delete(b)
+  end
+
+  # Redirects edges pointing to b so they point to a instead
+  defp redirect_neighbors(adj_map, edges_to_redirect, a, b, combine_weight) do
+    Enum.reduce(edges_to_redirect, adj_map, fn {nb, w}, acc ->
+      if nb == a or nb == b do
+        acc
+      else
+        Map.update(acc, nb, %{a => w}, fn nb_edges ->
+          nb_edges
+          |> Map.delete(b)
+          |> Map.update(a, w, &combine_weight.(&1, w))
+        end)
       end
-
-    Model.remove_node(final_graph, b)
+    end)
   end
 
   @doc """
