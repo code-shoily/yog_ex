@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Pathfinding**: Added `all_pair_shortest_path_unweighted/1` - computes shortest path distances between all pairs of nodes in unweighted graphs using BFS.
+
 ### Changed
 
 - **MinCut Algorithm Performance Optimization**
