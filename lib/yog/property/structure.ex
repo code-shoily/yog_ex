@@ -58,7 +58,7 @@ defmodule Yog.Property.Structure do
   """
   @spec tree?(Yog.graph()) :: boolean()
   def tree?(graph) do
-    case graph.kind do
+    case Model.type(graph) do
       :undirected ->
         n = Model.node_count(graph)
         e = Model.edge_count(graph)
@@ -74,18 +74,16 @@ defmodule Yog.Property.Structure do
   """
   @spec arborescence?(Yog.graph()) :: boolean()
   def arborescence?(graph) do
-    case graph.kind do
+    case Model.type(graph) do
       :directed ->
         n = Model.node_count(graph)
 
         if n > 0 and Model.edge_count(graph) == n - 1 do
           nodes = Model.all_nodes(graph)
 
-          in_edges = graph.in_edges
-
           in_degrees =
             for node <- nodes, reduce: %{} do
-              acc -> Map.put(acc, node, map_size(Map.get(in_edges, node, %{})))
+              acc -> Map.put(acc, node, Model.in_degree(graph, node))
             end
 
           roots = Enum.filter(nodes, fn node -> Map.get(in_degrees, node) == 0 end)
@@ -133,7 +131,7 @@ defmodule Yog.Property.Structure do
       e = Model.edge_count(graph)
 
       expected_e =
-        case graph.kind do
+        case Model.type(graph) do
           :undirected -> div(n * (n - 1), 2)
           :directed -> n * (n - 1)
         end
@@ -152,7 +150,7 @@ defmodule Yog.Property.Structure do
     if nodes == [] do
       true
     else
-      case graph.kind do
+      case Model.type(graph) do
         :undirected ->
           Enum.all?(nodes, fn u -> length(Model.neighbor_ids(graph, u)) == k end)
 
@@ -173,7 +171,7 @@ defmodule Yog.Property.Structure do
   """
   @spec connected?(Yog.graph()) :: boolean()
   def connected?(graph) do
-    case graph.kind do
+    case Model.type(graph) do
       :undirected ->
         case Model.all_nodes(graph) do
           [] -> true
@@ -190,7 +188,7 @@ defmodule Yog.Property.Structure do
   """
   @spec strongly_connected?(Yog.graph()) :: boolean()
   def strongly_connected?(graph) do
-    case graph.kind do
+    case Model.type(graph) do
       :undirected ->
         connected?(graph)
 
@@ -216,7 +214,7 @@ defmodule Yog.Property.Structure do
   """
   @spec weakly_connected?(Yog.graph()) :: boolean()
   def weakly_connected?(graph) do
-    case graph.kind do
+    case Model.type(graph) do
       :undirected ->
         connected?(graph)
 
@@ -256,7 +254,7 @@ defmodule Yog.Property.Structure do
   """
   @spec chordal?(Yog.graph()) :: boolean()
   def chordal?(graph) do
-    case graph.kind do
+    case Model.type(graph) do
       :undirected ->
         case mcs_ordering(graph) do
           nil -> false

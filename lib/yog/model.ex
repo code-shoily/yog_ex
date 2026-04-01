@@ -857,6 +857,98 @@ defmodule Yog.Model do
   end
 
   @doc """
+  Returns the out-degree of a node (number of outgoing edges).
+
+  For undirected graphs, this returns the total degree (same as `in_degree/2`).
+
+  **Time Complexity:** O(1)
+
+  ## Example
+
+      iex> {:ok, graph} =
+      ...>   Yog.Model.new(:directed)
+      ...>   |> Yog.Model.add_node(1, "A")
+      ...>   |> Yog.Model.add_node(2, "B")
+      ...>   |> Yog.Model.add_edge(1, 2, 10)
+      iex> Yog.Model.out_degree(graph, 1)
+      1
+      iex> Yog.Model.out_degree(graph, 2)
+      0
+
+  """
+  @spec out_degree(graph(), node_id()) :: non_neg_integer()
+  def out_degree(%Graph{out_edges: out_edges}, id) do
+    case Map.fetch(out_edges, id) do
+      {:ok, targets} -> map_size(targets)
+      :error -> 0
+    end
+  end
+
+  @doc """
+  Returns the in-degree of a node (number of incoming edges).
+
+  For undirected graphs, this returns the total degree (same as `out_degree/2`).
+
+  **Time Complexity:** O(1)
+
+  ## Example
+
+      iex> {:ok, graph} =
+      ...>   Yog.Model.new(:directed)
+      ...>   |> Yog.Model.add_node(1, "A")
+      ...>   |> Yog.Model.add_node(2, "B")
+      ...>   |> Yog.Model.add_edge(1, 2, 10)
+      iex> Yog.Model.in_degree(graph, 2)
+      1
+      iex> Yog.Model.in_degree(graph, 1)
+      0
+
+  """
+  @spec in_degree(graph(), node_id()) :: non_neg_integer()
+  def in_degree(%Graph{in_edges: in_edges}, id) do
+    case Map.fetch(in_edges, id) do
+      {:ok, sources} -> map_size(sources)
+      :error -> 0
+    end
+  end
+
+  @doc """
+  Returns the total degree of a node.
+
+  For directed graphs, this is the sum of in-degree and out-degree.
+  For undirected graphs, this counts each edge once (self-loops count as 2).
+
+  **Time Complexity:** O(1) for undirected, O(1) for directed
+
+  ## Example
+
+      iex> {:ok, graph} =
+      ...>   Yog.Model.new(:undirected)
+      ...>   |> Yog.Model.add_node(1, "A")
+      ...>   |> Yog.Model.add_node(2, "B")
+      ...>   |> Yog.Model.add_edge(1, 2, 10)
+      iex> Yog.Model.degree(graph, 1)
+      1
+
+  """
+  @spec degree(graph(), node_id()) :: non_neg_integer()
+  def degree(%Graph{kind: :undirected, out_edges: out_edges}, id) do
+    case Map.fetch(out_edges, id) do
+      {:ok, targets} ->
+        # Self-loops count as 2 in undirected graphs
+        base = map_size(targets)
+        if Map.has_key?(targets, id), do: base + 1, else: base
+
+      :error ->
+        0
+    end
+  end
+
+  def degree(%Graph{kind: :directed} = graph, id) do
+    in_degree(graph, id) + out_degree(graph, id)
+  end
+
+  @doc """
   Gets the type of the graph (`:directed` or `:undirected`).
 
   ## Example

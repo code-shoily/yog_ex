@@ -199,7 +199,7 @@ defmodule Yog.Operation do
   """
   @spec disjoint_union(Yog.graph(), Yog.graph()) :: Yog.graph()
   def disjoint_union(graph_a, graph_b) do
-    Yog.Graph.new(graph_a.kind)
+    Yog.Graph.new(Model.type(graph_a))
     |> add_tagged_component(graph_a, 0)
     |> add_tagged_component(graph_b, 1)
   end
@@ -244,18 +244,18 @@ defmodule Yog.Operation do
     v_map = Enum.with_index(second_nodes) |> Enum.into(%{})
 
     # Create empty graph with same kind
-    init_graph = Yog.Graph.new(first.kind)
+    init_graph = Yog.Graph.new(Model.type(first))
 
     # Add nodes: new_id = rank(u) * second_order + rank(v)
     graph_with_nodes =
       Enum.reduce(first_nodes, init_graph, fn u, g_acc ->
-        u_data = Map.fetch!(first.nodes, u)
+        u_data = Model.node(first, u)
         u_idx = Map.fetch!(u_map, u)
 
         Enum.reduce(second_nodes, g_acc, fn v, g ->
           v_idx = Map.fetch!(v_map, v)
           new_id = u_idx * second_order + v_idx
-          v_data = Map.fetch!(second.nodes, v)
+          v_data = Model.node(second, v)
           Model.add_node(g, new_id, {u_data, v_data})
         end)
       end)

@@ -362,6 +362,8 @@ defmodule Yog.IO.JSON do
   end
 
   defp to_generic_multi_format(graph, node_ser, edge_ser, include_metadata?) do
+    # Note: using direct field access as this function handles both Yog.Graph and Yog.Multi.Graph
+    # This will be replaced with protocol dispatch when protocols are implemented
     graph_type = if graph.kind == :directed, do: "directed", else: "undirected"
     nodes = Map.to_list(graph.nodes)
 
@@ -420,6 +422,7 @@ defmodule Yog.IO.JSON do
 
   defp build_multi_metadata(graph) do
     %{
+      # Note: using direct field access as this function handles both Yog.Graph and Yog.Multi.Graph
       node_count: map_size(graph.nodes),
       edge_count: map_size(graph.edges),
       directed: graph.kind == :directed

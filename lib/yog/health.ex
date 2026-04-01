@@ -301,7 +301,7 @@ defmodule Yog.Health do
     # 1. Pre-calculate degrees
     degrees =
       Enum.reduce(nodes, %{}, fn node, acc ->
-        deg = map_size(graph.out_edges[node] || %{})
+        deg = Model.out_degree(graph, node)
         Map.put(acc, node, deg)
       end)
 

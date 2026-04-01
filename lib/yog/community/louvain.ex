@@ -50,6 +50,7 @@ defmodule Yog.Community.Louvain do
   """
 
   alias Yog.Community.{Dendrogram, Metrics, Result}
+  alias Yog.Model
 
   @typedoc "Options for the Louvain algorithm"
   @type louvain_options :: %{
@@ -366,7 +367,7 @@ defmodule Yog.Community.Louvain do
       end)
 
     # Only divide by 2 for undirected graphs (each edge counted twice)
-    case graph.kind do
+    case Model.type(graph) do
       :undirected -> total / 2.0
       :directed -> total
     end
@@ -456,7 +457,7 @@ defmodule Yog.Community.Louvain do
           # For undirected graphs, use stable key {min, max} to avoid double-counting
           # Self-loops naturally handled (comm_u == comm_v)
           edge_key =
-            if original_graph.kind == :undirected and comm_u > comm_v do
+            if Model.type(original_graph) == :undirected and comm_u > comm_v do
               {comm_v, comm_u}
             else
               {comm_u, comm_v}

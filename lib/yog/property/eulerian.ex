@@ -138,7 +138,7 @@ defmodule Yog.Property.Eulerian do
     if nodes == [] do
       false
     else
-      case graph.kind do
+      case Model.type(graph) do
         :undirected -> has_eulerian_circuit_undirected?(graph, nodes)
         :directed -> has_eulerian_circuit_directed?(graph, nodes)
       end
@@ -146,32 +146,20 @@ defmodule Yog.Property.Eulerian do
   end
 
   defp has_eulerian_circuit_undirected?(graph, nodes) do
-    # All nodes must have even parity (self loops count as 2, so they don't affect parity)
-    out_edges = graph.out_edges
-
+    # All nodes must have even parity
     all_even =
       Enum.all?(nodes, fn node ->
-        inner = Map.get(out_edges, node, %{})
-        degree = map_size(inner)
-        # Self-loops: map_size counts 1 but contributes 2 to degree.
-        # Add 1 to correct the count (parity unchanged since +1 to +2 is even change).
-        adjusted_degree = if Map.has_key?(inner, node), do: degree + 1, else: degree
-        rem(adjusted_degree, 2) == 0
+        rem(Model.degree(graph, node), 2) == 0
       end)
 
     all_even and connected?(graph, nodes)
   end
 
   defp has_eulerian_circuit_directed?(graph, nodes) do
-    in_edges = graph.in_edges
-    out_edges = graph.out_edges
-
     # All nodes must have in_degree == out_degree
     all_balanced =
       Enum.all?(nodes, fn node ->
-        in_deg = map_size(Map.get(in_edges, node, %{}))
-        out_deg = map_size(Map.get(out_edges, node, %{}))
-        in_deg == out_deg
+        Model.in_degree(graph, node) == Model.out_degree(graph, node)
       end)
 
     all_balanced and connected?(graph, nodes)
@@ -225,7 +213,7 @@ defmodule Yog.Property.Eulerian do
     if nodes == [] do
       false
     else
-      case graph.kind do
+      case Model.type(graph) do
         :undirected -> has_eulerian_path_undirected?(graph, nodes)
         :directed -> has_eulerian_path_directed?(graph, nodes)
       end
@@ -233,32 +221,20 @@ defmodule Yog.Property.Eulerian do
   end
 
   defp has_eulerian_path_undirected?(graph, nodes) do
-    out_edges = graph.out_edges
-
     # 0 or 2 odd degree nodes
-    # Self-loops: map_size counts 1 but contributes 2 to degree.
-    # Add 1 to correct the count (parity unchanged since +1 to +2 is even change).
     odd_count =
       Enum.count(nodes, fn node ->
-        inner = Map.get(out_edges, node, %{})
-        degree = map_size(inner)
-        adjusted_degree = if Map.has_key?(inner, node), do: degree + 1, else: degree
-        rem(adjusted_degree, 2) == 1
+        rem(Model.degree(graph, node), 2) == 1
       end)
 
     (odd_count == 0 or odd_count == 2) and connected?(graph, nodes)
   end
 
   defp has_eulerian_path_directed?(graph, nodes) do
-    in_edges = graph.in_edges
-    out_edges = graph.out_edges
-
     # At most one start (out - in = 1), at most one end (in - out = 1)
     stats =
       Enum.reduce(nodes, {0, 0, true}, fn node, {starts, ends, valid} ->
-        in_deg = map_size(Map.get(in_edges, node, %{}))
-        out_deg = map_size(Map.get(out_edges, node, %{}))
-        diff = out_deg - in_deg
+        diff = Model.out_degree(graph, node) - Model.in_degree(graph, node)
 
         cond do
           diff == 1 -> {starts + 1, ends, valid and starts < 1}
@@ -417,7 +393,7 @@ defmodule Yog.Property.Eulerian do
   defp find_path_start(graph) do
     nodes = Model.all_nodes(graph)
 
-    case graph.kind do
+    case Model.type(graph) do
       :undirected ->
         # Find odd degree vertex
         Enum.find(nodes, fn node ->
@@ -472,7 +448,7 @@ defmodule Yog.Property.Eulerian do
 
         # For undirected, also remove reverse edge
         new_map =
-          if graph.kind == :undirected and current != next do
+          if Model.type(graph) == :undirected and current != next do
             rev_key = {next, current}
             new_map = Map.update!(new_map, rev_key, &(&1 - 1))
             if new_map[rev_key] == 0, do: Map.delete(new_map, rev_key), else: new_map
@@ -490,7 +466,7 @@ defmodule Yog.Property.Eulerian do
 
   defp find_unused_edge(graph, current, edge_map) do
     candidates =
-      case graph.kind do
+      case Model.type(graph) do
         :undirected -> Model.neighbor_ids(graph, current)
         :directed -> Model.successor_ids(graph, current)
       end
