@@ -44,7 +44,7 @@ defmodule Yog do
   @type node_id() :: integer()
   @type graph_type() :: :directed | :undirected
   @type edge_tuple() :: {node_id(), node_id(), any()}
-  @type graph() :: any()
+  @type graph() :: Yog.Model.Protocol.t()
 
   @doc """
   Returns true if the given value is a Yog graph.
