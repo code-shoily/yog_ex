@@ -201,20 +201,31 @@ defmodule Yog.Pathfinding.Matrix do
     end
   end
 
-  # Run Dijkstra from each POI and collect results
+  # Run Dijkstra from each POI and collect results in parallel
   defp run_dijkstra_multi(graph, points_of_interest, _poi_set, zero, add, compare) do
-    # Run Dijkstra from each POI
-    results =
-      Enum.reduce(points_of_interest, %{}, fn from, acc ->
-        distances = Dijkstra.single_source_distances(graph, from, zero, add, compare)
+    parallel_opts = [
+      max_concurrency: System.schedulers_online(),
+      timeout: :infinity
+    ]
 
-        # Add entries for this source to all reachable POIs
-        Enum.reduce(points_of_interest, acc, fn to, inner_acc ->
-          case Map.fetch(distances, to) do
-            {:ok, dist} -> Map.put(inner_acc, {from, to}, dist)
-            :error -> inner_acc
-          end
-        end)
+    results =
+      points_of_interest
+      |> Task.async_stream(
+        fn from ->
+          distances = Dijkstra.single_source_distances(graph, from, zero, add, compare)
+
+          # Add entries for this source to all reachable POIs
+          Enum.reduce(points_of_interest, %{}, fn to, acc ->
+            case Map.fetch(distances, to) do
+              {:ok, dist} -> Map.put(acc, {from, to}, dist)
+              :error -> acc
+            end
+          end)
+        end,
+        parallel_opts
+      )
+      |> Enum.reduce(%{}, fn {:ok, source_results}, acc ->
+        Map.merge(acc, source_results)
       end)
 
     {:ok, results}
