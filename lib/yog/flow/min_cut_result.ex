@@ -67,36 +67,6 @@ defmodule Yog.Flow.MinCutResult do
   end
 
   @doc """
-  Creates a new min cut result from MapSet partitions (backward compatibility).
-
-  ## Deprecated
-
-  This function is kept for backward compatibility with code that tracks
-  full node partitions. For new code, use `new/3` with partition sizes.
-
-  ## Examples
-
-      iex> source = MapSet.new([1, 2, 3])
-      iex> sink = MapSet.new([4, 5])
-      iex> Yog.Flow.MinCutResult.new(source, sink)
-      %Yog.Flow.MinCutResult{
-        cut_value: nil,
-        source_side_size: 3,
-        sink_side_size: 2,
-        algorithm: :unknown
-      }
-  """
-  @spec new(MapSet.t(), MapSet.t()) :: t()
-  def new(source_side, sink_side) do
-    %__MODULE__{
-      cut_value: nil,
-      source_side_size: MapSet.size(source_side),
-      sink_side_size: MapSet.size(sink_side),
-      algorithm: :unknown
-    }
-  end
-
-  @doc """
   Returns the total number of nodes in the graph.
 
   ## Examples
@@ -106,15 +76,10 @@ defmodule Yog.Flow.MinCutResult do
       7
   """
   @spec total_nodes(t()) :: non_neg_integer()
-  def total_nodes(%__MODULE__{source_side_size: s, sink_side_size: t}) do
-    s + t
-  end
+  def total_nodes(%__MODULE__{source_side_size: s, sink_side_size: t}), do: s + t
 
   @doc """
   Computes the product of partition sizes.
-
-  This is commonly needed for Advent of Code problems where the answer
-  is the product of the two partition sizes.
 
   ## Examples
 
@@ -123,9 +88,7 @@ defmodule Yog.Flow.MinCutResult do
       12
   """
   @spec partition_product(t()) :: non_neg_integer()
-  def partition_product(%__MODULE__{source_side_size: s, sink_side_size: t}) do
-    s * t
-  end
+  def partition_product(%__MODULE__{source_side_size: s, sink_side_size: t}), do: s * t
 
   @doc """
   Compute the cut value from a graph and the partition.
@@ -145,15 +108,5 @@ defmodule Yog.Flow.MinCutResult do
     cv
   end
 
-  def compute_cut_value(%__MODULE__{}, _graph) do
-    # Fallback when cut_value is nil - can't compute without node sets
-    0
-  end
-
-  # Backward compatibility aliases
-  @deprecated "Use source_side_size/1 instead"
-  def source_side(%__MODULE__{source_side_size: s}), do: s
-
-  @deprecated "Use sink_side_size/1 instead"
-  def sink_side(%__MODULE__{sink_side_size: s}), do: s
+  def compute_cut_value(%__MODULE__{}, _graph), do: 0
 end

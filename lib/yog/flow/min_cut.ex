@@ -103,25 +103,20 @@ defmodule Yog.Flow.MinCut do
       n when n <= 1 ->
         MinCutResult.new(0, 0, 0)
 
-      _n ->
-        # Start every node with a weight of 1 (representing itself)
-        # This tracks how many original nodes have been merged together
+      n ->
         graph = Transform.map_nodes(graph, fn _ -> 1 end)
-        do_min_cut(graph, nil)
+        do_min_cut(graph, nil, n)
     end
   end
 
-  defp do_min_cut(graph, best_cut) do
-    # Stoer-Wagner terminates when only one node remains
+  defp do_min_cut(graph, best_cut, total_nodes) do
     if Model.node_count(graph) <= 1 do
       best_cut
     else
       {s, t, cut_weight} = maximum_adjacency_search(graph)
 
-      # Get the sizes of the merged nodes (stored as node data by Transform.map_nodes)
       t_size = Model.node(graph, t) || 1
       s_size = Model.node(graph, s) || 1
-      total_nodes = Enum.sum(Enum.map(Model.all_nodes(graph), &Model.node(graph, &1)))
 
       current_cut =
         if is_nil(best_cut) or cut_weight < best_cut.cut_value do
@@ -134,13 +129,9 @@ defmodule Yog.Flow.MinCut do
           best_cut
         end
 
-      # Contract s and t: merge t into s
-      new_graph = Transform.contract(graph, s, t, &+/2)
-
-      # Update s's node count to include t's nodes
-      new_graph = Model.add_node(new_graph, s, s_size + t_size)
-
-      do_min_cut(new_graph, current_cut)
+      Transform.contract(graph, s, t, &+/2)
+      |> Model.add_node(s, s_size + t_size)
+      |> do_min_cut(current_cut, total_nodes)
     end
   end
 
@@ -153,15 +144,12 @@ defmodule Yog.Flow.MinCut do
     nodes = Model.all_nodes(graph)
     [start | rest] = nodes
 
-    # Build initial distances from start node
     initial_dists =
       Model.neighbors(graph, start)
       |> Enum.reduce(%{}, fn {neighbor, weight}, acc ->
         Map.put(acc, neighbor, weight)
       end)
 
-    # Build max-priority queue with remaining nodes
-    # Comparator: max-heap by distance (higher distance = higher priority)
     pq =
       Enum.reduce(rest, PriorityQueue.new(fn a, b -> a >= b end), fn node, acc ->
         dist = Map.get(initial_dists, node, 0)
@@ -179,10 +167,8 @@ defmodule Yog.Flow.MinCut do
         pq
       )
 
-    # The list is built with newest at head
     [t, s | _] = final_order
 
-    # The true cut weight of t is the accumulated weight in the MAS weights dict
     cut_weight = Map.get(final_weights, t, 0)
 
     {s, t, cut_weight}
@@ -197,7 +183,8 @@ defmodule Yog.Flow.MinCut do
       new_remaining = MapSet.delete(remaining, node)
 
       {new_weights, updated_queue} =
-        Model.neighbors(graph, node)
+        graph
+        |> Model.neighbors(node)
         |> Enum.reduce({weights, new_queue}, fn {neighbor, weight}, {weights_acc, queue_acc} ->
           if MapSet.member?(new_remaining, neighbor) do
             existing_w = Map.get(weights_acc, neighbor, 0)
@@ -224,14 +211,8 @@ defmodule Yog.Flow.MinCut do
 
   defp get_next_mas_node(queue, remaining, weights) do
     case PriorityQueue.pop(queue) do
-      :error ->
-        # If queue is empty, pick the first node from remaining
-        [node | _] = MapSet.to_list(remaining)
-        {node, queue}
-
       {:ok, {w, node}, q_rest} ->
         if MapSet.member?(remaining, node) do
-          # Verify this is the current weight, not a stale entry
           current_weight = Map.get(weights, node, 0)
 
           if w == current_weight do
@@ -242,6 +223,10 @@ defmodule Yog.Flow.MinCut do
         else
           get_next_mas_node(q_rest, remaining, weights)
         end
+
+      :error ->
+        [node | _] = MapSet.to_list(remaining)
+        {node, queue}
     end
   end
 end
