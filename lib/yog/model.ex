@@ -1,32 +1,21 @@
 defmodule Yog.Model do
   @moduledoc """
-  Graph operations and the `Yog.Model` protocol.
+  Core graph data structures and basic operations for the yog library.
 
-  This module provides:
-  1. The `Yog.Model` protocol for graph implementations (see `Yog.Model.Protocol`)
-  2. Mutation functions that operate on `Yog.Graph` structs
-  3. Convenience delegations to the protocol for querying any graph type
+  This module defines the fundamental `Graph` type and provides all basic operations
+  for creating and manipulating graphs. The graph uses an adjacency list representation
+  with dual indexing (both outgoing and incoming edges) for efficient traversal in both
+  directions.
 
-  ## The Protocol
+  ## Graph Types
 
-  The `Yog.Model` protocol defines the interface that all graph implementations
-  must satisfy. This enables algorithms to work with:
+  - **Directed Graph**: Edges have a direction (one-way relationships)
+  - **Undirected Graph**: Edges are bidirectional (mutual relationships)
 
-  - `Yog.Graph` - Standard adjacency list (built-in)
-  - `Yog.Multi.Graph` - Multigraph with edge IDs (built-in)
-  - `Yog.DAG` - Directed acyclic graph wrapper (built-in)
-  - Custom implementations - See `Yog.Model.Protocol` for details
+  ## Type Parameters
 
-  ## Query vs Mutation
-
-  **Query functions** (read-only) work with ANY graph implementation via the protocol:
-  - `successors/2`, `predecessors/2`, `all_nodes/1`
-  - `out_degree/2`, `in_degree/2`, `degree/2`
-  - `type/1`, `node_count/1`, `edge_count/1`
-
-  **Mutation functions** create and modify `Yog.Graph` structs:
-  - `new/1`, `add_node/3`, `add_edge/3`
-  - `remove_node/2`, `remove_edge/3`
+  - `node_data`: The type of data stored at each node (e.g., `String`, `City`, `Task`)
+  - `edge_data`: The type of data stored on edges, typically weights (e.g., `Int`, `Float`)
 
   ## Quick Start
 
@@ -39,26 +28,13 @@ defmodule Yog.Model do
       iex> Yog.Model.successors(g, 1)
       [{2, 10}]
 
-  ## Custom Graph Implementations
+  ## Design Notes
 
-  Implement the `Yog.Model` protocol for your own graph struct:
+  The dual-map representation enables O(1) edge existence checks and O(1) transpose
+  operations, at the cost of increased memory usage and slightly more complex edge
+  updates.
 
-      defmodule MyGraph do
-        defstruct [:data]
-      end
 
-      defimpl Yog.Model, for: MyGraph do
-        def type(_), do: :directed
-        def all_nodes(g), do: ...
-        def successors(g, node), do: ...
-        # ... implement all protocol functions
-      end
-
-  Then use with any Yog algorithm:
-
-      graph = %MyGraph{...}
-      Yog.Pathfinding.shortest_path(in: graph, from: :a, to: :b)
-      Yog.Community.louvain(graph)
   """
 
   alias Yog.Graph
@@ -74,12 +50,11 @@ defmodule Yog.Model do
   @type graph_type :: :directed | :undirected
 
   @typedoc """
-  A graph data structure.
+  A simple graph data structure that can be directed or undirected.
 
-  This is any term that implements the `Yog.Model` protocol,
-  typically `Yog.Graph.t()` or `Yog.Multi.Graph.t()`.
+  This is an alias for `Yog.Graph.t()`.
   """
-  @type graph :: Yog.Model.Protocol.t()
+  @type graph :: Graph.t()
 
   # =============================================================================
   # CREATE/UPDATE GRAPH
@@ -653,8 +628,11 @@ defmodule Yog.Model do
       [{2, 10}]
   """
   @spec successors(graph(), node_id()) :: [{node_id(), term()}]
-  def successors(graph, id) do
-    Yog.Model.Protocol.successors(graph, id)
+  def successors(%Graph{out_edges: out_edges}, id) do
+    case Map.fetch(out_edges, id) do
+      {:ok, inner} -> Map.to_list(inner)
+      :error -> []
+    end
   end
 
   @doc """
@@ -672,8 +650,11 @@ defmodule Yog.Model do
       [{1, 10}]
   """
   @spec predecessors(graph(), node_id()) :: [{node_id(), term()}]
-  def predecessors(graph, id) do
-    Yog.Model.Protocol.predecessors(graph, id)
+  def predecessors(%Graph{in_edges: in_edges}, id) do
+    case Map.fetch(in_edges, id) do
+      {:ok, inner} -> Map.to_list(inner)
+      :error -> []
+    end
   end
 
   @doc """
@@ -695,8 +676,22 @@ defmodule Yog.Model do
       [{2, 10}, {3, 20}]
   """
   @spec neighbors(graph(), node_id()) :: [{node_id(), term()}]
-  def neighbors(graph, id) do
-    Yog.Model.Protocol.neighbors(graph, id)
+  def neighbors(%Graph{kind: :undirected} = graph, id) do
+    successors(graph, id)
+  end
+
+  def neighbors(%Graph{kind: :directed} = graph, id) do
+    outgoing = successors(graph, id)
+
+    case Map.fetch(graph.in_edges, id) do
+      {:ok, inner} ->
+        out_ids = successor_ids(graph, id)
+        incoming_to_add = inner |> Map.drop(out_ids) |> Map.to_list()
+        outgoing ++ incoming_to_add
+
+      :error ->
+        outgoing
+    end
   end
 
   @doc """
@@ -715,8 +710,14 @@ defmodule Yog.Model do
       [2, 3]
   """
   @spec neighbor_ids(graph(), node_id()) :: [node_id()]
-  def neighbor_ids(graph, id) do
-    Yog.Model.Protocol.neighbor_ids(graph, id)
+  def neighbor_ids(%Graph{kind: :undirected} = graph, id) do
+    successor_ids(graph, id)
+  end
+
+  def neighbor_ids(%Graph{kind: :directed} = graph, id) do
+    out_ids = successor_ids(graph, id)
+    in_ids = predecessor_ids(graph, id)
+    Enum.uniq(out_ids ++ in_ids)
   end
 
   @doc """
@@ -733,8 +734,11 @@ defmodule Yog.Model do
       [2]
   """
   @spec successor_ids(graph(), node_id()) :: [node_id()]
-  def successor_ids(graph, id) do
-    Yog.Model.Protocol.successor_ids(graph, id)
+  def successor_ids(%Graph{out_edges: out_edges}, id) do
+    case Map.fetch(out_edges, id) do
+      {:ok, inner} -> Map.keys(inner)
+      :error -> []
+    end
   end
 
   @doc """
@@ -751,8 +755,11 @@ defmodule Yog.Model do
       [1]
   """
   @spec predecessor_ids(graph(), node_id()) :: [node_id()]
-  def predecessor_ids(graph, id) do
-    Yog.Model.Protocol.predecessor_ids(graph, id)
+  def predecessor_ids(%Graph{in_edges: in_edges}, id) do
+    case Map.fetch(in_edges, id) do
+      {:ok, inner} -> Map.keys(inner)
+      :error -> []
+    end
   end
 
   @doc """
@@ -769,8 +776,8 @@ defmodule Yog.Model do
       [1, 2]
   """
   @spec all_nodes(graph()) :: [node_id()]
-  def all_nodes(graph) do
-    Yog.Model.Protocol.all_nodes(graph)
+  def all_nodes(%Graph{nodes: nodes}) do
+    Map.keys(nodes)
   end
 
   @doc """
@@ -788,8 +795,8 @@ defmodule Yog.Model do
       2
   """
   @spec order(graph()) :: integer()
-  def order(graph) do
-    Yog.Model.Protocol.order(graph)
+  def order(%Graph{nodes: nodes}) do
+    map_size(nodes)
   end
 
   @doc """
@@ -806,12 +813,10 @@ defmodule Yog.Model do
       ...>   |> Yog.Model.add_node(2, "B")
       iex> Yog.Model.node_count(graph)
       2
-
-  Delegates to the `Yog.Model` protocol.
   """
   @spec node_count(graph()) :: integer()
   def node_count(graph) do
-    Yog.Model.Protocol.node_count(graph)
+    order(graph)
   end
 
   @doc """
@@ -832,11 +837,23 @@ defmodule Yog.Model do
       iex> Yog.Model.edge_count(graph)
       1
 
-  Delegates to the `Yog.Model` protocol.
   """
   @spec edge_count(graph()) :: integer()
-  def edge_count(graph) do
-    Yog.Model.Protocol.edge_count(graph)
+  def edge_count(%Graph{kind: :directed, out_edges: out_edges}) do
+    Enum.reduce(out_edges, 0, fn {_src, targets}, acc ->
+      acc + map_size(targets)
+    end)
+  end
+
+  def edge_count(%Graph{kind: :undirected, out_edges: out_edges}) do
+    {total, self_loops} =
+      Enum.reduce(out_edges, {0, 0}, fn {src, targets}, {acc_total, acc_self} ->
+        new_total = acc_total + map_size(targets)
+        new_self = if Map.has_key?(targets, src), do: acc_self + 1, else: acc_self
+        {new_total, new_self}
+      end)
+
+    div(total - self_loops, 2) + self_loops
   end
 
   @doc """
@@ -860,8 +877,11 @@ defmodule Yog.Model do
 
   """
   @spec out_degree(graph(), node_id()) :: non_neg_integer()
-  def out_degree(graph, id) do
-    Yog.Model.Protocol.out_degree(graph, id)
+  def out_degree(%Graph{out_edges: out_edges}, id) do
+    case Map.fetch(out_edges, id) do
+      {:ok, targets} -> map_size(targets)
+      :error -> 0
+    end
   end
 
   @doc """
@@ -885,8 +905,11 @@ defmodule Yog.Model do
 
   """
   @spec in_degree(graph(), node_id()) :: non_neg_integer()
-  def in_degree(graph, id) do
-    Yog.Model.Protocol.in_degree(graph, id)
+  def in_degree(%Graph{in_edges: in_edges}, id) do
+    case Map.fetch(in_edges, id) do
+      {:ok, sources} -> map_size(sources)
+      :error -> 0
+    end
   end
 
   @doc """
@@ -909,8 +932,20 @@ defmodule Yog.Model do
 
   """
   @spec degree(graph(), node_id()) :: non_neg_integer()
-  def degree(graph, id) do
-    Yog.Model.Protocol.degree(graph, id)
+  def degree(%Graph{kind: :undirected, out_edges: out_edges}, id) do
+    case Map.fetch(out_edges, id) do
+      {:ok, targets} ->
+        # Self-loops count as 2 in undirected graphs
+        base = map_size(targets)
+        if Map.has_key?(targets, id), do: base + 1, else: base
+
+      :error ->
+        0
+    end
+  end
+
+  def degree(%Graph{kind: :directed} = graph, id) do
+    in_degree(graph, id) + out_degree(graph, id)
   end
 
   @doc """
@@ -923,8 +958,8 @@ defmodule Yog.Model do
       :directed
   """
   @spec type(graph()) :: graph_type()
-  def type(graph) do
-    Yog.Model.Protocol.type(graph)
+  def type(%Graph{kind: kind}) do
+    kind
   end
 
   @doc """
@@ -941,8 +976,8 @@ defmodule Yog.Model do
       "A"
   """
   @spec nodes(graph()) :: map()
-  def nodes(graph) do
-    Yog.Model.Protocol.nodes(graph)
+  def nodes(%Graph{nodes: nodes}) do
+    nodes
   end
 
   @doc """
@@ -960,7 +995,7 @@ defmodule Yog.Model do
   """
   @spec node(graph(), node_id()) :: term() | nil
   def node(graph, id) do
-    Yog.Model.Protocol.node(graph, id)
+    graph |> nodes() |> Map.get(id)
   end
 
   @doc """
@@ -977,8 +1012,8 @@ defmodule Yog.Model do
   **Time Complexity:** O(1)
   """
   @spec has_node?(graph(), node_id()) :: boolean()
-  def has_node?(graph, id) do
-    Yog.Model.Protocol.has_node?(graph, id)
+  def has_node?(%Graph{nodes: nodes}, id) do
+    Map.has_key?(nodes, id)
   end
 
   @doc """
@@ -1003,8 +1038,11 @@ defmodule Yog.Model do
   **Time Complexity:** O(1)
   """
   @spec has_edge?(graph(), node_id(), node_id()) :: boolean()
-  def has_edge?(graph, src, dst) do
-    Yog.Model.Protocol.has_edge?(graph, src, dst)
+  def has_edge?(%Graph{out_edges: out}, src, dst) do
+    case Map.fetch(out, src) do
+      {:ok, inner} -> Map.has_key?(inner, dst)
+      :error -> false
+    end
   end
 
   @doc """
@@ -1018,8 +1056,11 @@ defmodule Yog.Model do
       10
   """
   @spec edge_data(graph(), node_id(), node_id()) :: term() | nil
-  def edge_data(graph, src, dst) do
-    Yog.Model.Protocol.edge_data(graph, src, dst)
+  def edge_data(%Graph{out_edges: out}, src, dst) do
+    case Map.fetch(out, src) do
+      {:ok, inner} -> Map.get(inner, dst)
+      :error -> nil
+    end
   end
 
   @doc """
@@ -1073,8 +1114,23 @@ defmodule Yog.Model do
       1
   """
   @spec all_edges(graph()) :: [{node_id(), node_id(), number()}]
-  def all_edges(graph) do
-    Yog.Model.Protocol.all_edges(graph)
+  def all_edges(%Graph{kind: kind, out_edges: out_edges}) do
+    if kind == :directed do
+      for {from, dests} <- out_edges,
+          {to, weight} <- dests do
+        {from, to, weight}
+      end
+    else
+      # For undirected graphs, deduplicate by only taking edges where from <= to
+      # NOTE: This relies on Erlang term ordering. For complex types (structs/maps),
+      # the ordering is valid but may be semantically arbitrary. Ensure consistent
+      # node ID types to avoid unexpected edge ordering.
+      for {from, dests} <- out_edges,
+          {to, weight} <- dests,
+          from <= to do
+        {from, to, weight}
+      end
+    end
   end
 
   # =============================================================================

@@ -29,36 +29,6 @@ defmodule Yog.DAG do
   @enforce_keys [:graph]
   defstruct [:graph]
 
-  # =============================================================================
-  # Yog.Model.Protocol Implementation
-  # Delegates all operations to the underlying graph
-  # =============================================================================
-
-  defimpl Yog.Model.Protocol do
-    alias Yog.DAG
-
-    def type(%DAG{graph: g}), do: Yog.Model.Protocol.type(g)
-    def node_count(%DAG{graph: g}), do: Yog.Model.Protocol.node_count(g)
-    def order(%DAG{graph: g}), do: Yog.Model.Protocol.order(g)
-    def edge_count(%DAG{graph: g}), do: Yog.Model.Protocol.edge_count(g)
-    def all_nodes(%DAG{graph: g}), do: Yog.Model.Protocol.all_nodes(g)
-    def nodes(%DAG{graph: g}), do: Yog.Model.Protocol.nodes(g)
-    def node(%DAG{graph: g}, id), do: Yog.Model.Protocol.node(g, id)
-    def has_node?(%DAG{graph: g}, id), do: Yog.Model.Protocol.has_node?(g, id)
-    def successors(%DAG{graph: g}, id), do: Yog.Model.Protocol.successors(g, id)
-    def predecessors(%DAG{graph: g}, id), do: Yog.Model.Protocol.predecessors(g, id)
-    def successor_ids(%DAG{graph: g}, id), do: Yog.Model.Protocol.successor_ids(g, id)
-    def predecessor_ids(%DAG{graph: g}, id), do: Yog.Model.Protocol.predecessor_ids(g, id)
-    def neighbors(%DAG{graph: g}, id), do: Yog.Model.Protocol.neighbors(g, id)
-    def neighbor_ids(%DAG{graph: g}, id), do: Yog.Model.Protocol.neighbor_ids(g, id)
-    def has_edge?(%DAG{graph: g}, src, dst), do: Yog.Model.Protocol.has_edge?(g, src, dst)
-    def edge_data(%DAG{graph: g}, src, dst), do: Yog.Model.Protocol.edge_data(g, src, dst)
-    def all_edges(%DAG{graph: g}), do: Yog.Model.Protocol.all_edges(g)
-    def out_degree(%DAG{graph: g}, id), do: Yog.Model.Protocol.out_degree(g, id)
-    def in_degree(%DAG{graph: g}, id), do: Yog.Model.Protocol.in_degree(g, id)
-    def degree(%DAG{graph: g}, id), do: Yog.Model.Protocol.degree(g, id)
-  end
-
   @doc """
   Creates a new empty DAG.
   """
