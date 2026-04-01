@@ -200,19 +200,15 @@ defmodule Yog.Pathfinding.Bidirectional do
 
   # Bidirectional BFS implementation
   defp do_bidirectional_bfs(graph, from, to) do
-    # Queue from start: {node, path_from_start}
     queue_fwd = [{from, [from]}]
-    # Queue from goal: {node, path_from_goal}
     queue_bwd = [{to, [to]}]
-    # Visited from start: node => path (reversed: [node...from])
     visited_fwd = %{from => [from]}
-    # Visited from goal: node => path (reversed: [node...to])
     visited_bwd = %{to => [to]}
 
     do_bfs_step(graph, queue_fwd, queue_bwd, visited_fwd, visited_bwd)
   end
 
-  defp do_bfs_step(_graph, [], [], _visited_fwd, _visited_bwd) do
+  defp do_bfs_step(_graph, [], _queue_bwd, _visited_fwd, _visited_bwd) do
     :error
   end
 
@@ -220,68 +216,74 @@ defmodule Yog.Pathfinding.Bidirectional do
     :error
   end
 
-  defp do_bfs_step(_graph, [], _queue_bwd, _visited_fwd, _visited_bwd) do
-    :error
-  end
-
   defp do_bfs_step(graph, queue_fwd, queue_bwd, visited_fwd, visited_bwd) do
-    # Check for intersection first
-    # Find all intersections and pick the one with shortest total path
-    shortest_intersection =
-      visited_fwd
-      |> Enum.reduce(nil, fn {node, path_fwd}, best ->
-        case Map.fetch(visited_bwd, node) do
-          {:ok, path_bwd} ->
-            len = length(path_fwd) + length(path_bwd) - 1
+    # Always expand the smaller frontier for optimal performance
+    if length(queue_fwd) <= length(queue_bwd) do
+      case expand_bfs_level(graph, queue_fwd, visited_fwd, visited_bwd) do
+        {:found, new_path, other_path} ->
+          # Expanding forward: new_path goes [meeting_point...from],
+          # other_path goes [meeting_point...to]
+          full_path = Enum.reverse(new_path) ++ tl(other_path)
+          weight = length(new_path) + length(other_path) - 2
+          {:ok, Path.new(full_path, weight, :bidirectional_bfs)}
 
-            if best == nil or len < elem(best, 3) do
-              {node, path_fwd, path_bwd, len}
-            else
-              best
-            end
-
-          :error ->
-            best
-        end
-      end)
-
-    if shortest_intersection do
-      {_node, path_fwd, path_bwd, total_dist} = shortest_intersection
-      # path_fwd goes from meeting point back to start [node...from]
-      # path_bwd goes from meeting point back to goal [node...to]
-      # Combined: reverse(path_fwd) + (path_bwd without first element)
-      full_path = Enum.reverse(path_fwd) ++ tl(path_bwd)
-      {:ok, Path.new(full_path, total_dist - 1, :bidirectional_bfs)}
+        {:continue, new_queue_fwd, new_visited_fwd} ->
+          do_bfs_step(graph, new_queue_fwd, queue_bwd, new_visited_fwd, visited_bwd)
+      end
     else
-      # Expand frontiers one level
-      {new_queue_fwd, new_visited_fwd} = expand_bfs_level(graph, queue_fwd, visited_fwd)
-      {new_queue_bwd, new_visited_bwd} = expand_bfs_level(graph, queue_bwd, visited_bwd)
+      case expand_bfs_level(graph, queue_bwd, visited_bwd, visited_fwd) do
+        {:found, new_path, other_path} ->
+          # Expanding backward: new_path goes [meeting_point...to],
+          # other_path goes [meeting_point...from]
+          full_path = Enum.reverse(other_path) ++ tl(new_path)
+          weight = length(new_path) + length(other_path) - 2
+          {:ok, Path.new(full_path, weight, :bidirectional_bfs)}
 
-      # Check if we exhausted both frontiers
-      if new_queue_fwd == [] and new_queue_bwd == [] do
-        :error
-      else
-        do_bfs_step(graph, new_queue_fwd, new_queue_bwd, new_visited_fwd, new_visited_bwd)
+        {:continue, new_queue_bwd, new_visited_bwd} ->
+          do_bfs_step(graph, queue_fwd, new_queue_bwd, visited_fwd, new_visited_bwd)
       end
     end
   end
 
-  defp expand_bfs_level(graph, queue, visited) do
-    {new_queue_rev, new_visited} =
-      Enum.reduce(queue, {[], visited}, fn {node, path}, {nq, nv} ->
-        successors = Model.successor_ids(graph, node)
+  # Expands one BFS level, checking for intersection with the opposite visited set
+  # as soon as each new node is discovered.
+  defp expand_bfs_level(graph, queue, visited, other_visited) do
+    {new_queue_rev, new_visited, result} =
+      Enum.reduce(queue, {[], visited, nil}, fn {node, path}, {nq, nv, res} ->
+        if res != nil do
+          {nq, nv, res}
+        else
+          successors = Model.successor_ids(graph, node)
 
-        Enum.reduce(successors, {nq, nv}, fn neighbor, {nq_acc, nv_acc} ->
-          if Map.has_key?(nv_acc, neighbor) do
-            {nq_acc, nv_acc}
-          else
-            new_path = [neighbor | path]
-            {[{neighbor, new_path} | nq_acc], Map.put(nv_acc, neighbor, new_path)}
-          end
-        end)
+          Enum.reduce(successors, {nq, nv, res}, fn neighbor, {nq_acc, nv_acc, res_acc} ->
+            cond do
+              res_acc != nil ->
+                {nq_acc, nv_acc, res_acc}
+
+              Map.has_key?(nv_acc, neighbor) ->
+                {nq_acc, nv_acc, res_acc}
+
+              true ->
+                new_path = [neighbor | path]
+                new_visited = Map.put(nv_acc, neighbor, new_path)
+
+                case Map.fetch(other_visited, neighbor) do
+                  {:ok, other_path} ->
+                    {nq_acc, new_visited, {new_path, other_path}}
+
+                  :error ->
+                    {[{neighbor, new_path} | nq_acc], new_visited, res_acc}
+                end
+            end
+          end)
+        end
       end)
 
-    {Enum.reverse(new_queue_rev), new_visited}
+    if result != nil do
+      {:found, elem(result, 0), elem(result, 1)}
+    else
+      {:continue, Enum.reverse(new_queue_rev), new_visited}
+    end
   end
 
   # Bidirectional Dijkstra implementation - simplified version
