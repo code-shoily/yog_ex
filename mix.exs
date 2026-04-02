@@ -70,7 +70,7 @@ defmodule YogEx.MixProject do
   defp package do
     [
       name: "yog_ex",
-      files: ~w(lib .formatter.exs mix.exs README.md PROPERTIES.md LICENSE CHANGELOG.md),
+      files: ~w(lib .formatter.exs mix.exs README.md PROPERTIES.md LICENSE CHANGELOG.md wiki),
       licenses: ["Apache-2.0"],
       links: %{
         "GitHub" => @source_url,
@@ -82,7 +82,16 @@ defmodule YogEx.MixProject do
   defp docs do
     [
       main: "readme",
-      extras: ["README.md", "CHANGELOG.md", "PROPERTIES.md"],
+      extras: [
+        "README.md",
+        "CHANGELOG.md",
+        "PROPERTIES.md",
+        "wiki/README.md",
+        "wiki/interoperability.md"
+      ],
+      groups_for_extras: [
+        Wiki: Path.wildcard("wiki/*.md")
+      ],
       source_ref: "v#{@version}",
       source_url: @source_url
     ]

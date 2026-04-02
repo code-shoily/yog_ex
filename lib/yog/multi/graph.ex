@@ -570,10 +570,9 @@ defimpl Yog.Queryable, for: Yog.Multi.Graph do
 end
 
 defimpl Yog.Modifiable, for: Yog.Multi.Graph do
-  alias Yog.Modifiable, as: Mutator
   alias Yog.Multi.Graph
 
-  def add_node(graph, id, data), do: Mutator.add_node(graph, id, data)
+  def add_node(graph, id, data), do: Graph.add_node(graph, id, data)
   def remove_node(graph, id), do: Graph.remove_node(graph, id)
 
   def add_edge(graph, src, dst, weight) do
@@ -581,49 +580,6 @@ defimpl Yog.Modifiable, for: Yog.Multi.Graph do
       {:ok, updated_multi, _edge_id} -> {:ok, updated_multi}
       {:error, reason} -> {:error, to_string(reason)}
     end
-  end
-
-  def add_edge(graph, opts) do
-    src = Keyword.fetch!(opts, :from)
-    dst = Keyword.fetch!(opts, :to)
-    weight = Keyword.fetch!(opts, :with)
-    add_edge(graph, src, dst, weight)
-  end
-
-  def remove_edge(graph, src, dst), do: Graph.remove_edges_between(graph, src, dst)
-
-  def add_edge_ensure(graph, src, dst, weight, default) do
-    graph
-    |> ensure_node(src, default)
-    |> ensure_node(dst, default)
-    |> then(fn g ->
-      {:ok, updated} = add_edge(g, src, dst, weight)
-      updated
-    end)
-  end
-
-  def add_edge_ensure(graph, opts) do
-    src = Keyword.fetch!(opts, :from)
-    dst = Keyword.fetch!(opts, :to)
-    weight = Keyword.fetch!(opts, :with)
-    default = Keyword.get(opts, :default)
-    add_edge_ensure(graph, src, dst, weight, default)
-  end
-
-  def add_edge_with(graph, src, dst, weight, make_fn) do
-    graph
-    |> ensure_node_with(src, make_fn)
-    |> ensure_node_with(dst, make_fn)
-    |> then(fn g ->
-      {:ok, updated} = add_edge(g, src, dst, weight)
-      updated
-    end)
-  end
-
-  def add_unweighted_edge(graph, opts) do
-    src = Keyword.fetch!(opts, :from)
-    dst = Keyword.fetch!(opts, :to)
-    add_edge(graph, src, dst, nil)
   end
 
   def add_edges(graph, edges) do
@@ -635,21 +591,15 @@ defimpl Yog.Modifiable, for: Yog.Multi.Graph do
     end)
   end
 
-  def add_simple_edges(graph, edges) do
-    Enum.reduce_while(edges, {:ok, graph}, fn {src, dst}, {:ok, g} ->
-      case add_edge(g, src, dst, 1) do
-        {:ok, updated} -> {:cont, {:ok, updated}}
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
-    end)
-  end
+  def remove_edge(graph, src, dst), do: Graph.remove_edges_between(graph, src, dst)
 
-  def add_unweighted_edges(graph, edges) do
-    Enum.reduce_while(edges, {:ok, graph}, fn {src, dst}, {:ok, g} ->
-      case add_edge(g, src, dst, nil) do
-        {:ok, updated} -> {:cont, {:ok, updated}}
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
+  def add_edge_ensure(graph, src, dst, weight, default_data) do
+    graph
+    |> ensure_node(src, default_data)
+    |> ensure_node(dst, default_data)
+    |> then(fn g ->
+      {:ok, updated} = add_edge(g, src, dst, weight)
+      updated
     end)
   end
 
@@ -674,9 +624,5 @@ defimpl Yog.Modifiable, for: Yog.Multi.Graph do
 
   defp ensure_node(graph, id, data) do
     if Graph.has_node?(graph, id), do: graph, else: Graph.add_node(graph, id, data)
-  end
-
-  defp ensure_node_with(graph, id, make_fn) do
-    if Graph.has_node?(graph, id), do: graph, else: Graph.add_node(graph, id, make_fn.(id))
   end
 end

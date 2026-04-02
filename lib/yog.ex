@@ -157,7 +157,12 @@ defmodule Yog do
       [{1, 5}]
   """
   @spec add_edge(graph(), keyword()) :: {:ok, graph()} | {:error, String.t()}
-  def add_edge(graph, opts), do: Yog.Modifiable.add_edge(graph, opts)
+  def add_edge(graph, opts) when is_list(opts) do
+    from = Keyword.fetch!(opts, :from)
+    to = Keyword.fetch!(opts, :to)
+    weight = Keyword.fetch!(opts, :with)
+    Model.add_edge(graph, from, to, weight)
+  end
 
   @doc """
   Raw binding for add_edge with positional arguments.
@@ -170,7 +175,7 @@ defmodule Yog do
       [{2, 10}]
   """
   @spec add_edge(graph(), node_id(), node_id(), any()) :: {:ok, graph()} | {:error, String.t()}
-  def add_edge(graph, from, to, weight), do: Yog.Modifiable.add_edge(graph, from, to, weight)
+  def add_edge(graph, from, to, weight), do: Model.add_edge(graph, from, to, weight)
 
   @doc """
   Adds an edge to the graph, raising on error.
@@ -183,7 +188,12 @@ defmodule Yog do
       [{2, 10}]
   """
   @spec add_edge!(graph(), keyword()) :: graph()
-  def add_edge!(graph, opts), do: Yog.Modifiable.add_edge(graph, opts) |> elem(1)
+  def add_edge!(graph, opts) when is_list(opts) do
+    from = Keyword.fetch!(opts, :from)
+    to = Keyword.fetch!(opts, :to)
+    weight = Keyword.fetch!(opts, :with)
+    Model.add_edge!(graph, from, to, weight)
+  end
 
   @doc """
   Adds an edge to the graph with positional arguments, raising on error.
@@ -217,7 +227,13 @@ defmodule Yog do
       [{2, 10}]
   """
   @spec add_edge_ensure(graph(), keyword()) :: graph()
-  def add_edge_ensure(graph, opts), do: Yog.Modifiable.add_edge_ensure(graph, opts)
+  def add_edge_ensure(graph, opts) when is_list(opts) do
+    from = Keyword.fetch!(opts, :from)
+    to = Keyword.fetch!(opts, :to)
+    weight = Keyword.fetch!(opts, :with)
+    default = Keyword.get(opts, :default)
+    Model.add_edge_ensure(graph, from, to, weight, default)
+  end
 
   @doc """
   Ensures both endpoint nodes exist with positional arguments, then adds an edge.
@@ -229,7 +245,7 @@ defmodule Yog do
       [{2, 10}]
   """
   def add_edge_ensure(graph, from, to, weight, default \\ nil),
-    do: Yog.Modifiable.add_edge_ensure(graph, from, to, weight, default)
+    do: Model.add_edge_ensure(graph, from, to, weight, default)
 
   @doc """
   Adds an edge with a function to create default node data if nodes don't exist.
@@ -251,7 +267,7 @@ defmodule Yog do
   """
   @spec add_edge_with(graph(), node_id(), node_id(), any(), (node_id() -> any())) :: graph()
   def add_edge_with(graph, from, to, weight, default_fn),
-    do: Yog.Modifiable.add_edge_with(graph, from, to, weight, default_fn)
+    do: Model.add_edge_with(graph, from, to, weight, default_fn)
 
   @doc """
   Adds an unweighted edge to the graph.
@@ -272,7 +288,11 @@ defmodule Yog do
       [{2, nil}]
   """
   @spec add_unweighted_edge(graph(), keyword()) :: {:ok, graph()} | {:error, String.t()}
-  def add_unweighted_edge(graph, opts), do: Yog.Modifiable.add_unweighted_edge(graph, opts)
+  def add_unweighted_edge(graph, opts) when is_list(opts) do
+    from = Keyword.fetch!(opts, :from)
+    to = Keyword.fetch!(opts, :to)
+    Model.add_edge(graph, from, to, nil)
+  end
 
   @doc """
   Adds an unweighted edge with positional arguments.
@@ -440,7 +460,9 @@ defmodule Yog do
   """
   @spec add_simple_edges(graph(), [{node_id(), node_id()}]) ::
           {:ok, graph()} | {:error, String.t()}
-  def add_simple_edges(graph, edges), do: Yog.Modifiable.add_simple_edges(graph, edges)
+  def add_simple_edges(graph, edges) do
+    Model.add_simple_edges(graph, edges)
+  end
 
   @doc """
   Adds multiple unweighted edges (weight = nil).
@@ -461,7 +483,9 @@ defmodule Yog do
   """
   @spec add_unweighted_edges(graph(), [{node_id(), node_id()}]) ::
           {:ok, graph()} | {:error, String.t()}
-  def add_unweighted_edges(graph, edges), do: Yog.Modifiable.add_unweighted_edges(graph, edges)
+  def add_unweighted_edges(graph, edges) do
+    Model.add_unweighted_edges(graph, edges)
+  end
 
   # ============= Query =============
 

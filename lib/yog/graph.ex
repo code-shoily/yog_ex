@@ -223,21 +223,11 @@ defimpl Yog.Modifiable, for: Yog.Graph do
   def add_node(graph, id, data), do: Yog.Model.add_node(graph, id, data)
   def remove_node(graph, id), do: Yog.Model.remove_node(graph, id)
   def add_edge(graph, src, dst, weight), do: Yog.Model.add_edge(graph, src, dst, weight)
-  def add_edge(graph, opts), do: Yog.Model.add_edge(graph, opts)
+  def add_edges(graph, edges), do: Yog.Model.add_edges(graph, edges)
   def remove_edge(graph, src, dst), do: Yog.Model.remove_edge(graph, src, dst)
 
-  def add_edge_ensure(graph, src, dst, weight, default),
-    do: Yog.Model.add_edge_ensure(graph, src, dst, weight, default)
-
-  def add_edge_ensure(graph, opts), do: Yog.Model.add_edge_ensure(graph, opts)
-
-  def add_edge_with(graph, src, dst, weight, make_fn),
-    do: Yog.Model.add_edge_with(graph, src, dst, weight, make_fn)
-
-  def add_unweighted_edge(graph, opts), do: Yog.Model.add_unweighted_edge(graph, opts)
-  def add_edges(graph, edges), do: Yog.Model.add_edges(graph, edges)
-  def add_simple_edges(graph, edges), do: Yog.Model.add_simple_edges(graph, edges)
-  def add_unweighted_edges(graph, edges), do: Yog.Model.add_unweighted_edges(graph, edges)
+  def add_edge_ensure(graph, src, dst, weight, default_data),
+    do: Yog.Model.add_edge_ensure(graph, src, dst, weight, default_data)
 
   def add_edge_with_combine(graph, src, dst, weight, with_combine),
     do: Yog.Model.add_edge_with_combine(graph, src, dst, weight, with_combine)

@@ -40,39 +40,15 @@ end
 defimpl Yog.Modifiable, for: Yog.DAG.Graph do
   alias Yog.DAG.Model
   alias Yog.Modifiable, as: Mutator
-  alias Yog.Queryable, as: QueryModel
 
   def add_node(dag, id, data), do: Model.add_node(dag, id, data)
   def remove_node(dag, id), do: Model.remove_node(dag, id)
-
   def add_edge(dag, src, dst, weight), do: Model.add_edge(dag, src, dst, weight)
-
-  def add_edge(dag, opts) do
-    src = Keyword.fetch!(opts, :from)
-    dst = Keyword.fetch!(opts, :to)
-    weight = Keyword.fetch!(opts, :with)
-    add_edge(dag, src, dst, weight)
-  end
-
+  def add_edges(dag, edges), do: Model.add_edges(dag, edges)
   def remove_edge(dag, src, dst), do: Model.remove_edge(dag, src, dst)
 
-  def add_edge_ensure(dag, src, dst, weight, default),
-    do: Model.add_edge_ensure(dag, src, dst, weight, default)
-
-  def add_edge_ensure(dag, opts), do: Model.add_edge_ensure(dag, opts)
-
-  def add_edge_with(dag, src, dst, weight, make_fn),
-    do: Model.add_edge_with(dag, src, dst, weight, make_fn)
-
-  def add_unweighted_edge(dag, opts) do
-    src = Keyword.fetch!(opts, :from)
-    dst = Keyword.fetch!(opts, :to)
-    add_edge(dag, src, dst, nil)
-  end
-
-  def add_edges(dag, edges), do: Model.add_edges(dag, edges)
-  def add_simple_edges(dag, edges), do: Model.add_simple_edges(dag, edges)
-  def add_unweighted_edges(dag, edges), do: Model.add_unweighted_edges(dag, edges)
+  def add_edge_ensure(dag, src, dst, weight, default_data),
+    do: Model.add_edge_ensure(dag, src, dst, weight, default_data)
 
   def add_edge_with_combine(dag, src, dst, weight, with_combine) do
     case Yog.Queryable.edge_data(dag.graph, src, dst) do

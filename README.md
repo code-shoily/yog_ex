@@ -355,6 +355,11 @@ Detailed examples are located in the [examples/](https://github.com/code-shoily/
 - [Mermaid rendering](examples/render_mermaid.exs) - Generating Mermaid diagrams
 - [Graph I/O](examples/render_json.exs) - Exporting matrices and objects to JSON and other formats for interoperability
 
+### Interoperability
+
+- [Libgraph Integration](examples/libgraph_interop.exs) - Using YogEx algorithms on [libgraph](https://github.com/bitwalker/libgraph) Graph structures via protocols
+- 📖 [Interoperability Guide](https://hexdocs.pm/yog_ex/interoperability.html) - Complete guide to integrating external graph libraries (libgraph, :digraph, custom types)
+
 ### Running Examples
 
 ```sh

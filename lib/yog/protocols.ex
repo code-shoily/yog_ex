@@ -71,8 +71,23 @@ defprotocol Yog.Modifiable do
   @moduledoc """
   Protocol for graph modification operations.
 
-  This protocol defines the standard interface for adding, removing, and
-  updating nodes and edges within a graph.
+  This protocol defines the minimal interface for adding, removing, and
+  updating nodes and edges within a graph. Convenience functions for common
+  patterns (unweighted edges, batch operations, etc.) are provided by the
+  main API modules (`Yog`, `Yog.Model`) and delegate to these core functions.
+
+  ## Core Operations
+
+  - `add_node/3`, `remove_node/2` - Node lifecycle
+  - `add_edge/4`, `add_edges/2`, `remove_edge/3` - Edge lifecycle
+  - `add_edge_ensure/5` - Edge with auto-created nodes
+  - `add_edge_with_combine/5` - Edge with weight merging
+
+  ## Convenience Alternatives
+
+  For `add_unweighted_edge/2`, `add_simple_edges/2`, `add_unweighted_edges/2`,
+  use the corresponding functions in `Yog` or `Yog.Model` modules which
+  delegate to the protocol functions above.
   """
 
   @doc "Adds a node to the graph with the given ID and data."
@@ -84,40 +99,17 @@ defprotocol Yog.Modifiable do
   @doc "Adds an edge to the graph with the given weight."
   def add_edge(graph, src, dst, weight)
 
-  @doc "Adds an edge to the graph using a keyword list of options."
-  def add_edge(graph, opts)
+  @doc "Adds multiple edges to the graph for batch efficiency."
+  def add_edges(graph, edges)
 
   @doc "Removes an edge from the graph."
   def remove_edge(graph, src, dst)
 
   @doc """
-  Ensures both endpoint nodes exist, then adds an edge.
-  Returns a graph (never fails).
+  Ensures both endpoint nodes exist (creating them with default data if needed),
+  then adds an edge. Returns a graph (never fails).
   """
-  def add_edge_ensure(graph, src, dst, weight, default)
-
-  @doc """
-  Ensures both endpoint nodes exist, then adds an edge using options.
-  """
-  def add_edge_ensure(graph, opts)
-
-  @doc """
-  Ensures both endpoint nodes exist, then adds an edge, but if they don't, 
-  calls the make_fn with the node ID to generate the data.
-  """
-  def add_edge_with(graph, src, dst, weight, make_fn)
-
-  @doc "Adds an unweighted edge to the graph."
-  def add_unweighted_edge(graph, opts)
-
-  @doc "Adds multiple edges to the graph."
-  def add_edges(graph, edges)
-
-  @doc "Adds multiple simple edges (weight = 1) to the graph."
-  def add_simple_edges(graph, edges)
-
-  @doc "Adds multiple unweighted edges (weight = nil) to the graph."
-  def add_unweighted_edges(graph, edges)
+  def add_edge_ensure(graph, src, dst, weight, default_data)
 
   @doc """
   Adds an edge, but if an edge already exists, combines the new weight
