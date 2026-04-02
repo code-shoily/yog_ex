@@ -3,7 +3,7 @@ defmodule Yog.Traversal.Cycle do
   Cycle detection algorithms for directed and undirected graphs.
   """
 
-  alias Yog.Model
+  alias Yog.Queryable, as: Model
   alias Yog.Traversal.Sort
 
   @doc """
@@ -16,7 +16,7 @@ defmodule Yog.Traversal.Cycle do
   """
   @spec cyclic?(Yog.graph()) :: boolean()
   def cyclic?(graph) do
-    case graph.kind do
+    case Model.type(graph) do
       :directed ->
         case Sort.topological_sort(graph) do
           {:error, :contains_cycle} -> true

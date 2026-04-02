@@ -3,8 +3,8 @@ defmodule Yog.Traversal.Sort do
   Topological sorting algorithms — Kahn's algorithm and lexicographic variant.
   """
 
-  alias Yog.Model
   alias Yog.PriorityQueue, as: PQ
+  alias Yog.Queryable, as: Model
 
   @doc """
   Performs a topological sort on a directed graph using Kahn's algorithm.
@@ -83,17 +83,9 @@ defmodule Yog.Traversal.Sort do
   end
 
   # Build degree map
-  defp build_degree_map(%{in_edges: in_edges} = graph) do
+  defp build_degree_map(graph) do
     graph
-    |> Enum.map(fn {id, _} ->
-      degree =
-        case Map.fetch(in_edges, id) do
-          {:ok, inner} -> map_size(inner)
-          :error -> 0
-        end
-
-      {id, degree}
-    end)
+    |> Enum.map(fn {id, _} -> {id, Model.in_degree(graph, id)} end)
     |> Map.new()
   end
 
