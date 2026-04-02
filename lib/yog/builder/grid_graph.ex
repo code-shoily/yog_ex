@@ -118,7 +118,7 @@ defmodule Yog.Builder.GridGraph do
     if valid_coord?(rows, cols, row, col) do
       node_id = coord_to_id_raw(cols, row, col)
 
-      case Yog.Model.node(graph, node_id) do
+      case Yog.Queryable.node(graph, node_id) do
         nil -> {:error, nil}
         data -> {:ok, data}
       end

@@ -55,13 +55,7 @@ defmodule Yog.Transform do
   alias Yog.Queryable, as: Model
   alias Yog.Transformable
 
-  defp mutate!(result) do
-    case result do
-      {:ok, g} -> g
-      g when is_struct(g) -> g
-      {:error, reason} -> raise ArgumentError, reason
-    end
-  end
+  defp mutate!(result), do: Yog.Utils.unwrap_mutate!(result)
 
   @doc """
   Reverses the direction of every edge in the graph (graph transpose).

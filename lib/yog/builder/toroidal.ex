@@ -49,7 +49,9 @@ defmodule Yog.Builder.Toroidal do
   alias Yog.Builder.Grid
   alias Yog.Builder.GridGraph
   alias Yog.Builder.ToroidalGraph
-  alias Yog.Model
+  alias Yog.Modifiable, as: Mutator
+  alias Yog.Queryable, as: Model
+  alias Yog.Transformable
 
   @typedoc "Toroidal grid type (now using ToroidalGraph)"
   @type toroidal_grid :: ToroidalGraph.t()
@@ -78,10 +80,10 @@ defmodule Yog.Builder.Toroidal do
 
   O(rows × cols)
   """
-  @spec from_2d_list([[term()]], Model.graph_type(), (term(), term() -> boolean())) ::
+  @spec from_2d_list([[term()]], Model.graph_type(), (term(), term() -> boolean()), keyword()) ::
           ToroidalGraph.t()
-  def from_2d_list(grid_data, graph_type, can_move_fn) do
-    from_2d_list_with_topology(grid_data, graph_type, rook(), can_move_fn)
+  def from_2d_list(grid_data, graph_type, can_move_fn, opts \\ []) do
+    from_2d_list_with_topology(grid_data, graph_type, rook(), can_move_fn, opts)
   end
 
   @doc """
@@ -104,10 +106,11 @@ defmodule Yog.Builder.Toroidal do
           [[term()]],
           Model.graph_type(),
           topology(),
-          (term(), term() -> boolean())
+          (term(), term() -> boolean()),
+          keyword()
         ) ::
           ToroidalGraph.t()
-  def from_2d_list_with_topology(grid_data, graph_type, topology, can_move_fn) do
+  def from_2d_list_with_topology(grid_data, graph_type, topology, can_move_fn, opts \\ []) do
     rows = length(grid_data)
 
     cols =
@@ -129,10 +132,16 @@ defmodule Yog.Builder.Toroidal do
       end)
 
     # Add all nodes
+    init =
+      case Keyword.get(opts, :into) do
+        nil -> Yog.Graph.new(graph_type)
+        template -> Transformable.empty(template, graph_type)
+      end
+
     graph_with_nodes =
-      Enum.reduce(cells, Model.new(graph_type), fn {row, col, data}, g ->
+      Enum.reduce(cells, init, fn {row, col, data}, g ->
         id = coord_to_id(row, col, cols)
-        Model.add_node(g, id, data)
+        Mutator.add_node(g, id, data)
       end)
 
     # Add edges with wrapping
@@ -149,10 +158,7 @@ defmodule Yog.Builder.Toroidal do
           to_data = Model.node(acc_g, to_id)
 
           if to_data != nil && can_move_fn.(from_data, to_data) do
-            case Model.add_edge(acc_g, from_id, to_id, 1) do
-              {:ok, new_g} -> new_g
-              {:error, _} -> acc_g
-            end
+            Mutator.add_edge(acc_g, from_id, to_id, 1) |> Yog.Utils.unwrap_mutate!()
           else
             acc_g
           end

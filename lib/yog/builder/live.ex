@@ -74,7 +74,7 @@ defmodule Yog.Builder.Live do
   """
 
   alias Yog.Builder.Labeled
-  alias Yog.Model
+  alias Yog.Modifiable, as: Mutator
 
   defstruct registry: %{}, next_id: 0, pending: []
 
@@ -436,19 +436,16 @@ defmodule Yog.Builder.Live do
     Enum.reduce(transitions, graph, fn transition, g ->
       case transition do
         {:add_node, id, label} ->
-          Model.add_node(g, id, label)
+          Mutator.add_node(g, id, label)
 
         {:add_edge, src, dst, weight} ->
-          case Model.add_edge(g, src, dst, weight) do
-            {:ok, new_g} -> new_g
-            {:error, _} -> g
-          end
+          Mutator.add_edge(g, src, dst, weight) |> Yog.Utils.unwrap_mutate!()
 
         {:remove_edge, src, dst} ->
-          Model.remove_edge(g, src, dst)
+          Mutator.remove_edge(g, src, dst)
 
         {:remove_node, id} ->
-          Model.remove_node(g, id)
+          Mutator.remove_node(g, id)
       end
     end)
   end

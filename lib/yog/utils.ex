@@ -50,6 +50,22 @@ defmodule Yog.Utils do
   def compare(_, _), do: :eq
 
   @doc """
+  Unwraps the result of a mutation protocol call.
+
+  Handles both the `{:ok, graph}` success tuple and the raw `graph` struct
+  frequently returned by the `Yog.Modifiable` protocol. Raises an
+  `ArgumentError` on failure tuples.
+  """
+  @spec unwrap_mutate!({:ok, Yog.graph()} | Yog.graph() | {:error, term()}) :: Yog.graph()
+  def unwrap_mutate!(result) do
+    case result do
+      {:ok, g} -> g
+      g when is_struct(g) -> g
+      {:error, reason} -> raise ArgumentError, to_string(reason)
+    end
+  end
+
+  @doc """
   Calculates the difference (distance) between two vectors (maps of scores)
   using the specified norm type.
 
