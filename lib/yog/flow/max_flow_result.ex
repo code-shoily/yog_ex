@@ -27,6 +27,10 @@ defmodule Yog.Flow.MaxFlowResult do
       15
   """
 
+  alias Yog.Queryable, as: Model
+
+  @type node_id :: Model.node_id()
+
   @enforce_keys [:max_flow, :residual_graph, :source, :sink]
   defstruct [:max_flow, :residual_graph, :source, :sink, algorithm: :unknown, metadata: %{}]
 
@@ -42,7 +46,7 @@ defmodule Yog.Flow.MaxFlowResult do
   @doc """
   Creates a new max flow result.
   """
-  @spec new(number(), Yog.graph(), Yog.Model.node_id(), Yog.Model.node_id()) :: t()
+  @spec new(number(), Yog.graph(), node_id(), node_id()) :: t()
   def new(max_flow, residual_graph, source, sink) do
     %__MODULE__{
       max_flow: max_flow,
@@ -71,7 +75,7 @@ defmodule Yog.Flow.MaxFlowResult do
   """
   @spec residual_capacity(t(), Yog.Model.node_id(), Yog.Model.node_id()) :: number()
   def residual_capacity(%__MODULE__{residual_graph: graph}, src, dst) do
-    successors = Yog.Model.successors(graph, src)
+    successors = Model.successors(graph, src)
 
     case Enum.find(successors, fn {id, _} -> id == dst end) do
       {_, capacity} -> capacity

@@ -83,7 +83,7 @@ defmodule Yog.Flow.SuccessiveShortestPath do
   - [CP-Algorithms: Min-Cost Flow](https://cp-algorithms.com/graph/min_cost_flow.html)
   """
 
-  alias Yog.Model
+  alias Yog.Queryable, as: Model
 
   @typedoc """
   A flow vector assigning an amount of flow to each edge.

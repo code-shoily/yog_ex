@@ -58,7 +58,8 @@ defmodule Yog.Flow.MaxFlow do
 
   alias Yog.Flow.MaxFlowResult
   alias Yog.Flow.MinCutResult
-  alias Yog.Model
+  alias Yog.Modifiable, as: Mutator
+  alias Yog.Queryable, as: Model
 
   @typedoc """
   Result of a max flow computation.
@@ -188,20 +189,20 @@ defmodule Yog.Flow.MaxFlow do
   # Convert internal residual map back to a Yog.Graph structure
   # Direct construction is faster than using Model.add_edge for bulk operations
   defp residual_to_graph(original_graph, residual_map) do
-    # Build residual graph using Model API for protocol compatibility
+    # Build residual graph using Mutator API for protocol compatibility
     # Start with empty directed graph
     # Add all nodes from original graph with their metadata
     graph =
-      Enum.reduce(Model.all_nodes(original_graph), Model.new(:directed), fn node, acc ->
+      Enum.reduce(Model.all_nodes(original_graph), Yog.new(:directed), fn node, acc ->
         data = Model.node(original_graph, node)
-        Model.add_node(acc, node, data)
+        Mutator.add_node(acc, node, data)
       end)
 
     # Add edges from residual map
     Enum.reduce(residual_map, graph, fn {u, edges}, acc ->
       Enum.reduce(edges, acc, fn {v, cap}, inner_acc ->
         if cap != 0 do
-          case Model.add_edge(inner_acc, u, v, cap) do
+          case Mutator.add_edge(inner_acc, u, v, cap) do
             {:ok, new_graph} -> new_graph
             {:error, _} -> inner_acc
           end

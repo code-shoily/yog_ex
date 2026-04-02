@@ -61,8 +61,9 @@ defmodule Yog.Flow.MinCut do
   """
 
   alias Yog.Flow.MinCutResult
-  alias Yog.Model
+  alias Yog.Modifiable, as: Mutator
   alias Yog.PriorityQueue
+  alias Yog.Queryable, as: Model
   alias Yog.Transform
 
   @doc """
@@ -130,7 +131,7 @@ defmodule Yog.Flow.MinCut do
         end
 
       Transform.contract(graph, s, t, &+/2)
-      |> Model.add_node(s, s_size + t_size)
+      |> Mutator.add_node(s, s_size + t_size)
       |> do_min_cut(current_cut, total_nodes)
     end
   end
