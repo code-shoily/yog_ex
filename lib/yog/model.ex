@@ -88,8 +88,8 @@ defmodule Yog.Model do
       2
   """
   @spec add_node(graph(), node_id(), term()) :: graph()
-  def add_node(%Graph{} = graph, id, data) do
-    %{graph | nodes: Map.put(graph.nodes, id, data)}
+  def add_node(%{nodes: nodes} = graph, id, data) do
+    %{graph | nodes: Map.put(nodes, id, data)}
   end
 
   @doc """
@@ -599,11 +599,11 @@ defmodule Yog.Model do
       []
   """
   @spec remove_edge(graph(), node_id(), node_id()) :: graph()
-  def remove_edge(%Graph{kind: :directed} = graph, src, dst) do
+  def remove_edge(%{kind: :directed} = graph, src, dst) do
     do_remove_directed_edge(graph, src, dst)
   end
 
-  def remove_edge(%Graph{kind: :undirected} = graph, src, dst) do
+  def remove_edge(%{kind: :undirected} = graph, src, dst) do
     graph
     |> do_remove_directed_edge(src, dst)
     |> do_remove_directed_edge(dst, src)
@@ -776,7 +776,7 @@ defmodule Yog.Model do
       [1, 2]
   """
   @spec all_nodes(graph()) :: [node_id()]
-  def all_nodes(%Graph{nodes: nodes}) do
+  def all_nodes(%{nodes: nodes}) do
     Map.keys(nodes)
   end
 
@@ -795,7 +795,7 @@ defmodule Yog.Model do
       2
   """
   @spec order(graph()) :: integer()
-  def order(%Graph{nodes: nodes}) do
+  def order(%{nodes: nodes}) do
     map_size(nodes)
   end
 
@@ -958,7 +958,7 @@ defmodule Yog.Model do
       :directed
   """
   @spec type(graph()) :: graph_type()
-  def type(%Graph{kind: kind}) do
+  def type(%{kind: kind}) do
     kind
   end
 
@@ -976,7 +976,7 @@ defmodule Yog.Model do
       "A"
   """
   @spec nodes(graph()) :: map()
-  def nodes(%Graph{nodes: nodes}) do
+  def nodes(%{nodes: nodes}) do
     nodes
   end
 
@@ -1012,7 +1012,7 @@ defmodule Yog.Model do
   **Time Complexity:** O(1)
   """
   @spec has_node?(graph(), node_id()) :: boolean()
-  def has_node?(%Graph{nodes: nodes}, id) do
+  def has_node?(%{nodes: nodes}, id) do
     Map.has_key?(nodes, id)
   end
 

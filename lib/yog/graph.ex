@@ -28,6 +28,8 @@ defmodule Yog.Graph do
 
   - **Enumerable**: Iterates over nodes as `{id, data}` tuples
   - **Inspect**: Compact representation showing graph type and statistics
+  - **Yog.Queryable**: Standard interface for read-only graph operations
+  - **Yog.Modifiable**: Standard interface for graph modification operations
   """
 
   @type node_id :: term()
@@ -178,4 +180,51 @@ defimpl Inspect, for: Yog.Graph do
       ">"
     ])
   end
+end
+
+defimpl Yog.Queryable, for: Yog.Graph do
+  def successors(graph, id), do: Yog.Model.successors(graph, id)
+  def predecessors(graph, id), do: Yog.Model.predecessors(graph, id)
+  def neighbors(graph, id), do: Yog.Model.neighbors(graph, id)
+  def successor_ids(graph, id), do: Yog.Model.successor_ids(graph, id)
+  def predecessor_ids(graph, id), do: Yog.Model.predecessor_ids(graph, id)
+  def neighbor_ids(graph, id), do: Yog.Model.neighbor_ids(graph, id)
+  def all_nodes(graph), do: Yog.Model.all_nodes(graph)
+  def order(graph), do: Yog.Model.order(graph)
+  def node_count(graph), do: Yog.Model.node_count(graph)
+  def edge_count(graph), do: Yog.Model.edge_count(graph)
+  def out_degree(graph, id), do: Yog.Model.out_degree(graph, id)
+  def in_degree(graph, id), do: Yog.Model.in_degree(graph, id)
+  def degree(graph, id), do: Yog.Model.degree(graph, id)
+  def has_node?(graph, id), do: Yog.Model.has_node?(graph, id)
+  def has_edge?(graph, src, dst), do: Yog.Model.has_edge?(graph, src, dst)
+  def node(graph, id), do: Yog.Model.node(graph, id)
+  def nodes(graph), do: Yog.Model.nodes(graph)
+  def edge_data(graph, src, dst), do: Yog.Model.edge_data(graph, src, dst)
+  def all_edges(graph), do: Yog.Model.all_edges(graph)
+  def type(graph), do: Yog.Model.type(graph)
+end
+
+defimpl Yog.Modifiable, for: Yog.Graph do
+  def add_node(graph, id, data), do: Yog.Model.add_node(graph, id, data)
+  def remove_node(graph, id), do: Yog.Model.remove_node(graph, id)
+  def add_edge(graph, src, dst, weight), do: Yog.Model.add_edge(graph, src, dst, weight)
+  def add_edge(graph, opts), do: Yog.Model.add_edge(graph, opts)
+  def remove_edge(graph, src, dst), do: Yog.Model.remove_edge(graph, src, dst)
+
+  def add_edge_ensure(graph, src, dst, weight, default),
+    do: Yog.Model.add_edge_ensure(graph, src, dst, weight, default)
+
+  def add_edge_ensure(graph, opts), do: Yog.Model.add_edge_ensure(graph, opts)
+
+  def add_edge_with(graph, src, dst, weight, make_fn),
+    do: Yog.Model.add_edge_with(graph, src, dst, weight, make_fn)
+
+  def add_unweighted_edge(graph, opts), do: Yog.Model.add_unweighted_edge(graph, opts)
+  def add_edges(graph, edges), do: Yog.Model.add_edges(graph, edges)
+  def add_simple_edges(graph, edges), do: Yog.Model.add_simple_edges(graph, edges)
+  def add_unweighted_edges(graph, edges), do: Yog.Model.add_unweighted_edges(graph, edges)
+
+  def add_edge_with_combine(graph, src, dst, weight, with_combine),
+    do: Yog.Model.add_edge_with_combine(graph, src, dst, weight, with_combine)
 end

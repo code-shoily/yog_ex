@@ -24,6 +24,7 @@ defmodule YogEx.MixProject do
 
       # Test Coverage
       test_coverage: [tool: ExCoveralls],
+      consolidate_protocols: Mix.env() != :test,
       # Suppress warnings for Erlang modules
       xref: [
         exclude: [
