@@ -3,7 +3,7 @@ defmodule Yog.Connectivity.Analysis do
   Algorithms for analyzing graph connectivity (bridges, articulation points).
   """
 
-  alias Yog.Queryable, as: Model
+  use Yog.Algorithm
 
   @type bridge :: {Yog.node_id(), Yog.node_id()}
   @type connectivity_results :: %{

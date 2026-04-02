@@ -45,7 +45,7 @@ defmodule Yog.Community.LocalCommunity do
   - Clauset, A. (2005). Finding local community structure in networks.
   """
 
-  alias Yog.Queryable, as: Model
+  use Yog.Algorithm
 
   @typedoc "Options for local community detection"
   @type local_options :: %{

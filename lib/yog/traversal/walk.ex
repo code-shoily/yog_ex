@@ -7,7 +7,7 @@ defmodule Yog.Traversal.Walk do
   next nodes are prioritized based on weights, heuristics, or randomness.
   """
 
-  alias Yog.Queryable, as: Model
+  use Yog.Algorithm
 
   @type order :: :breadth_first | :depth_first | :best_first | :random
   @type walk_control :: :continue | :stop | :halt

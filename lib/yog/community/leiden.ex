@@ -61,9 +61,9 @@ defmodule Yog.Community.Leiden do
 
   """
 
+  use Yog.Algorithm
+
   alias Yog.Community.{Dendrogram, Result}
-  alias Yog.Modifiable, as: Mutator
-  alias Yog.Queryable, as: Model
 
   @typedoc "Options for the Leiden algorithm"
   @type leiden_options :: %{

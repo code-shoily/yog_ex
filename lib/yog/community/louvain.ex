@@ -49,9 +49,9 @@ defmodule Yog.Community.Louvain do
   - [Wikipedia: Louvain Method](https://en.wikipedia.org/wiki/Louvain_method)
   """
 
+  use Yog.Algorithm
+
   alias Yog.Community.{Dendrogram, Metrics, Result}
-  alias Yog.Modifiable, as: Mutator
-  alias Yog.Queryable, as: Model
 
   @typedoc "Options for the Louvain algorithm"
   @type louvain_options :: %{

@@ -52,8 +52,9 @@ defmodule Yog.Community.FluidCommunities do
 
   """
 
+  use Yog.Algorithm
+
   alias Yog.Community.Result
-  alias Yog.Queryable, as: Model
 
   @typedoc "Options for Fluid Communities algorithm"
   @type fluid_options :: %{

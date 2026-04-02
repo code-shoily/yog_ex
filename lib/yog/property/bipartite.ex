@@ -80,7 +80,7 @@ defmodule Yog.Property.Bipartite do
   - [CP-Algorithms: Bipartite Check](https://cp-algorithms.com/graph/bipartite-check.html)
   """
 
-  alias Yog.Queryable, as: Model
+  use Yog.Algorithm
 
   @typedoc """
   A partition of a bipartite graph into two independent sets.

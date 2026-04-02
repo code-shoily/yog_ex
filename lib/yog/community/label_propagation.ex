@@ -30,8 +30,9 @@ defmodule Yog.Community.LabelPropagation do
       true
   """
 
+  use Yog.Algorithm
+
   alias Yog.Community.Result
-  alias Yog.Queryable, as: Model
 
   @doc """
   Returns default options for LPA.

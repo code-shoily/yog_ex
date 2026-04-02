@@ -3,8 +3,8 @@ defmodule Yog.Traversal.Sort do
   Topological sorting algorithms — Kahn's algorithm and lexicographic variant.
   """
 
+  use Yog.Algorithm
   alias Yog.PriorityQueue, as: PQ
-  alias Yog.Queryable, as: Model
 
   @doc """
   Performs a topological sort on a directed graph using Kahn's algorithm.

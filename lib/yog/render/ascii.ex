@@ -70,10 +70,10 @@ defmodule Yog.Render.ASCII do
   - Perfect for "Mazes for Programmers" book examples
   """
 
+  use Yog.Algorithm
   alias Yog.Builder.Grid
   alias Yog.Builder.GridGraph
   alias Yog.Builder.ToroidalGraph
-  alias Yog.Queryable, as: Model
 
   @typedoc "Grid type from Yog.Builder.Grid"
   @type grid :: GridGraph.t()

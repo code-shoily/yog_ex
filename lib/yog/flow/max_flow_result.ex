@@ -27,7 +27,7 @@ defmodule Yog.Flow.MaxFlowResult do
       15
   """
 
-  alias Yog.Queryable, as: Model
+  use Yog.Algorithm
 
   @type node_id :: Yog.node_id()
 

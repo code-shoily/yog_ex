@@ -48,10 +48,11 @@ defmodule Yog.Community.Walktrap do
 
   """
 
+  use Yog.Algorithm
+
   alias Yog.Community
   alias Yog.Community.{Dendrogram, Result}
   alias Yog.PriorityQueue
-  alias Yog.Queryable, as: Model
 
   @typedoc "Options for Walktrap algorithm"
   @type walktrap_options :: %{

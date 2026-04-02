@@ -50,10 +50,10 @@ defmodule Yog.Community.GirvanNewman do
 
   """
 
+  use Yog.Algorithm
+
   alias Yog.Community.{Dendrogram, Result}
-  alias Yog.Modifiable, as: Mutator
   alias Yog.PriorityQueue, as: PQ
-  alias Yog.Queryable, as: Model
 
   @typedoc "Options for Girvan-Newman algorithm"
   @type girvan_newman_options :: %{target_communities: integer() | nil}

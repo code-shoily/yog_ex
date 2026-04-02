@@ -3,7 +3,7 @@ defmodule Yog.Traversal.Cycle do
   Cycle detection algorithms for directed and undirected graphs.
   """
 
-  alias Yog.Queryable, as: Model
+  use Yog.Algorithm
   alias Yog.Traversal.Sort
 
   @doc """

@@ -45,8 +45,8 @@ defmodule Yog.Property.Structure do
       true
   """
 
+  use Yog.Algorithm
   alias Yog.Property.Bipartite
-  alias Yog.Queryable, as: Model
   alias Yog.Traversal
 
   @doc """

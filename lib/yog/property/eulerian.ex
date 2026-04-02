@@ -88,7 +88,7 @@ defmodule Yog.Property.Eulerian do
   - [CP-Algorithms: Eulerian Path](https://cp-algorithms.com/graph/euler_path.html)
   """
 
-  alias Yog.Queryable, as: Model
+  use Yog.Algorithm
 
   @doc """
   Checks if the graph contains an Eulerian circuit.

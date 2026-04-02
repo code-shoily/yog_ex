@@ -3,7 +3,7 @@ defmodule Yog.Connectivity.Components do
   Algorithms for finding (weakly) connected components in graphs.
   """
 
-  alias Yog.Queryable, as: Model
+  use Yog.Algorithm
 
   @type component :: [Yog.node_id()]
 

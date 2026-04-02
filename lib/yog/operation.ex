@@ -70,8 +70,7 @@ defmodule Yog.Operation do
 
   """
 
-  alias Yog.Modifiable, as: Mutator
-  alias Yog.Queryable, as: Model
+  use Yog.Algorithm
   alias Yog.Transformable
 
   # ============= Set-Theoretic Operations =============

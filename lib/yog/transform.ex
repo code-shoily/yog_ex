@@ -51,8 +51,7 @@ defmodule Yog.Transform do
   Async variants added in v0.60.1.
   """
 
-  alias Yog.Modifiable, as: Mutator
-  alias Yog.Queryable, as: Model
+  use Yog.Algorithm
   alias Yog.Transformable
 
   defp mutate!(result), do: Yog.Utils.unwrap_mutate!(result)

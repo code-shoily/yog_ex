@@ -48,7 +48,7 @@ defmodule Yog.Connectivity.KCore do
       0
   """
 
-  alias Yog.Queryable, as: Model
+  use Yog.Algorithm
 
   @doc """
   Detects the k-core of a graph.
