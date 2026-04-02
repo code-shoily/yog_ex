@@ -228,3 +228,33 @@ defimpl Yog.Modifiable, for: Yog.Graph do
   def add_edge_with_combine(graph, src, dst, weight, with_combine),
     do: Yog.Model.add_edge_with_combine(graph, src, dst, weight, with_combine)
 end
+
+defimpl Yog.Transformable, for: Yog.Graph do
+  def empty(graph), do: Yog.Graph.new(graph.kind)
+  def empty(_graph, kind), do: Yog.Graph.new(kind)
+
+  def transpose(graph) do
+    %{graph | out_edges: graph.in_edges, in_edges: graph.out_edges}
+  end
+
+  def map_nodes(graph, fun) do
+    new_nodes = Map.new(graph.nodes, fn {id, data} -> {id, fun.(data)} end)
+    %{graph | nodes: new_nodes}
+  end
+
+  def map_edges(graph, fun) do
+    transform_inner = fn inner_map ->
+      Map.new(inner_map, fn {dst, weight} -> {dst, fun.(weight)} end)
+    end
+
+    transform_outer = fn outer_map ->
+      Map.new(outer_map, fn {src, inner_map} -> {src, transform_inner.(inner_map)} end)
+    end
+
+    %{
+      graph
+      | out_edges: transform_outer.(graph.out_edges),
+        in_edges: transform_outer.(graph.in_edges)
+    }
+  end
+end

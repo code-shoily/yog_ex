@@ -70,7 +70,9 @@ defmodule Yog.Operation do
 
   """
 
-  alias Yog.Model
+  alias Yog.Modifiable, as: Mutator
+  alias Yog.Queryable, as: Model
+  alias Yog.Transformable
 
   # ============= Set-Theoretic Operations =============
 
@@ -199,7 +201,7 @@ defmodule Yog.Operation do
   """
   @spec disjoint_union(Yog.graph(), Yog.graph()) :: Yog.graph()
   def disjoint_union(graph_a, graph_b) do
-    Yog.Graph.new(Model.type(graph_a))
+    Transformable.empty(graph_a)
     |> add_tagged_component(graph_a, 0)
     |> add_tagged_component(graph_b, 1)
   end
@@ -243,8 +245,8 @@ defmodule Yog.Operation do
     u_map = Enum.with_index(first_nodes) |> Enum.into(%{})
     v_map = Enum.with_index(second_nodes) |> Enum.into(%{})
 
-    # Create empty graph with same kind
-    init_graph = Yog.Graph.new(Model.type(first))
+    # Create empty graph with same implementation and kind
+    init_graph = Transformable.empty(first)
 
     # Add nodes: new_id = rank(u) * second_order + rank(v)
     graph_with_nodes =
@@ -256,7 +258,7 @@ defmodule Yog.Operation do
           v_idx = Map.fetch!(v_map, v)
           new_id = u_idx * second_order + v_idx
           v_data = Model.node(second, v)
-          Model.add_node(g, new_id, {u_data, v_data})
+          Mutator.add_node(g, new_id, {u_data, v_data})
         end)
       end)
 
@@ -272,7 +274,7 @@ defmodule Yog.Operation do
             v_succ_idx = Map.fetch!(v_map, v_succ)
             src_id = u_idx * second_order + v_idx
             dst_id = u_idx * second_order + v_succ_idx
-            Model.add_edge!(g_inner, src_id, dst_id, {default_second, weight})
+            Mutator.add_edge_ensure(g_inner, src_id, dst_id, {default_second, weight}, nil)
           end)
         end)
       end)
@@ -288,7 +290,7 @@ defmodule Yog.Operation do
           u_succ_idx = Map.fetch!(u_map, u_succ)
           src_id = u_idx * second_order + v_idx
           dst_id = u_succ_idx * second_order + v_idx
-          Model.add_edge!(g_inner, src_id, dst_id, {weight, default_first})
+          Mutator.add_edge_ensure(g_inner, src_id, dst_id, {weight, default_first}, nil)
         end)
       end)
     end)
@@ -363,7 +365,7 @@ defmodule Yog.Operation do
               g
 
             true ->
-              case Model.add_edge(g, src, dst, default_weight) do
+              case Mutator.add_edge(g, src, dst, default_weight) do
                 {:ok, new_g} -> new_g
                 {:error, _} -> g
               end
@@ -490,14 +492,14 @@ defmodule Yog.Operation do
 
   # Reindex edges with
   defp add_tagged_component(target_graph, source_graph, tag) do
-    target_graph =
+    graph_with_nodes =
       Enum.reduce(Model.all_nodes(source_graph), target_graph, fn node_id, acc ->
         data = Model.node(source_graph, node_id)
-        Model.add_node(acc, {tag, node_id}, data)
+        Mutator.add_node(acc, {tag, node_id}, data)
       end)
 
-    Enum.reduce(Model.all_edges(source_graph), target_graph, fn {u, v, data}, acc ->
-      Model.add_edge!(acc, {tag, u}, {tag, v}, data)
+    Enum.reduce(Model.all_edges(source_graph), graph_with_nodes, fn {u, v, data}, acc ->
+      Mutator.add_edge_ensure(acc, {tag, u}, {tag, v}, data, nil)
     end)
   end
 

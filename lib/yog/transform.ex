@@ -51,7 +51,17 @@ defmodule Yog.Transform do
   Async variants added in v0.60.1.
   """
 
-  alias Yog.Model
+  alias Yog.Modifiable, as: Mutator
+  alias Yog.Queryable, as: Model
+  alias Yog.Transformable
+
+  defp mutate!(result) do
+    case result do
+      {:ok, g} -> g
+      g when is_struct(g) -> g
+      {:error, reason} -> raise ArgumentError, reason
+    end
+  end
 
   @doc """
   Reverses the direction of every edge in the graph (graph transpose).
@@ -84,8 +94,8 @@ defmodule Yog.Transform do
   - Reversing dependencies in a DAG
   """
   @spec transpose(Yog.graph()) :: Yog.graph()
-  def transpose(%Yog.Graph{} = graph) do
-    %{graph | out_edges: graph.in_edges, in_edges: graph.out_edges}
+  def transpose(graph) do
+    Transformable.transpose(graph)
   end
 
   @doc """
@@ -123,9 +133,8 @@ defmodule Yog.Transform do
       5
   """
   @spec map_nodes(Yog.graph(), (term() -> term())) :: Yog.graph()
-  def map_nodes(%Yog.Graph{} = graph, fun) do
-    new_nodes = Map.new(graph.nodes, fn {id, data} -> {id, fun.(data)} end)
-    %{graph | nodes: new_nodes}
+  def map_nodes(graph, fun) do
+    Transformable.map_nodes(graph, fun)
   end
 
   @doc """
@@ -253,20 +262,8 @@ defmodule Yog.Transform do
       [{2, "short"}]
   """
   @spec map_edges(Yog.graph(), (term() -> term())) :: Yog.graph()
-  def map_edges(%Yog.Graph{} = graph, fun) do
-    transform_inner = fn inner_map ->
-      Map.new(inner_map, fn {dst, weight} -> {dst, fun.(weight)} end)
-    end
-
-    transform_outer = fn outer_map ->
-      Map.new(outer_map, fn {src, inner_map} -> {src, transform_inner.(inner_map)} end)
-    end
-
-    %{
-      graph
-      | out_edges: transform_outer.(graph.out_edges),
-        in_edges: transform_outer.(graph.in_edges)
-    }
+  def map_edges(graph, fun) do
+    Transformable.map_edges(graph, fun)
   end
 
   @doc """
@@ -444,23 +441,29 @@ defmodule Yog.Transform do
   - Filter by node importance/centrality
   """
   @spec filter_nodes(Yog.graph(), (term() -> boolean())) :: Yog.graph()
-  def filter_nodes(%Yog.Graph{} = graph, predicate) do
-    kept_nodes = Map.filter(graph.nodes, fn {_id, data} -> predicate.(data) end)
+  def filter_nodes(graph, predicate) do
+    # 1. Filter and collect kept node IDs
+    kept_nodes =
+      Model.all_nodes(graph)
+      |> Enum.filter(fn id -> predicate.(Model.node(graph, id)) end)
+      |> MapSet.new()
 
-    prune_edges = fn outer_map ->
-      outer_map
-      |> Map.filter(fn {src, _} -> Map.has_key?(kept_nodes, src) end)
-      |> Map.new(fn {src, inner_map} ->
-        {src, Map.filter(inner_map, fn {dst, _} -> Map.has_key?(kept_nodes, dst) end)}
+    # 2. Create new graph and add nodes
+    init = Transformable.empty(graph)
+
+    graph_with_nodes =
+      Enum.reduce(kept_nodes, init, fn id, acc ->
+        Mutator.add_node(acc, id, Model.node(graph, id))
       end)
-    end
 
-    %{
-      graph
-      | nodes: kept_nodes,
-        out_edges: prune_edges.(graph.out_edges),
-        in_edges: prune_edges.(graph.in_edges)
-    }
+    # 3. Filter and add edges where both endpoints are kept
+    edges =
+      Model.all_edges(graph)
+      |> Enum.filter(fn {u, v, _w} ->
+        MapSet.member?(kept_nodes, u) and MapSet.member?(kept_nodes, v)
+      end)
+
+    Mutator.add_edges(graph_with_nodes, edges) |> mutate!()
   end
 
   @doc """
@@ -493,34 +496,22 @@ defmodule Yog.Transform do
   """
   @spec filter_edges(Yog.graph(), (Yog.node_id(), Yog.node_id(), term() -> boolean())) ::
           Yog.graph()
-  def filter_edges(%Yog.Graph{} = graph, predicate) do
-    new_out =
-      for {src, inner_map} <- graph.out_edges, reduce: %{} do
-        acc ->
-          filtered_inner =
-            Map.filter(inner_map, fn {dst, weight} -> predicate.(src, dst, weight) end)
+  def filter_edges(graph, predicate) do
+    # 1. Start with empty graph
+    init = Transformable.empty(graph)
 
-          if map_size(filtered_inner) > 0 do
-            Map.put(acc, src, filtered_inner)
-          else
-            acc
-          end
-      end
+    # 2. Add all nodes first (preserving all nodes as per documentation)
+    graph_with_nodes =
+      Enum.reduce(Model.all_nodes(graph), init, fn id, acc ->
+        Mutator.add_node(acc, id, Model.node(graph, id))
+      end)
 
-    new_in =
-      for {dst, inner_map} <- graph.in_edges, reduce: %{} do
-        acc ->
-          filtered_inner =
-            Map.filter(inner_map, fn {src, weight} -> predicate.(src, dst, weight) end)
+    # 3. Filter and add edges
+    edges =
+      Model.all_edges(graph)
+      |> Enum.filter(fn {u, v, w} -> predicate.(u, v, w) end)
 
-          if map_size(filtered_inner) > 0 do
-            Map.put(acc, dst, filtered_inner)
-          else
-            acc
-          end
-      end
-
-    %{graph | out_edges: new_out, in_edges: new_in}
+    Mutator.add_edges(graph_with_nodes, edges) |> mutate!()
   end
 
   @doc """
@@ -542,8 +533,10 @@ defmodule Yog.Transform do
       5
   """
   @spec update_node(Yog.graph(), Yog.node_id(), term(), (term() -> term())) :: Yog.graph()
-  def update_node(%Yog.Graph{} = graph, id, default, fun) do
-    %{graph | nodes: Map.update(graph.nodes, id, default, fun)}
+  def update_node(graph, id, default, fun) do
+    data = Model.node(graph, id)
+    new_data = if data, do: fun.(data), else: default
+    Mutator.add_node(graph, id, new_data)
   end
 
   @doc """
@@ -576,35 +569,11 @@ defmodule Yog.Transform do
   """
   @spec update_edge(Yog.graph(), Yog.node_id(), Yog.node_id(), term(), (term() -> term())) ::
           Yog.graph()
-  def update_edge(%Yog.Graph{} = graph, u, v, default, fun) do
-    if Map.has_key?(graph.nodes, u) and Map.has_key?(graph.nodes, v) do
-      update_directed = fn g, src, dst ->
-        update_map = fn map, start, finish ->
-          inner = Map.get(map, start, %{})
-          new_inner = Map.update(inner, finish, default, fun)
-          Map.put(map, start, new_inner)
-        end
-
-        %{
-          g
-          | out_edges: update_map.(g.out_edges, src, dst),
-            in_edges: update_map.(g.in_edges, dst, src)
-        }
-      end
-
-      case graph.kind do
-        :directed ->
-          update_directed.(graph, u, v)
-
-        :undirected ->
-          if u == v do
-            update_directed.(graph, u, v)
-          else
-            graph
-            |> update_directed.(u, v)
-            |> update_directed.(v, u)
-          end
-      end
+  def update_edge(graph, u, v, default, fun) do
+    if Model.has_node?(graph, u) and Model.has_node?(graph, v) do
+      weight = Model.edge_data(graph, u, v)
+      new_weight = if weight, do: fun.(weight), else: default
+      Mutator.add_edge(graph, u, v, new_weight) |> mutate!()
     else
       graph
     end
@@ -642,47 +611,38 @@ defmodule Yog.Transform do
   - Testing graph density (sparse ↔ dense complement)
   """
   @spec complement(Yog.graph(), term()) :: Yog.graph()
-  def complement(%Yog.Graph{kind: kind} = graph, default_weight) do
-    node_ids = Map.keys(graph.nodes)
+  def complement(graph, default_weight) do
+    nodes = Model.all_nodes(graph)
+    init = Transformable.empty(graph)
 
-    out_edges =
-      for src <- node_ids, reduce: %{} do
-        acc_outer ->
-          inner =
-            for dst <- node_ids, src != dst, reduce: %{} do
-              acc_inner ->
-                has_edge =
-                  case Map.fetch(graph.out_edges, src) do
-                    {:ok, old_inner} -> Map.has_key?(old_inner, dst)
-                    :error -> false
-                  end
+    # 1. Add all nodes
+    graph_with_nodes =
+      Enum.reduce(nodes, init, fn id, acc ->
+        Mutator.add_node(acc, id, Model.node(graph, id))
+      end)
 
-                if has_edge do
-                  acc_inner
-                else
-                  Map.put(acc_inner, dst, default_weight)
-                end
-            end
+    # 2. Add edges where they DON'T exist
+    # Optimization: pre-calculate type to avoid redundant protocol calls
+    type = Model.type(graph)
 
-          if map_size(inner) > 0 do
-            Map.put(acc_outer, src, inner)
-          else
-            acc_outer
-          end
-      end
+    Enum.reduce(nodes, graph_with_nodes, fn u, acc_outer ->
+      Enum.reduce(nodes, acc_outer, fn v, acc_inner ->
+        cond do
+          u == v ->
+            acc_inner
 
-    in_edges =
-      if kind == :directed do
-        for {src, inners} <- out_edges, {dst, weight} <- inners, reduce: %{} do
-          acc_in ->
-            inner = Map.get(acc_in, dst, %{}) |> Map.put(src, weight)
-            Map.put(acc_in, dst, inner)
+          type == :undirected and u > v ->
+            # Only process each pair once for undirected
+            acc_inner
+
+          not Model.has_edge?(graph, u, v) ->
+            Mutator.add_edge(acc_inner, u, v, default_weight) |> mutate!()
+
+          true ->
+            acc_inner
         end
-      else
-        out_edges
-      end
-
-    %{graph | out_edges: out_edges, in_edges: in_edges}
+      end)
+    end)
   end
 
   @doc """
@@ -725,21 +685,28 @@ defmodule Yog.Transform do
   - Building graphs incrementally from multiple sources
   """
   @spec merge(Yog.graph(), Yog.graph()) :: Yog.graph()
-  def merge(%Yog.Graph{} = graph1, %Yog.Graph{} = graph2) do
-    merge_inner = fn m1, m2 -> Map.merge(m1, m2) end
+  def merge(graph1, graph2) do
+    # 1. Start with empty graph of base type
+    init = Transformable.empty(graph1)
 
-    merge_outer = fn outer1, outer2 ->
-      Map.merge(outer1, outer2, fn _src, inner1, inner2 ->
-        merge_inner.(inner1, inner2)
+    # 2. Add all from graph 1
+    g1_nodes = Model.nodes(graph1)
+
+    graph_with_g1 =
+      Enum.reduce(g1_nodes, init, fn {id, data}, acc ->
+        Mutator.add_node(acc, id, data)
       end)
-    end
+      |> Mutator.add_edges(Model.all_edges(graph1))
+      |> mutate!()
 
-    %{
-      graph1
-      | nodes: Map.merge(graph1.nodes, graph2.nodes),
-        out_edges: merge_outer.(graph1.out_edges, graph2.out_edges),
-        in_edges: merge_outer.(graph1.in_edges, graph2.in_edges)
-    }
+    # 3. Add all from graph 2 (overwrites conflicts)
+    g2_nodes = Model.nodes(graph2)
+
+    Enum.reduce(g2_nodes, graph_with_g1, fn {id, data}, acc ->
+      Mutator.add_node(acc, id, data)
+    end)
+    |> Mutator.add_edges(Model.all_edges(graph2))
+    |> mutate!()
   end
 
   @doc """
@@ -781,25 +748,28 @@ defmodule Yog.Transform do
   - `subgraph/2` - Filters by explicit node IDs (e.g., "keep nodes [1, 5, 7]")
   """
   @spec subgraph(Yog.graph(), [Yog.node_id()]) :: Yog.graph()
-  def subgraph(%Yog.Graph{} = graph, ids) do
+  def subgraph(graph, ids) do
     id_set = MapSet.new(ids)
+    init = Transformable.empty(graph)
 
-    filtered_nodes = Map.filter(graph.nodes, fn {id, _} -> MapSet.member?(id_set, id) end)
-
-    prune = fn outer ->
-      outer
-      |> Map.filter(fn {src, _} -> MapSet.member?(id_set, src) end)
-      |> Map.new(fn {src, inner} ->
-        {src, Map.filter(inner, fn {dst, _} -> MapSet.member?(id_set, dst) end)}
+    # 1. Add valid nodes
+    graph_with_nodes =
+      Enum.reduce(ids, init, fn id, acc ->
+        if Model.has_node?(graph, id) do
+          Mutator.add_node(acc, id, Model.node(graph, id))
+        else
+          acc
+        end
       end)
-    end
 
-    %{
-      graph
-      | nodes: filtered_nodes,
-        out_edges: prune.(graph.out_edges),
-        in_edges: prune.(graph.in_edges)
-    }
+    # 2. Add qualifying edges
+    edges =
+      Model.all_edges(graph)
+      |> Enum.filter(fn {u, v, _w} ->
+        MapSet.member?(id_set, u) and MapSet.member?(id_set, v)
+      end)
+
+    Mutator.add_edges(graph_with_nodes, edges) |> mutate!()
   end
 
   @doc """
@@ -865,49 +835,46 @@ defmodule Yog.Transform do
           Yog.node_id(),
           (term(), term() -> term())
         ) :: Yog.graph()
-  def contract(%Yog.Graph{out_edges: out_edges, in_edges: in_edges} = graph, a, b, combine_weight) do
-    b_in = Map.get(in_edges, b, %{})
-    b_out = Map.get(out_edges, b, %{})
+  def contract(graph, a, b, combine_weight) do
+    if Model.has_node?(graph, a) and Model.has_node?(graph, b) do
+      # Redirect and merge edges generically
+      init = Transformable.empty(graph)
 
-    a_out = merge_adjacent(Map.get(out_edges, a, %{}), b_out, combine_weight, a, b)
+      # 1. Add all nodes except 'b'
+      # Node 'a' gets merged data
+      graph_with_nodes =
+        Enum.reduce(Model.all_nodes(graph), init, fn id, acc ->
+          cond do
+            id == b ->
+              acc
 
-    out_edges =
-      graph.out_edges
-      |> redirect_neighbors(b_in, a, b, combine_weight)
-      |> Map.put(a, a_out)
-      |> Map.delete(b)
+            id == a ->
+              Mutator.add_node(acc, a, Model.node(graph, a))
 
-    if graph.kind == :undirected do
-      %{graph | nodes: Map.delete(graph.nodes, b), out_edges: out_edges, in_edges: out_edges}
-    else
-      a_in = merge_adjacent(Map.get(in_edges, a, %{}), b_in, combine_weight, a, b)
-      in_edges = redirect_neighbors(in_edges, b_out, a, b, combine_weight)
-      in_edges = in_edges |> Map.put(a, a_in) |> Map.delete(b)
-
-      %{graph | nodes: Map.delete(graph.nodes, b), out_edges: out_edges, in_edges: in_edges}
-    end
-  end
-
-  # Merges b's edges into a's adjacency map and removes self-loops
-  defp merge_adjacent(a_edges, b_edges, combine_weight, a, b) do
-    Map.merge(a_edges, b_edges, fn _k, v1, v2 -> combine_weight.(v1, v2) end)
-    |> Map.delete(a)
-    |> Map.delete(b)
-  end
-
-  # Redirects edges pointing to b so they point to a instead
-  defp redirect_neighbors(adj_map, edges_to_redirect, a, b, combine_weight) do
-    Enum.reduce(edges_to_redirect, adj_map, fn {nb, w}, acc ->
-      if nb == a or nb == b do
-        acc
-      else
-        Map.update(acc, nb, %{a => w}, fn nb_edges ->
-          nb_edges
-          |> Map.delete(b)
-          |> Map.update(a, w, &combine_weight.(&1, w))
+            true ->
+              Mutator.add_node(acc, id, Model.node(graph, id))
+          end
         end)
-      end
-    end)
+
+      # 2. Add and redirect all edges
+      # If endpoint is 'b', change to 'a'. Remove self-loops.
+      edges =
+        Model.all_edges(graph)
+        |> Enum.map(fn {u, v, w} ->
+          new_u = if u == b, do: a, else: u
+          new_v = if v == b, do: a, else: v
+          {new_u, new_v, w}
+        end)
+        |> Enum.reject(fn {u, v, _w} -> u == v end)
+
+      # 3. Use combine version if supported or handle duplicates
+      # Since we want to merge weights for same neighbor, we use add_edge_with_combine
+      Enum.reduce(edges, graph_with_nodes, fn {u, v, w}, acc ->
+        Mutator.add_edge_with_combine(acc, u, v, w, combine_weight) |> mutate!()
+      end)
+    else
+      graph
+    end
   end
 
   @doc """
@@ -929,25 +896,32 @@ defmodule Yog.Transform do
       true
   """
   @spec transitive_closure(Yog.graph()) :: Yog.graph()
-  def transitive_closure(%Yog.Graph{} = graph) do
+  def transitive_closure(graph) do
     case Yog.Traversal.topological_sort(graph) do
       {:ok, sorted} ->
         # Fast DAG-based closure
-        solve_transitive_reachability(graph, Enum.reverse(sorted))
-        |> Enum.reduce(graph, fn {node, targets}, g ->
-          add_closure_edges(g, node, targets)
+        reachable_map = solve_transitive_reachability(graph, Enum.reverse(sorted))
+
+        Enum.reduce(reachable_map, graph, fn {node, targets}, g_acc ->
+          Enum.reduce(targets, g_acc, fn target, g ->
+            if Model.has_edge?(g, node, target) do
+              g
+            else
+              Mutator.add_edge_ensure(g, node, target, 1, nil)
+            end
+          end)
         end)
 
       {:error, :contains_cycle} ->
         # General closure using BFS/DFS from each node
-        Enum.reduce(Yog.all_nodes(graph), graph, fn src, g_acc ->
+        Enum.reduce(Model.all_nodes(graph), graph, fn src, g_acc ->
           reachable = Yog.Traversal.walk(in: graph, from: src, using: :breadth_first) |> tl()
 
           Enum.reduce(reachable, g_acc, fn dst, g ->
             if Model.has_edge?(g, src, dst) do
               g
             else
-              Model.add_edge!(g, src, dst, 1)
+              Mutator.add_edge_ensure(g, src, dst, 1, nil)
             end
           end)
         end)
@@ -955,10 +929,8 @@ defmodule Yog.Transform do
   end
 
   defp solve_transitive_reachability(graph, sorted_nodes) do
-    out_edges = graph.out_edges
-
     Enum.reduce(sorted_nodes, %{}, fn node, acc ->
-      successors = Map.get(out_edges, node, %{}) |> Map.keys()
+      successors = Model.successor_ids(graph, node)
 
       all_reachable =
         Enum.reduce(successors, MapSet.new(successors), fn child, set_acc ->
@@ -967,18 +939,6 @@ defmodule Yog.Transform do
         end)
 
       Map.put(acc, node, all_reachable)
-    end)
-  end
-
-  defp add_closure_edges(graph, node, targets) do
-    existing = Model.successor_ids(graph, node) |> MapSet.new()
-
-    Enum.reduce(targets, graph, fn target, g_acc ->
-      if MapSet.member?(existing, target) do
-        g_acc
-      else
-        Model.add_edge!(g_acc, node, target, 1)
-      end
     end)
   end
 
@@ -1006,7 +966,7 @@ defmodule Yog.Transform do
       false
   """
   @spec transitive_reduction(Yog.graph()) :: {:ok, Yog.graph()} | {:error, :contains_cycle}
-  def transitive_reduction(%Yog.Graph{} = graph) do
+  def transitive_reduction(graph) do
     case Yog.Traversal.topological_sort(graph) do
       {:ok, _sorted} ->
         nodes = Model.all_nodes(graph)
@@ -1019,7 +979,7 @@ defmodule Yog.Transform do
 
         new_graph =
           Enum.reduce(edges_to_remove, graph, fn {from, to}, g ->
-            Model.remove_edge(g, from, to)
+            Mutator.remove_edge(g, from, to)
           end)
 
         {:ok, new_graph}
@@ -1065,8 +1025,25 @@ defmodule Yog.Transform do
       :directed
   """
   @spec to_directed(Yog.graph()) :: Yog.graph()
-  def to_directed(%Yog.Graph{} = graph) do
-    %{graph | kind: :directed}
+  def to_directed(graph) do
+    if Model.type(graph) == :directed do
+      graph
+    else
+      # Rebuild as directed using the implementation's empty directed graph
+      init = Transformable.empty(graph, :directed)
+
+      graph_with_nodes =
+        Enum.reduce(Model.nodes(graph), init, fn {id, data}, acc ->
+          Mutator.add_node(acc, id, data)
+        end)
+
+      Enum.reduce(Model.all_edges(graph), graph_with_nodes, fn {u, v, w}, acc ->
+        # For undirected input, we must add both directions to preserve connectivity in directed form
+        acc
+        |> Mutator.add_edge_ensure(u, v, w, nil)
+        |> Mutator.add_edge_ensure(v, u, w, nil)
+      end)
+    end
   end
 
   @doc """
@@ -1107,26 +1084,23 @@ defmodule Yog.Transform do
       [{2, 5}]
   """
   @spec to_undirected(Yog.graph(), (term(), term() -> term())) :: Yog.graph()
-  def to_undirected(%Yog.Graph{kind: :undirected} = graph, _resolve) do
-    graph
-  end
+  def to_undirected(graph, resolve) do
+    if Model.type(graph) == :undirected do
+      graph
+    else
+      # Rebuild as undirected
+      init = Transformable.empty(graph, :undirected)
 
-  def to_undirected(%Yog.Graph{kind: :directed} = graph, resolve) do
-    symmetric_out =
-      Enum.reduce(graph.out_edges, graph.out_edges, fn {src, inner}, acc_outer ->
-        Enum.reduce(inner, acc_outer, fn {dst, weight}, acc ->
-          dst_inner = Map.get(acc, dst, %{})
-
-          updated_inner =
-            case Map.fetch(dst_inner, src) do
-              {:ok, existing} -> Map.put(dst_inner, src, resolve.(existing, weight))
-              :error -> Map.put(dst_inner, src, weight)
-            end
-
-          Map.put(acc, dst, updated_inner)
+      # 1. Add all nodes
+      graph_with_nodes =
+        Enum.reduce(Model.nodes(graph), init, fn {id, data}, acc ->
+          Mutator.add_node(acc, id, data)
         end)
-      end)
 
-    %{graph | kind: :undirected, out_edges: symmetric_out, in_edges: symmetric_out}
+      # 2. Add edges with resolving logic
+      Enum.reduce(Model.all_edges(graph), graph_with_nodes, fn {u, v, w}, acc ->
+        Mutator.add_edge_with_combine(acc, u, v, w, resolve) |> mutate!()
+      end)
+    end
   end
 end

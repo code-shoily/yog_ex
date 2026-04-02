@@ -125,3 +125,39 @@ defprotocol Yog.Modifiable do
   """
   def add_edge_with_combine(graph, src, dst, weight, with_combine)
 end
+
+defprotocol Yog.Transformable do
+  @moduledoc """
+  Protocol for structural graph transformations.
+
+  This protocol defines operations that transform a graph while preserving or
+  systematically altering its structure. Implementations can provide optimized
+  versions of these operations (e.g., O(1) transpose).
+  """
+
+  @doc """
+  Returns an empty graph of the same implementation as the template.
+  The new graph will have the same kind (:directed or :undirected) as the template.
+  """
+  def empty(graph)
+
+  @doc """
+  Returns an empty graph of the same implementation as the template with the specified kind.
+  """
+  def empty(graph, kind)
+
+  @doc """
+  Reverses the direction of every edge in the graph (graph transpose).
+  """
+  def transpose(graph)
+
+  @doc """
+  Transforms node data using a function, preserving graph structure.
+  """
+  def map_nodes(graph, fun)
+
+  @doc """
+  Transforms edge weights using a function, preserving graph structure.
+  """
+  def map_edges(graph, fun)
+end
