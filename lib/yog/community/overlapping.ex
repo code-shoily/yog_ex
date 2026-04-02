@@ -25,7 +25,7 @@ defmodule Yog.Community.Overlapping do
 
   alias Yog.Community.Result
 
-  @type node_id :: Yog.Model.node_id()
+  @type node_id :: Yog.node_id()
   @type community_id :: any()
 
   @enforce_keys [:memberships, :num_communities]

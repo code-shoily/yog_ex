@@ -20,7 +20,7 @@ defmodule Yog.Community.Result do
       0
   """
 
-  @type node_id :: Yog.Model.node_id()
+  @type node_id :: Yog.node_id()
   @type community_id :: any()
 
   @enforce_keys [:assignments, :num_communities]

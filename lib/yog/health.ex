@@ -28,8 +28,8 @@ defmodule Yog.Health do
 
   """
 
-  alias Yog.Model
   alias Yog.Pathfinding.Dijkstra
+  alias Yog.Queryable, as: Model
   alias Yog.Transform
 
   @doc """
