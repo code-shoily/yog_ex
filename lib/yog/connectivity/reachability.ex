@@ -10,7 +10,8 @@ defmodule Yog.Connectivity.Reachability do
   counting with O(V) memory.
   """
 
-  alias Yog.Model
+  alias Yog.Modifiable
+  alias Yog.Queryable, as: Model
   import Bitwise, only: [band: 2, bsr: 2, bsl: 2]
 
   @typedoc "Direction for reachability counting"
@@ -380,7 +381,7 @@ defmodule Yog.Connectivity.Reachability do
     graph_with_nodes =
       Enum.with_index(sccs)
       |> Enum.reduce(init, fn {nodes, id}, g ->
-        Model.add_node(g, id, %{size: length(nodes)})
+        Modifiable.add_node(g, id, %{size: length(nodes)})
       end)
 
     # Add edges between SCCs
@@ -392,7 +393,7 @@ defmodule Yog.Connectivity.Reachability do
 
         if src_scc != dst_scc do
           # Add edge between components if not already present
-          Model.add_edge_ensure(acc_g, src_scc, dst_scc, 1, nil)
+          Modifiable.add_edge_ensure(acc_g, src_scc, dst_scc, 1, nil)
         else
           acc_g
         end

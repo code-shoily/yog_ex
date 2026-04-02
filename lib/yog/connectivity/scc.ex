@@ -3,7 +3,7 @@ defmodule Yog.Connectivity.SCC do
   Strongly Connected Components (SCC) algorithms.
   """
 
-  alias Yog.Model
+  alias Yog.Queryable, as: Model
 
   @doc """
   Finds Strongly Connected Components (SCC) using Tarjan's Algorithm.

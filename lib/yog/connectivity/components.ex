@@ -3,7 +3,7 @@ defmodule Yog.Connectivity.Components do
   Algorithms for finding (weakly) connected components in graphs.
   """
 
-  alias Yog.Model
+  alias Yog.Queryable, as: Model
 
   @type component :: [Yog.node_id()]
 
@@ -75,7 +75,7 @@ defmodule Yog.Connectivity.Components do
 
     # Get all neighbors (both successors and predecessors)
     successors = Model.successor_ids(graph, node)
-    predecessors = Model.predecessors(graph, node) |> Enum.map(fn {id, _} -> id end)
+    predecessors = Model.predecessor_ids(graph, node)
     all_neighbors = Enum.uniq(successors ++ predecessors)
 
     Enum.reduce(all_neighbors, {visited, [node | component]}, fn neighbor,
