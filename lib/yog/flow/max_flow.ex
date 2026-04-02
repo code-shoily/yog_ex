@@ -56,10 +56,10 @@ defmodule Yog.Flow.MaxFlow do
   - [Wikipedia: Max-Flow Min-Cut Theorem](https://en.wikipedia.org/wiki/Max-flow_min-cut_theorem)
   """
 
+  use Yog.Algorithm
+
   alias Yog.Flow.MaxFlowResult
   alias Yog.Flow.MinCutResult
-  alias Yog.Modifiable, as: Mutator
-  alias Yog.Queryable, as: Model
 
   @typedoc """
   Result of a max flow computation.

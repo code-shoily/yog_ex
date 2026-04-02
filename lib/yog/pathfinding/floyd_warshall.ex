@@ -66,7 +66,7 @@ defmodule Yog.Pathfinding.FloydWarshall do
   - [CP-Algorithms: Floyd-Warshall](https://cp-algorithms.com/graph/all-pair-shortest-path-floyd-warshall.html)
   """
 
-  alias Yog.Queryable, as: Model
+  use Yog.Algorithm
 
   @typedoc """
   Distance matrix: map from `{from, to}` tuple to distance.

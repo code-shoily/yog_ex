@@ -51,9 +51,10 @@ defmodule Yog.MST do
 
   """
 
+  use Yog.Algorithm
+
   alias Yog.DisjointSet
   alias Yog.PriorityQueue, as: PQ
-  alias Yog.Queryable, as: Model
 
   @typedoc """
   Represents an edge in the minimum spanning tree.

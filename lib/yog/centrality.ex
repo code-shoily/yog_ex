@@ -20,9 +20,10 @@ defmodule Yog.Centrality do
 
   """
 
+  use Yog.Algorithm
+
   alias Yog.Pathfinding.Dijkstra
   alias Yog.PriorityQueue, as: PQ
-  alias Yog.Queryable, as: Model
 
   @typedoc """
   A mapping of Node IDs to their calculated centrality scores.

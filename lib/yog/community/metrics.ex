@@ -8,8 +8,9 @@ defmodule Yog.Community.Metrics do
   - Graph and community density
   """
 
+  use Yog.Algorithm
+
   alias Yog.Community.Result
-  alias Yog.Queryable, as: Model
 
   @doc """
   Calculates modularity for a given community partition.

@@ -49,8 +49,7 @@ defmodule Yog.Builder.Toroidal do
   alias Yog.Builder.Grid
   alias Yog.Builder.GridGraph
   alias Yog.Builder.ToroidalGraph
-  alias Yog.Modifiable, as: Mutator
-  alias Yog.Queryable, as: Model
+  alias Yog.Model
   alias Yog.Transformable
 
   @typedoc "Toroidal grid type (now using ToroidalGraph)"
@@ -146,7 +145,7 @@ defmodule Yog.Builder.Toroidal do
     graph_with_nodes =
       Enum.reduce(cells, init, fn {row, col, data}, g ->
         id = coord_to_id(row, col, cols)
-        Mutator.add_node(g, id, data)
+        Model.add_node(g, id, data)
       end)
 
     # Add edges with wrapping
@@ -163,7 +162,7 @@ defmodule Yog.Builder.Toroidal do
           to_data = Model.node(acc_g, to_id)
 
           if to_data != nil && can_move_fn.(from_data, to_data) do
-            Mutator.add_edge(acc_g, from_id, to_id, 1) |> Yog.Utils.unwrap_mutate!()
+            Model.add_edge(acc_g, from_id, to_id, 1) |> Yog.Utils.unwrap_mutate!()
           else
             acc_g
           end

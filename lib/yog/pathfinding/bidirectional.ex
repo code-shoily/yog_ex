@@ -18,8 +18,9 @@ defmodule Yog.Pathfinding.Bidirectional do
 
   # credo:disable-for-this-file Credo.Check.Refactor.AppendSingleItem
 
+  use Yog.Algorithm
+
   alias Yog.Pathfinding.Path
-  alias Yog.Queryable, as: Model
 
   @typedoc "Result type for shortest path queries"
   @type path_result :: {:ok, Path.t()} | :error

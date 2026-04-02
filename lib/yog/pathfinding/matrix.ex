@@ -69,10 +69,11 @@ defmodule Yog.Pathfinding.Matrix do
   - See `Yog.Pathfinding.Dijkstra` for single-source algorithm details (O((V+E) log V))
   """
 
+  use Yog.Algorithm
+
   alias Yog.Pathfinding.Dijkstra
   alias Yog.Pathfinding.FloydWarshall
   alias Yog.Pathfinding.Johnson
-  alias Yog.Queryable, as: Model
 
   @typedoc """
   Distance matrix: map from `{from, to}` tuple to distance.

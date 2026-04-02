@@ -42,8 +42,8 @@ defmodule Yog.Builder.Labeled do
 
   """
 
-  alias Yog.Modifiable, as: Mutator
-  alias Yog.Queryable, as: Model
+  # Use direct Yog.Model for performance (builders only work with Yog.Graph)
+  alias Yog.Model
   alias Yog.Transformable
 
   @enforce_keys [:graph]
@@ -152,7 +152,7 @@ defmodule Yog.Builder.Labeled do
 
       :error ->
         id = next_id
-        new_graph = Mutator.add_node(graph, id, label)
+        new_graph = Model.add_node(graph, id, label)
         new_mapping = Map.put(label_to_id, label, id)
         new_builder = %{builder | graph: new_graph, label_to_id: new_mapping, next_id: id + 1}
         {new_builder, id}
@@ -180,7 +180,7 @@ defmodule Yog.Builder.Labeled do
     {builder_with_both, dst_id} = ensure_node(builder_with_src, to)
 
     %__MODULE__{graph: graph} = builder_with_both
-    new_graph = Mutator.add_edge(graph, src_id, dst_id, weight) |> Yog.Utils.unwrap_mutate!()
+    {:ok, new_graph} = Model.add_edge(graph, src_id, dst_id, weight)
 
     %{builder_with_both | graph: new_graph}
   end

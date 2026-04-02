@@ -60,10 +60,10 @@ defmodule Yog.Flow.MinCut do
   - [CP-Algorithms: Stoer-Wagner](https://cp-algorithms.com/graph/stoer_wagner.html)
   """
 
+  use Yog.Algorithm
+
   alias Yog.Flow.MinCutResult
-  alias Yog.Modifiable, as: Mutator
   alias Yog.PriorityQueue
-  alias Yog.Queryable, as: Model
   alias Yog.Transform
 
   @doc """
