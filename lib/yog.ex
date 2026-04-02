@@ -59,6 +59,8 @@ defmodule Yog do
   """
   @spec graph?(any()) :: boolean()
   def graph?(%Yog.Graph{}), do: true
+  def graph?(%Yog.Multi.Graph{}), do: true
+  def graph?(%Yog.DAG.Graph{}), do: true
   def graph?(_), do: false
 
   # ============= Creation =============
@@ -126,7 +128,7 @@ defmodule Yog do
       [1, 2]
   """
   @spec add_node(graph(), node_id(), any()) :: graph()
-  defdelegate add_node(graph, id, data), to: Model
+  def add_node(graph, id, data), do: Yog.Modifiable.add_node(graph, id, data)
 
   @doc """
   Adds an edge to the graph.
@@ -155,7 +157,7 @@ defmodule Yog do
       [{1, 5}]
   """
   @spec add_edge(graph(), keyword()) :: {:ok, graph()} | {:error, String.t()}
-  defdelegate add_edge(graph, opts), to: Model
+  def add_edge(graph, opts), do: Yog.Modifiable.add_edge(graph, opts)
 
   @doc """
   Raw binding for add_edge with positional arguments.
@@ -168,7 +170,7 @@ defmodule Yog do
       [{2, 10}]
   """
   @spec add_edge(graph(), node_id(), node_id(), any()) :: {:ok, graph()} | {:error, String.t()}
-  defdelegate add_edge(graph, from, to, weight), to: Model
+  def add_edge(graph, from, to, weight), do: Yog.Modifiable.add_edge(graph, from, to, weight)
 
   @doc """
   Adds an edge to the graph, raising on error.
@@ -181,7 +183,7 @@ defmodule Yog do
       [{2, 10}]
   """
   @spec add_edge!(graph(), keyword()) :: graph()
-  defdelegate add_edge!(graph, opts), to: Model
+  def add_edge!(graph, opts), do: Yog.Modifiable.add_edge(graph, opts) |> elem(1)
 
   @doc """
   Adds an edge to the graph with positional arguments, raising on error.
@@ -193,7 +195,8 @@ defmodule Yog do
       iex> Yog.successors(graph, 1)
       [{2, 10}]
   """
-  defdelegate add_edge!(graph, from, to, weight), to: Model
+  def add_edge!(graph, from, to, weight),
+    do: Yog.Modifiable.add_edge(graph, from, to, weight) |> elem(1)
 
   @doc """
   Ensures both endpoint nodes exist, then adds an edge.
@@ -214,7 +217,7 @@ defmodule Yog do
       [{2, 10}]
   """
   @spec add_edge_ensure(graph(), keyword()) :: graph()
-  defdelegate add_edge_ensure(graph, opts), to: Model
+  def add_edge_ensure(graph, opts), do: Yog.Modifiable.add_edge_ensure(graph, opts)
 
   @doc """
   Ensures both endpoint nodes exist with positional arguments, then adds an edge.
@@ -225,7 +228,8 @@ defmodule Yog do
       iex> Yog.successors(graph, 1)
       [{2, 10}]
   """
-  defdelegate add_edge_ensure(graph, from, to, weight, default \\ nil), to: Model
+  def add_edge_ensure(graph, from, to, weight, default \\ nil),
+    do: Yog.Modifiable.add_edge_ensure(graph, from, to, weight, default)
 
   @doc """
   Adds an edge with a function to create default node data if nodes don't exist.
@@ -246,7 +250,8 @@ defmodule Yog do
       [{2, 10}]
   """
   @spec add_edge_with(graph(), node_id(), node_id(), any(), (node_id() -> any())) :: graph()
-  defdelegate add_edge_with(graph, from, to, weight, default_fn), to: Model
+  def add_edge_with(graph, from, to, weight, default_fn),
+    do: Yog.Modifiable.add_edge_with(graph, from, to, weight, default_fn)
 
   @doc """
   Adds an unweighted edge to the graph.
@@ -267,7 +272,7 @@ defmodule Yog do
       [{2, nil}]
   """
   @spec add_unweighted_edge(graph(), keyword()) :: {:ok, graph()} | {:error, String.t()}
-  defdelegate add_unweighted_edge(graph, opts), to: Model
+  def add_unweighted_edge(graph, opts), do: Yog.Modifiable.add_unweighted_edge(graph, opts)
 
   @doc """
   Adds an unweighted edge with positional arguments.
@@ -398,7 +403,7 @@ defmodule Yog do
       2
   """
   @spec add_edges(graph(), [edge_tuple()]) :: {:ok, graph()} | {:error, String.t()}
-  defdelegate add_edges(graph, edges), to: Model
+  def add_edges(graph, edges), do: Yog.Modifiable.add_edges(graph, edges)
 
   @doc """
   Adds multiple edges to the graph, raising on error.
@@ -414,7 +419,7 @@ defmodule Yog do
       iex> length(Yog.successors(graph, 1))
       1
   """
-  defdelegate add_edges!(graph, edges), to: Model
+  def add_edges!(graph, edges), do: Yog.Modifiable.add_edges(graph, edges) |> elem(1)
 
   @doc """
   Adds multiple simple edges (weight = 1).
@@ -435,7 +440,7 @@ defmodule Yog do
   """
   @spec add_simple_edges(graph(), [{node_id(), node_id()}]) ::
           {:ok, graph()} | {:error, String.t()}
-  defdelegate add_simple_edges(graph, edges), to: Model
+  def add_simple_edges(graph, edges), do: Yog.Modifiable.add_simple_edges(graph, edges)
 
   @doc """
   Adds multiple unweighted edges (weight = nil).
@@ -456,7 +461,7 @@ defmodule Yog do
   """
   @spec add_unweighted_edges(graph(), [{node_id(), node_id()}]) ::
           {:ok, graph()} | {:error, String.t()}
-  defdelegate add_unweighted_edges(graph, edges), to: Model
+  def add_unweighted_edges(graph, edges), do: Yog.Modifiable.add_unweighted_edges(graph, edges)
 
   # ============= Query =============
 
@@ -475,7 +480,7 @@ defmodule Yog do
       [{2, 10}]
   """
   @spec successors(graph(), node_id()) :: [{node_id(), term()}]
-  defdelegate successors(graph, id), to: Model
+  def successors(graph, id), do: Yog.Queryable.successors(graph, id)
 
   @doc """
   Gets nodes you came FROM to reach the given node (predecessors).
@@ -492,7 +497,7 @@ defmodule Yog do
       [{1, 10}]
   """
   @spec predecessors(graph(), node_id()) :: [{node_id(), term()}]
-  defdelegate predecessors(graph, id), to: Model
+  def predecessors(graph, id), do: Yog.Queryable.predecessors(graph, id)
 
   @doc """
   Gets node IDs you can travel TO from the given node.
@@ -517,7 +522,7 @@ defmodule Yog do
   Returns all neighbor node IDs (without weights).
   """
   @spec neighbor_ids(graph(), node_id()) :: [node_id()]
-  defdelegate neighbor_ids(graph, id), to: Model
+  def neighbor_ids(graph, id), do: Yog.Queryable.neighbor_ids(graph, id)
 
   @doc """
   Gets all nodes connected to the given node, regardless of direction.
@@ -537,7 +542,7 @@ defmodule Yog do
       2
   """
   @spec neighbors(graph(), node_id()) :: [{node_id(), term()}]
-  defdelegate neighbors(graph, id), to: Model
+  def neighbors(graph, id), do: Yog.Queryable.neighbors(graph, id)
 
   @doc """
   Returns all unique node IDs that have edges in the graph.
@@ -553,7 +558,7 @@ defmodule Yog do
       [1, 2]
   """
   @spec all_nodes(graph()) :: [node_id()]
-  defdelegate all_nodes(graph), to: Model
+  def all_nodes(graph), do: Yog.Queryable.all_nodes(graph)
 
   @doc """
   Returns all node IDs in the graph.
@@ -565,37 +570,37 @@ defmodule Yog do
   Returns all edges in the graph as triplets `{from, to, weight}`.
   """
   @spec all_edges(graph()) :: [{node_id(), node_id(), any()}]
-  defdelegate all_edges(graph), to: Model
+  def all_edges(graph), do: Yog.Queryable.all_edges(graph)
 
   @doc """
   Returns the number of nodes in the graph.
   """
   @spec node_count(graph()) :: integer()
-  defdelegate node_count(graph), to: Model
+  def node_count(graph), do: Yog.Queryable.node_count(graph)
 
   @doc """
   Returns the number of edges in the graph.
   """
   @spec edge_count(graph()) :: integer()
-  defdelegate edge_count(graph), to: Model
+  def edge_count(graph), do: Yog.Queryable.edge_count(graph)
 
   @doc """
   Gets the data associated with a node.
   """
   @spec node(graph(), node_id()) :: term() | nil
-  defdelegate node(graph, id), to: Model
+  def node(graph, id), do: Yog.Queryable.node(graph, id)
 
   @doc """
   Checks if the graph contains a node with the given ID.
   """
   @spec has_node?(graph(), node_id()) :: boolean()
-  defdelegate has_node?(graph, id), to: Model
+  def has_node?(graph, id), do: Yog.Queryable.has_node?(graph, id)
 
   @doc """
   Checks if the graph contains an edge between `src` and `dst`.
   """
   @spec has_edge?(graph(), node_id(), node_id()) :: boolean()
-  defdelegate has_edge?(graph, src, dst), to: Model
+  def has_edge?(graph, src, dst), do: Yog.Queryable.has_edge?(graph, src, dst)
 
   # ============= Analysis =============
 

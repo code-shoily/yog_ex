@@ -10,34 +10,25 @@ defmodule Yog.DAG do
 
       iex> graph = Yog.Graph.new(:directed)
       iex> {:ok, dag} = Yog.DAG.from_graph(graph)
-      iex> is_struct(dag, Yog.DAG)
+      iex> is_struct(dag, Yog.DAG.Graph)
       true
 
   ## Protocols
 
-  `Yog.DAG` implements the `Enumerable` and `Inspect` protocols:
-
-  - **Enumerable**: Iterates over nodes as `{id, data}` tuples via the underlying graph
-  - **Inspect**: Compact representation showing node and edge counts
+  `Yog.DAG.Graph` implements core graph protocols like `Yog.Queryable`, 
+  `Yog.Modifiable`, `Enumerable`, and `Inspect`.
   """
-  alias Yog.Property.Cyclicity
 
-  @type t :: %__MODULE__{
-          graph: Yog.Graph.t()
-        }
+  alias Yog.DAG.Graph
+  alias Yog.DAG.Model
 
-  @enforce_keys [:graph]
-  defstruct [:graph]
+  @type t :: Graph.t()
 
   @doc """
   Creates a new empty DAG.
   """
   @spec new() :: t()
-  def new do
-    %__MODULE__{
-      graph: Yog.Graph.new(:directed)
-    }
-  end
+  def new, do: Model.new(:directed)
 
   @doc """
   Attempts to create a DAG from a graph.
@@ -45,37 +36,32 @@ defmodule Yog.DAG do
   Validates that the graph is directed and contains no cycles.
   """
   @spec from_graph(Yog.Graph.t()) :: {:ok, t()} | {:error, :cycle_detected}
-  def from_graph(%Yog.Graph{kind: :undirected}) do
-    {:error, :cycle_detected}
-  end
-
-  def from_graph(%Yog.Graph{} = graph) do
-    if Cyclicity.acyclic?(graph) do
-      {:ok, %__MODULE__{graph: graph}}
-    else
-      {:error, :cycle_detected}
-    end
-  end
+  defdelegate from_graph(graph), to: Model
 
   @doc """
   Unwraps a DAG back into a regular Graph.
   """
-  @spec to_graph(t()) :: Yog.Graph.t()
-  def to_graph(%__MODULE__{graph: graph}), do: graph
+  @spec to_graph(dag :: t()) :: Yog.Graph.t()
+  defdelegate to_graph(dag), to: Model
 
   # ============= Modification =============
 
   @doc "Adds a node to the DAG."
-  defdelegate add_node(dag, id, data), to: Yog.DAG.Model
+  @spec add_node(t(), Yog.node_id(), any()) :: t()
+  defdelegate add_node(dag, id, data), to: Model
 
   @doc "Removes a node and all its connected edges from the DAG."
-  defdelegate remove_node(dag, id), to: Yog.DAG.Model
+  @spec remove_node(t(), Yog.node_id()) :: t()
+  defdelegate remove_node(dag, id), to: Model
 
   @doc "Adds an edge to the DAG, validating for cycles."
-  defdelegate add_edge(dag, from, to, weight), to: Yog.DAG.Model
+  @spec add_edge(t(), Yog.node_id(), Yog.node_id(), any()) ::
+          {:ok, t()} | {:error, :cycle_detected | term()}
+  defdelegate add_edge(dag, from, to, weight), to: Model
 
   @doc "Removes an edge from the DAG."
-  defdelegate remove_edge(dag, from, to), to: Yog.DAG.Model
+  @spec remove_edge(t(), Yog.node_id(), Yog.node_id()) :: t()
+  defdelegate remove_edge(dag, from, to), to: Model
 
   # ============= Algorithms =============
 
@@ -90,75 +76,4 @@ defmodule Yog.DAG do
 
   @doc "Finds the lowest common ancestors (LCAs) of two nodes."
   defdelegate lowest_common_ancestors(dag, node_a, node_b), to: Yog.DAG.Algorithm
-end
-
-defimpl Enumerable, for: Yog.DAG do
-  @moduledoc """
-  Enumerable implementation for `Yog.DAG`.
-
-  Iterates over nodes as `{id, data}` tuples via the underlying graph.
-
-  ## Examples
-
-      iex> {:ok, dag} =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.DAG.from_graph()
-      iex> Enum.to_list(dag)
-      [{1, "A"}, {2, "B"}]
-
-      iex> Enum.count(dag)
-      2
-  """
-
-  def count(%Yog.DAG{graph: graph}) do
-    Enumerable.count(graph)
-  end
-
-  def member?(%Yog.DAG{graph: graph}, element) do
-    Enumerable.member?(graph, element)
-  end
-
-  def reduce(%Yog.DAG{graph: graph}, acc, fun) do
-    Enumerable.reduce(graph, acc, fun)
-  end
-
-  def slice(%Yog.DAG{graph: graph}) do
-    Enumerable.slice(graph)
-  end
-end
-
-defimpl Inspect, for: Yog.DAG do
-  @moduledoc """
-  Inspect implementation for `Yog.DAG`.
-
-  Provides a compact representation showing node and edge counts.
-
-  ## Examples
-
-      iex> {:ok, dag} =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.DAG.from_graph()
-      iex> inspect(dag)
-      "#Yog.DAG<1 node, 0 edges>"
-  """
-
-  import Inspect.Algebra
-
-  def inspect(%Yog.DAG{graph: graph}, _opts) do
-    node_count = Yog.Model.node_count(graph)
-    edge_count = Yog.Graph.edge_count(graph)
-
-    node_str = if node_count == 1, do: "node", else: "nodes"
-    edge_str = if edge_count == 1, do: "edge", else: "edges"
-
-    concat([
-      "#Yog.DAG<",
-      "#{node_count} #{node_str}, ",
-      "#{edge_count} #{edge_str}",
-      ">"
-    ])
-  end
 end
