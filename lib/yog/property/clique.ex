@@ -77,7 +77,7 @@ defmodule Yog.Property.Clique do
   - [CP-Algorithms: Finding Cliques](https://cp-algorithms.com/graph/search_for_connected_components.html)
   """
 
-  alias Yog.Model
+  alias Yog.Queryable, as: Model
 
   @doc """
   Finds the maximum clique in an undirected graph.
