@@ -197,26 +197,34 @@ defimpl Inspect, for: Yog.Graph do
 end
 
 defimpl Yog.Queryable, for: Yog.Graph do
+  alias Yog.Queryable.Defaults
+
+  # Core required functions
   def successors(graph, id), do: Yog.Model.successors(graph, id)
   def predecessors(graph, id), do: Yog.Model.predecessors(graph, id)
-  def neighbors(graph, id), do: Yog.Model.neighbors(graph, id)
-  def successor_ids(graph, id), do: Yog.Model.successor_ids(graph, id)
-  def predecessor_ids(graph, id), do: Yog.Model.predecessor_ids(graph, id)
-  def neighbor_ids(graph, id), do: Yog.Model.neighbor_ids(graph, id)
+  def type(graph), do: Yog.Model.type(graph)
+  def node(graph, id), do: Yog.Model.node(graph, id)
   def all_nodes(graph), do: Yog.Model.all_nodes(graph)
   def order(graph), do: Yog.Model.order(graph)
-  def node_count(graph), do: Yog.Model.node_count(graph)
   def edge_count(graph), do: Yog.Model.edge_count(graph)
+
+  # Overrides for O(1) efficiency (instead of O(degree) defaults)
   def out_degree(graph, id), do: Yog.Model.out_degree(graph, id)
   def in_degree(graph, id), do: Yog.Model.in_degree(graph, id)
+  # Override: degree for undirected graphs should not double-count
   def degree(graph, id), do: Yog.Model.degree(graph, id)
   def has_node?(graph, id), do: Yog.Model.has_node?(graph, id)
   def has_edge?(graph, src, dst), do: Yog.Model.has_edge?(graph, src, dst)
-  def node(graph, id), do: Yog.Model.node(graph, id)
-  def nodes(graph), do: Yog.Model.nodes(graph)
   def edge_data(graph, src, dst), do: Yog.Model.edge_data(graph, src, dst)
+  def nodes(graph), do: Yog.Model.nodes(graph)
   def all_edges(graph), do: Yog.Model.all_edges(graph)
-  def type(graph), do: Yog.Model.type(graph)
+
+  # Using defaults for these
+  defdelegate successor_ids(graph, id), to: Defaults
+  defdelegate predecessor_ids(graph, id), to: Defaults
+  defdelegate neighbors(graph, id), to: Defaults
+  defdelegate neighbor_ids(graph, id), to: Defaults
+  defdelegate node_count(graph), to: Defaults
 end
 
 defimpl Yog.Modifiable, for: Yog.Graph do

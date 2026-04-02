@@ -18,56 +18,86 @@ By implementing these protocols for your graph type, you unlock YogEx's entire a
 
 The `Yog.Queryable` protocol is the foundation. Most YogEx algorithms (centrality, pathfinding, community detection) only require this protocol.
 
-### Required Functions
+### Minimal Implementation (7 Functions)
+
+Only these 7 functions are **required**. All others have working defaults in `Yog.Queryable.Defaults`:
 
 ```elixir
-defprotocol Yog.Queryable do
-  @spec successors(t, node_id) :: [{node_id, weight}]
-  def successors(graph, node_id)
-
-  @spec predecessors(t, node_id) :: [{node_id, weight}]
-  def predecessors(graph, node_id)
-
-  @spec type(t) :: :directed | :undirected
-  def type(graph)
-
-  @spec order(t) :: non_neg_integer
-  def order(graph)
-
-  @spec has_node?(t, node_id) :: boolean
-  def has_node?(graph, node_id)
-
-  @spec node(t, node_id) :: term | nil
-  def node(graph, node_id)
-
-  @spec all_nodes(t) :: [node_id]
-  def all_nodes(graph)
-
-  @spec out_degree(t, node_id) :: non_neg_integer
-  def out_degree(graph, node_id)
-
-  @spec in_degree(t, node_id) :: non_neg_integer
-  def in_degree(graph, node_id)
-
-  @spec edge_data(t, node_id, node_id) :: weight | nil
-  def edge_data(graph, src, dst)
+defimpl Yog.Queryable, for: MyGraph do
+  # Navigation - the fundamental graph operations
+  def successors(graph, id), do: ...
+  def predecessors(graph, id), do: ...
+  
+  # Metadata
+  def type(graph), do: ...           # :directed or :undirected
+  def order(graph), do: ...          # number of nodes
+  def edge_count(graph), do: ...     # number of edges
+  def all_nodes(graph), do: ...      # list of node IDs
+  
+  # Node data
+  def node(graph, id), do: ...       # data for a node, or nil
 end
 ```
 
-### Optional Functions
+### Functions with Defaults
 
-These have default implementations that derive from the required functions:
+These functions have working defaults derived from the 7 core functions above:
 
-- `neighbors/2` - Combined successors and predecessors
-- `neighbor_ids/2` - IDs only (no weights)
-- `successor_ids/2` - IDs only
-- `predecessor_ids/2` - IDs only
-- `nodes/1` - Map of id => node data
-- `degree/2` - Total degree (out + in)
-- `has_edge?/3` - Check edge existence
-- `node_count/1` - Alias for `order/1`
-- `edge_count/1` - Requires implementation for efficiency
-- `all_edges/1` - List all edges as `{src, dst, weight}`
+| Function | Default Implementation | Override When... |
+|----------|----------------------|------------------|
+| `out_degree/2` | `length(successors(graph, id))` | You track degree explicitly (O(1) vs O(degree)) |
+| `in_degree/2` | `length(predecessors(graph, id))` | You track degree explicitly |
+| `degree/2` | `out_degree + in_degree` | You need undirected graph semantics |
+| `has_node?/2` | `id in all_nodes(graph)` | You have faster lookup (e.g., MapSet) |
+| `has_edge?/3` | Search successors | You have O(1) edge lookup |
+| `edge_data/3` | Find in successors | You have O(1) edge weight lookup |
+| `nodes/1` | Map all_nodes to data | N/A (rarely needs override) |
+| `all_edges/1` | Iterate all nodes + successors | You have batch edge access |
+| `successor_ids/2` | Extract from successors | N/A |
+| `predecessor_ids/2` | Extract from predecessors | N/A |
+| `neighbors/2` | Merge successors + predecessors | N/A |
+| `neighbor_ids/2` | Unique union | N/A |
+| `node_count/1` | Alias for order | N/A |
+
+### Example: Using Defaults
+
+```elixir
+defimpl Yog.Queryable, for: Graph do
+  alias Yog.Queryable.Defaults
+
+  # Required - 7 core functions
+  def successors(graph, id) do
+    # your implementation
+  end
+  
+  def predecessors(graph, id) do
+    # your implementation
+  end
+  
+  def type(graph), do: graph.type
+  def order(graph), do: map_size(graph.nodes)
+  def edge_count(graph), do: graph.edge_count
+  def all_nodes(graph), do: Map.keys(graph.nodes)
+  def node(graph, id), do: Map.get(graph.nodes, id)
+
+  # Override defaults for efficiency
+  def out_degree(graph, id), do: Map.get(graph.out_degrees, id, 0)
+  def in_degree(graph, id), do: Map.get(graph.in_degrees, id, 0)
+  
+  # Use defaults for the rest
+  defdelegate degree(graph, id), to: Defaults
+  defdelegate has_node?(graph, id), to: Defaults
+  defdelegate has_edge?(graph, src, dst), to: Defaults
+  defdelegate edge_data(graph, src, dst), to: Defaults
+  defdelegate nodes(graph), to: Defaults
+  defdelegate all_edges(graph), to: Defaults
+  defdelegate successor_ids(graph, id), to: Defaults
+  defdelegate predecessor_ids(graph, id), to: Defaults
+  defdelegate neighbors(graph, id), to: Defaults
+  defdelegate neighbor_ids(graph, id), to: Defaults
+  defdelegate node_count(graph), to: Defaults
+end
+```
 
 ## Example 1: libgraph Integration
 

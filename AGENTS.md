@@ -288,35 +288,66 @@ end
 
 ### Yog.Queryable
 
+**Core Protocol** (7 required functions):
+
 ```elixir
-# Navigation
+# Navigation (fundamental)
 successors(graph, id) :: [{id, weight}]
 predecessors(graph, id) :: [{id, weight}]
-neighbors(graph, id) :: [{id, weight}]
-successor_ids(graph, id) :: [id]
-predecessor_ids(graph, id) :: [id]
-neighbor_ids(graph, id) :: [id]
 
-# Graph properties
+# Graph metadata
+type(graph) :: :directed | :undirected
 order(graph) :: integer()
-node_count(graph) :: integer()
 edge_count(graph) :: integer()
 all_nodes(graph) :: [id]
-type(graph) :: :directed | :undirected
 
-# Node properties
-has_node?(graph, id) :: boolean()
+# Node data
 node(graph, id) :: data | nil
-nodes(graph) :: %{id => data}
-out_degree(graph, id) :: integer()
-in_degree(graph, id) :: integer()
-degree(graph, id) :: integer()
-
-# Edge properties
-has_edge?(graph, src, dst) :: boolean()
-edge_data(graph, src, dst) :: weight | nil
-all_edges(graph) :: [{src, dst, weight}]
 ```
+
+**Functions with Defaults** (via `Yog.Queryable.Defaults`):
+
+```elixir
+# Derived from successors/predecessors
+out_degree(graph, id) :: integer()    # default: length(successors)
+in_degree(graph, id) :: integer()     # default: length(predecessors)
+degree(graph, id) :: integer()        # default: out + in (or just out for undirected)
+successor_ids(graph, id) :: [id]      # default: extract IDs from successors
+predecessor_ids(graph, id) :: [id]    # default: extract IDs from predecessors
+neighbors(graph, id) :: [{id, weight}] # default: merge successors + predecessors
+neighbor_ids(graph, id) :: [id]       # default: unique union
+
+# Derived from all_nodes
+has_node?(graph, id) :: boolean()     # default: id in all_nodes
+nodes(graph) :: %{id => data}         # default: map all_nodes to their data
+node_count(graph) :: integer()        # default: order
+
+# Derived from successors
+has_edge?(graph, src, dst) :: boolean() # default: dst in successors(src)
+edge_data(graph, src, dst) :: weight | nil # default: find in successors(src)
+all_edges(graph) :: [{src, dst, weight}]   # default: iterate all nodes + successors
+```
+
+> **Design Note**: Only 7 core functions are required! All others have working default
+> implementations in `Yog.Queryable.Defaults`. Override defaults when your implementation
+> can provide better efficiency (e.g., O(1) `out_degree` vs O(degree) default).
+>
+> Example minimal implementation:
+> ```elixir
+> defimpl Yog.Queryable, for: MyGraph do
+>   def successors(g, id), do: ...
+>   def predecessors(g, id), do: ...
+>   def type(g), do: ...
+>   def node(g, id), do: ...
+>   def all_nodes(g), do: ...
+>   def order(g), do: ...
+>   def edge_count(g), do: ...
+>
+>   # Override for efficiency
+>   def out_degree(g, id), do: Map.get(g.degrees, id, 0)
+>   defdelegate has_edge?(g, s, d), to: Yog.Queryable.Defaults
+> end
+> ```
 
 ### Yog.Modifiable
 

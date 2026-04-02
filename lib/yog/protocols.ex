@@ -1,70 +1,75 @@
 defprotocol Yog.Queryable do
   @moduledoc """
-  Protocol for read-only graph queries.
+  Minimal protocol for read-only graph queries.
 
-  This protocol defines the standard interface for extracting information from
-  a graph without modifying its structure or data.
+  This protocol defines only the essential functions needed to query a graph.
+  All other query operations can be derived from these core functions using
+  `Yog.Queryable.Defaults`. Implementations should override defaults for efficiency.
+
+  ## Required Functions (7)
+
+  Implementations MUST provide these:
+  - `successors/2` - nodes reachable from given node as [{id, weight}]
+  - `predecessors/2` - nodes that can reach given node as [{id, weight}]
+  - `type/1` - :directed or :undirected
+  - `node/2` - data associated with a node (nil if not found)
+  - `all_nodes/1` - list of all node IDs
+  - `order/1` - number of nodes
+  - `edge_count/1` - number of edges
+
+  ## Optional Functions (with defaults)
+
+  These have working default implementations in `Yog.Queryable.Defaults`:
+  - `out_degree/2` - defaults to length(successors)
+  - `in_degree/2` - defaults to length(predecessors)
+  - `degree/2` - defaults to out_degree + in_degree
+  - `successor_ids/2`, `predecessor_ids/2`, `neighbor_ids/2`
+  - `neighbors/2` - merged successors and predecessors
+  - `has_node?/2`, `has_edge?/3`
+  - `nodes/1`, `all_edges/1`, `edge_data/3`
+  - `node_count/1` - alias for order
+
+  ## Example: Minimal Implementation
+
+      defimpl Yog.Queryable, for: MyGraph do
+        def successors(graph, id), do: ...
+        def predecessors(graph, id), do: ...
+        def type(graph), do: ...
+        def node(graph, id), do: ...
+        def all_nodes(graph), do: ...
+        def order(graph), do: ...
+        def edge_count(graph), do: ...
+
+        # Override defaults for efficiency
+        def out_degree(graph, id), do: Map.get(graph.degrees, id, 0)
+        defdelegate has_edge?(g, s, d), to: Yog.Queryable.Defaults
+        # ... etc
+      end
   """
 
-  @doc "Gets nodes you can travel TO from the given node (successors)."
+  # Core required functions
   def successors(graph, id)
-
-  @doc "Gets nodes you came FROM to reach the given node (predecessors)."
   def predecessors(graph, id)
-
-  @doc "Gets all nodes connected to the given node, regardless of direction."
-  def neighbors(graph, id)
-
-  @doc "Returns all successor node IDs (without weights)."
-  def successor_ids(graph, id)
-
-  @doc "Returns all predecessor node IDs (without weights)."
-  def predecessor_ids(graph, id)
-
-  @doc "Returns all neighbor node IDs (without weights)."
-  def neighbor_ids(graph, id)
-
-  @doc "Returns all node IDs in the graph."
+  def type(graph)
+  def node(graph, id)
   def all_nodes(graph)
-
-  @doc "Returns the number of nodes in the graph (graph order)."
   def order(graph)
-
-  @doc "Returns the number of nodes in the graph."
-  def node_count(graph)
-
-  @doc "Returns the number of edges in the graph."
   def edge_count(graph)
 
-  @doc "Returns the out-degree of a node (number of outgoing edges)."
+  # Optional with defaults
   def out_degree(graph, id)
-
-  @doc "Returns the in-degree of a node (number of incoming edges)."
   def in_degree(graph, id)
-
-  @doc "Returns the total degree of a node."
   def degree(graph, id)
-
-  @doc "Checks if the graph contains a node with the given ID."
+  def successor_ids(graph, id)
+  def predecessor_ids(graph, id)
+  def neighbors(graph, id)
+  def neighbor_ids(graph, id)
   def has_node?(graph, id)
-
-  @doc "Checks if the graph contains an edge between src and dst."
   def has_edge?(graph, src, dst)
-
-  @doc "Gets the data associated with a node."
-  def node(graph, id)
-
-  @doc "Returns all nodes in the graph as a map."
   def nodes(graph)
-
-  @doc "Gets the weight/data of an edge between two nodes."
-  def edge_data(graph, src, dst)
-
-  @doc "Returns all edges in the graph as triplets {from, to, weight}."
   def all_edges(graph)
-
-  @doc "Gets the type of the graph (:directed or :undirected)."
-  def type(graph)
+  def edge_data(graph, src, dst)
+  def node_count(graph)
 end
 
 defprotocol Yog.Modifiable do
@@ -76,7 +81,7 @@ defprotocol Yog.Modifiable do
   patterns (unweighted edges, batch operations, etc.) are provided by the
   main API modules (`Yog`, `Yog.Model`) and delegate to these core functions.
 
-  ## Core Operations
+  ## Core Operations (7 functions)
 
   - `add_node/3`, `remove_node/2` - Node lifecycle
   - `add_edge/4`, `add_edges/2`, `remove_edge/3` - Edge lifecycle
