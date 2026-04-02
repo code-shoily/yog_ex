@@ -310,7 +310,7 @@ defmodule Yog.Pathfinding do
           Yog.node_id() => %{Yog.node_id() => non_neg_integer()}
         }
   def all_pairs_shortest_paths_unweighted(graph) do
-    nodes = Yog.Model.all_nodes(graph)
+    nodes = Yog.Queryable.all_nodes(graph)
 
     # 1. Determine concurrency based on hardware
     # We use schedulers_online to ensure we hit every core without overloading
@@ -336,7 +336,7 @@ defmodule Yog.Pathfinding do
   # Standard BFS to find all distances from a single source: O(V + E)
   defp bfs_distances(graph, source) do
     # Handle edge case: isolated node (no edges at all)
-    case Yog.Model.successors(graph, source) do
+    case Yog.Queryable.successors(graph, source) do
       [] ->
         %{source => 0}
 
@@ -354,7 +354,7 @@ defmodule Yog.Pathfinding do
       {{:value, {curr, dist}}, rest_q} ->
         # Use Model.successors for proper encapsulation
         # Returns list of {neighbor, weight} tuples; we only need neighbor IDs for unweighted
-        neighbors = Yog.Model.successors(graph, curr) |> Enum.map(&elem(&1, 0))
+        neighbors = Yog.Queryable.successor_ids(graph, curr)
 
         {next_q, next_v} =
           Enum.reduce(neighbors, {rest_q, visited}, fn nb, {q_acc, v_acc} ->

@@ -33,9 +33,9 @@ defmodule Yog.Pathfinding.AStar do
       Yog.Pathfinding.AStar.a_star(graph, start, goal, 0, &(&1+&2), &Integer.compare/2, heuristic)
   """
 
-  alias Yog.Model
   alias Yog.Pathfinding.Path
   alias Yog.PriorityQueue, as: PQ
+  alias Yog.Queryable, as: Model
 
   @typedoc "Result type for shortest path queries"
   @type path_result :: {:ok, Path.t()} | :error

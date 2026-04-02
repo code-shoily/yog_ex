@@ -38,8 +38,8 @@ defmodule Yog.Pathfinding.BellmanFord do
       #=> {:shortest_path, {:path, [:a, :b, :c], 1}}
   """
 
-  alias Yog.Model
   alias Yog.Pathfinding.Path
+  alias Yog.Queryable, as: Model
 
   @typedoc "Result type for Bellman-Ford shortest path queries"
   @type result ::

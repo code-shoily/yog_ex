@@ -76,8 +76,8 @@ defmodule Yog.Pathfinding.Johnson do
   - [Wikipedia: Johnson's Algorithm](https://en.wikipedia.org/wiki/Johnson%27s_algorithm)
   """
 
-  alias Yog.Model
   alias Yog.Pathfinding.Dijkstra
+  alias Yog.Queryable, as: Model
   alias Yog.Transform
 
   @typedoc """

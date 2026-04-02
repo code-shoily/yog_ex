@@ -38,9 +38,9 @@ defmodule Yog.Pathfinding.Dijkstra do
       #=> %{:a => 0, :b => 4, :c => 5}
   """
 
-  alias Yog.Model
   alias Yog.Pathfinding.Path
   alias Yog.PriorityQueue, as: PQ
+  alias Yog.Queryable, as: Model
 
   @typedoc "Result type for shortest path queries"
   @type path_result :: {:ok, Path.t()} | :error
