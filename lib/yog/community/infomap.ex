@@ -66,7 +66,7 @@ defmodule Yog.Community.Infomap do
   """
 
   alias Yog.Community.Result
-  alias Yog.Model
+  alias Yog.Queryable, as: Model
 
   @typedoc "Options for Infomap algorithm"
   @type options :: %{

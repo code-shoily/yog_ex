@@ -53,7 +53,7 @@ defmodule Yog.Community.FluidCommunities do
   """
 
   alias Yog.Community.Result
-  alias Yog.Model
+  alias Yog.Queryable, as: Model
 
   @typedoc "Options for Fluid Communities algorithm"
   @type fluid_options :: %{
@@ -113,7 +113,7 @@ defmodule Yog.Community.FluidCommunities do
 
   def detect_with_options(graph, opts) when is_map(opts) do
     options = Map.merge(default_options(), opts)
-    all_nodes = Yog.all_nodes(graph)
+    all_nodes = Model.all_nodes(graph)
     k = min(options.target_communities, length(all_nodes))
 
     case k do

@@ -50,7 +50,8 @@ defmodule Yog.Community.Louvain do
   """
 
   alias Yog.Community.{Dendrogram, Metrics, Result}
-  alias Yog.Model
+  alias Yog.Modifiable, as: Mutator
+  alias Yog.Queryable, as: Model
 
   @typedoc "Options for the Louvain algorithm"
   @type louvain_options :: %{
@@ -111,7 +112,7 @@ defmodule Yog.Community.Louvain do
   def detect_with_stats(graph, opts) do
     options = Map.merge(default_options(), Map.new(opts))
 
-    nodes = Yog.all_nodes(graph)
+    nodes = Model.all_nodes(graph)
     total_weight = calculate_total_weight(graph)
 
     # Initialize: each node in its own community
@@ -144,7 +145,7 @@ defmodule Yog.Community.Louvain do
   def detect_hierarchical_with_options(graph, opts) do
     options = Map.merge(default_options(), Map.new(opts))
 
-    nodes = Yog.all_nodes(graph)
+    nodes = Model.all_nodes(graph)
     total_weight = calculate_total_weight(graph)
 
     initial_assignments = Map.new(Enum.with_index(nodes), fn {node, i} -> {node, i} end)
@@ -287,7 +288,7 @@ defmodule Yog.Community.Louvain do
   # Pre-calculate total edge weight from node to each neighbor community
   # Returns %{community_id => total_weight} in O(degree) time
   defp calculate_neighbor_weights_by_comm(graph, state, node) do
-    neighbors = Yog.Model.successors(graph, node)
+    neighbors = Model.successors(graph, node)
 
     Enum.reduce(neighbors, %{}, fn {neighbor_id, weight}, acc ->
       comm = Map.get(state.assignments, neighbor_id, neighbor_id)
@@ -355,12 +356,12 @@ defmodule Yog.Community.Louvain do
   end
 
   defp calculate_total_weight(graph) do
-    nodes = Yog.all_nodes(graph)
+    nodes = Model.all_nodes(graph)
 
     total =
       Enum.reduce(nodes, 0.0, fn node, acc ->
         weight_sum =
-          Yog.Model.successors(graph, node)
+          Model.successors(graph, node)
           |> Enum.reduce(0, fn {_, weight}, sum -> sum + weight end)
 
         acc + weight_sum
@@ -374,11 +375,11 @@ defmodule Yog.Community.Louvain do
   end
 
   defp calculate_node_weights(graph) do
-    nodes = Yog.all_nodes(graph)
+    nodes = Model.all_nodes(graph)
 
     Map.new(nodes, fn node ->
       weight_sum =
-        Yog.Model.successors(graph, node)
+        Model.successors(graph, node)
         |> Enum.reduce(0, fn {_, weight}, sum -> sum + weight end)
 
       {node, weight_sum * 1.0}
@@ -428,7 +429,7 @@ defmodule Yog.Community.Louvain do
     # Add super-nodes
     new_graph_with_nodes =
       Enum.reduce(communities, new_graph, fn {comm_id, _nodes}, g ->
-        Yog.add_node(g, comm_id, nil)
+        Mutator.add_node(g, comm_id, nil)
       end)
 
     # Aggregate edges
@@ -443,7 +444,7 @@ defmodule Yog.Community.Louvain do
   end
 
   defp aggregate_edges(original_graph, new_graph, assignments) do
-    nodes = Yog.all_nodes(original_graph)
+    nodes = Model.all_nodes(original_graph)
 
     # Step 1: Accumulate weights in a Map %{{u_comm, v_comm} => weight}
     # This avoids per-edge graph operations - uses O(1) Map operations instead
@@ -451,7 +452,7 @@ defmodule Yog.Community.Louvain do
       Enum.reduce(nodes, %{}, fn u, acc ->
         comm_u = Map.get(assignments, u, u)
 
-        Enum.reduce(Yog.Model.successors(original_graph, u), acc, fn {v, weight}, inner_acc ->
+        Enum.reduce(Model.successors(original_graph, u), acc, fn {v, weight}, inner_acc ->
           comm_v = Map.get(assignments, v, v)
 
           # For undirected graphs, use stable key {min, max} to avoid double-counting
@@ -469,7 +470,7 @@ defmodule Yog.Community.Louvain do
 
     # Step 2: Bulk add all accumulated edges to the new graph
     Enum.reduce(edge_weights, new_graph, fn {{u, v}, weight}, g ->
-      Yog.Model.add_edge_ensure(g, u, v, weight, default: nil)
+      Mutator.add_edge_ensure(g, u, v, weight, default: nil)
     end)
   end
 

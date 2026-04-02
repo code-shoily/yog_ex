@@ -50,8 +50,8 @@ defmodule Yog.Community.Walktrap do
 
   alias Yog.Community
   alias Yog.Community.{Dendrogram, Result}
-  alias Yog.Model
   alias Yog.PriorityQueue
+  alias Yog.Queryable, as: Model
 
   @typedoc "Options for Walktrap algorithm"
   @type walktrap_options :: %{
@@ -107,7 +107,7 @@ defmodule Yog.Community.Walktrap do
 
   def detect_with_options(graph, opts) when is_map(opts) do
     options = Map.merge(default_options(), opts)
-    nodes = Yog.all_nodes(graph)
+    nodes = Model.all_nodes(graph)
 
     case length(nodes) do
       0 ->
@@ -149,7 +149,7 @@ defmodule Yog.Community.Walktrap do
   """
   @spec detect_hierarchical(Yog.graph(), integer()) :: Dendrogram.t()
   def detect_hierarchical(graph, walk_length \\ 4) do
-    nodes = Yog.all_nodes(graph)
+    nodes = Model.all_nodes(graph)
 
     # 1. Compute transition probabilities P^t
     p_t = compute_pt(graph, nodes, walk_length)

@@ -62,7 +62,8 @@ defmodule Yog.Community.Leiden do
   """
 
   alias Yog.Community.{Dendrogram, Result}
-  alias Yog.Model
+  alias Yog.Modifiable, as: Mutator
+  alias Yog.Queryable, as: Model
 
   @typedoc "Options for the Leiden algorithm"
   @type leiden_options :: %{
@@ -131,7 +132,7 @@ defmodule Yog.Community.Leiden do
 
   def detect_with_options(graph, opts) when is_map(opts) do
     options = Map.merge(default_options(), opts)
-    nodes = Yog.all_nodes(graph)
+    nodes = Model.all_nodes(graph)
 
     case length(nodes) do
       0 ->
@@ -194,7 +195,7 @@ defmodule Yog.Community.Leiden do
 
   def detect_hierarchical_with_options(graph, opts) when is_map(opts) do
     options = Map.merge(default_options(), opts)
-    nodes = Yog.all_nodes(graph)
+    nodes = Model.all_nodes(graph)
     total_weight = calculate_total_weight(graph)
 
     initial_assignments = Map.new(Enum.with_index(nodes), fn {node, i} -> {node, i} end)
@@ -584,7 +585,7 @@ defmodule Yog.Community.Leiden do
   end
 
   defp calculate_total_weight(graph) do
-    nodes = Yog.all_nodes(graph)
+    nodes = Model.all_nodes(graph)
 
     total =
       Enum.reduce(nodes, 0.0, fn node, acc ->
@@ -603,7 +604,7 @@ defmodule Yog.Community.Leiden do
   end
 
   defp calculate_node_weights(graph) do
-    nodes = Yog.all_nodes(graph)
+    nodes = Model.all_nodes(graph)
 
     Map.new(nodes, fn node ->
       weight_sum =
@@ -657,7 +658,7 @@ defmodule Yog.Community.Leiden do
     # Add super-nodes
     new_graph_with_nodes =
       Enum.reduce(communities, new_graph, fn {comm_id, _nodes}, g ->
-        Yog.add_node(g, comm_id, nil)
+        Mutator.add_node(g, comm_id, nil)
       end)
 
     # Aggregate edges
@@ -672,7 +673,7 @@ defmodule Yog.Community.Leiden do
   end
 
   defp aggregate_edges(original_graph, new_graph, assignments) do
-    nodes = Yog.all_nodes(original_graph)
+    nodes = Model.all_nodes(original_graph)
 
     # Step 1: Accumulate weights in a Map %{{u_comm, v_comm} => weight}
     # This avoids O(degree) search for each edge - uses O(1) Map operations instead
@@ -698,7 +699,7 @@ defmodule Yog.Community.Leiden do
 
     # Step 2: Bulk add all accumulated edges to the new graph
     Enum.reduce(edge_weights, new_graph, fn {{u, v}, weight}, g ->
-      Model.add_edge_ensure(g, u, v, weight, default: nil)
+      Mutator.add_edge_ensure(g, u, v, weight, default: nil)
     end)
   end
 

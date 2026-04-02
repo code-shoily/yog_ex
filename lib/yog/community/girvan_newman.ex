@@ -51,8 +51,9 @@ defmodule Yog.Community.GirvanNewman do
   """
 
   alias Yog.Community.{Dendrogram, Result}
-  alias Yog.Model
+  alias Yog.Modifiable, as: Mutator
   alias Yog.PriorityQueue, as: PQ
+  alias Yog.Queryable, as: Model
 
   @typedoc "Options for Girvan-Newman algorithm"
   @type girvan_newman_options :: %{target_communities: integer() | nil}
@@ -81,7 +82,7 @@ defmodule Yog.Community.GirvanNewman do
   """
   @spec edge_betweenness(Yog.graph()) :: %{{Yog.node_id(), Yog.node_id()} => float()}
   def edge_betweenness(graph) do
-    nodes = Yog.all_nodes(graph)
+    nodes = Model.all_nodes(graph)
 
     edge_scores =
       Enum.reduce(nodes, %{}, fn s, acc ->
@@ -95,12 +96,10 @@ defmodule Yog.Community.GirvanNewman do
       end)
 
     # Scale for undirected graphs
-    case graph do
-      %Yog.Graph{kind: :undirected} ->
-        Map.new(edge_scores, fn {k, v} -> {k, v / 2.0} end)
-
-      _ ->
-        edge_scores
+    if Model.type(graph) == :undirected do
+      Map.new(edge_scores, fn {k, v} -> {k, v / 2.0} end)
+    else
+      edge_scores
     end
   end
 
@@ -322,7 +321,7 @@ defmodule Yog.Community.GirvanNewman do
         # Remove all edges with max betweenness
         new_graph =
           Enum.reduce(edges_to_remove, graph, fn {u, v}, g ->
-            Model.remove_edge(g, u, v)
+            Mutator.remove_edge(g, u, v)
           end)
 
         do_gn_split(new_graph, new_levels, current_num_comms)
@@ -331,16 +330,11 @@ defmodule Yog.Community.GirvanNewman do
   end
 
   defp count_edges(graph) do
-    nodes = Yog.all_nodes(graph)
-
-    Enum.reduce(nodes, 0, fn node, acc ->
-      successors = Model.successors(graph, node)
-      acc + length(successors)
-    end)
+    Model.edge_count(graph)
   end
 
   defp find_connected_components(graph) do
-    nodes = Yog.all_nodes(graph)
+    nodes = Model.all_nodes(graph)
 
     {_visited, assignments, _count} =
       Enum.reduce(nodes, {MapSet.new(), %{}, 0}, fn u, {visited, assignments, count} ->

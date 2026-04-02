@@ -9,7 +9,7 @@ defmodule Yog.Community.Metrics do
   """
 
   alias Yog.Community.Result
-  alias Yog.Model
+  alias Yog.Queryable, as: Model
 
   @doc """
   Calculates modularity for a given community partition.
@@ -116,7 +116,7 @@ defmodule Yog.Community.Metrics do
     # For each edge (u,v), count |N(u) ∩ N(v)|
     # Each triangle counted 3 times (once per edge), so divide by 3
 
-    nodes = Yog.all_nodes(graph)
+    nodes = Model.all_nodes(graph)
 
     # Pre-compute neighbor MapSets for O(1) intersection
     neighbor_sets =
@@ -172,7 +172,7 @@ defmodule Yog.Community.Metrics do
   """
   @spec triangles_per_node(Yog.graph()) :: %{Yog.node_id() => integer()}
   def triangles_per_node(graph) do
-    nodes = Yog.all_nodes(graph)
+    nodes = Model.all_nodes(graph)
 
     # Pre-compute ordered neighbor lists
     neighbor_sets =
@@ -272,7 +272,7 @@ defmodule Yog.Community.Metrics do
   """
   @spec average_clustering_coefficient(Yog.graph()) :: float()
   def average_clustering_coefficient(graph) do
-    nodes = Yog.all_nodes(graph)
+    nodes = Model.all_nodes(graph)
 
     if nodes == [] do
       0.0

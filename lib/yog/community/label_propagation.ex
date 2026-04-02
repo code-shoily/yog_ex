@@ -31,6 +31,7 @@ defmodule Yog.Community.LabelPropagation do
   """
 
   alias Yog.Community.Result
+  alias Yog.Queryable, as: Model
 
   @doc """
   Returns default options for LPA.
@@ -84,7 +85,7 @@ defmodule Yog.Community.LabelPropagation do
     max_iterations = Keyword.get(opts, :max_iterations, 100)
     seed = Keyword.get(opts, :seed, 0)
 
-    nodes = Yog.all_nodes(graph)
+    nodes = Model.all_nodes(graph)
 
     if nodes == [] do
       Result.new(%{})
@@ -153,7 +154,7 @@ defmodule Yog.Community.LabelPropagation do
   end
 
   defp get_neighbors(graph, node) do
-    Yog.Model.neighbor_ids(graph, node)
+    Model.neighbor_ids(graph, node)
   end
 
   # Single-pass frequency count with current label preference and randomized tie-break
