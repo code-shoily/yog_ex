@@ -39,6 +39,8 @@ end
 
 defimpl Yog.Modifiable, for: Yog.DAG.Graph do
   alias Yog.DAG.Model
+  alias Yog.Modifiable, as: Mutator
+  alias Yog.Queryable, as: QueryModel
 
   def add_node(dag, id, data), do: Model.add_node(dag, id, data)
   def remove_node(dag, id), do: Model.remove_node(dag, id)
@@ -80,10 +82,10 @@ defimpl Yog.Modifiable, for: Yog.DAG.Graph do
       existing_weight ->
         new_weight = with_combine.(existing_weight, weight)
 
-        new_graph =
+        {:ok, new_graph} =
           dag.graph
-          |> Yog.Model.remove_edge(src, dst)
-          |> Yog.Model.add_edge!(src, dst, new_weight)
+          |> Mutator.remove_edge(src, dst)
+          |> Mutator.add_edge(src, dst, new_weight)
 
         {:ok, %Yog.DAG.Graph{graph: new_graph}}
     end
@@ -100,8 +102,10 @@ end
 defimpl Inspect, for: Yog.DAG.Graph do
   import Inspect.Algebra
 
+  alias Yog.Queryable, as: QueryModel
+
   def inspect(%Yog.DAG.Graph{graph: graph}, _opts) do
-    node_count = Yog.Model.node_count(graph)
+    node_count = QueryModel.node_count(graph)
     edge_count = Yog.Graph.edge_count(graph)
 
     node_str = if node_count == 1, do: "node", else: "nodes"

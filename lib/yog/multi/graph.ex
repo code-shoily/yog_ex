@@ -33,14 +33,16 @@ defmodule Yog.Multi.Graph do
 
   @type edge_id :: non_neg_integer()
   @type edge_data :: {edge_id(), number()}
-  @type edge_key :: {Yog.Model.node_id(), Yog.Model.node_id()}
+  @type edge_key :: {Yog.node_id(), Yog.node_id()}
 
   @type t :: %__MODULE__{
           kind: :directed | :undirected,
-          nodes: %{Yog.Model.node_id() => term()},
+          nodes: %{Yog.node_id() => term()},
           edges: %{edge_key() => [edge_data()]},
           next_edge_id: non_neg_integer()
         }
+
+  alias Yog.Modifiable, as: Mutator
 
   @doc """
   Creates a new empty multigraph.
@@ -79,7 +81,7 @@ defmodule Yog.Multi.Graph do
       iex> Map.has_key?(multi.nodes, 1)
       true
   """
-  @spec add_node(t(), Yog.Model.node_id(), term()) :: t()
+  @spec add_node(t(), Yog.node_id(), term()) :: t()
   def add_node(%__MODULE__{nodes: nodes} = multi, node_id, data) do
     %{multi | nodes: Map.put(nodes, node_id, data)}
   end
@@ -102,7 +104,7 @@ defmodule Yog.Multi.Graph do
       iex> is_integer(edge_id)
       true
   """
-  @spec add_edge(t(), Yog.Model.node_id(), Yog.Model.node_id(), number()) ::
+  @spec add_edge(t(), Yog.node_id(), Yog.node_id(), number()) ::
           {:ok, t(), edge_id()} | {:error, term()}
   def add_edge(
         %__MODULE__{nodes: nodes, edges: edges, next_edge_id: next_id, kind: kind} = multi,
@@ -152,7 +154,7 @@ defmodule Yog.Multi.Graph do
       iex> Yog.Multi.Graph.edge_count(multi, 1, 2)
       0
   """
-  @spec remove_edge(t(), Yog.Model.node_id(), Yog.Model.node_id(), edge_id()) :: t()
+  @spec remove_edge(t(), Yog.node_id(), Yog.node_id(), edge_id()) :: t()
   def remove_edge(%__MODULE__{edges: edges, kind: kind} = multi, from, to, edge_id) do
     edge_key = {from, to}
 
@@ -194,7 +196,7 @@ defmodule Yog.Multi.Graph do
       iex> length(edges) >= 1
       true
   """
-  @spec get_edges(t(), Yog.Model.node_id(), Yog.Model.node_id()) :: [edge_data()]
+  @spec get_edges(t(), Yog.node_id(), Yog.node_id()) :: [edge_data()]
   def get_edges(%__MODULE__{edges: edges}, from, to) do
     Map.get(edges, {from, to}, [])
   end
@@ -212,7 +214,7 @@ defmodule Yog.Multi.Graph do
       iex> count >= 1
       true
   """
-  @spec edge_count(t(), Yog.Model.node_id(), Yog.Model.node_id()) :: non_neg_integer()
+  @spec edge_count(t(), Yog.node_id(), Yog.node_id()) :: non_neg_integer()
   def edge_count(multi, from, to) do
     multi
     |> get_edges(from, to)
@@ -262,7 +264,7 @@ defmodule Yog.Multi.Graph do
           if kind == :undirected and from > to do
             g
           else
-            case Yog.Model.add_edge(g, from, to, weight) do
+            case Mutator.add_edge(g, from, to, weight) do
               {:ok, new_g} -> new_g
               {:error, _} -> g
             end
@@ -312,7 +314,7 @@ defmodule Yog.Multi.Graph do
           |> Enum.map(fn {_id, weight} -> weight end)
           |> Enum.reduce(&combine_fn.(&1, &2))
 
-        case Yog.Model.add_edge(g, from, to, combined_weight) do
+        case Mutator.add_edge(g, from, to, combined_weight) do
           {:ok, new_g} -> new_g
           {:error, _} -> g
         end
@@ -367,19 +369,19 @@ defmodule Yog.Multi.Graph do
   @doc """
   Checks if the multigraph contains a node with the given ID.
   """
-  @spec has_node?(t(), Yog.Model.node_id()) :: boolean()
+  @spec has_node?(t(), Yog.node_id()) :: boolean()
   def has_node?(multi, id), do: Yog.Model.has_node?(multi, id)
 
   @doc """
   Checks if the multigraph contains an edge between `src` and `dst`.
   """
-  @spec has_edge?(t(), Yog.Model.node_id(), Yog.Model.node_id()) :: boolean()
+  @spec has_edge?(t(), Yog.node_id(), Yog.node_id()) :: boolean()
   def has_edge?(%__MODULE__{edges: edges}, src, dst), do: Map.has_key?(edges, {src, dst})
 
   @doc """
   Gets the data associated with a node.
   """
-  @spec node(t(), Yog.Model.node_id()) :: term() | nil
+  @spec node(t(), Yog.node_id()) :: term() | nil
   def node(multi, id), do: Yog.Model.node(multi, id)
 
   @doc """
@@ -391,13 +393,13 @@ defmodule Yog.Multi.Graph do
   @doc """
   Returns all node IDs in the multigraph.
   """
-  @spec all_nodes(t()) :: [Yog.Model.node_id()]
+  @spec all_nodes(t()) :: [Yog.node_id()]
   def all_nodes(multi), do: Yog.Model.all_nodes(multi)
 
   @doc """
   Returns all edges in the graph as triplets `{from, to, weight}`.
   """
-  @spec all_edges(t()) :: [{Yog.Model.node_id(), Yog.Model.node_id(), number()}]
+  @spec all_edges(t()) :: [{Yog.node_id(), Yog.node_id(), number()}]
   def all_edges(%__MODULE__{edges: edges, kind: kind}) do
     if kind == :directed do
       for {{from, to}, edge_list} <- edges,
@@ -416,7 +418,7 @@ defmodule Yog.Multi.Graph do
   @doc """
   Returns the out-degree of a node (total count of all parallel outgoing edges).
   """
-  @spec out_degree(t(), Yog.Model.node_id()) :: non_neg_integer()
+  @spec out_degree(t(), Yog.node_id()) :: non_neg_integer()
   def out_degree(%__MODULE__{edges: edges}, id) do
     Enum.reduce(edges, 0, fn {{from, _to}, edge_list}, acc ->
       if from == id, do: acc + length(edge_list), else: acc
@@ -426,7 +428,7 @@ defmodule Yog.Multi.Graph do
   @doc """
   Returns the in-degree of a node (total count of all parallel incoming edges).
   """
-  @spec in_degree(t(), Yog.Model.node_id()) :: non_neg_integer()
+  @spec in_degree(t(), Yog.node_id()) :: non_neg_integer()
   def in_degree(%__MODULE__{edges: edges}, id) do
     Enum.reduce(edges, 0, fn {{_from, to}, edge_list}, acc ->
       if to == id, do: acc + length(edge_list), else: acc
@@ -436,7 +438,7 @@ defmodule Yog.Multi.Graph do
   @doc """
   Returns the total degree of a node.
   """
-  @spec degree(t(), Yog.Model.node_id()) :: non_neg_integer()
+  @spec degree(t(), Yog.node_id()) :: non_neg_integer()
   def degree(multi, id) do
     case multi.kind do
       :directed -> out_degree(multi, id) + in_degree(multi, id)
@@ -447,7 +449,7 @@ defmodule Yog.Multi.Graph do
   @doc """
   Removes a node and all its connected parallel edges.
   """
-  @spec remove_node(t(), Yog.Model.node_id()) :: t()
+  @spec remove_node(t(), Yog.node_id()) :: t()
   def remove_node(%__MODULE__{nodes: nodes, edges: edges} = multi, id) do
     new_nodes = Map.delete(nodes, id)
 
@@ -464,7 +466,7 @@ defmodule Yog.Multi.Graph do
   @doc """
   Removes all parallel edges between `from` and `to`.
   """
-  @spec remove_edges_between(t(), Yog.Model.node_id(), Yog.Model.node_id()) :: t()
+  @spec remove_edges_between(t(), Yog.node_id(), Yog.node_id()) :: t()
   def remove_edges_between(%__MODULE__{edges: edges, kind: kind} = multi, from, to) do
     updated_edges = Map.delete(edges, {from, to})
 
@@ -568,9 +570,10 @@ defimpl Yog.Queryable, for: Yog.Multi.Graph do
 end
 
 defimpl Yog.Modifiable, for: Yog.Multi.Graph do
+  alias Yog.Modifiable, as: Mutator
   alias Yog.Multi.Graph
 
-  def add_node(graph, id, data), do: Yog.Model.add_node(graph, id, data)
+  def add_node(graph, id, data), do: Mutator.add_node(graph, id, data)
   def remove_node(graph, id), do: Graph.remove_node(graph, id)
 
   def add_edge(graph, src, dst, weight) do

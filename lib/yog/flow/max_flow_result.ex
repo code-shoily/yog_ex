@@ -29,16 +29,16 @@ defmodule Yog.Flow.MaxFlowResult do
 
   alias Yog.Queryable, as: Model
 
-  @type node_id :: Model.node_id()
+  @type node_id :: Yog.node_id()
 
   @enforce_keys [:max_flow, :residual_graph, :source, :sink]
   defstruct [:max_flow, :residual_graph, :source, :sink, algorithm: :unknown, metadata: %{}]
 
   @type t :: %__MODULE__{
           max_flow: number(),
-          residual_graph: Yog.graph(),
-          source: Yog.Model.node_id(),
-          sink: Yog.Model.node_id(),
+          residual_graph: Yog.Graph.t(),
+          source: Yog.node_id(),
+          sink: Yog.node_id(),
           algorithm: atom(),
           metadata: map()
         }
@@ -46,7 +46,7 @@ defmodule Yog.Flow.MaxFlowResult do
   @doc """
   Creates a new max flow result.
   """
-  @spec new(number(), Yog.graph(), node_id(), node_id()) :: t()
+  @spec new(number(), Yog.Graph.t(), node_id(), node_id()) :: t()
   def new(max_flow, residual_graph, source, sink) do
     %__MODULE__{
       max_flow: max_flow,
@@ -59,7 +59,7 @@ defmodule Yog.Flow.MaxFlowResult do
   @doc """
   Creates a new max flow result with algorithm name.
   """
-  @spec new(number(), Yog.graph(), Yog.Model.node_id(), Yog.Model.node_id(), atom()) :: t()
+  @spec new(number(), Yog.Graph.t(), Yog.node_id(), Yog.node_id(), atom()) :: t()
   def new(max_flow, residual_graph, source, sink, algorithm) do
     %__MODULE__{
       max_flow: max_flow,
@@ -73,7 +73,7 @@ defmodule Yog.Flow.MaxFlowResult do
   @doc """
   Get flow value on a specific edge in the residual graph.
   """
-  @spec residual_capacity(t(), Yog.Model.node_id(), Yog.Model.node_id()) :: number()
+  @spec residual_capacity(t(), Yog.node_id(), Yog.node_id()) :: number()
   def residual_capacity(%__MODULE__{residual_graph: graph}, src, dst) do
     successors = Model.successors(graph, src)
 

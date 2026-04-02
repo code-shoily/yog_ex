@@ -402,26 +402,11 @@ defmodule Yog.Render.DOT do
   # PRIVATE HELPERS
   # =============================================================================
 
-  defp extract_nodes(graph) do
-    case graph do
-      %{nodes: n} when is_map(n) -> n
-      _ -> %{}
-    end
-  end
+  defp extract_nodes(graph), do: graph.nodes
 
-  defp extract_edges(graph) do
-    case graph do
-      %{out_edges: e} when is_map(e) -> e
-      _ -> %{}
-    end
-  end
+  defp extract_edges(graph), do: graph.out_edges
 
-  defp extract_kind(graph) do
-    case graph do
-      %{kind: k} -> k
-      _ -> :directed
-    end
-  end
+  defp extract_kind(graph), do: graph.kind
 
   defp build_graph_attrs(options) do
     attrs =

@@ -33,7 +33,7 @@ defmodule Yog.Pathfinding.Path do
   defstruct [:nodes, :weight, algorithm: :unknown, metadata: %{}]
 
   @type t :: %__MODULE__{
-          nodes: [Yog.Model.node_id()],
+          nodes: [Yog.node_id()],
           weight: any(),
           algorithm: atom(),
           metadata: map()
@@ -50,7 +50,7 @@ defmodule Yog.Pathfinding.Path do
       iex> path.weight
       10
   """
-  @spec new([Yog.Model.node_id()], any()) :: t()
+  @spec new([Yog.node_id()], any()) :: t()
   def new(nodes, weight) when is_list(nodes) do
     %__MODULE__{
       nodes: nodes,
@@ -67,7 +67,7 @@ defmodule Yog.Pathfinding.Path do
       iex> path.algorithm
       :dijkstra
   """
-  @spec new([Yog.Model.node_id()], any(), atom()) :: t()
+  @spec new([Yog.node_id()], any(), atom()) :: t()
   def new(nodes, weight, algorithm)
       when is_list(nodes) and is_atom(algorithm) do
     %__MODULE__{
@@ -86,7 +86,7 @@ defmodule Yog.Pathfinding.Path do
       iex> path.metadata
       %{visited: 42}
   """
-  @spec new([Yog.Model.node_id()], any(), atom(), map()) :: t()
+  @spec new([Yog.node_id()], any(), atom(), map()) :: t()
   def new(nodes, weight, algorithm, metadata)
       when is_list(nodes) and is_atom(algorithm) and is_map(metadata) do
     %__MODULE__{
@@ -149,7 +149,7 @@ defmodule Yog.Pathfinding.Path do
       iex> Yog.Pathfinding.Path.start(path)
       nil
   """
-  @spec start(t()) :: Yog.Model.node_id() | nil
+  @spec start(t()) :: Yog.node_id() | nil
   def start(%__MODULE__{nodes: []}), do: nil
   def start(%__MODULE__{nodes: [first | _]}), do: first
 
@@ -167,7 +167,7 @@ defmodule Yog.Pathfinding.Path do
       iex> Yog.Pathfinding.Path.finish(path)
       nil
   """
-  @spec finish(t()) :: Yog.Model.node_id() | nil
+  @spec finish(t()) :: Yog.node_id() | nil
   def finish(%__MODULE__{nodes: []}), do: nil
   def finish(%__MODULE__{nodes: nodes}), do: List.last(nodes)
 
@@ -206,7 +206,7 @@ defmodule Yog.Pathfinding.Path do
       iex> Yog.Pathfinding.Path.contains?(path, 5)
       false
   """
-  @spec contains?(t(), Yog.Model.node_id()) :: boolean()
+  @spec contains?(t(), Yog.node_id()) :: boolean()
   def contains?(%__MODULE__{nodes: nodes}, node_id) do
     node_id in nodes
   end
@@ -226,7 +226,7 @@ defmodule Yog.Pathfinding.Path do
       iex> Yog.Pathfinding.Path.at(path, 5)
       nil
   """
-  @spec at(t(), non_neg_integer()) :: Yog.Model.node_id() | nil
+  @spec at(t(), non_neg_integer()) :: Yog.node_id() | nil
   def at(%__MODULE__{nodes: nodes}, index) when is_integer(index) and index >= 0 do
     Enum.at(nodes, index)
   end
@@ -253,7 +253,7 @@ defmodule Yog.Pathfinding.Path do
       [{1, 2, 10}, {2, 3, 5}]
 
   """
-  @spec hydrate_path(Yog.Model.graph(), [Yog.Model.node_id()]) :: list()
+  @spec hydrate_path(Yog.Graph.t(), [Yog.node_id()]) :: list()
   def hydrate_path(graph, node_ids) do
     node_ids
     |> Enum.chunk_every(2, 1, :discard)

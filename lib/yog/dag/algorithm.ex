@@ -9,6 +9,7 @@ defmodule Yog.DAG.Algorithm do
 
   alias Yog.DAG.Model
   alias Yog.Pathfinding.Utils, as: PathUtils
+  alias Yog.Queryable, as: QueryModel
 
   @doc """
   Returns a topological ordering of all nodes in the DAG.
@@ -96,7 +97,7 @@ defmodule Yog.DAG.Algorithm do
     {distances, predecessors} =
       Enum.reduce(sorted_nodes, {%{}, %{}}, fn node, {dist_acc, pred_acc} ->
         node_dist = Map.get(dist_acc, node, 0)
-        out_edges = Yog.Model.successors(graph, node) |> Map.new()
+        out_edges = QueryModel.successors(graph, node) |> Map.new()
 
         update_longest_distances(out_edges, node, node_dist, dist_acc, pred_acc)
       end)
@@ -185,7 +186,7 @@ defmodule Yog.DAG.Algorithm do
       if node_dist == nil do
         acc
       else
-        out_edges = Yog.Model.successors(graph, node) |> Map.new()
+        out_edges = QueryModel.successors(graph, node) |> Map.new()
         relax_edges(out_edges, node, node_dist, dist_acc, pred_acc)
       end
     end)

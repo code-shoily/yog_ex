@@ -6,6 +6,7 @@ defmodule Yog.DAG.Model do
   and guarantees acyclicity at the type level.
   """
 
+  alias Yog.Modifiable, as: Mutator
   alias Yog.Property.Cyclicity
 
   @typedoc """
@@ -22,7 +23,7 @@ defmodule Yog.DAG.Model do
   @doc """
   Creates a new, empty DAG.
   """
-  @spec new(Yog.Model.graph_type()) :: t()
+  @spec new(:directed | :undirected) :: t()
   def new(_type) do
     %Yog.DAG.Graph{graph: Yog.Graph.new(:directed)}
   end
@@ -70,7 +71,7 @@ defmodule Yog.DAG.Model do
   """
   @spec add_node(t(), Yog.node_id(), any()) :: t()
   def add_node(%Yog.DAG.Graph{graph: graph}, id, data) do
-    %Yog.DAG.Graph{graph: Yog.Model.add_node(graph, id, data)}
+    %Yog.DAG.Graph{graph: Mutator.add_node(graph, id, data)}
   end
 
   @doc """
@@ -84,7 +85,7 @@ defmodule Yog.DAG.Model do
   """
   @spec remove_node(t(), Yog.node_id()) :: t()
   def remove_node(%Yog.DAG.Graph{graph: graph}, id) do
-    %Yog.DAG.Graph{graph: Yog.Model.remove_node(graph, id)}
+    %Yog.DAG.Graph{graph: Mutator.remove_node(graph, id)}
   end
 
   @doc """
@@ -98,7 +99,7 @@ defmodule Yog.DAG.Model do
   """
   @spec remove_edge(t(), Yog.node_id(), Yog.node_id()) :: t()
   def remove_edge(%Yog.DAG.Graph{graph: graph}, from, to) do
-    %Yog.DAG.Graph{graph: Yog.Model.remove_edge(graph, from, to)}
+    %Yog.DAG.Graph{graph: Mutator.remove_edge(graph, from, to)}
   end
 
   @doc """
@@ -114,7 +115,7 @@ defmodule Yog.DAG.Model do
   @spec add_edge(t(), Yog.node_id(), Yog.node_id(), any()) ::
           {:ok, t()} | {:error, :cycle_detected | term()}
   def add_edge(%Yog.DAG.Graph{graph: graph}, from, to, weight) do
-    case Yog.Model.add_edge(graph, from, to, weight) do
+    case Mutator.add_edge(graph, from, to, weight) do
       {:ok, new_graph} ->
         if Cyclicity.acyclic?(new_graph) do
           {:ok, %Yog.DAG.Graph{graph: new_graph}}

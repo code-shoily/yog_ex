@@ -73,6 +73,7 @@ defmodule Yog.Render.ASCII do
   alias Yog.Builder.Grid
   alias Yog.Builder.GridGraph
   alias Yog.Builder.ToroidalGraph
+  alias Yog.Queryable, as: Model
 
   @typedoc "Grid type from Yog.Builder.Grid"
   @type grid :: GridGraph.t()
@@ -412,14 +413,9 @@ defmodule Yog.Render.ASCII do
   end
 
   # Checks if an edge exists from one node to another.
-  @spec has_edge?(Yog.graph(), Yog.node_id(), Yog.node_id()) :: boolean()
+  @spec has_edge?(Yog.Graph.t(), Yog.node_id(), Yog.node_id()) :: boolean()
   defp has_edge?(graph, from, to) do
-    case Yog.Model.successors(graph, from) do
-      [] ->
-        false
-
-      neighbors ->
-        Enum.any?(neighbors, fn {id, _weight} -> id == to end)
-    end
+    successors = Model.successors(graph, from)
+    Enum.any?(successors, fn {id, _weight} -> id == to end)
   end
 end

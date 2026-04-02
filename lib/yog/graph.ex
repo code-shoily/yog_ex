@@ -93,6 +93,20 @@ defmodule Yog.Graph do
   def node_count(%__MODULE__{} = graph) do
     map_size(graph.nodes)
   end
+
+  @doc """
+  Returns the out_edges map from the graph.
+
+  ## Example
+
+      iex> graph = Yog.directed() |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      iex> Yog.Graph.out_edges(graph)
+      %{1 => %{2 => 5}}
+  """
+  @spec out_edges(t()) :: %{node_id() => %{node_id() => number()}}
+  def out_edges(%__MODULE__{} = graph) do
+    graph.out_edges
+  end
 end
 
 defimpl Enumerable, for: Yog.Graph do
