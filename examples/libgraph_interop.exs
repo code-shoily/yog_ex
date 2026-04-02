@@ -4,6 +4,11 @@
 # This example demonstrates using YogEx's centrality algorithms on a 
 # libgraph Graph through the Queryable protocol.
 #
+# ## Key Point
+#
+# Only 7 functions are REQUIRED for full YogEx compatibility!
+# All other functions use defaults from Yog.Queryable.Defaults.
+#
 # ## Running this example
 #
 # Create a temporary Mix project and run the example:
@@ -69,8 +74,32 @@ if Protocol.consolidated?(Yog.Queryable) do
   System.halt(1)
 end
 
-# Define the protocol implementation for libgraph's Graph struct
+# =============================================================================
+# MINIMAL PROTOCOL IMPLEMENTATION
+# =============================================================================
+#
+# Only 7 functions are REQUIRED for full YogEx algorithm compatibility!
+# All other functions automatically use efficient defaults from 
+# Yog.Queryable.Defaults.
+#
+# Required (7):
+#   successors/2, predecessors/2, type/1, node/2, all_nodes/1, order/1, edge_count/1
+#
+# Optional overrides (for O(1) efficiency):
+#   out_degree/2, in_degree/2, degree/2
+#
+# Defaults available (see Yog.Queryable.Defaults):
+#   has_node?/2, has_edge?/3, edge_data/3, nodes/1, all_edges/1,
+#   successor_ids/2, predecessor_ids/2, neighbors/2, neighbor_ids/2, node_count/1
+# =============================================================================
+
 defimpl Yog.Queryable, for: Graph do
+  alias Yog.Queryable.Defaults
+
+  # === REQUIRED: 7 Core Functions ===
+  # These are the ONLY functions you must implement!
+
+  @doc "Get successors as [{id, weight}] - REQUIRED"
   def successors(graph, id) do
     graph
     |> Graph.out_neighbors(id)
@@ -80,6 +109,7 @@ defimpl Yog.Queryable, for: Graph do
     end)
   end
 
+  @doc "Get predecessors as [{id, weight}] - REQUIRED"
   def predecessors(graph, id) do
     graph
     |> Graph.in_neighbors(id)
@@ -89,97 +119,64 @@ defimpl Yog.Queryable, for: Graph do
     end)
   end
 
-  def neighbors(graph, id) do
-    # Combine successors and predecessors without duplicates
-    succs = successors(graph, id) |> Map.new()
-    preds = predecessors(graph, id) |> Map.new()
-
-    Map.merge(preds, succs)
-    |> Map.to_list()
-  end
-
-  def successor_ids(graph, id) do
-    Graph.out_neighbors(graph, id)
-  end
-
-  def predecessor_ids(graph, id) do
-    Graph.in_neighbors(graph, id)
-  end
-
-  def neighbor_ids(graph, id) do
-    succs = successor_ids(graph, id) |> MapSet.new()
-    preds = predecessor_ids(graph, id) |> MapSet.new()
-
-    MapSet.union(succs, preds)
-    |> MapSet.to_list()
-  end
-
-  def all_nodes(graph) do
-    Graph.vertices(graph)
-  end
-
-  def order(graph) do
-    Graph.num_vertices(graph)
-  end
-
-  def node_count(graph), do: order(graph)
-
-  def edge_count(graph) do
-    Graph.num_edges(graph)
-  end
-
-  def out_degree(graph, id) do
-    Graph.out_degree(graph, id)
-  end
-
-  def in_degree(graph, id) do
-    Graph.in_degree(graph, id)
-  end
-
-  def degree(graph, id) do
-    out_degree(graph, id) + in_degree(graph, id)
-  end
-
-  def has_node?(graph, id) do
-    Graph.has_vertex?(graph, id)
-  end
-
-  def has_edge?(graph, src, dst) do
-    Graph.edge(graph, src, dst) != nil
-  end
-
-  def node(graph, id) do
-    # libgraph doesn't store node data separately, return the ID itself
-    if has_node?(graph, id), do: id, else: nil
-  end
-
-  def nodes(graph) do
-    all_nodes(graph)
-    |> Map.new(fn id -> {id, id} end)
-  end
-
-  def edge_data(graph, src, dst) do
-    case Graph.edge(graph, src, dst) do
-      %Graph.Edge{v1: ^src, v2: ^dst, weight: weight} -> weight
-      _ -> nil
-    end
-  end
-
-  def all_edges(graph) do
-    graph
-    |> Graph.edges()
-    |> Enum.map(fn {src, dst, weight} -> {src, dst, weight} end)
-  end
-
+  @doc "Graph type - REQUIRED"
   def type(%Graph{type: type}), do: type
+
+  @doc "Number of nodes - REQUIRED"
+  def order(graph), do: Graph.num_vertices(graph)
+
+  @doc "Number of edges - REQUIRED"
+  def edge_count(graph), do: Graph.num_edges(graph)
+
+  @doc "All node IDs - REQUIRED"
+  def all_nodes(graph), do: Graph.vertices(graph)
+
+  @doc "Node data (nil if not found) - REQUIRED"
+  def node(graph, id) do
+    # libgraph doesn't store separate node data, return ID itself if exists
+    if Graph.has_vertex?(graph, id), do: id, else: nil
+  end
+
+  # === OVERRIDES: For O(1) Efficiency ===
+  # These override the O(degree) defaults with libgraph's O(1) lookups
+
+  @doc "Out-degree (O(1) via libgraph)"
+  def out_degree(graph, id), do: Graph.out_degree(graph, id)
+
+  @doc "In-degree (O(1) via libgraph)"
+  def in_degree(graph, id), do: Graph.in_degree(graph, id)
+
+  @doc "Total degree (O(1) via libgraph, handles undirected correctly)"
+  def degree(graph, id), do: Graph.degree(graph, id)
+
+  # === DEFAULTS: Use Yog.Queryable.Defaults ===
+  # These 11 functions work automatically via defaults!
+  # Uncomment any to override with optimized implementations.
+
+  defdelegate has_node?(graph, id), to: Defaults
+  defdelegate has_edge?(graph, src, dst), to: Defaults
+  defdelegate edge_data(graph, src, dst), to: Defaults
+  defdelegate nodes(graph), to: Defaults
+  defdelegate all_edges(graph), to: Defaults
+  defdelegate successor_ids(graph, id), to: Defaults
+  defdelegate predecessor_ids(graph, id), to: Defaults
+  defdelegate neighbors(graph, id), to: Defaults
+  defdelegate neighbor_ids(graph, id), to: Defaults
+  defdelegate node_count(graph), to: Defaults
 end
 
-# Main example code
+# =============================================================================
+# DEMO CODE
+# =============================================================================
+
 alias Yog.Centrality
 
 IO.puts("=" |> String.duplicate(60))
 IO.puts("Libgraph + YogEx Protocol Interoperability Demo")
 IO.puts("=" |> String.duplicate(60))
+IO.puts("")
+IO.puts("Protocol implementation: 7 required + 3 efficiency overrides")
+IO.puts("The other 11 functions use defaults from Yog.Queryable.Defaults")
 IO.puts("")
 
 # Create a libgraph graph (Zachary's Karate Club - a classic network)
@@ -299,10 +296,15 @@ IO.puts("")
 IO.puts("=" |> String.duplicate(60))
 IO.puts("Demo complete! 🎉")
 IO.puts("")
-IO.puts("Key takeaway: YogEx algorithms work on ANY graph type")
-IO.puts("that implements the Yog.Queryable protocol.")
+IO.puts("Implementation summary:")
+IO.puts("  • 7 required functions implemented")
+IO.puts("  • 3 efficiency overrides (out_degree, in_degree, degree)")
+IO.puts("  • 11 functions delegated to Yog.Queryable.Defaults")
 IO.puts("")
-IO.puts("The protocol implementation above enables:")
+IO.puts("Key takeaway: YogEx algorithms work on ANY graph type")
+IO.puts("that implements just 7 core functions of Yog.Queryable!")
+IO.puts("")
+IO.puts("This enables:")
 IO.puts("  • libgraph Graph → YogEx Centrality ✓")
 IO.puts("  • libgraph Graph → YogEx Pathfinding ✓")
 IO.puts("  • libgraph Graph → YogEx Community Detection ✓")

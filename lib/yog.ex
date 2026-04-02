@@ -161,7 +161,7 @@ defmodule Yog do
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
     weight = Keyword.fetch!(opts, :with)
-    Model.add_edge(graph, from, to, weight)
+    Yog.Modifiable.add_edge(graph, from, to, weight)
   end
 
   @doc """
@@ -175,7 +175,7 @@ defmodule Yog do
       [{2, 10}]
   """
   @spec add_edge(graph(), node_id(), node_id(), any()) :: {:ok, graph()} | {:error, String.t()}
-  def add_edge(graph, from, to, weight), do: Model.add_edge(graph, from, to, weight)
+  def add_edge(graph, from, to, weight), do: Yog.Modifiable.add_edge(graph, from, to, weight)
 
   @doc """
   Adds an edge to the graph, raising on error.
@@ -192,7 +192,7 @@ defmodule Yog do
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
     weight = Keyword.fetch!(opts, :with)
-    Model.add_edge!(graph, from, to, weight)
+    Yog.Modifiable.add_edge(graph, from, to, weight) |> elem(1)
   end
 
   @doc """
@@ -232,7 +232,7 @@ defmodule Yog do
     to = Keyword.fetch!(opts, :to)
     weight = Keyword.fetch!(opts, :with)
     default = Keyword.get(opts, :default)
-    Model.add_edge_ensure(graph, from, to, weight, default)
+    Yog.Modifiable.add_edge_ensure(graph, from, to, weight, default)
   end
 
   @doc """
@@ -245,7 +245,7 @@ defmodule Yog do
       [{2, 10}]
   """
   def add_edge_ensure(graph, from, to, weight, default \\ nil),
-    do: Model.add_edge_ensure(graph, from, to, weight, default)
+    do: Yog.Modifiable.add_edge_ensure(graph, from, to, weight, default)
 
   @doc """
   Adds an edge with a function to create default node data if nodes don't exist.
@@ -266,8 +266,21 @@ defmodule Yog do
       [{2, 10}]
   """
   @spec add_edge_with(graph(), node_id(), node_id(), any(), (node_id() -> any())) :: graph()
-  def add_edge_with(graph, from, to, weight, default_fn),
-    do: Model.add_edge_with(graph, from, to, weight, default_fn)
+  def add_edge_with(graph, from, to, weight, default_fn) do
+    graph
+    |> ensure_node_with(from, default_fn)
+    |> ensure_node_with(to, default_fn)
+    |> Yog.Modifiable.add_edge(from, to, weight)
+    |> elem(1)
+  end
+
+  defp ensure_node_with(graph, id, make_fn) do
+    if Yog.Queryable.has_node?(graph, id) do
+      graph
+    else
+      Yog.Modifiable.add_node(graph, id, make_fn.(id))
+    end
+  end
 
   @doc """
   Adds an unweighted edge to the graph.
@@ -291,7 +304,7 @@ defmodule Yog do
   def add_unweighted_edge(graph, opts) when is_list(opts) do
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
-    Model.add_edge(graph, from, to, nil)
+    Yog.Modifiable.add_edge(graph, from, to, nil)
   end
 
   @doc """
@@ -310,7 +323,7 @@ defmodule Yog do
   @spec add_unweighted_edge(graph(), node_id(), node_id()) ::
           {:ok, graph()} | {:error, String.t()}
   def add_unweighted_edge(graph, from, to) do
-    Model.add_edge(graph, from, to, nil)
+    Yog.Modifiable.add_edge(graph, from, to, nil)
   end
 
   @doc """
@@ -329,11 +342,11 @@ defmodule Yog do
   def add_unweighted_edge!(graph, opts) when is_list(opts) do
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
-    Model.add_edge!(graph, from, to, nil)
+    Yog.Modifiable.add_edge(graph, from, to, nil) |> elem(1)
   end
 
   def add_unweighted_edge!(graph, from, to) do
-    Model.add_edge!(graph, from, to, nil)
+    Yog.Modifiable.add_edge(graph, from, to, nil) |> elem(1)
   end
 
   @doc """
@@ -358,7 +371,7 @@ defmodule Yog do
   def add_simple_edge(graph, opts) when is_list(opts) do
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
-    Model.add_edge(graph, from, to, 1)
+    Yog.Modifiable.add_edge(graph, from, to, 1)
   end
 
   @doc """
@@ -376,7 +389,7 @@ defmodule Yog do
   """
   @spec add_simple_edge(graph(), node_id(), node_id()) :: {:ok, graph()} | {:error, String.t()}
   def add_simple_edge(graph, from, to) do
-    Model.add_edge(graph, from, to, 1)
+    Yog.Modifiable.add_edge(graph, from, to, 1)
   end
 
   @doc """
@@ -395,11 +408,11 @@ defmodule Yog do
   def add_simple_edge!(graph, opts) when is_list(opts) do
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
-    Model.add_edge!(graph, from, to, 1)
+    Yog.Modifiable.add_edge(graph, from, to, 1) |> elem(1)
   end
 
   def add_simple_edge!(graph, from, to) do
-    Model.add_edge!(graph, from, to, 1)
+    Yog.Modifiable.add_edge(graph, from, to, 1) |> elem(1)
   end
 
   @doc """
@@ -461,7 +474,8 @@ defmodule Yog do
   @spec add_simple_edges(graph(), [{node_id(), node_id()}]) ::
           {:ok, graph()} | {:error, String.t()}
   def add_simple_edges(graph, edges) do
-    Model.add_simple_edges(graph, edges)
+    edges = Enum.map(edges, fn {u, v} -> {u, v, 1} end)
+    Yog.Modifiable.add_edges(graph, edges)
   end
 
   @doc """
@@ -484,7 +498,8 @@ defmodule Yog do
   @spec add_unweighted_edges(graph(), [{node_id(), node_id()}]) ::
           {:ok, graph()} | {:error, String.t()}
   def add_unweighted_edges(graph, edges) do
-    Model.add_unweighted_edges(graph, edges)
+    edges = Enum.map(edges, fn {u, v} -> {u, v, nil} end)
+    Yog.Modifiable.add_edges(graph, edges)
   end
 
   # ============= Query =============
@@ -540,7 +555,7 @@ defmodule Yog do
       [2, 3]
   """
   @spec successor_ids(graph(), node_id()) :: [node_id()]
-  defdelegate successor_ids(graph, id), to: Model
+  def successor_ids(graph, id), do: Yog.Queryable.successor_ids(graph, id)
 
   @doc """
   Returns all neighbor node IDs (without weights).
@@ -948,7 +963,7 @@ defmodule Yog do
   @spec from_edges(:directed | :undirected, [{node_id(), node_id(), any()}]) :: graph()
   def from_edges(type, edges) do
     Enum.reduce(edges, new(type), fn {src, dst, weight}, g ->
-      Model.add_edge_ensure(g, src, dst, weight, nil)
+      Yog.Modifiable.add_edge_ensure(g, src, dst, weight, nil)
     end)
   end
 
@@ -965,7 +980,7 @@ defmodule Yog do
   @spec from_unweighted_edges(:directed | :undirected, [{node_id(), node_id()}]) :: graph()
   def from_unweighted_edges(type, edges) do
     Enum.reduce(edges, new(type), fn {src, dst}, g ->
-      Model.add_edge_ensure(g, src, dst, nil, nil)
+      Yog.Modifiable.add_edge_ensure(g, src, dst, nil, nil)
     end)
   end
 

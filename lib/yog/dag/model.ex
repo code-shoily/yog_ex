@@ -142,33 +142,13 @@ defmodule Yog.DAG.Model do
   end
 
   @doc """
-  Adds multiple simple edges (weight = 1).
-  """
-  @spec add_simple_edges(t(), [{Yog.node_id(), Yog.node_id()}]) :: {:ok, t()} | {:error, term()}
-  def add_simple_edges(dag, edges) do
-    triplets = Enum.map(edges, fn {src, dst} -> {src, dst, 1} end)
-    add_edges(dag, triplets)
-  end
-
-  @doc """
-  Adds multiple unweighted edges (weight = nil).
-  """
-  @spec add_unweighted_edges(t(), [{Yog.node_id(), Yog.node_id()}]) ::
-          {:ok, t()} | {:error, term()}
-  def add_unweighted_edges(dag, edges) do
-    triplets = Enum.map(edges, fn {src, dst} -> {src, dst, nil} end)
-    add_edges(dag, triplets)
-  end
-
-  @doc """
   Ensures nodes exist then adds an edge.
   Returns updated DAG or raises if a cycle is created.
-  (Protocol Modifiable says "never fails", but DAG must maintain invariant)
+  (Protocol Modifiable says "returns graph", but DAG must maintain invariant)
   """
-  def add_edge_ensure(dag, from, to, weight, default) do
-    new_graph =
-      dag.graph
-      |> Yog.Model.add_edge_ensure(from, to, weight, default)
+  @spec add_edge_ensure(t(), Yog.node_id(), Yog.node_id(), any(), any()) :: t()
+  def add_edge_ensure(%Yog.DAG.Graph{graph: graph}, from, to, weight, default) do
+    new_graph = Mutator.add_edge_ensure(graph, from, to, weight, default)
 
     if Cyclicity.acyclic?(new_graph) do
       %Yog.DAG.Graph{graph: new_graph}
@@ -178,28 +158,22 @@ defmodule Yog.DAG.Model do
   end
 
   @doc """
-  Ensures nodes exist using keyword options.
+  Adds an edge, combining weights if edge already exists.
+  Returns {:ok, dag} or raises if a cycle is created.
   """
-  def add_edge_ensure(dag, opts) when is_list(opts) do
-    from = Keyword.fetch!(opts, :from)
-    to = Keyword.fetch!(opts, :to)
-    weight = Keyword.fetch!(opts, :with)
-    default = Keyword.get(opts, :default)
-    add_edge_ensure(dag, from, to, weight, default)
-  end
+  @spec add_edge_with_combine(t(), Yog.node_id(), Yog.node_id(), any(), (any(), any() -> any())) ::
+          {:ok, t()} | {:error, term()}
+  def add_edge_with_combine(%Yog.DAG.Graph{graph: graph}, from, to, weight, combine_fn) do
+    case Mutator.add_edge_with_combine(graph, from, to, weight, combine_fn) do
+      {:ok, new_graph} ->
+        if Cyclicity.acyclic?(new_graph) do
+          {:ok, %Yog.DAG.Graph{graph: new_graph}}
+        else
+          {:error, :cycle_detected}
+        end
 
-  @doc """
-  Ensures nodes exist with data generator then adds an edge.
-  """
-  def add_edge_with(dag, from, to, weight, make_fn) do
-    new_graph =
-      dag.graph
-      |> Yog.Model.add_edge_with(from, to, weight, make_fn)
-
-    if Cyclicity.acyclic?(new_graph) do
-      %Yog.DAG.Graph{graph: new_graph}
-    else
-      raise "Adding edge {#{from}, #{to}} would create a cycle in DAG"
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 end

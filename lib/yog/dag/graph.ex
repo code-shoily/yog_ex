@@ -39,7 +39,6 @@ end
 
 defimpl Yog.Modifiable, for: Yog.DAG.Graph do
   alias Yog.DAG.Model
-  alias Yog.Modifiable, as: Mutator
 
   def add_node(dag, id, data), do: Model.add_node(dag, id, data)
   def remove_node(dag, id), do: Model.remove_node(dag, id)
@@ -50,22 +49,8 @@ defimpl Yog.Modifiable, for: Yog.DAG.Graph do
   def add_edge_ensure(dag, src, dst, weight, default_data),
     do: Model.add_edge_ensure(dag, src, dst, weight, default_data)
 
-  def add_edge_with_combine(dag, src, dst, weight, with_combine) do
-    case Yog.Queryable.edge_data(dag.graph, src, dst) do
-      nil ->
-        add_edge(dag, src, dst, weight)
-
-      existing_weight ->
-        new_weight = with_combine.(existing_weight, weight)
-
-        {:ok, new_graph} =
-          dag.graph
-          |> Mutator.remove_edge(src, dst)
-          |> Mutator.add_edge(src, dst, new_weight)
-
-        {:ok, %Yog.DAG.Graph{graph: new_graph}}
-    end
-  end
+  def add_edge_with_combine(dag, src, dst, weight, with_combine),
+    do: Model.add_edge_with_combine(dag, src, dst, weight, with_combine)
 end
 
 defimpl Enumerable, for: Yog.DAG.Graph do
@@ -75,6 +60,34 @@ defimpl Enumerable, for: Yog.DAG.Graph do
   def slice(%Yog.DAG.Graph{graph: graph}), do: Enumerable.slice(graph)
 end
 
+defimpl Yog.Transformable, for: Yog.DAG.Graph do
+  alias Yog.DAG.Model
+
+  def empty(%Yog.DAG.Graph{graph: graph}) do
+    %Yog.DAG.Graph{graph: Yog.Transformable.empty(graph)}
+  end
+
+  def empty(%Yog.DAG.Graph{graph: graph}, kind) do
+    %Yog.DAG.Graph{graph: Yog.Transformable.empty(graph, kind)}
+  end
+
+  @doc """
+  Transpose reverses all edges. For a DAG, this maintains acyclicity
+  (the transpose of a DAG is still a DAG, just with reversed edges).
+  """
+  def transpose(%Yog.DAG.Graph{graph: graph}) do
+    %Yog.DAG.Graph{graph: Yog.Transformable.transpose(graph)}
+  end
+
+  def map_nodes(%Yog.DAG.Graph{graph: graph}, fun) do
+    %Yog.DAG.Graph{graph: Yog.Transformable.map_nodes(graph, fun)}
+  end
+
+  def map_edges(%Yog.DAG.Graph{graph: graph}, fun) do
+    %Yog.DAG.Graph{graph: Yog.Transformable.map_edges(graph, fun)}
+  end
+end
+
 defimpl Inspect, for: Yog.DAG.Graph do
   import Inspect.Algebra
 
@@ -82,7 +95,7 @@ defimpl Inspect, for: Yog.DAG.Graph do
 
   def inspect(%Yog.DAG.Graph{graph: graph}, _opts) do
     node_count = QueryModel.node_count(graph)
-    edge_count = Yog.Graph.edge_count(graph)
+    edge_count = QueryModel.edge_count(graph)
 
     node_str = if node_count == 1, do: "node", else: "nodes"
     edge_str = if edge_count == 1, do: "edge", else: "edges"

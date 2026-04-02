@@ -101,10 +101,14 @@ end
 
 ## Example 1: libgraph Integration
 
-[libgraph](https://github.com/bitwalker/libgraph) is a popular Elixir graph library. Here's how to integrate it:
+[libgraph](https://github.com/bitwalker/libgraph) is a popular Elixir graph library. Here's a minimal integration using only 7 required functions + 2 efficiency overrides:
 
 ```elixir
 defimpl Yog.Queryable, for: Graph do
+  alias Yog.Queryable.Defaults
+
+  # === Required: 7 core functions ===
+  
   def successors(graph, id) do
     graph
     |> Graph.out_neighbors(id)
@@ -125,33 +129,32 @@ defimpl Yog.Queryable, for: Graph do
 
   def type(%Graph{type: type}), do: type
   def order(graph), do: Graph.num_vertices(graph)
-  def node_count(graph), do: Graph.num_vertices(graph)
   def edge_count(graph), do: Graph.num_edges(graph)
-  def has_node?(graph, id), do: Graph.has_vertex?(graph, id)
-  
-  def has_edge?(graph, src, dst) do
-    Graph.edge(graph, src, dst) != nil
-  end
+  def all_nodes(graph), do: Graph.vertices(graph)
   
   def node(graph, id) do
-    if has_node?(graph, id), do: id, else: nil
+    # libgraph doesn't store separate node data, return ID itself
+    if Graph.has_vertex?(graph, id), do: id, else: nil
   end
+
+  # === Overrides for O(1) efficiency ===
   
-  def all_nodes(graph), do: Graph.vertices(graph)
   def out_degree(graph, id), do: Graph.out_degree(graph, id)
   def in_degree(graph, id), do: Graph.in_degree(graph, id)
   def degree(graph, id), do: Graph.degree(graph, id)
+
+  # === Use defaults for the rest ===
   
-  def edge_data(graph, src, dst) do
-    case Graph.edge(graph, src, dst) do
-      %Graph.Edge{v1: ^src, v2: ^dst, weight: weight} -> weight
-      _ -> nil
-    end
-  end
-  
-  def all_edges(graph) do
-    Graph.edges(graph)
-  end
+  defdelegate has_node?(graph, id), to: Defaults
+  defdelegate has_edge?(graph, src, dst), to: Defaults
+  defdelegate edge_data(graph, src, dst), to: Defaults
+  defdelegate nodes(graph), to: Defaults
+  defdelegate all_edges(graph), to: Defaults
+  defdelegate successor_ids(graph, id), to: Defaults
+  defdelegate predecessor_ids(graph, id), to: Defaults
+  defdelegate neighbors(graph, id), to: Defaults
+  defdelegate neighbor_ids(graph, id), to: Defaults
+  defdelegate node_count(graph), to: Defaults
 end
 ```
 
@@ -182,6 +185,8 @@ Erlang's `:digraph` module provides a built-in graph data structure:
 
 ```elixir
 defimpl Yog.Queryable, for: Reference do
+  alias Yog.Queryable.Defaults
+
   # Check if reference is a digraph
   defp digraph?(ref) do
     try do
@@ -192,103 +197,78 @@ defimpl Yog.Queryable, for: Reference do
     end
   end
 
+  # === Required: 7 core functions ===
+  
   def successors(ref, id) do
-    case digraph?(ref) do
-      false -> []
-      true ->
-        ref
-        |> :digraph.out_edges(id)
-        |> Enum.map(fn edge ->
-          {_, ^id, to, weight} = :digraph.edge(ref, edge)
-          {to, weight}
-        end)
+    with true <- digraph?(ref),
+         edges <- :digraph.out_edges(ref, id) do
+      Enum.map(edges, fn edge ->
+        {_, ^id, to, weight} = :digraph.edge(ref, edge)
+        {to, weight}
+      end)
+    else
+      _ -> []
     end
   end
 
   def predecessors(ref, id) do
-    case digraph?(ref) do
-      false -> []
-      true ->
-        ref
-        |> :digraph.in_edges(id)
-        |> Enum.map(fn edge ->
-          {_, from, ^id, weight} = :digraph.edge(ref, edge)
-          {from, weight}
-        end)
+    with true <- digraph?(ref),
+         edges <- :digraph.in_edges(ref, id) do
+      Enum.map(edges, fn edge ->
+        {_, from, ^id, weight} = :digraph.edge(ref, edge)
+        {from, weight}
+      end)
+    else
+      _ -> []
     end
   end
 
-  def type(ref) do
-    with true <- digraph?(ref),
-         info <- :digraph.info(ref),
-         true <- Keyword.get(info, :cyclicity) == :acyclic do
-      :directed
-    else
-      _ -> :directed  # Default for digraph
-    end
-  end
+  def type(_ref), do: :directed  # :digraph is always directed
 
   def order(ref) do
-    case digraph?(ref) do
-      false -> 0
-      true -> length(:digraph.vertices(ref))
-    end
+    if digraph?(ref), do: length(:digraph.vertices(ref)), else: 0
   end
 
-  def has_node?(ref, id) do
-    case digraph?(ref) do
-      false -> false
-      true -> :digraph.vertex(ref, id) != false
-    end
-  end
-
-  def node(ref, id) do
-    case digraph?(ref) do
-      false -> nil
-      true -> 
-        case :digraph.vertex(ref, id) do
-          {^id, label} -> label
-          false -> nil
-        end
-    end
+  def edge_count(ref) do
+    if digraph?(ref), do: length(:digraph.edges(ref)), else: 0
   end
 
   def all_nodes(ref) do
-    case digraph?(ref) do
-      false -> []
-      true -> :digraph.vertices(ref)
+    if digraph?(ref), do: :digraph.vertices(ref), else: []
+  end
+
+  def node(ref, id) do
+    with true <- digraph?(ref),
+         {^id, label} <- :digraph.vertex(ref, id) do
+      label
+    else
+      _ -> nil
     end
   end
 
+  # === Overrides for O(1) efficiency ===
+  
   def out_degree(ref, id) do
-    case digraph?(ref) do
-      false -> 0
-      true -> :digraph.out_degree(ref, id)
-    end
+    if digraph?(ref), do: :digraph.out_degree(ref, id), else: 0
   end
 
   def in_degree(ref, id) do
-    case digraph?(ref) do
-      false -> 0
-      true -> :digraph.in_degree(ref, id)
-    end
+    if digraph?(ref), do: :digraph.in_degree(ref, id), else: 0
   end
 
-  def edge_data(ref, src, dst) do
-    case digraph?(ref) do
-      false -> nil
-      true ->
-        ref
-        |> :digraph.edges(src, dst)
-        |> List.first()
-        |> case do
-          nil -> nil
-          edge ->
-            {_, _, _, weight} = :digraph.edge(ref, edge)
-            weight
-        end
-    end
-  end
+  # === Use defaults for the rest ===
+  
+  defdelegate has_node?(ref, id), to: Defaults
+  defdelegate has_edge?(ref, src, dst), to: Defaults
+  defdelegate edge_data(ref, src, dst), to: Defaults
+  defdelegate nodes(ref), to: Defaults
+  defdelegate all_edges(ref), to: Defaults
+  defdelegate degree(ref, id), to: Defaults
+  defdelegate successor_ids(ref, id), to: Defaults
+  defdelegate predecessor_ids(ref, id), to: Defaults
+  defdelegate neighbors(ref, id), to: Defaults
+  defdelegate neighbor_ids(ref, id), to: Defaults
+  defdelegate node_count(ref), to: Defaults
 end
 ```
 
@@ -318,25 +298,28 @@ defprotocol Yog.Modifiable do
   @spec add_node(t, node_id, term) :: t
   def add_node(graph, id, data)
 
+  @spec remove_node(t, node_id) :: t
+  def remove_node(graph, id)
+
   @spec add_edge(t, node_id, node_id, weight) :: {:ok, t} | {:error, term}
   def add_edge(graph, src, dst, weight)
 
-  @spec add_edge!(t, node_id, node_id, weight) :: t
-  def add_edge!(graph, src, dst, weight)
-
-  @spec remove_node(t, node_id) :: t
-  def remove_node(graph, id)
+  @spec add_edges(t, [{node_id, node_id, weight}]) :: {:ok, t} | {:error, term}
+  def add_edges(graph, edges)
 
   @spec remove_edge(t, node_id, node_id) :: t
   def remove_edge(graph, src, dst)
 
-  @spec clear(t) :: t
-  def clear(graph)
+  @spec add_edge_ensure(t, node_id, node_id, weight, default_data) :: t
+  def add_edge_ensure(graph, src, dst, weight, default_data)
 
-  @spec update_node(t, node_id, (term -> term)) :: t
-  def update_node(graph, id, updater)
+  @spec add_edge_with_combine(t, node_id, node_id, weight, (weight, weight -> weight)) :: {:ok, t} | {:error, term}
+  def add_edge_with_combine(graph, src, dst, weight, with_combine)
 end
 ```
+
+**Note**: Convenience functions like `add_simple_edges/2` (weight=1), `add_unweighted_edge/2` (weight=nil), 
+`add_edge_ensure/2` (keyword opts), etc. are provided by the `Yog` and `Yog.Model` API modules, not the protocol.
 
 ## The Transformable Protocol
 
@@ -344,17 +327,20 @@ For structural operations:
 
 ```elixir
 defprotocol Yog.Transformable do
-  @spec reverse(t) :: t
-  def reverse(graph)
+  @spec empty(t) :: t
+  def empty(graph)
+
+  @spec empty(t, :directed | :undirected) :: t
+  def empty(graph, kind)
 
   @spec transpose(t) :: t
   def transpose(graph)
 
-  @spec subgraph(t, [node_id]) :: t
-  def subgraph(graph, nodes)
+  @spec map_nodes(t, (term -> term)) :: t
+  def map_nodes(graph, fun)
 
-  @spec contract(t, node_id, node_id) :: t
-  def contract(graph, u, v)
+  @spec map_edges(t, (weight -> weight)) :: t
+  def map_edges(graph, fun)
 end
 ```
 
@@ -422,7 +408,7 @@ end
 
 ## Complete Example: Adjacency List
 
-Here's a minimal implementation for a custom adjacency list:
+Here's a minimal implementation for a custom adjacency list using **only 7 functions**:
 
 ```elixir
 defmodule MyApp.AdjacencyList do
@@ -435,57 +421,89 @@ defmodule MyApp.AdjacencyList do
   def add_edge(%__MODULE__{nodes: nodes} = g, src, dst, weight \\ 1.0) do
     neighbors = Map.get(nodes, src, [])
     new_nodes = Map.put(nodes, src, [{dst, weight} | neighbors])
-    %__MODULE__{g | nodes: new_nodes}
+    %{g | nodes: new_nodes}
   end
 end
 
 defimpl Yog.Queryable, for: MyApp.AdjacencyList do
-  alias MyApp.AdjacencyList
+  alias Yog.Queryable.Defaults
 
-  def successors(%AdjacencyList{nodes: nodes}, id) do
+  # === Required: Only 7 functions! ===
+
+  def successors(%MyApp.AdjacencyList{nodes: nodes}, id) do
     Map.get(nodes, id, [])
   end
 
-  def predecessors(%AdjacencyList{nodes: nodes}, id) do
+  def predecessors(%MyApp.AdjacencyList{nodes: nodes}, id) do
     nodes
     |> Enum.flat_map(fn {src, edges} ->
-      Enum.filter(edges, fn {dst, _} -> dst == id end)
+      edges
+      |> Enum.filter(fn {dst, _} -> dst == id end)
       |> Enum.map(fn {_, w} -> {src, w} end)
     end)
   end
 
-  def type(%AdjacencyList{type: type}), do: type
-  def order(%AdjacencyList{nodes: nodes}), do: map_size(nodes)
-  def has_node?(%AdjacencyList{nodes: nodes}, id), do: Map.has_key?(nodes, id)
+  def type(%MyApp.AdjacencyList{type: type}), do: type
+  def order(%MyApp.AdjacencyList{nodes: nodes}), do: map_size(nodes)
+  def edge_count(%MyApp.AdjacencyList{nodes: nodes}) do
+    nodes |> Map.values() |> Enum.map(&length/1) |> Enum.sum()
+  end
+  def all_nodes(%MyApp.AdjacencyList{nodes: nodes}), do: Map.keys(nodes)
   def node(graph, id), do: if(has_node?(graph, id), do: id, else: nil)
-  def all_nodes(%AdjacencyList{nodes: nodes}), do: Map.keys(nodes)
+
+  # === Use defaults for everything else ===
   
-  def out_degree(graph, id) do
-    length(successors(graph, id))
-  end
-  
-  def in_degree(graph, id) do
-    length(predecessors(graph, id))
-  end
-  
-  def edge_data(graph, src, dst) do
-    graph
-    |> successors(src)
-    |> Enum.find_value(fn {d, w} -> if d == dst, do: w end)
-  end
+  defdelegate has_node?(graph, id), to: Defaults
+  defdelegate has_edge?(graph, src, dst), to: Defaults
+  defdelegate out_degree(graph, id), to: Defaults
+  defdelegate in_degree(graph, id), to: Defaults
+  defdelegate degree(graph, id), to: Defaults
+  defdelegate edge_data(graph, src, dst), to: Defaults
+  defdelegate nodes(graph), to: Defaults
+  defdelegate all_edges(graph), to: Defaults
+  defdelegate successor_ids(graph, id), to: Defaults
+  defdelegate predecessor_ids(graph, id), to: Defaults
+  defdelegate neighbors(graph, id), to: Defaults
+  defdelegate neighbor_ids(graph, id), to: Defaults
+  defdelegate node_count(graph), to: Defaults
 end
 ```
 
+That's it! With just 7 functions implemented, you get:
+- Full YogEx algorithm compatibility (centrality, pathfinding, community detection)
+- All derived functions (degrees, edge checks, neighbor lists) work automatically
+- Zero boilerplate for common operations
+
 ## Summary
 
-| To use YogEx with... | Implement... |
-|---------------------|--------------|
-| Read-only algorithms | `Yog.Queryable` |
-| Graph building | `Yog.Queryable` + `Yog.Modifiable` |
-| Full transformation support | All three protocols |
+| To use YogEx with... | Implement... | Minimum Functions |
+|---------------------|--------------|-------------------|
+| Read-only algorithms | `Yog.Queryable` | **7** |
+| Graph building | `Yog.Queryable` + `Yog.Modifiable` | **7 + 7 = 14** |
+| Full transformation support | All three protocols | **7 + 7 + 5 = 19** |
+
+### Quick Reference
+
+**Queryable (7 required):**
+```elixir
+successors/2, predecessors/2, type/1, node/2, all_nodes/1, order/1, edge_count/1
+```
+
+**Modifiable (7 required):**
+```elixir
+add_node/3, remove_node/2, add_edge/4, add_edges/2, remove_edge/3, 
+add_edge_ensure/5, add_edge_with_combine/5
+```
+
+**Transformable (5 required):**
+```elixir
+empty/1, empty/2, transpose/1, map_nodes/2, map_edges/2
+```
+
+### Design Philosophy
 
 The protocol-based design means you can:
-- **Use YogEx algorithms** on any graph data structure
-- **Migrate gradually** from other libraries
-- **Optimize** for your specific use case while keeping the same API
-- **Test** with confidence using the protocol contracts
+- **Use YogEx algorithms** on any graph data structure with minimal effort (7 functions!)
+- **Migrate gradually** from other libraries without rewriting your graph code
+- **Optimize** only what matters - override defaults for your hot paths
+- **Test** with confidence using the protocol contracts in `Yog.Queryable.Defaults`
