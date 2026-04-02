@@ -116,14 +116,12 @@ defmodule Yog.Connectivity.SCC do
         end
       end)
 
-    transposed = Yog.Transform.transpose(graph)
-
     {_, sccs} =
       Enum.reduce(finish_order, {MapSet.new(), []}, fn node, {visited, components} ->
         if MapSet.member?(visited, node) do
           {visited, components}
         else
-          {new_visited, component} = dfs_collect(transposed, node, visited, [])
+          {new_visited, component} = dfs_collect_reversed(graph, node, visited, [])
           {new_visited, [component | components]}
         end
       end)
@@ -147,15 +145,15 @@ defmodule Yog.Connectivity.SCC do
     {final_visited, [node | final_order]}
   end
 
-  defp dfs_collect(graph, node, visited, component) do
+  defp dfs_collect_reversed(graph, node, visited, component) do
     visited = MapSet.put(visited, node)
-    neighbors = Model.successor_ids(graph, node)
+    neighbors = Model.predecessor_ids(graph, node)
 
     Enum.reduce(neighbors, {visited, [node | component]}, fn neighbor, {acc_visited, acc_comp} ->
       if MapSet.member?(acc_visited, neighbor) do
         {acc_visited, acc_comp}
       else
-        dfs_collect(graph, neighbor, acc_visited, acc_comp)
+        dfs_collect_reversed(graph, neighbor, acc_visited, acc_comp)
       end
     end)
   end

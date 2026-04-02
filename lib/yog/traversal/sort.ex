@@ -38,7 +38,7 @@ defmodule Yog.Traversal.Sort do
       |> Enum.filter(fn {_id, degree} -> degree == 0 end)
       |> Enum.map(fn {id, _} -> id end)
 
-    do_kahn(graph, queue, in_degrees, [], 0, Enum.count(graph))
+    do_kahn(graph, queue, in_degrees, [], 0, Model.node_count(graph))
   end
 
   @doc """
@@ -79,13 +79,13 @@ defmodule Yog.Traversal.Sort do
       |> Enum.map(fn {id, _} -> {Model.node(graph, id), id} end)
       |> Enum.reduce(pq, fn item, acc -> PQ.push(acc, item) end)
 
-    do_lexical_kahn_pq(graph, initial_pq, in_degrees, [], 0, Enum.count(graph))
+    do_lexical_kahn_pq(graph, initial_pq, in_degrees, [], 0, Model.node_count(graph))
   end
 
   # Build degree map
   defp build_degree_map(graph) do
-    graph
-    |> Enum.map(fn {id, _} -> {id, Model.in_degree(graph, id)} end)
+    Model.all_nodes(graph)
+    |> Enum.map(fn id -> {id, Model.in_degree(graph, id)} end)
     |> Map.new()
   end
 

@@ -20,9 +20,9 @@ defmodule Yog.Centrality do
 
   """
 
-  alias Yog.Model
   alias Yog.Pathfinding.Dijkstra
   alias Yog.PriorityQueue, as: PQ
+  alias Yog.Queryable, as: Model
 
   @typedoc """
   A mapping of Node IDs to their calculated centrality scores.
@@ -74,26 +74,24 @@ defmodule Yog.Centrality do
     nodes = Model.all_nodes(graph)
 
     factor = if n > 1, do: (n - 1) * 1.0, else: 1.0
-
-    %Yog.Graph{kind: kind, out_edges: out_edges, in_edges: in_edges} = graph
+    kind = Model.type(graph)
 
     Enum.reduce(nodes, %{}, fn id, acc ->
       count =
         case kind do
           :undirected ->
-            Map.get(out_edges, id, %{}) |> map_size()
+            Model.degree(graph, id)
 
           :directed ->
             case mode do
               :in_degree ->
-                Map.get(in_edges, id, %{}) |> map_size()
+                Model.in_degree(graph, id)
 
               :out_degree ->
-                Map.get(out_edges, id, %{}) |> map_size()
+                Model.out_degree(graph, id)
 
               :total_degree ->
-                (Map.get(out_edges, id, %{}) |> map_size()) +
-                  (Map.get(in_edges, id, %{}) |> map_size())
+                Model.in_degree(graph, id) + Model.out_degree(graph, id)
             end
         end
 
@@ -415,7 +413,7 @@ defmodule Yog.Centrality do
 
     out_degrees_map =
       Enum.reduce(nodes, %{}, fn id, acc ->
-        Map.put(acc, id, get_out_degree(graph, id))
+        Map.put(acc, id, Model.out_degree(graph, id))
       end)
 
     sinks =
@@ -725,8 +723,8 @@ defmodule Yog.Centrality do
     end)
   end
 
-  defp apply_undirected_scaling(scores, %Yog.Graph{kind: kind}) do
-    case kind do
+  defp apply_undirected_scaling(scores, graph) do
+    case Model.type(graph) do
       :undirected ->
         Map.new(scores, fn {node, score} ->
           {node, score * 0.5}
@@ -917,34 +915,12 @@ defmodule Yog.Centrality do
   end
 
   defp get_in_neighbor_ids(graph, node) do
-    %Yog.Graph{kind: kind, in_edges: in_edges, out_edges: out_edges} = graph
-
-    case kind do
+    case Model.type(graph) do
       :undirected ->
-        # Direct map access avoids intermediate list from Model.neighbors
-        case Map.fetch(out_edges, node) do
-          {:ok, inner} -> Map.keys(inner)
-          :error -> []
-        end
+        Model.neighbor_ids(graph, node)
 
       :directed ->
-        # Direct map access avoids intermediate list from Model.predecessors
-        case Map.fetch(in_edges, node) do
-          {:ok, inner} -> Map.keys(inner)
-          :error -> []
-        end
-    end
-  end
-
-  defp get_out_degree(graph, node) do
-    %Yog.Graph{kind: kind} = graph
-
-    case kind do
-      :undirected ->
-        length(Model.neighbors(graph, node))
-
-      :directed ->
-        length(Model.successors(graph, node))
+        Model.predecessor_ids(graph, node)
     end
   end
 end

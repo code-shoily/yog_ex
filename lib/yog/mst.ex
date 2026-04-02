@@ -52,8 +52,8 @@ defmodule Yog.MST do
   """
 
   alias Yog.DisjointSet
-  alias Yog.Model
   alias Yog.PriorityQueue, as: PQ
+  alias Yog.Queryable, as: Model
 
   @typedoc """
   Represents an edge in the minimum spanning tree.
@@ -136,15 +136,15 @@ defmodule Yog.MST do
           [edge()] | {:error, :undirected_only}
   def kruskal(graph, compare \\ &Yog.Utils.compare/2)
 
-  def kruskal(%Yog.Graph{kind: :directed}, _compare) do
-    {:error, :undirected_only}
-  end
-
   def kruskal(graph, compare) do
-    edges = extract_edges(graph)
-    sorted_edges = Enum.sort(edges, fn a, b -> compare.(a.weight, b.weight) == :lt end)
+    if Model.type(graph) == :directed do
+      {:error, :undirected_only}
+    else
+      edges = extract_edges(graph)
+      sorted_edges = Enum.sort(edges, fn a, b -> compare.(a.weight, b.weight) == :lt end)
 
-    do_kruskal(sorted_edges, DisjointSet.new(), [])
+      do_kruskal(sorted_edges, DisjointSet.new(), [])
+    end
   end
 
   @doc """
@@ -224,27 +224,27 @@ defmodule Yog.MST do
           [edge()] | {:error, :undirected_only}
   def prim(graph, compare \\ &Yog.Utils.compare/2)
 
-  def prim(%Yog.Graph{kind: :directed}, _compare) do
-    {:error, :undirected_only}
-  end
-
   def prim(graph, compare) do
-    node_ids = Model.all_nodes(graph)
+    if Model.type(graph) == :directed do
+      {:error, :undirected_only}
+    else
+      node_ids = Model.all_nodes(graph)
 
-    case node_ids do
-      [] ->
-        []
+      case node_ids do
+        [] ->
+          []
 
-      [start | _] ->
-        initial_edges = get_all_edges_from_node(graph, start)
+        [start | _] ->
+          initial_edges = get_all_edges_from_node(graph, start)
 
-        initial_pq =
-          PQ.new(fn a, b -> compare.(a.weight, b.weight) == :lt end)
-          |> push_all(initial_edges)
+          initial_pq =
+            PQ.new(fn a, b -> compare.(a.weight, b.weight) == :lt end)
+            |> push_all(initial_edges)
 
-        initial_visited = MapSet.new([start])
+          initial_visited = MapSet.new([start])
 
-        do_prim(graph, initial_pq, initial_visited, [], compare)
+          do_prim(graph, initial_pq, initial_visited, [], compare)
+      end
     end
   end
 
@@ -259,9 +259,13 @@ defmodule Yog.MST do
 
   # Extracts all edges from a graph.
   # For undirected graphs, only includes each edge once (when from_id <= to_id).
-  defp extract_edges(%Yog.Graph{kind: kind, out_edges: out_edges}) do
-    Enum.flat_map(out_edges, fn {from_id, targets} ->
-      Enum.flat_map(targets, fn {to_id, weight} ->
+  defp extract_edges(graph) do
+    kind = Model.type(graph)
+
+    Model.all_nodes(graph)
+    |> Enum.flat_map(fn from_id ->
+      Model.successors(graph, from_id)
+      |> Enum.flat_map(fn {to_id, weight} ->
         if kind == :undirected && from_id > to_id do
           []
         else
