@@ -287,7 +287,7 @@ defmodule Yog.Builder.Live do
       iex> length(Yog.all_nodes(graph))
       2
   """
-  @spec sync(t(), Yog.graph()) :: {t(), Yog.graph()}
+  @spec sync(t(), Yog.Graph.t()) :: {t(), Yog.Graph.t()}
   def sync(%__MODULE__{pending: []} = builder, graph) do
     {builder, graph}
   end

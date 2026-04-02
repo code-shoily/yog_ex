@@ -80,7 +80,12 @@ defmodule Yog.Builder.Toroidal do
 
   O(rows × cols)
   """
-  @spec from_2d_list([[term()]], Model.graph_type(), (term(), term() -> boolean()), keyword()) ::
+  @spec from_2d_list(
+          [[term()]],
+          :directed | :undirected,
+          (term(), term() -> boolean()),
+          keyword()
+        ) ::
           ToroidalGraph.t()
   def from_2d_list(grid_data, graph_type, can_move_fn, opts \\ []) do
     from_2d_list_with_topology(grid_data, graph_type, rook(), can_move_fn, opts)
@@ -104,7 +109,7 @@ defmodule Yog.Builder.Toroidal do
   """
   @spec from_2d_list_with_topology(
           [[term()]],
-          Model.graph_type(),
+          :directed | :undirected,
           topology(),
           (term(), term() -> boolean()),
           keyword()
@@ -174,8 +179,8 @@ defmodule Yog.Builder.Toroidal do
   @spec to_graph(
           toroidal_grid()
           | GridGraph.t()
-          | {:toroidal_grid, Yog.graph(), integer(), integer()}
-        ) :: Yog.graph()
+          | {:toroidal_grid, Yog.Graph.t(), integer(), integer()}
+        ) :: Yog.Graph.t()
   def to_graph(%ToroidalGraph{graph: graph}), do: graph
 
   def to_graph(%GridGraph{graph: graph}), do: graph
@@ -192,7 +197,7 @@ defmodule Yog.Builder.Toroidal do
   Returns `{:ok, cell_data}` or `{:error, nil}` if out of bounds.
   """
   @spec get_cell(
-          toroidal_grid() | GridGraph.t() | {:toroidal_grid, Yog.graph(), integer(), integer()},
+          toroidal_grid() | GridGraph.t() | {:toroidal_grid, Yog.Graph.t(), integer(), integer()},
           integer(),
           integer()
         ) ::

@@ -38,7 +38,7 @@ defmodule Yog.Builder.GridGraph do
   defstruct [:graph, :rows, :cols, topology: :rook, predicate: nil]
 
   @type t :: %__MODULE__{
-          graph: Yog.graph(),
+          graph: Yog.Graph.t(),
           rows: non_neg_integer(),
           cols: non_neg_integer(),
           topology: atom(),
@@ -59,7 +59,7 @@ defmodule Yog.Builder.GridGraph do
       iex> grid.topology
       :rook
   """
-  @spec new(Yog.graph(), non_neg_integer(), non_neg_integer()) :: t()
+  @spec new(Yog.Graph.t(), non_neg_integer(), non_neg_integer()) :: t()
   def new(graph, rows, cols) do
     %__MODULE__{
       graph: graph,
@@ -78,7 +78,7 @@ defmodule Yog.Builder.GridGraph do
       iex> grid.topology
       :queen
   """
-  @spec new(Yog.graph(), non_neg_integer(), non_neg_integer(), atom()) :: t()
+  @spec new(Yog.Graph.t(), non_neg_integer(), non_neg_integer(), atom()) :: t()
   def new(graph, rows, cols, topology) do
     %__MODULE__{
       graph: graph,
@@ -97,7 +97,7 @@ defmodule Yog.Builder.GridGraph do
       iex> Yog.Builder.GridGraph.to_graph(grid)
       graph
   """
-  @spec to_graph(t()) :: Yog.graph()
+  @spec to_graph(t()) :: Yog.Graph.t()
   def to_graph(%__MODULE__{graph: graph}), do: graph
 
   @doc """
@@ -142,7 +142,7 @@ defmodule Yog.Builder.GridGraph do
       iex> Yog.Builder.GridGraph.coord_to_id(grid, 2, 3)
       11
   """
-  @spec coord_to_id(t(), non_neg_integer(), non_neg_integer()) :: Yog.Model.node_id()
+  @spec coord_to_id(t(), non_neg_integer(), non_neg_integer()) :: Yog.node_id()
   def coord_to_id(%__MODULE__{cols: cols}, row, col) do
     coord_to_id_raw(cols, row, col)
   end
@@ -162,7 +162,7 @@ defmodule Yog.Builder.GridGraph do
       iex> Yog.Builder.GridGraph.id_to_coord(grid, 11)
       {2, 3}
   """
-  @spec id_to_coord(t(), Yog.Model.node_id()) :: {non_neg_integer(), non_neg_integer()}
+  @spec id_to_coord(t(), Yog.node_id()) :: {non_neg_integer(), non_neg_integer()}
   def id_to_coord(%__MODULE__{cols: cols}, node_id) when is_integer(node_id) do
     row = div(node_id, cols)
     col = rem(node_id, cols)

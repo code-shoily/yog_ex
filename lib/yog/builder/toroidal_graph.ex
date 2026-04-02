@@ -19,7 +19,7 @@ defmodule Yog.Builder.ToroidalGraph do
   defstruct [:graph, :rows, :cols, topology: :rook]
 
   @type t :: %__MODULE__{
-          graph: Yog.graph(),
+          graph: Yog.Graph.t(),
           rows: non_neg_integer(),
           cols: non_neg_integer(),
           topology: atom()
@@ -28,7 +28,7 @@ defmodule Yog.Builder.ToroidalGraph do
   @doc """
   Creates a new toroidal graph result.
   """
-  @spec new(Yog.graph(), non_neg_integer(), non_neg_integer(), atom()) :: t()
+  @spec new(Yog.Graph.t(), non_neg_integer(), non_neg_integer(), atom()) :: t()
   def new(graph, rows, cols, topology \\ :rook) do
     %__MODULE__{
       graph: graph,
@@ -52,7 +52,7 @@ defmodule Yog.Builder.ToroidalGraph do
   @doc """
   Unwraps to a plain graph.
   """
-  @spec to_graph(t()) :: Yog.graph()
+  @spec to_graph(t()) :: Yog.Graph.t()
   def to_graph(%__MODULE__{graph: graph}), do: graph
 
   @doc """

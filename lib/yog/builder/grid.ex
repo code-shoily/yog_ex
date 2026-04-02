@@ -47,7 +47,7 @@ defmodule Yog.Builder.Grid do
   alias Yog.Transformable
 
   @typedoc "Grid builder type: {:grid_builder, graph, rows, cols}"
-  @type grid :: {:grid_builder, Yog.graph(), integer(), integer()}
+  @type grid :: {:grid_builder, Yog.Graph.t(), integer(), integer()}
 
   @typedoc "Topology is a list of {row_delta, col_delta} movement offsets."
   @type topology :: [{integer(), integer()}]
@@ -74,7 +74,12 @@ defmodule Yog.Builder.Grid do
       iex> is_struct(grid, Yog.Builder.GridGraph)
       true
   """
-  @spec from_2d_list([[term()]], Model.graph_type(), (term(), term() -> boolean()), keyword()) ::
+  @spec from_2d_list(
+          [[term()]],
+          :directed | :undirected,
+          (term(), term() -> boolean()),
+          keyword()
+        ) ::
           GridGraph.t()
   def from_2d_list(grid_data, graph_type, can_move_fn, opts \\ []) do
     from_2d_list_with_topology(grid_data, graph_type, rook(), can_move_fn, opts)
@@ -101,7 +106,7 @@ defmodule Yog.Builder.Grid do
   """
   @spec from_2d_list_with_topology(
           [[term()]],
-          Model.graph_type(),
+          :directed | :undirected,
           topology(),
           (term(), term() -> boolean()),
           keyword()
@@ -171,8 +176,8 @@ defmodule Yog.Builder.Grid do
   @doc """
   Converts a grid builder into a usable Graph for algorithms.
   """
-  @spec to_graph(GridGraph.t() | grid() | {:grid, Yog.graph(), integer(), integer()}) ::
-          Yog.graph()
+  @spec to_graph(GridGraph.t() | grid() | {:grid, Yog.Graph.t(), integer(), integer()}) ::
+          Yog.Graph.t()
   def to_graph(%GridGraph{} = grid) do
     GridGraph.to_graph(grid)
   end
@@ -194,7 +199,7 @@ defmodule Yog.Builder.Grid do
   Returns `{:ok, cell_data}` or `{:error, nil}` if out of bounds.
   """
   @spec get_cell(
-          GridGraph.t() | grid() | {:grid, Yog.graph(), integer(), integer()},
+          GridGraph.t() | grid() | {:grid, Yog.Graph.t(), integer(), integer()},
           integer(),
           integer()
         ) ::
@@ -239,8 +244,11 @@ defmodule Yog.Builder.Grid do
       iex> is_integer(start_id)
       true
   """
-  @spec find_node(GridGraph.t() | grid() | {:grid, Yog.graph(), integer(), integer()}, (term() ->
-                                                                                          boolean())) ::
+  @spec find_node(
+          GridGraph.t() | grid() | {:grid, Yog.Graph.t(), integer(), integer()},
+          (term() ->
+             boolean())
+        ) ::
           {:ok, Yog.node_id()} | {:error, nil}
   def find_node(%GridGraph{graph: graph, rows: rows, cols: cols}, predicate) do
     do_find_node(graph, rows, cols, predicate)

@@ -51,8 +51,8 @@ defmodule Yog.Builder.Labeled do
 
   @typedoc "Labeled builder struct"
   @type t :: %__MODULE__{
-          kind: Model.graph_type(),
-          graph: Yog.graph(),
+          kind: :directed | :undirected,
+          graph: Yog.Graph.t(),
           label_to_id: %{label() => Yog.node_id()},
           next_id: integer()
         }
@@ -95,7 +95,7 @@ defmodule Yog.Builder.Labeled do
       iex> is_struct(builder, Yog.Builder.Labeled)
       true
   """
-  @spec new(Model.graph_type(), Yog.graph() | nil) :: t()
+  @spec new(:directed | :undirected, Yog.Graph.t() | nil) :: t()
   def new(graph_type, template \\ nil) do
     %__MODULE__{
       kind: graph_type,
@@ -227,7 +227,7 @@ defmodule Yog.Builder.Labeled do
       iex> builder = Yog.Builder.Labeled.from_list(:directed, edges)
       iex> {:ok, [{"B", 5}]} = Yog.Builder.Labeled.successors(builder, "A")
   """
-  @spec from_list(Model.graph_type(), [{label(), label(), term()}]) :: t()
+  @spec from_list(:directed | :undirected, [{label(), label(), term()}]) :: t()
   def from_list(graph_type, edges) do
     Enum.reduce(edges, new(graph_type), fn {src, dst, weight}, builder ->
       add_edge(builder, src, dst, weight)
@@ -243,7 +243,7 @@ defmodule Yog.Builder.Labeled do
       iex> builder = Yog.Builder.Labeled.from_unweighted_list(:directed, edges)
       iex> {:ok, [{"B", nil}]} = Yog.Builder.Labeled.successors(builder, "A")
   """
-  @spec from_unweighted_list(Model.graph_type(), [{label(), label()}]) :: t()
+  @spec from_unweighted_list(:directed | :undirected, [{label(), label()}]) :: t()
   def from_unweighted_list(graph_type, edges) do
     Enum.reduce(edges, new(graph_type), fn {src, dst}, builder ->
       add_unweighted_edge(builder, src, dst)
@@ -265,7 +265,7 @@ defmodule Yog.Builder.Labeled do
       iex> Yog.graph?(graph)
       true
   """
-  @spec to_graph(t()) :: Yog.graph()
+  @spec to_graph(t()) :: Yog.Graph.t()
   def to_graph(%__MODULE__{graph: graph}), do: graph
 
   @doc """
