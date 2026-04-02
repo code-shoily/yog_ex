@@ -16,6 +16,16 @@ defmodule Yog.Queryable.Defaults do
   but implementations with O(1) degree tracking should override it.
   """
 
+  # Inline small functions to reduce call overhead
+  @compile {:inline,
+            out_degree: 2,
+            in_degree: 2,
+            degree: 2,
+            successor_ids: 2,
+            predecessor_ids: 2,
+            has_node?: 2,
+            node_count: 1}
+
   alias Yog.Queryable, as: Model
 
   @doc "Default: out_degree is length of successors"

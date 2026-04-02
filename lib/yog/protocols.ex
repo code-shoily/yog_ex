@@ -6,6 +6,18 @@ defprotocol Yog.Queryable do
   All other query operations can be derived from these core functions using
   `Yog.Queryable.Defaults`. Implementations should override defaults for efficiency.
 
+  ## Performance Note
+
+  For best performance, **ensure protocols are consolidated** in production:
+
+      # In your mix.exs
+      consolidate_protocols: Mix.env() != :dev
+
+  Or run with: `MIX_ENV=prod mix run ...`
+
+  Unconsolidated protocols can be 2-3x slower due to dynamic dispatch overhead.
+  Protocol consolidation happens automatically in releases (`mix release`).
+
   ## Required Functions (7)
 
   Implementations MUST provide these:

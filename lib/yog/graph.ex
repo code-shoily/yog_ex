@@ -197,34 +197,170 @@ defimpl Inspect, for: Yog.Graph do
 end
 
 defimpl Yog.Queryable, for: Yog.Graph do
-  alias Yog.Queryable.Defaults
+  # Direct struct access for maximum performance (no delegation to Model/Defaults)
 
-  # Core required functions
-  def successors(graph, id), do: Yog.Model.successors(graph, id)
-  def predecessors(graph, id), do: Yog.Model.predecessors(graph, id)
-  def type(graph), do: Yog.Model.type(graph)
-  def node(graph, id), do: Yog.Model.node(graph, id)
-  def all_nodes(graph), do: Yog.Model.all_nodes(graph)
-  def order(graph), do: Yog.Model.order(graph)
-  def edge_count(graph), do: Yog.Model.edge_count(graph)
+  # Core required functions - direct field access
+  def successors(%Yog.Graph{out_edges: out_edges}, id) do
+    case Map.fetch(out_edges, id) do
+      {:ok, inner} -> Map.to_list(inner)
+      :error -> []
+    end
+  end
 
-  # Overrides for O(1) efficiency (instead of O(degree) defaults)
-  def out_degree(graph, id), do: Yog.Model.out_degree(graph, id)
-  def in_degree(graph, id), do: Yog.Model.in_degree(graph, id)
-  # Override: degree for undirected graphs should not double-count
-  def degree(graph, id), do: Yog.Model.degree(graph, id)
-  def has_node?(graph, id), do: Yog.Model.has_node?(graph, id)
-  def has_edge?(graph, src, dst), do: Yog.Model.has_edge?(graph, src, dst)
-  def edge_data(graph, src, dst), do: Yog.Model.edge_data(graph, src, dst)
-  def nodes(graph), do: Yog.Model.nodes(graph)
-  def all_edges(graph), do: Yog.Model.all_edges(graph)
+  def predecessors(%Yog.Graph{in_edges: in_edges}, id) do
+    case Map.fetch(in_edges, id) do
+      {:ok, inner} -> Map.to_list(inner)
+      :error -> []
+    end
+  end
 
-  # Using defaults for these
-  defdelegate successor_ids(graph, id), to: Defaults
-  defdelegate predecessor_ids(graph, id), to: Defaults
-  defdelegate neighbors(graph, id), to: Defaults
-  defdelegate neighbor_ids(graph, id), to: Defaults
-  defdelegate node_count(graph), to: Defaults
+  def type(%Yog.Graph{kind: kind}), do: kind
+  def node(%Yog.Graph{nodes: nodes}, id), do: Map.get(nodes, id)
+  def all_nodes(%Yog.Graph{nodes: nodes}), do: Map.keys(nodes)
+  def order(%Yog.Graph{nodes: nodes}), do: map_size(nodes)
+
+  def edge_count(%Yog.Graph{kind: :directed, out_edges: out_edges}) do
+    Enum.reduce(out_edges, 0, fn {_src, targets}, acc ->
+      acc + map_size(targets)
+    end)
+  end
+
+  def edge_count(%Yog.Graph{kind: :undirected, out_edges: out_edges}) do
+    {total, self_loops} =
+      Enum.reduce(out_edges, {0, 0}, fn {src, targets}, {acc_total, acc_self} ->
+        new_total = acc_total + map_size(targets)
+        new_self = if Map.has_key?(targets, src), do: acc_self + 1, else: acc_self
+        {new_total, new_self}
+      end)
+
+    div(total - self_loops, 2) + self_loops
+  end
+
+  # O(1) degree lookups - direct field access
+  def out_degree(%Yog.Graph{out_edges: out_edges}, id) do
+    case Map.fetch(out_edges, id) do
+      {:ok, inner} -> map_size(inner)
+      :error -> 0
+    end
+  end
+
+  def in_degree(%Yog.Graph{in_edges: in_edges}, id) do
+    case Map.fetch(in_edges, id) do
+      {:ok, inner} -> map_size(inner)
+      :error -> 0
+    end
+  end
+
+  def degree(%Yog.Graph{kind: :undirected, out_edges: out_edges}, id) do
+    case Map.fetch(out_edges, id) do
+      {:ok, targets} ->
+        # Self-loops count as 2 in undirected graphs
+        base = map_size(targets)
+        if Map.has_key?(targets, id), do: base + 1, else: base
+
+      :error ->
+        0
+    end
+  end
+
+  def degree(%Yog.Graph{} = graph, id) do
+    out_degree(graph, id) + in_degree(graph, id)
+  end
+
+  # Fast lookups - direct field access
+  def has_node?(%Yog.Graph{nodes: nodes}, id), do: Map.has_key?(nodes, id)
+
+  def has_edge?(%Yog.Graph{out_edges: out_edges}, src, dst) do
+    case Map.fetch(out_edges, src) do
+      {:ok, inner} -> Map.has_key?(inner, dst)
+      :error -> false
+    end
+  end
+
+  def edge_data(%Yog.Graph{out_edges: out_edges}, src, dst) do
+    case Map.fetch(out_edges, src) do
+      {:ok, inner} -> Map.get(inner, dst)
+      :error -> nil
+    end
+  end
+
+  def nodes(%Yog.Graph{nodes: nodes}), do: nodes
+
+  def all_edges(%Yog.Graph{kind: :undirected, out_edges: out_edges}) do
+    # For undirected graphs, edges are stored in both directions.
+    # Only return edges where src <= dst to avoid duplicates.
+    out_edges
+    |> Enum.flat_map(fn {src, inner} ->
+      inner
+      |> Enum.filter(fn {dst, _weight} -> src <= dst end)
+      |> Enum.map(fn {dst, weight} -> {src, dst, weight} end)
+    end)
+  end
+
+  def all_edges(%Yog.Graph{out_edges: out_edges}) do
+    out_edges
+    |> Enum.flat_map(fn {src, inner} ->
+      Enum.map(inner, fn {dst, weight} -> {src, dst, weight} end)
+    end)
+  end
+
+  # Derived functions - direct implementation (not via Defaults module)
+  def successor_ids(%Yog.Graph{out_edges: out_edges}, id) do
+    case Map.fetch(out_edges, id) do
+      {:ok, inner} -> Map.keys(inner)
+      :error -> []
+    end
+  end
+
+  def predecessor_ids(%Yog.Graph{in_edges: in_edges}, id) do
+    case Map.fetch(in_edges, id) do
+      {:ok, inner} -> Map.keys(inner)
+      :error -> []
+    end
+  end
+
+  def neighbors(%Yog.Graph{kind: :undirected} = graph, id) do
+    successors(graph, id)
+  end
+
+  def neighbors(%Yog.Graph{out_edges: out_edges, in_edges: in_edges}, id) do
+    outgoing =
+      case Map.fetch(out_edges, id) do
+        {:ok, inner} -> inner
+        :error -> %{}
+      end
+
+    case Map.fetch(in_edges, id) do
+      {:ok, inner} ->
+        # Merge, with outgoing taking precedence
+        Map.merge(inner, outgoing) |> Map.to_list()
+
+      :error ->
+        Map.to_list(outgoing)
+    end
+  end
+
+  def neighbor_ids(%Yog.Graph{kind: :undirected} = graph, id) do
+    successor_ids(graph, id)
+  end
+
+  def neighbor_ids(%Yog.Graph{out_edges: out_edges, in_edges: in_edges}, id) do
+    out =
+      case Map.fetch(out_edges, id) do
+        {:ok, inner} -> Map.keys(inner)
+        :error -> []
+      end
+
+    in_keys =
+      case Map.fetch(in_edges, id) do
+        {:ok, inner} -> Map.keys(inner)
+        :error -> []
+      end
+
+    Enum.uniq(out ++ in_keys)
+  end
+
+  def node_count(%Yog.Graph{nodes: nodes}), do: map_size(nodes)
 end
 
 defimpl Yog.Modifiable, for: Yog.Graph do
