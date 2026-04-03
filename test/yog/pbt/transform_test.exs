@@ -154,5 +154,44 @@ defmodule Yog.PBT.TransformTest do
         end
       end
     end
+
+    property "transitive closure/reduction round-trip for DAGs: reduction(closure(G)) == G when G is transitively reduced" do
+      check all(graph <- arborescence_gen()) do
+        {:ok, reduced} = Yog.Transform.transitive_reduction(graph)
+        closure = Yog.Transform.transitive_closure(reduced)
+        {:ok, round_trip} = Yog.Transform.transitive_reduction(closure)
+
+        assert Yog.all_nodes(round_trip) |> MapSet.new() == Yog.all_nodes(graph) |> MapSet.new()
+        assert Yog.all_edges(round_trip) |> MapSet.new() == Yog.all_edges(graph) |> MapSet.new()
+      end
+    end
+
+    property "transitive closure idempotence for DAGs: closure(reduction(G)) == closure(G)" do
+      check all(graph <- arborescence_gen()) do
+        closure_of_original = Yog.Transform.transitive_closure(graph)
+        {:ok, reduced} = Yog.Transform.transitive_reduction(graph)
+        closure_of_reduced = Yog.Transform.transitive_closure(reduced)
+
+        assert Yog.all_nodes(closure_of_reduced) |> MapSet.new() ==
+                 Yog.all_nodes(closure_of_original) |> MapSet.new()
+
+        assert Yog.all_edges(closure_of_reduced) |> MapSet.new() ==
+                 Yog.all_edges(closure_of_original) |> MapSet.new()
+      end
+    end
+
+    property "transitive reduction idempotence for DAGs: reduction(closure(G)) == reduction(G)" do
+      check all(graph <- arborescence_gen()) do
+        {:ok, reduction_of_original} = Yog.Transform.transitive_reduction(graph)
+        closure = Yog.Transform.transitive_closure(graph)
+        {:ok, reduction_of_closure} = Yog.Transform.transitive_reduction(closure)
+
+        assert Yog.all_nodes(reduction_of_closure) |> MapSet.new() ==
+                 Yog.all_nodes(reduction_of_original) |> MapSet.new()
+
+        assert Yog.all_edges(reduction_of_closure) |> MapSet.new() ==
+                 Yog.all_edges(reduction_of_original) |> MapSet.new()
+      end
+    end
   end
 end
