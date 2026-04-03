@@ -9,18 +9,20 @@ defmodule Yog.GraphTest do
   alias Yog.Model
 
   test "edge_count with self-loops (directed)" do
-    graph = Graph.new(:directed)
-            |> Model.add_node(1, "A")
-            |> Model.add_edge!(1, 1, 10)
+    graph =
+      Graph.new(:directed)
+      |> Model.add_node(1, "A")
+      |> Model.add_edge!(1, 1, 10)
 
     # 1 directed self-loop = 1 edge
     assert Graph.edge_count(graph) == 1
   end
 
   test "edge_count with self-loops (undirected)" do
-    graph = Graph.new(:undirected)
-            |> Model.add_node(1, "A")
-            |> Model.add_edge!(1, 1, 10)
+    graph =
+      Graph.new(:undirected)
+      |> Model.add_node(1, "A")
+      |> Model.add_edge!(1, 1, 10)
 
     # 1 undirected self-loop = 1 edge
     assert Graph.edge_count(graph) == 1
@@ -28,11 +30,12 @@ defmodule Yog.GraphTest do
 
   test "edge_count complex with self-loops (undirected)" do
     # 2 nodes, 1 normal edge, 1 self-loop = 2 edges
-    graph = Graph.new(:undirected)
-            |> Model.add_node(1, "A")
-            |> Model.add_node(2, "B")
-            |> Model.add_edge!(1, 2, 10)
-            |> Model.add_edge!(1, 1, 5)
+    graph =
+      Graph.new(:undirected)
+      |> Model.add_node(1, "A")
+      |> Model.add_node(2, "B")
+      |> Model.add_edge!(1, 2, 10)
+      |> Model.add_edge!(1, 1, 5)
 
     assert Graph.edge_count(graph) == 2
   end
