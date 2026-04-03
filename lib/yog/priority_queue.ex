@@ -82,7 +82,8 @@ defmodule Yog.PriorityQueue do
       iex> Yog.PriorityQueue.empty?(Yog.PriorityQueue.new())
       true
 
-      iex> Yog.PriorityQueue.empty?(Yog.PriorityQueue.new() |> Yog.PriorityQueue.push(1))
+      iex> Yog.PriorityQueue.empty?(Yog.PriorityQueue.new()
+      ...> |> Yog.PriorityQueue.push(1))
       false
   """
   @spec empty?(t()) :: boolean()
@@ -94,15 +95,18 @@ defmodule Yog.PriorityQueue do
 
   ## Examples
 
-      iex> pq = Yog.PriorityQueue.new() |> Yog.PriorityQueue.push(5) |> Yog.PriorityQueue.push(3)
+      iex> pq =
+      ...>   Yog.PriorityQueue.new()
+      ...>   |> Yog.PriorityQueue.push(5)
+      ...>   |> Yog.PriorityQueue.push(3)
       iex> Yog.PriorityQueue.peek(pq)
       {:ok, 3}
   """
   @spec push(t(), any()) :: t()
-  def push(%Empty{compare_fn: cmp}, value), do: node(value, [], cmp)
+  def push(%Empty{compare_fn: cmp}, value), do: make_node(value, [], cmp)
 
   def push(%Node{compare_fn: cmp} = heap, value) do
-    merge(heap, node(value, [], cmp), cmp)
+    merge(heap, make_node(value, [], cmp), cmp)
   end
 
   @doc """
@@ -154,6 +158,11 @@ defmodule Yog.PriorityQueue do
       iex> {:ok, min, _} = Yog.PriorityQueue.pop(pq)
       iex> min
       1
+
+      iex> pq = Yog.PriorityQueue.from_list([3, 1, 4, 1, 5], &Kernel.>=/2)
+      iex> {:ok, max, _} = Yog.PriorityQueue.pop(pq)
+      iex> max
+      5
   """
   @spec from_list([any()]) :: t()
   def from_list(list), do: from_list(list, fn a, b -> a <= b end)
@@ -168,7 +177,11 @@ defmodule Yog.PriorityQueue do
 
   ## Examples
 
-      iex> Yog.PriorityQueue.new() |> Yog.PriorityQueue.push(3) |> Yog.PriorityQueue.push(1) |> Yog.PriorityQueue.push(2) |> Yog.PriorityQueue.to_list()
+      iex> Yog.PriorityQueue.new()
+      ...> |> Yog.PriorityQueue.push(3)
+      ...> |> Yog.PriorityQueue.push(1)
+      ...> |> Yog.PriorityQueue.push(2)
+      ...> |> Yog.PriorityQueue.to_list()
       [1, 2, 3]
   """
   @spec to_list(t()) :: [any()]
@@ -188,16 +201,21 @@ defmodule Yog.PriorityQueue do
 
   ## Examples
 
-      iex> Yog.PriorityQueue.new() |> Yog.PriorityQueue.push(1) |> Yog.PriorityQueue.push(2) |> Yog.PriorityQueue.size()
+      iex> Yog.PriorityQueue.new()
+      ...> |> Yog.PriorityQueue.push(1)
+      ...> |> Yog.PriorityQueue.push(2)
+      ...> |> Yog.PriorityQueue.size()
       2
   """
   @spec size(t()) :: non_neg_integer()
   def size(%Empty{size: s}), do: s
   def size(%Node{size: s}), do: s
 
-  # Private functions
+  # =============================================================================
+  # Private Helper Functions
+  # =============================================================================
 
-  defp node(value, children, compare_fn) do
+  defp make_node(value, children, compare_fn) do
     total_size = 1 + Enum.reduce(children, 0, fn %Node{size: s}, acc -> acc + s end)
     %Node{value: value, children: children, compare_fn: compare_fn, size: total_size}
   end
@@ -211,9 +229,9 @@ defmodule Yog.PriorityQueue do
          cmp
        ) do
     if cmp.(v1, v2) do
-      node(v1, [h2 | c1], cmp)
+      make_node(v1, [h2 | c1], cmp)
     else
-      node(v2, [h1 | c2], cmp)
+      make_node(v2, [h1 | c2], cmp)
     end
   end
 
