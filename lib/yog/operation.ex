@@ -70,12 +70,21 @@ defmodule Yog.Operation do
 
   """
 
+  alias Yog.Graph
   alias Yog.Model
 
-  # ============= Set-Theoretic Operations =============
+  # =============================================================================
+  # SET-THEORETIC OPERATIONS
+  # =============================================================================
 
   @doc """
   Returns a graph containing all nodes and edges from both input graphs.
+
+  Node data and edge weights from `other` take precedence on conflicts.
+  Both graphs must have the same kind (`:directed` or `:undirected`);
+  the result inherits the kind from `base`.
+
+  **Time Complexity:** O(V₁ + V₂ + E₁ + E₂)
 
   ## Examples
 
@@ -91,7 +100,7 @@ defmodule Yog.Operation do
       iex> Yog.Model.order(union)
       3
   """
-  @spec union(Yog.graph(), Yog.graph()) :: Yog.graph()
+  @spec union(Graph.t(), Graph.t()) :: Graph.t()
   def union(base, other) do
     Yog.Transform.merge(base, other)
   end
@@ -99,21 +108,29 @@ defmodule Yog.Operation do
   @doc """
   Returns a graph containing only nodes and edges that exist in both input graphs.
 
+  For directed graphs, a directed edge must exist in both graphs to be kept.
+  For undirected graphs, an undirected edge must exist in both graphs.
+
+  **Time Complexity:** O(V + E)
+
   ## Examples
 
       iex> g1 = Yog.undirected()
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
       ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
       iex> g2 = Yog.undirected()
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
       ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
       iex> intersection = Yog.Operation.intersection(g1, g2)
       iex> Yog.Model.order(intersection)
-      2
+      3
   """
-  @spec intersection(Yog.graph(), Yog.graph()) :: Yog.graph()
+  @spec intersection(Graph.t(), Graph.t()) :: Graph.t()
   def intersection(first, second) do
     common_nodes =
       MapSet.intersection(
@@ -130,6 +147,12 @@ defmodule Yog.Operation do
   Returns a graph containing nodes and edges that exist in the first graph
   but not in the second.
 
+  Any node that appears in `second` is removed from the result, along with
+  all its incident edges. Of the remaining nodes, only edges that do not
+  appear in `second` are kept.
+
+  **Time Complexity:** O(V + E)
+
   ## Examples
 
       iex> g1 = Yog.undirected()
@@ -139,14 +162,15 @@ defmodule Yog.Operation do
       iex> g2 = Yog.undirected()
       ...> |> Yog.add_node(3, nil)
       iex> diff = Yog.Operation.difference(g1, g2)
-      iex> Yog.Model.order(diff) >= 0
+      iex> Yog.Model.order(diff)
+      2
+      iex> Yog.Model.has_edge?(diff, 1, 2)
       true
   """
-  @spec difference(Yog.graph(), Yog.graph()) :: Yog.graph()
+  @spec difference(Graph.t(), Graph.t()) :: Graph.t()
   def difference(first, second) do
     second_node_set = MapSet.new(Model.all_nodes(second))
 
-    # Keep nodes of 'first' that are NOT in 'second'
     nodes_v1_minus_v2 =
       Model.all_nodes(first)
       |> Enum.reject(&MapSet.member?(second_node_set, &1))
@@ -159,34 +183,52 @@ defmodule Yog.Operation do
   @doc """
   Returns a graph containing edges that exist in exactly one of the input graphs.
 
+  The result is the union of `difference(first, second)` and
+  `difference(second, first)`. Nodes that have no incident unique edges
+  will not appear in the result.
+
+  **Time Complexity:** O(V₁ + V₂ + E₁ + E₂)
+
   ## Examples
 
       iex> g1 = Yog.undirected()
       ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
       ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
       iex> g2 = Yog.undirected()
-      ...> |> Yog.add_node(1, nil)
       ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
       iex> sym_diff = Yog.Operation.symmetric_difference(g1, g2)
-      iex> is_struct(sym_diff, Yog.Graph)
-      true
+      iex> Yog.Model.order(sym_diff)
+      1
+      iex> Yog.Model.edge_count(sym_diff)
+      0
   """
-  @spec symmetric_difference(Yog.graph(), Yog.graph()) :: Yog.graph()
+  @spec symmetric_difference(Graph.t(), Graph.t()) :: Graph.t()
   def symmetric_difference(first, second) do
     first_only = difference(first, second)
     second_only = difference(second, first)
     union(first_only, second_only)
   end
 
-  # ============= Composition & Joins =============
+  # =============================================================================
+  # COMPOSITION & JOINS
+  # =============================================================================
 
   @doc """
   Computes the disjoint union of two graphs.
 
   Unlike a simple join, this function guarantees that nodes from Graph A
-  and Graph B remain distinct by tagging their IDs, even if they share
-  the same original ID.
+  and Graph B remain distinct by tagging their IDs as `{0, id}` and `{1, id}`,
+  even if they share the same original ID.
+
+  The resulting graph uses the kind (`:directed` or `:undirected`) from
+  `graph_a`. Combining graphs of different kinds may lead to unexpected
+  edge behavior.
+
+  **Time Complexity:** O(V₁ + V₂ + E₁ + E₂)
 
   ## Example
       iex> g1 = Yog.directed() |> Yog.add_node("root", "Data A")
@@ -197,7 +239,7 @@ defmodule Yog.Operation do
       iex> Yog.Model.node(union, {0, "root"})
       "Data A"
   """
-  @spec disjoint_union(Yog.graph(), Yog.graph()) :: Yog.graph()
+  @spec disjoint_union(Graph.t(), Graph.t()) :: Graph.t()
   def disjoint_union(graph_a, graph_b) do
     Yog.Graph.new(Model.type(graph_a))
     |> add_tagged_component(graph_a, 0)
@@ -211,12 +253,14 @@ defmodule Yog.Operation do
   input graphs. Useful for generating grids, hypercubes, and other
   complex structures.
 
+  **Time Complexity:** O(V₁ × V₂ + E₁ × V₂ + E₂ × V₁)
+
   ## Parameters
 
   - `first` - First input graph
   - `second` - Second input graph
-  - `default_first` - Default edge data for edges from first graph
-  - `default_second` - Default edge data for edges from second graph
+  - `default_first` - Default edge data for edges derived from `first`
+  - `default_second` - Default edge data for edges derived from `second`
 
   ## Examples
 
@@ -233,7 +277,7 @@ defmodule Yog.Operation do
       ...> Yog.Model.order(product)
       4
   """
-  @spec cartesian_product(Yog.graph(), Yog.graph(), any(), any()) :: Yog.graph()
+  @spec cartesian_product(Graph.t(), Graph.t(), any(), any()) :: Graph.t()
   def cartesian_product(first, second, default_first, default_second) do
     first_nodes = Model.all_nodes(first)
     second_nodes = Model.all_nodes(second)
@@ -297,7 +341,10 @@ defmodule Yog.Operation do
   @doc """
   Composes two graphs by merging overlapping nodes and combining their edges.
 
-  This is equivalent to `union/2` - both graphs are merged together.
+  This is equivalent to `union/2` - both graphs are merged together with
+  `other`'s data taking precedence on conflicts.
+
+  **Time Complexity:** O(V₁ + V₂ + E₁ + E₂)
 
   ## Examples
 
@@ -313,7 +360,7 @@ defmodule Yog.Operation do
       iex> Yog.Model.order(composed)
       3
   """
-  @spec compose(Yog.graph(), Yog.graph()) :: Yog.graph()
+  @spec compose(Graph.t(), Graph.t()) :: Graph.t()
   def compose(first, second) do
     union(first, second)
   end
@@ -323,6 +370,10 @@ defmodule Yog.Operation do
 
   The k-th power of a graph G, denoted G^k, is a graph where two nodes are
   adjacent if and only if their distance in G is at most k.
+
+  Self-loops are never added.
+
+  **Time Complexity:** O(V × (V + E)) in the worst case
 
   ## Parameters
 
@@ -341,10 +392,10 @@ defmodule Yog.Operation do
       iex> # G^2 connects nodes at distance <= 2
       ...> power = Yog.Operation.power(path, 2, 1)
       iex> # Node 0 and 2 should now be connected (distance 2 in original)
-      ...> Yog.Model.order(power)
-      3
+      ...> Yog.Model.has_edge?(power, 0, 2)
+      true
   """
-  @spec power(Yog.graph(), integer(), any()) :: Yog.graph()
+  @spec power(Graph.t(), integer(), any()) :: Graph.t()
   def power(graph, k, default_weight) do
     if k <= 1 do
       graph
@@ -373,12 +424,16 @@ defmodule Yog.Operation do
     end
   end
 
-  # ============= Structural Comparison =============
+  # =============================================================================
+  # STRUCTURAL COMPARISON
+  # =============================================================================
 
   @doc """
   Checks if the first graph is a subgraph of the second graph.
 
   Returns `true` if all nodes and edges in the first graph exist in the second.
+
+  **Time Complexity:** O(Vₚ + Eₚ) where Vₚ and Eₚ are the nodes and edges of the potential subgraph
 
   ## Examples
 
@@ -401,7 +456,7 @@ defmodule Yog.Operation do
       iex> Yog.Operation.subgraph?(not_subgraph, container)
       false
   """
-  @spec subgraph?(Yog.graph(), Yog.graph()) :: boolean()
+  @spec subgraph?(Graph.t(), Graph.t()) :: boolean()
   def subgraph?(potential, container) do
     potential_nodes = Model.all_nodes(potential)
     container_nodes = MapSet.new(Model.all_nodes(container))
@@ -430,6 +485,9 @@ defmodule Yog.Operation do
   Two graphs are isomorphic if there exists a bijection between their node sets
   that preserves adjacency. This implementation uses degree sequence comparison
   and backtracking to test for isomorphism.
+
+  **Time Complexity:** O(V log V + E) for the fast checks; exponential in the
+  worst case due to backtracking (not recommended for large graphs).
 
   ## Examples
 
@@ -460,7 +518,7 @@ defmodule Yog.Operation do
       iex> Yog.Operation.isomorphic?(g1, path)
       false
   """
-  @spec isomorphic?(Yog.graph(), Yog.graph()) :: boolean()
+  @spec isomorphic?(Graph.t(), Graph.t()) :: boolean()
   def isomorphic?(first, second) do
     first_order = Model.order(first)
     second_order = Model.order(second)
@@ -486,9 +544,11 @@ defmodule Yog.Operation do
     end
   end
 
-  # ============= Helper Functions =============
+  # =============================================================================
+  # Private Helper Functions
+  # =============================================================================
 
-  # Reindex edges with
+  # Reindex edges with a tag to avoid ID collisions
   defp add_tagged_component(target_graph, source_graph, tag) do
     target_graph =
       Enum.reduce(Model.all_nodes(source_graph), target_graph, fn node_id, acc ->
@@ -518,7 +578,7 @@ defmodule Yog.Operation do
     )
   end
 
-  # Computes the degree sequence of a graph
+  # Computes the degree sequence of a graph as {in_degree, out_degree} pairs
   defp degree_sequence(graph) do
     Model.all_nodes(graph)
     |> Enum.map(fn node ->
@@ -575,32 +635,31 @@ defmodule Yog.Operation do
 
     inconsistent_edges =
       Enum.reduce(mapping, 0, fn {src_neighbor, candidate_neighbor}, count ->
-        if src_neighbor in src_successors do
-          if candidate_neighbor in candidate_successors do
-            count
-          else
-            count + 1
-          end
-        else
+        edge_in_first? = src_neighbor in src_successors
+        edge_in_second? = candidate_neighbor in candidate_successors
+
+        if edge_in_first? == edge_in_second? do
           count
+        else
+          count + 1
         end
       end)
 
-    src_predecessors = Model.predecessors(first, src) |> Enum.map(fn {id, _} -> id end)
+    src_predecessors =
+      Model.predecessors(first, src) |> Enum.map(fn {id, _} -> id end)
 
     candidate_predecessors =
       Model.predecessors(second, candidate) |> Enum.map(fn {id, _} -> id end)
 
     inconsistent_incoming =
       Enum.reduce(mapping, 0, fn {src_neighbor, candidate_neighbor}, count ->
-        if src_neighbor in src_predecessors do
-          if candidate_neighbor in candidate_predecessors do
-            count
-          else
-            count + 1
-          end
-        else
+        edge_in_first? = src_neighbor in src_predecessors
+        edge_in_second? = candidate_neighbor in candidate_predecessors
+
+        if edge_in_first? == edge_in_second? do
           count
+        else
+          count + 1
         end
       end)
 

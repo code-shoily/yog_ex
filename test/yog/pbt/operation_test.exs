@@ -52,5 +52,56 @@ defmodule Yog.PBT.OperationTest do
         assert Yog.Operation.isomorphic?(graph, reindexed)
       end
     end
+
+    property "power(G, 1) == G" do
+      check all(graph <- graph_gen()) do
+        assert Yog.Operation.power(graph, 1, 1) == graph
+      end
+    end
+
+    property "cartesian_product order equals product of orders" do
+      check all(g1 <- directed_graph_gen(), g2 <- directed_graph_gen()) do
+        product = Yog.Operation.cartesian_product(g1, g2, 0, 0)
+        assert Yog.node_count(product) == Yog.node_count(g1) * Yog.node_count(g2)
+      end
+    end
+
+    property "subgraph? is reflexive" do
+      check all(graph <- graph_gen()) do
+        assert Yog.Operation.subgraph?(graph, graph)
+      end
+    end
+
+    property "subgraph?(subgraph(G, S), G) is true" do
+      check all(graph <- graph_gen()) do
+        ids = Yog.all_nodes(graph)
+
+        if length(ids) > 0 do
+          subset = Enum.take(ids, max(1, div(length(ids), 2)))
+          sub = Yog.subgraph(graph, subset)
+          assert Yog.Operation.subgraph?(sub, graph)
+        end
+      end
+    end
+
+    property "symmetric_difference is commutative" do
+      check all({g1, g2} <- same_kind_graphs_gen()) do
+        sd1 = Yog.Operation.symmetric_difference(g1, g2)
+        sd2 = Yog.Operation.symmetric_difference(g2, g1)
+
+        assert Yog.node_count(sd1) == Yog.node_count(sd2)
+        assert Yog.edge_count(sd1) == Yog.edge_count(sd2)
+      end
+    end
+
+    property "symmetric_difference edges are in exactly one input" do
+      check all({g1, g2} <- same_kind_graphs_gen()) do
+        sd = Yog.Operation.symmetric_difference(g1, g2)
+
+        for {u, v, _w} <- Yog.all_edges(sd) do
+          assert Yog.Model.has_edge?(g1, u, v) != Yog.Model.has_edge?(g2, u, v)
+        end
+      end
+    end
   end
 end

@@ -285,7 +285,7 @@ defmodule Yog.OperationTest do
 
       result = Operation.power(g, 1, 1)
 
-      assert Yog.Model.order(result) == 2
+      assert result == g
     end
 
     test "k=2 connects distance-2 nodes" do
@@ -300,9 +300,9 @@ defmodule Yog.OperationTest do
 
       result = Operation.power(g, 2, 1)
 
-      # Should have same nodes
       assert Yog.Model.order(result) == 3
-      # Nodes 0 and 2 should now be connected (distance 2 in original)
+      assert Yog.Model.has_edge?(result, 0, 2)
+      assert Yog.Model.edge_count(result) == 3
     end
 
     test "k=0 returns original graph" do
@@ -314,7 +314,27 @@ defmodule Yog.OperationTest do
 
       result = Operation.power(g, 0, 1)
 
-      assert Yog.Model.order(result) == 2
+      assert result == g
+    end
+
+    test "k=3 on a path of 4 connects all pairs" do
+      # Path: 0-1-2-3
+      g =
+        Yog.undirected()
+        |> Yog.add_node(0, nil)
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_node(3, nil)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+
+      result = Operation.power(g, 3, 1)
+
+      assert Yog.Model.order(result) == 4
+      # In a path of 4, max distance is 3, so k=3 should make it a clique
+      assert Yog.Model.has_edge?(result, 0, 3)
+      assert Yog.Model.edge_count(result) == 6
     end
   end
 
@@ -443,6 +463,48 @@ defmodule Yog.OperationTest do
         |> Yog.add_node(2, nil)
         |> Yog.add_node(3, nil)
         |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+
+      assert Operation.isomorphic?(g1, g2) == false
+    end
+
+    test "returns true for isomorphic directed graphs" do
+      g1 =
+        Yog.directed()
+        |> Yog.add_node(:a, nil)
+        |> Yog.add_node(:b, nil)
+        |> Yog.add_node(:c, nil)
+        |> Yog.add_edge_ensure(from: :a, to: :b, with: 1)
+        |> Yog.add_edge_ensure(from: :b, to: :c, with: 1)
+
+      g2 =
+        Yog.directed()
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_node(3, nil)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+
+      assert Operation.isomorphic?(g1, g2) == true
+    end
+
+    test "returns false for non-isomorphic directed graphs" do
+      # g1: a -> b, a -> c (star out)
+      g1 =
+        Yog.directed()
+        |> Yog.add_node(:a, nil)
+        |> Yog.add_node(:b, nil)
+        |> Yog.add_node(:c, nil)
+        |> Yog.add_edge_ensure(from: :a, to: :b, with: 1)
+        |> Yog.add_edge_ensure(from: :a, to: :c, with: 1)
+
+      # g2: a -> b, c -> b (star in)
+      g2 =
+        Yog.directed()
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_node(3, nil)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 3, to: 2, with: 1)
 
       assert Operation.isomorphic?(g1, g2) == false
     end
