@@ -51,7 +51,12 @@ defmodule Yog.Transform do
   Async variants added in v0.60.1.
   """
 
+  alias Yog.Graph
   alias Yog.Model
+
+  # =============================================================================
+  # STRUCTURE TRANSFORMATIONS
+  # =============================================================================
 
   @doc """
   Reverses the direction of every edge in the graph (graph transpose).
@@ -83,10 +88,104 @@ defmodule Yog.Transform do
   - Finding all nodes that can reach a target node
   - Reversing dependencies in a DAG
   """
-  @spec transpose(Yog.graph()) :: Yog.graph()
-  def transpose(%Yog.Graph{} = graph) do
+  @spec transpose(Graph.t()) :: Graph.t()
+  def transpose(%Graph{} = graph) do
     %{graph | out_edges: graph.in_edges, in_edges: graph.out_edges}
   end
+
+  @doc """
+  Converts an undirected graph to a directed graph.
+
+  Since yog internally stores undirected edges as bidirectional directed edges,
+  this is essentially free — it just changes the `kind` flag. The resulting
+  directed graph has two directed edges (A→B and B→A) for each original
+  undirected edge.
+
+  If the graph is already directed, it is returned unchanged.
+
+  **Time Complexity:** O(1)
+
+  ## Example
+
+      iex> undirected =
+      ...>   Yog.undirected()
+      ...>   |> Yog.add_node(1, "A")
+      ...>   |> Yog.add_node(2, "B")
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+      iex> directed = Yog.Transform.to_directed(undirected)
+      iex> # Has edges: 1->2 and 2->1 (both with weight 10)
+      iex> directed.kind
+      :directed
+  """
+  @spec to_directed(Graph.t()) :: Graph.t()
+  def to_directed(%Graph{} = graph) do
+    %{graph | kind: :directed}
+  end
+
+  @doc """
+  Converts a directed graph to an undirected graph.
+
+  For each directed edge A→B, ensures B→A also exists. If both A→B and B→A
+  already exist with different weights, the `resolve` function decides which
+  weight to keep.
+
+  If the graph is already undirected, it is returned unchanged.
+
+  **Time Complexity:** O(E) where E is the number of edges
+
+  ## Examples
+
+  ### When both directions exist, keep the smaller weight
+
+      iex> directed =
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(1, "A")
+      ...>   |> Yog.add_node(2, "B")
+      ...>   |> Yog.add_edges!([{1, 2, 10}, {2, 1, 20}])
+      iex> undirected = Yog.Transform.to_undirected(directed, &min/2)
+      iex> # Edge 1-2 has weight 10 (min of 10 and 20)
+      iex> Yog.successors(undirected, 1)
+      [{2, 10}]
+
+  ### One-directional edges get mirrored automatically
+
+      iex> directed =
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(1, "A")
+      ...>   |> Yog.add_node(2, "B")
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      iex> undirected = Yog.Transform.to_undirected(directed, &min/2)
+      iex> # Edge exists in both directions with weight 5
+      iex> Enum.sort(Yog.successors(undirected, 1))
+      [{2, 5}]
+  """
+  @spec to_undirected(Graph.t(), (term(), term() -> term())) :: Graph.t()
+  def to_undirected(%Graph{kind: :undirected} = graph, _resolve) do
+    graph
+  end
+
+  def to_undirected(%Graph{kind: :directed} = graph, resolve) do
+    symmetric_out =
+      Enum.reduce(graph.out_edges, graph.out_edges, fn {src, inner}, acc_outer ->
+        Enum.reduce(inner, acc_outer, fn {dst, weight}, acc ->
+          dst_inner = Map.get(acc, dst, %{})
+
+          updated_inner =
+            case Map.fetch(dst_inner, src) do
+              {:ok, existing} -> Map.put(dst_inner, src, resolve.(existing, weight))
+              :error -> Map.put(dst_inner, src, weight)
+            end
+
+          Map.put(acc, dst, updated_inner)
+        end)
+      end)
+
+    %{graph | kind: :undirected, out_edges: symmetric_out, in_edges: symmetric_out}
+  end
+
+  # =============================================================================
+  # NODE TRANSFORMATIONS
+  # =============================================================================
 
   @doc """
   Transforms node data using a function, preserving graph structure.
@@ -122,8 +221,8 @@ defmodule Yog.Transform do
       iex> int_graph.nodes[1]
       5
   """
-  @spec map_nodes(Yog.graph(), (term() -> term())) :: Yog.graph()
-  def map_nodes(%Yog.Graph{} = graph, fun) do
+  @spec map_nodes(Graph.t(), (term() -> term())) :: Graph.t()
+  def map_nodes(%Graph{} = graph, fun) do
     new_nodes = Map.new(graph.nodes, fn {id, data} -> {id, fun.(data)} end)
     %{graph | nodes: new_nodes}
   end
@@ -179,8 +278,8 @@ defmodule Yog.Transform do
       # Parallel map_nodes_async on 8-core system: ~1 second
       graph |> Yog.Transform.map_nodes_async(fn x -> expensive_function(x) end)
   """
-  @spec map_nodes_async(Yog.graph(), (term() -> term()), keyword()) :: Yog.graph()
-  def map_nodes_async(%Yog.Graph{} = graph, fun, opts \\ []) do
+  @spec map_nodes_async(Graph.t(), (term() -> term()), keyword()) :: Graph.t()
+  def map_nodes_async(%Graph{} = graph, fun, opts \\ []) do
     default_opts = [
       max_concurrency: System.schedulers_online(),
       timeout: 5000,
@@ -201,6 +300,77 @@ defmodule Yog.Transform do
 
     %{graph | nodes: new_nodes}
   end
+
+  @doc """
+  Updates a specific node's data using an updater function.
+
+  Similar to `Map.update/4`, it takes an initial value if the node doesn't exist,
+  but since this is a graph transformation, it is typically used on existing nodes.
+
+  ## Example
+
+      iex> graph = Yog.directed() |> Yog.add_node(1, 100)
+      iex> updated = Yog.Transform.update_node(graph, 1, 0, fn x -> x + 50 end)
+      iex> Yog.Model.node(updated, 1)
+      150
+
+      iex> graph = Yog.directed()
+      iex> updated = Yog.Transform.update_node(graph, 1, 5, fn x -> x + 5 end)
+      iex> Yog.Model.node(updated, 1)
+      5
+  """
+  @spec update_node(Graph.t(), Yog.node_id(), term(), (term() -> term())) :: Graph.t()
+  def update_node(%Graph{} = graph, id, default, fun) do
+    %{graph | nodes: Map.update(graph.nodes, id, default, fun)}
+  end
+
+  @doc """
+  Filters nodes by a predicate, automatically pruning connected edges.
+
+  Returns a new graph containing only nodes whose data satisfies the predicate.
+  All edges connected to removed nodes (both incoming and outgoing) are
+  automatically removed to maintain graph consistency.
+
+  **Time Complexity:** O(V + E) where V is nodes and E is edges
+
+  ## Example
+
+      iex> graph =
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(1, "apple")
+      ...>   |> Yog.add_node(2, "banana")
+      ...>   |> Yog.add_node(3, "apricot")
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 2)
+      iex> # Keep only nodes starting with 'a'
+      iex> filtered = Yog.Transform.filter_nodes(graph, fn s ->
+      ...>   String.starts_with?(s, "a")
+      ...> end)
+      iex> # Result has nodes 1 and 3, edge 1->2 is removed (node 2 gone)
+      iex> map_size(filtered.nodes)
+      2
+
+  ## Use Cases
+
+  - Extract subgraphs based on node properties
+  - Remove inactive/disabled nodes from a network
+  - Filter by node importance/centrality
+  """
+  @spec filter_nodes(Graph.t(), (term() -> boolean())) :: Graph.t()
+  def filter_nodes(%Graph{} = graph, predicate) do
+    kept_nodes = Map.filter(graph.nodes, fn {_id, data} -> predicate.(data) end)
+
+    %{
+      graph
+      | nodes: kept_nodes,
+        out_edges: prune_edges(graph.out_edges, kept_nodes),
+        in_edges: prune_edges(graph.in_edges, kept_nodes)
+    }
+  end
+
+  # =============================================================================
+  # EDGE TRANSFORMATIONS
+  # =============================================================================
 
   @doc """
   Transforms edge weights using a function, preserving graph structure.
@@ -252,8 +422,8 @@ defmodule Yog.Transform do
       iex> Yog.successors(labeled, 1)
       [{2, "short"}]
   """
-  @spec map_edges(Yog.graph(), (term() -> term())) :: Yog.graph()
-  def map_edges(%Yog.Graph{} = graph, fun) do
+  @spec map_edges(Graph.t(), (term() -> term())) :: Graph.t()
+  def map_edges(%Graph{} = graph, fun) do
     transform_inner = fn inner_map ->
       Map.new(inner_map, fn {dst, weight} -> {dst, fun.(weight)} end)
     end
@@ -328,8 +498,8 @@ defmodule Yog.Transform do
       # Parallel map_edges_async on 8-core system: ~1 second
       graph |> Yog.Transform.map_edges_async(fn w -> expensive_transform(w) end)
   """
-  @spec map_edges_async(Yog.graph(), (term() -> term()), keyword()) :: Yog.graph()
-  def map_edges_async(%Yog.Graph{} = graph, fun, opts \\ []) do
+  @spec map_edges_async(Graph.t(), (term() -> term()), keyword()) :: Graph.t()
+  def map_edges_async(%Graph{} = graph, fun, opts \\ []) do
     default_opts = [
       max_concurrency: System.schedulers_online(),
       timeout: 5000,
@@ -395,9 +565,9 @@ defmodule Yog.Transform do
       iex> Yog.successors(result, 1)
       [{2, 13}] # 1 + 2 + 10
   """
-  @spec map_edges_indexed(Yog.graph(), (Yog.node_id(), Yog.node_id(), term() -> term())) ::
-          Yog.graph()
-  def map_edges_indexed(%Yog.Graph{} = graph, fun) do
+  @spec map_edges_indexed(Graph.t(), (Yog.node_id(), Yog.node_id(), term() -> term())) ::
+          Graph.t()
+  def map_edges_indexed(%Graph{} = graph, fun) do
     new_out =
       Map.new(graph.out_edges, fn {src, inner} ->
         {src, Map.new(inner, fn {dst, weight} -> {dst, fun.(src, dst, weight)} end)}
@@ -409,141 +579,6 @@ defmodule Yog.Transform do
       end)
 
     %{graph | out_edges: new_out, in_edges: new_in}
-  end
-
-  @doc """
-  Filters nodes by a predicate, automatically pruning connected edges.
-
-  Returns a new graph containing only nodes whose data satisfies the predicate.
-  All edges connected to removed nodes (both incoming and outgoing) are
-  automatically removed to maintain graph consistency.
-
-  **Time Complexity:** O(V + E) where V is nodes and E is edges
-
-  ## Example
-
-      iex> graph =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "apple")
-      ...>   |> Yog.add_node(2, "banana")
-      ...>   |> Yog.add_node(3, "apricot")
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
-      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 2)
-      iex> # Keep only nodes starting with 'a'
-      iex> filtered = Yog.Transform.filter_nodes(graph, fn s ->
-      ...>   String.starts_with?(s, "a")
-      ...> end)
-      iex> # Result has nodes 1 and 3, edge 1->2 is removed (node 2 gone)
-      iex> map_size(filtered.nodes)
-      2
-
-  ## Use Cases
-
-  - Extract subgraphs based on node properties
-  - Remove inactive/disabled nodes from a network
-  - Filter by node importance/centrality
-  """
-  @spec filter_nodes(Yog.graph(), (term() -> boolean())) :: Yog.graph()
-  def filter_nodes(%Yog.Graph{} = graph, predicate) do
-    kept_nodes = Map.filter(graph.nodes, fn {_id, data} -> predicate.(data) end)
-
-    prune_edges = fn outer_map ->
-      outer_map
-      |> Map.filter(fn {src, _} -> Map.has_key?(kept_nodes, src) end)
-      |> Map.new(fn {src, inner_map} ->
-        {src, Map.filter(inner_map, fn {dst, _} -> Map.has_key?(kept_nodes, dst) end)}
-      end)
-    end
-
-    %{
-      graph
-      | nodes: kept_nodes,
-        out_edges: prune_edges.(graph.out_edges),
-        in_edges: prune_edges.(graph.in_edges)
-    }
-  end
-
-  @doc """
-  Filters edges by a predicate, preserving all nodes.
-
-  Returns a new graph with the same nodes but only the edges where the
-  predicate returns `true`. The predicate receives `(src, dst, weight)`.
-
-  **Time Complexity:** O(E) where E is the number of edges
-
-  ## Example
-
-      iex> {:ok, graph} =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edges([{1, 2, 5}, {1, 3, 15}, {2, 3, 3}])
-      iex> # Keep only edges with weight >= 10
-      iex> heavy = Yog.Transform.filter_edges(graph, fn _src, _dst, w -> w >= 10 end)
-      iex> # Result: edges [1->3 (15)], edges 1->2 and 2->3 removed
-      iex> Yog.successors(heavy, 1)
-      [{3, 15}]
-
-  ## Use Cases
-
-  - Pruning low-weight edges in weighted networks
-  - Removing self-loops: `filter_edges(g, fn(s, d, _) -> s != d end)`
-  - Threshold-based graph sparsification
-  """
-  @spec filter_edges(Yog.graph(), (Yog.node_id(), Yog.node_id(), term() -> boolean())) ::
-          Yog.graph()
-  def filter_edges(%Yog.Graph{} = graph, predicate) do
-    new_out =
-      for {src, inner_map} <- graph.out_edges, reduce: %{} do
-        acc ->
-          filtered_inner =
-            Map.filter(inner_map, fn {dst, weight} -> predicate.(src, dst, weight) end)
-
-          if map_size(filtered_inner) > 0 do
-            Map.put(acc, src, filtered_inner)
-          else
-            acc
-          end
-      end
-
-    new_in =
-      for {dst, inner_map} <- graph.in_edges, reduce: %{} do
-        acc ->
-          filtered_inner =
-            Map.filter(inner_map, fn {src, weight} -> predicate.(src, dst, weight) end)
-
-          if map_size(filtered_inner) > 0 do
-            Map.put(acc, dst, filtered_inner)
-          else
-            acc
-          end
-      end
-
-    %{graph | out_edges: new_out, in_edges: new_in}
-  end
-
-  @doc """
-  Updates a specific node's data using an updater function.
-
-  Similar to `Map.update/4`, it takes an initial value if the node doesn't exist,
-  but since this is a graph transformation, it is typically used on existing nodes.
-
-  ## Example
-
-      iex> graph = Yog.directed() |> Yog.add_node(1, 100)
-      iex> updated = Yog.Transform.update_node(graph, 1, 0, fn x -> x + 50 end)
-      iex> Yog.Model.node(updated, 1)
-      150
-
-      iex> graph = Yog.directed()
-      iex> updated = Yog.Transform.update_node(graph, 1, 5, fn x -> x + 5 end)
-      iex> Yog.Model.node(updated, 1)
-      5
-  """
-  @spec update_node(Yog.graph(), Yog.node_id(), term(), (term() -> term())) :: Yog.graph()
-  def update_node(%Yog.Graph{} = graph, id, default, fun) do
-    %{graph | nodes: Map.update(graph.nodes, id, default, fun)}
   end
 
   @doc """
@@ -574,9 +609,9 @@ defmodule Yog.Transform do
       iex> Yog.successors(updated, 2)
       [{1, 20}]
   """
-  @spec update_edge(Yog.graph(), Yog.node_id(), Yog.node_id(), term(), (term() -> term())) ::
-          Yog.graph()
-  def update_edge(%Yog.Graph{} = graph, u, v, default, fun) do
+  @spec update_edge(Graph.t(), Yog.node_id(), Yog.node_id(), term(), (term() -> term())) ::
+          Graph.t()
+  def update_edge(%Graph{} = graph, u, v, default, fun) do
     if Map.has_key?(graph.nodes, u) and Map.has_key?(graph.nodes, v) do
       update_directed = fn g, src, dst ->
         update_map = fn map, start, finish ->
@@ -611,6 +646,127 @@ defmodule Yog.Transform do
   end
 
   @doc """
+  Filters edges by a predicate, preserving all nodes.
+
+  Returns a new graph with the same nodes but only the edges where the
+  predicate returns `true`. The predicate receives `(src, dst, weight)`.
+
+  **Time Complexity:** O(E) where E is the number of edges
+
+  ## Example
+
+      iex> {:ok, graph} =
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(1, "A")
+      ...>   |> Yog.add_node(2, "B")
+      ...>   |> Yog.add_node(3, "C")
+      ...>   |> Yog.add_edges([{1, 2, 5}, {1, 3, 15}, {2, 3, 3}])
+      iex> # Keep only edges with weight >= 10
+      iex> heavy = Yog.Transform.filter_edges(graph, fn _src, _dst, w -> w >= 10 end)
+      iex> # Result: edges [1->3 (15)], edges 1->2 and 2->3 removed
+      iex> Yog.successors(heavy, 1)
+      [{3, 15}]
+
+  ## Use Cases
+
+  - Pruning low-weight edges in weighted networks
+  - Removing self-loops: `filter_edges(g, fn(s, d, _) -> s != d end)`
+  - Threshold-based graph sparsification
+  """
+  @spec filter_edges(Graph.t(), (Yog.node_id(), Yog.node_id(), term() -> boolean())) ::
+          Graph.t()
+  def filter_edges(%Graph{} = graph, predicate) do
+    new_out =
+      for {src, inner_map} <- graph.out_edges, reduce: %{} do
+        acc ->
+          filtered_inner =
+            Map.filter(inner_map, fn {dst, weight} -> predicate.(src, dst, weight) end)
+
+          if map_size(filtered_inner) > 0 do
+            Map.put(acc, src, filtered_inner)
+          else
+            acc
+          end
+      end
+
+    new_in =
+      for {dst, inner_map} <- graph.in_edges, reduce: %{} do
+        acc ->
+          filtered_inner =
+            Map.filter(inner_map, fn {src, weight} -> predicate.(src, dst, weight) end)
+
+          if map_size(filtered_inner) > 0 do
+            Map.put(acc, dst, filtered_inner)
+          else
+            acc
+          end
+      end
+
+    %{graph | out_edges: new_out, in_edges: new_in}
+  end
+
+  # =============================================================================
+  # GRAPH COMBINATIONS
+  # =============================================================================
+
+  @doc """
+  Combines two graphs, with the second graph's data taking precedence on conflicts.
+
+  Merges nodes, out_edges, and in_edges from both graphs. When a node exists in
+  both graphs, the node data from `other` overwrites `base`. When the same edge
+  exists in both graphs, the edge weight from `other` overwrites `base`.
+
+  Importantly, edges from different nodes are combined - if `base` has edges
+  1->2 and 1->3, and `other` has edges 1->4 and 1->5, the result will have
+  all four edges from node 1.
+
+  The resulting graph uses the `kind` (Directed/Undirected) from the base graph.
+
+  **Time Complexity:** O(V + E) for both graphs combined
+
+  ## Example
+
+      iex> base =
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(1, "Original")
+      ...>   |> Yog.add_node(2, "B")
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+      iex> other =
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(1, "Updated")
+      ...>   |> Yog.add_node(3, "C")
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 3, with: 20)
+      iex> merged = Yog.Transform.merge(base, other)
+      iex> # Node 1 has "Updated" (from other)
+      iex> # Node 1 has edges to: 2 and 3 (all edges combined)
+      iex> length(Yog.successors(merged, 1))
+      2
+
+  ## Use Cases
+
+  - Combining disjoint subgraphs
+  - Applying updates/patches to a graph
+  - Building graphs incrementally from multiple sources
+  """
+  @spec merge(Graph.t(), Graph.t()) :: Graph.t()
+  def merge(%Graph{} = graph1, %Graph{} = graph2) do
+    merge_inner = fn m1, m2 -> Map.merge(m1, m2) end
+
+    merge_outer = fn outer1, outer2 ->
+      Map.merge(outer1, outer2, fn _src, inner1, inner2 ->
+        merge_inner.(inner1, inner2)
+      end)
+    end
+
+    %{
+      graph1
+      | nodes: Map.merge(graph1.nodes, graph2.nodes),
+        out_edges: merge_outer.(graph1.out_edges, graph2.out_edges),
+        in_edges: merge_outer.(graph1.in_edges, graph2.in_edges)
+    }
+  end
+
+  @doc """
   Creates the complement of a graph.
 
   The complement contains the same nodes but connects all pairs of nodes
@@ -641,8 +797,8 @@ defmodule Yog.Transform do
   - Graph coloring via complement analysis
   - Testing graph density (sparse ↔ dense complement)
   """
-  @spec complement(Yog.graph(), term()) :: Yog.graph()
-  def complement(%Yog.Graph{kind: kind} = graph, default_weight) do
+  @spec complement(Graph.t(), term()) :: Graph.t()
+  def complement(%Graph{kind: kind} = graph, default_weight) do
     node_ids = Map.keys(graph.nodes)
 
     out_edges =
@@ -686,63 +842,6 @@ defmodule Yog.Transform do
   end
 
   @doc """
-  Combines two graphs, with the second graph's data taking precedence on conflicts.
-
-  Merges nodes, out_edges, and in_edges from both graphs. When a node exists in
-  both graphs, the node data from `other` overwrites `base`. When the same edge
-  exists in both graphs, the edge weight from `other` overwrites `base`.
-
-  Importantly, edges from different nodes are combined - if `base` has edges
-  1->2 and 1->3, and `other` has edges 1->4 and 1->5, the result will have
-  all four edges from node 1.
-
-  The resulting graph uses the `kind` (Directed/Undirected) from the base graph.
-
-  **Time Complexity:** O(V + E) for both graphs combined
-
-  ## Example
-
-      iex> base =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "Original")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
-      iex> other =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "Updated")
-      ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 3, with: 20)
-      iex> merged = Yog.Transform.merge(base, other)
-      iex> # Node 1 has "Updated" (from other)
-      iex> # Node 1 has edges to: 2 and 3 (all edges combined)
-      iex> length(Yog.successors(merged, 1))
-      2
-
-  ## Use Cases
-
-  - Combining disjoint subgraphs
-  - Applying updates/patches to a graph
-  - Building graphs incrementally from multiple sources
-  """
-  @spec merge(Yog.graph(), Yog.graph()) :: Yog.graph()
-  def merge(%Yog.Graph{} = graph1, %Yog.Graph{} = graph2) do
-    merge_inner = fn m1, m2 -> Map.merge(m1, m2) end
-
-    merge_outer = fn outer1, outer2 ->
-      Map.merge(outer1, outer2, fn _src, inner1, inner2 ->
-        merge_inner.(inner1, inner2)
-      end)
-    end
-
-    %{
-      graph1
-      | nodes: Map.merge(graph1.nodes, graph2.nodes),
-        out_edges: merge_outer.(graph1.out_edges, graph2.out_edges),
-        in_edges: merge_outer.(graph1.in_edges, graph2.in_edges)
-    }
-  end
-
-  @doc """
   Extracts a subgraph containing only the specified nodes and their connecting edges.
 
   Returns a new graph with only the nodes whose IDs are in the provided list,
@@ -780,25 +879,17 @@ defmodule Yog.Transform do
   - `filter_nodes/2` - Filters by predicate on node data (e.g., "keep active users")
   - `subgraph/2` - Filters by explicit node IDs (e.g., "keep nodes [1, 5, 7]")
   """
-  @spec subgraph(Yog.graph(), [Yog.node_id()]) :: Yog.graph()
-  def subgraph(%Yog.Graph{} = graph, ids) do
+  @spec subgraph(Graph.t(), [Yog.node_id()]) :: Graph.t()
+  def subgraph(%Graph{} = graph, ids) do
     id_set = MapSet.new(ids)
 
     filtered_nodes = Map.filter(graph.nodes, fn {id, _} -> MapSet.member?(id_set, id) end)
 
-    prune = fn outer ->
-      outer
-      |> Map.filter(fn {src, _} -> MapSet.member?(id_set, src) end)
-      |> Map.new(fn {src, inner} ->
-        {src, Map.filter(inner, fn {dst, _} -> MapSet.member?(id_set, dst) end)}
-      end)
-    end
-
     %{
       graph
       | nodes: filtered_nodes,
-        out_edges: prune.(graph.out_edges),
-        in_edges: prune.(graph.in_edges)
+        out_edges: prune_edges(graph.out_edges, id_set),
+        in_edges: prune_edges(graph.in_edges, id_set)
     }
   end
 
@@ -860,12 +951,12 @@ defmodule Yog.Transform do
   - **Karger's algorithm** for minimum cut (randomized)
   """
   @spec contract(
-          Yog.graph(),
+          Graph.t(),
           Yog.node_id(),
           Yog.node_id(),
           (term(), term() -> term())
-        ) :: Yog.graph()
-  def contract(%Yog.Graph{out_edges: out_edges, in_edges: in_edges} = graph, a, b, combine_weight) do
+        ) :: Graph.t()
+  def contract(%Graph{out_edges: out_edges, in_edges: in_edges} = graph, a, b, combine_weight) do
     b_in = Map.get(in_edges, b, %{})
     b_out = Map.get(out_edges, b, %{})
 
@@ -888,6 +979,116 @@ defmodule Yog.Transform do
     end
   end
 
+  # =============================================================================
+  # REACHABILITY TRANSFORMATIONS
+  # =============================================================================
+
+  @doc """
+  Computes the transitive closure of the graph.
+
+  The transitive closure adds an edge from node A to node C whenever there is
+  a path from A to C. For a DAG, this uses a topological sorting optimization.
+  For graphs with cycles, it uses a general path-reaching approach.
+
+  **Time Complexity:** O(V × (V + E))
+
+  ## Examples
+
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_edge_ensure(1, 2, 1, nil)
+      ...> |> Yog.add_edge_ensure(2, 3, 1, nil)
+      iex> closure = Yog.Transform.transitive_closure(graph)
+      iex> Yog.Model.has_edge?(closure, 1, 3)
+      true
+  """
+  @spec transitive_closure(Graph.t()) :: Graph.t()
+  def transitive_closure(%Graph{} = graph) do
+    case Yog.Traversal.topological_sort(graph) do
+      {:ok, sorted} ->
+        solve_transitive_reachability(graph, Enum.reverse(sorted))
+        |> Enum.reduce(graph, fn {node, targets}, g ->
+          add_closure_edges(g, node, targets)
+        end)
+
+      {:error, :contains_cycle} ->
+        Enum.reduce(Yog.all_nodes(graph), graph, fn src, g_acc ->
+          reachable = Yog.Traversal.walk(in: graph, from: src, using: :breadth_first) |> tl()
+
+          Enum.reduce(reachable, g_acc, fn dst, g ->
+            if Model.has_edge?(g, src, dst) do
+              g
+            else
+              Model.add_edge!(g, src, dst, 1)
+            end
+          end)
+        end)
+    end
+  end
+
+  @doc """
+  Computes the transitive reduction of a DAG.
+
+  Transitive reduction removes redundant edges that are implied by transitivity.
+  For Directed Acyclic Graphs (DAGs), the result is unique and minimal.
+
+  If the graph contains cycles, this returns an error as transitive reduction
+  is not uniquely defined for general graphs with cycles.
+
+  **Time Complexity:** O(V × (V + E))
+
+  ## Examples
+
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_edge_ensure(:a, :b, 1, nil)
+      ...> |> Yog.add_edge_ensure(:b, :c, 1, nil)
+      ...> |> Yog.add_edge_ensure(:a, :c, 1, nil)
+      iex> reduction = Yog.Transform.transitive_reduction(graph)
+      iex> {:ok, red} = reduction
+      iex> # Edge a->c is redundant because a->b->c exists
+      iex> Yog.Model.has_edge?(red, :a, :c)
+      false
+  """
+  @spec transitive_reduction(Graph.t()) :: {:ok, Graph.t()} | {:error, :contains_cycle}
+  def transitive_reduction(%Graph{} = graph) do
+    case Yog.Traversal.topological_sort(graph) do
+      {:ok, _sorted} ->
+        nodes = Model.all_nodes(graph)
+
+        edges_to_remove =
+          for node <- nodes,
+              {target, _weight} <- Model.successors(graph, node),
+              has_indirect_path?(graph, node, target),
+              do: {node, target}
+
+        new_graph =
+          Enum.reduce(edges_to_remove, graph, fn {from, to}, g ->
+            Model.remove_edge(g, from, to)
+          end)
+
+        {:ok, new_graph}
+
+      {:error, :contains_cycle} ->
+        {:error, :contains_cycle}
+    end
+  end
+
+  # =============================================================================
+  # Private Helper Functions
+  # =============================================================================
+
+  # Prunes an edges map (out_edges or in_edges) so that only nodes present in
+  # `allowed` (a map or MapSet) are kept, both in the outer and inner maps.
+  defp prune_edges(outer_map, allowed) do
+    outer_map
+    |> Map.filter(fn {src, _} -> contains?(allowed, src) end)
+    |> Map.new(fn {src, inner_map} ->
+      {src, Map.filter(inner_map, fn {dst, _} -> contains?(allowed, dst) end)}
+    end)
+  end
+
+  defp contains?(%MapSet{} = set, key), do: MapSet.member?(set, key)
+  defp contains?(map, key) when is_map(map), do: Map.has_key?(map, key)
+
   # Merges b's edges into a's adjacency map and removes self-loops
   defp merge_adjacent(a_edges, b_edges, combine_weight, a, b) do
     Map.merge(a_edges, b_edges, fn _k, v1, v2 -> combine_weight.(v1, v2) end)
@@ -908,50 +1109,6 @@ defmodule Yog.Transform do
         end)
       end
     end)
-  end
-
-  @doc """
-  Computes the transitive closure of the graph.
-
-  The transitive closure adds an edge from node A to node C whenever there is
-  a path from A to C. For a DAG, this uses a topological sorting optimization.
-  For graphs with cycles, it uses a general path-reaching approach.
-
-  **Time Complexity:** O(V × (V + E))
-
-  ## Examples
-
-      iex> graph = Yog.directed()
-      ...> |> Yog.add_edge_ensure(1, 2, 1, nil)
-      ...> |> Yog.add_edge_ensure(2, 3, 1, nil)
-      iex> closure = Yog.Transform.transitive_closure(graph)
-      iex> Yog.Model.has_edge?(closure, 1, 3)
-      true
-  """
-  @spec transitive_closure(Yog.graph()) :: Yog.graph()
-  def transitive_closure(%Yog.Graph{} = graph) do
-    case Yog.Traversal.topological_sort(graph) do
-      {:ok, sorted} ->
-        # Fast DAG-based closure
-        solve_transitive_reachability(graph, Enum.reverse(sorted))
-        |> Enum.reduce(graph, fn {node, targets}, g ->
-          add_closure_edges(g, node, targets)
-        end)
-
-      {:error, :contains_cycle} ->
-        # General closure using BFS/DFS from each node
-        Enum.reduce(Yog.all_nodes(graph), graph, fn src, g_acc ->
-          reachable = Yog.Traversal.walk(in: graph, from: src, using: :breadth_first) |> tl()
-
-          Enum.reduce(reachable, g_acc, fn dst, g ->
-            if Model.has_edge?(g, src, dst) do
-              g
-            else
-              Model.add_edge!(g, src, dst, 1)
-            end
-          end)
-        end)
-    end
   end
 
   defp solve_transitive_reachability(graph, sorted_nodes) do
@@ -982,53 +1139,6 @@ defmodule Yog.Transform do
     end)
   end
 
-  @doc """
-  Computes the transitive reduction of a DAG.
-
-  Transitive reduction removes redundant edges that are implied by transitivity.
-  For Directed Acyclic Graphs (DAGs), the result is unique and minimal.
-
-  If the graph contains cycles, this returns an error as transitive reduction
-  is not uniquely defined for general graphs with cycles.
-
-  **Time Complexity:** O(V × (V + E))
-
-  ## Examples
-
-      iex> graph = Yog.directed()
-      ...> |> Yog.add_edge_ensure(:a, :b, 1, nil)
-      ...> |> Yog.add_edge_ensure(:b, :c, 1, nil)
-      ...> |> Yog.add_edge_ensure(:a, :c, 1, nil)
-      iex> reduction = Yog.Transform.transitive_reduction(graph)
-      iex> {:ok, red} = reduction
-      iex> # Edge a->c is redundant because a->b->c exists
-      iex> Yog.Model.has_edge?(red, :a, :c)
-      false
-  """
-  @spec transitive_reduction(Yog.graph()) :: {:ok, Yog.graph()} | {:error, :contains_cycle}
-  def transitive_reduction(%Yog.Graph{} = graph) do
-    case Yog.Traversal.topological_sort(graph) do
-      {:ok, _sorted} ->
-        nodes = Model.all_nodes(graph)
-
-        edges_to_remove =
-          for node <- nodes,
-              {target, _weight} <- Model.successors(graph, node),
-              has_indirect_path?(graph, node, target),
-              do: {node, target}
-
-        new_graph =
-          Enum.reduce(edges_to_remove, graph, fn {from, to}, g ->
-            Model.remove_edge(g, from, to)
-          end)
-
-        {:ok, new_graph}
-
-      {:error, :contains_cycle} ->
-        {:error, :contains_cycle}
-    end
-  end
-
   defp has_indirect_path?(graph, from, to) do
     # To check for an indirect path from 'from' to 'to', we look for any
     # path that doesn't use the direct edge (from -> to).
@@ -1038,95 +1148,5 @@ defmodule Yog.Transform do
     |> Enum.any?(fn successor ->
       Yog.Traversal.reachable?(graph, successor, to)
     end)
-  end
-
-  @doc """
-  Converts an undirected graph to a directed graph.
-
-  Since yog internally stores undirected edges as bidirectional directed edges,
-  this is essentially free — it just changes the `kind` flag. The resulting
-  directed graph has two directed edges (A→B and B→A) for each original
-  undirected edge.
-
-  If the graph is already directed, it is returned unchanged.
-
-  **Time Complexity:** O(1)
-
-  ## Example
-
-      iex> undirected =
-      ...>   Yog.undirected()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
-      iex> directed = Yog.Transform.to_directed(undirected)
-      iex> # Has edges: 1->2 and 2->1 (both with weight 10)
-      iex> directed.kind
-      :directed
-  """
-  @spec to_directed(Yog.graph()) :: Yog.graph()
-  def to_directed(%Yog.Graph{} = graph) do
-    %{graph | kind: :directed}
-  end
-
-  @doc """
-  Converts a directed graph to an undirected graph.
-
-  For each directed edge A→B, ensures B→A also exists. If both A→B and B→A
-  already exist with different weights, the `resolve` function decides which
-  weight to keep.
-
-  If the graph is already undirected, it is returned unchanged.
-
-  **Time Complexity:** O(E) where E is the number of edges
-
-  ## Examples
-
-  ### When both directions exist, keep the smaller weight
-
-      iex> directed =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_edges!([{1, 2, 10}, {2, 1, 20}])
-      iex> undirected = Yog.Transform.to_undirected(directed, &min/2)
-      iex> # Edge 1-2 has weight 10 (min of 10 and 20)
-      iex> Yog.successors(undirected, 1)
-      [{2, 10}]
-
-  ### One-directional edges get mirrored automatically
-
-      iex> directed =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
-      iex> undirected = Yog.Transform.to_undirected(directed, &min/2)
-      iex> # Edge exists in both directions with weight 5
-      iex> Enum.sort(Yog.successors(undirected, 1))
-      [{2, 5}]
-  """
-  @spec to_undirected(Yog.graph(), (term(), term() -> term())) :: Yog.graph()
-  def to_undirected(%Yog.Graph{kind: :undirected} = graph, _resolve) do
-    graph
-  end
-
-  def to_undirected(%Yog.Graph{kind: :directed} = graph, resolve) do
-    symmetric_out =
-      Enum.reduce(graph.out_edges, graph.out_edges, fn {src, inner}, acc_outer ->
-        Enum.reduce(inner, acc_outer, fn {dst, weight}, acc ->
-          dst_inner = Map.get(acc, dst, %{})
-
-          updated_inner =
-            case Map.fetch(dst_inner, src) do
-              {:ok, existing} -> Map.put(dst_inner, src, resolve.(existing, weight))
-              :error -> Map.put(dst_inner, src, weight)
-            end
-
-          Map.put(acc, dst, updated_inner)
-        end)
-      end)
-
-    %{graph | kind: :undirected, out_edges: symmetric_out, in_edges: symmetric_out}
   end
 end
