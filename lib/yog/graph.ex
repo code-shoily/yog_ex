@@ -99,15 +99,22 @@ defmodule Yog.Graph do
   """
   @spec edge_count(t()) :: non_neg_integer()
   def edge_count(%__MODULE__{} = graph) do
-    count =
-      graph.out_edges
-      |> Map.values()
-      |> Enum.map(&map_size/1)
-      |> Enum.sum()
-
     case graph.kind do
-      :directed -> count
-      :undirected -> div(count, 2)
+      :directed ->
+        graph.out_edges
+        |> Map.values()
+        |> Enum.map(&map_size/1)
+        |> Enum.sum()
+
+      :undirected ->
+        {total, self_loops} =
+          Enum.reduce(graph.out_edges, {0, 0}, fn {src, targets}, {acc_total, acc_self} ->
+            new_total = acc_total + map_size(targets)
+            new_self = if Map.has_key?(targets, src), do: acc_self + 1, else: acc_self
+            {new_total, new_self}
+          end)
+
+        div(total - self_loops, 2) + self_loops
     end
   end
 
