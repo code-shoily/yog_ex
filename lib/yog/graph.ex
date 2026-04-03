@@ -45,6 +45,15 @@ defmodule Yog.Graph do
 
   @doc """
   Creates a new empty graph of the given type.
+
+  ## Example
+
+      iex> Yog.Graph.new(:directed)
+      %Yog.Graph{kind: :directed, in_edges: %{}, nodes: %{}, out_edges: %{}}
+
+      iex> Yog.Graph.new(:undirected)
+      %Yog.Graph{kind: :undirected, in_edges: %{}, nodes: %{}, out_edges: %{}}
+
   """
   @spec new(kind()) :: t()
   def new(kind) when kind in [:directed, :undirected] do
@@ -69,6 +78,24 @@ defmodule Yog.Graph do
 
       edge_count = Yog.Graph.edge_count(graph)
       # Use edge_count in subsequent calculations...
+
+  ## Example
+
+      iex> graph = Yog.Graph.new(:directed)
+      ...> |> Yog.add_node(1, "A")
+      ...> |> Yog.add_node(2, "B")
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 3, with: 20)
+      iex> Yog.Graph.edge_count(graph)
+      2
+
+      iex> graph = Yog.Graph.new(:undirected)
+      ...> |> Yog.add_node(1, "A")
+      ...> |> Yog.add_node(2, "B")
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 3, with: 20)
+      iex> Yog.Graph.edge_count(graph)
+      2
   """
   @spec edge_count(t()) :: non_neg_integer()
   def edge_count(%__MODULE__{} = graph) do
@@ -86,6 +113,24 @@ defmodule Yog.Graph do
 
   @doc """
   Returns the number of nodes in the graph.
+
+  ## Example
+
+      iex> graph = Yog.Graph.new(:directed)
+      ...> |> Yog.add_node(1, "A")
+      ...> |> Yog.add_node(2, "B")
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 3, with: 20)
+      iex> Yog.Graph.node_count(graph)
+      3
+
+      iex> graph = Yog.Graph.new(:undirected)
+      ...> |> Yog.add_node(1, "A")
+      ...> |> Yog.add_node(2, "B")
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 3, with: 20)
+      iex> Yog.Graph.node_count(graph)
+      3
   """
   @spec node_count(t()) :: non_neg_integer()
   def node_count(%__MODULE__{} = graph) do
@@ -107,10 +152,8 @@ defimpl Enumerable, for: Yog.Graph do
       ...>   |> Yog.add_node(2, "B")
       iex> Enum.to_list(graph)
       [{1, "A"}, {2, "B"}]
-
       iex> Enum.count(graph)
       2
-
       iex> Enum.map(graph, fn {_id, data} -> data end)
       ["A", "B"]
   """
@@ -119,6 +162,22 @@ defimpl Enumerable, for: Yog.Graph do
     {:ok, map_size(nodes)}
   end
 
+  @doc """
+  Checks if a node exists in the graph.
+
+  ## Example
+
+      iex> graph = Yog.Graph.new(:directed)
+      ...> |> Yog.add_node(1, "A")
+      ...> |> Yog.add_node(2, "B")
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+      iex> Enum.member?(graph, {1, "A"})
+      true
+      iex> Enum.member?(graph, {1, "B"})
+      false
+      iex> Enum.member?(graph, :not_a_tuple)
+      false
+  """
   def member?(%Yog.Graph{nodes: nodes}, {id, data}) do
     {:ok, Map.get(nodes, id) == data}
   end
@@ -127,13 +186,37 @@ defimpl Enumerable, for: Yog.Graph do
     {:ok, false}
   end
 
+  @doc """
+  Reduces the graph to a single value.
+
+  ## Example
+
+      iex> graph = Yog.Graph.new(:directed)
+      ...> |> Yog.add_node(1, "A")
+      ...> |> Yog.add_node(2, "B")
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+      iex> Enum.reduce(graph, 0, fn {id, _data}, acc -> acc + id end)
+      3
+  """
   def reduce(%Yog.Graph{nodes: nodes}, acc, fun) do
     Enumerable.reduce(nodes, acc, fun)
   end
 
+  @doc """
+  Slices the graph into a list of nodes.
+
+  ## Example
+
+      iex> graph = Yog.Graph.new(:directed)
+      ...> |> Yog.add_node(1, "A")
+      ...> |> Yog.add_node(2, "B")
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+      iex> Enum.slice(graph, 0, 1)
+      [{1, "A"}]
+  """
   def slice(%Yog.Graph{nodes: nodes}) do
     {:ok, map_size(nodes),
-     fn start, length ->
+     fn start, length, _step ->
        nodes
        |> :maps.to_list()
        |> Enum.slice(start, length)
@@ -152,7 +235,6 @@ defimpl Inspect, for: Yog.Graph do
       iex> graph = Yog.directed() |> Yog.add_node(1, "A")
       iex> inspect(graph)
       "#Yog.Graph<:directed, 1 node, 0 edges>"
-
       iex> graph = Yog.undirected() |> Yog.add_node(1, "A") |> Yog.add_node(2, "B")
       ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
       iex> inspect(graph)
@@ -162,6 +244,18 @@ defimpl Inspect, for: Yog.Graph do
 
   import Inspect.Algebra
 
+  @doc """
+  Inspects the graph.
+
+  ## Example
+
+      iex> graph = Yog.Graph.new(:directed)
+      ...> |> Yog.add_node(1, "A")
+      ...> |> Yog.add_node(2, "B")
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+      iex> inspect(graph)
+      "#Yog.Graph<:directed, 2 nodes, 1 edge>"
+  """
   def inspect(%Yog.Graph{} = graph, opts) do
     node_count = map_size(graph.nodes)
     edge_count = Yog.Graph.edge_count(graph)
