@@ -209,5 +209,64 @@ defmodule Yog.PBT.GeneratorTest do
         assert Yog.all_edges(g1) |> MapSet.new() == Yog.all_edges(g2) |> MapSet.new()
       end
     end
+
+    property "sbm(n, k, p_in, p_out) has exactly n nodes" do
+      check all(
+              n <- StreamData.integer(5..30),
+              k <- StreamData.integer(1..5),
+              p_in <- StreamData.float(min: 0.0, max: 1.0),
+              p_out <- StreamData.float(min: 0.0, max: 1.0)
+            ) do
+        g = Random.sbm(n, k, p_in, p_out)
+        assert Yog.node_count(g) == n
+      end
+    end
+
+    property "sbm community assignments are in valid range" do
+      check all(
+              n <- StreamData.integer(5..30),
+              k <- StreamData.integer(1..5),
+              seed <- StreamData.integer(1..10_000)
+            ) do
+        {_g, communities} = Random.sbm_with_labels(n, k, 0.3, 0.05, seed: seed)
+        assert map_size(communities) == n
+        assert Enum.all?(communities, fn {_node, comm} -> comm >= 0 and comm < k end)
+      end
+    end
+
+    property "dcsbm(n, k, p_in, p_out) has exactly n nodes" do
+      check all(
+              n <- StreamData.integer(5..30),
+              k <- StreamData.integer(1..5),
+              p_in <- StreamData.float(min: 0.0, max: 1.0),
+              p_out <- StreamData.float(min: 0.0, max: 1.0)
+            ) do
+        g = Random.dcsbm(n, k, p_in, p_out)
+        assert Yog.node_count(g) == n
+      end
+    end
+
+    property "hsbm(n, opts) has exactly n nodes" do
+      check all(
+              n <- StreamData.integer(8..64),
+              seed <- StreamData.integer(1..10_000)
+            ) do
+        g = Random.hsbm(n, levels: 2, branching: 2, seed: seed)
+        assert Yog.node_count(g) == n
+      end
+    end
+
+    property "sbm with same seed is reproducible" do
+      check all(
+              n <- StreamData.integer(5..20),
+              k <- StreamData.integer(1..4),
+              seed <- StreamData.integer(1..10_000)
+            ) do
+        {g1, comm1} = Random.sbm_with_labels(n, k, 0.3, 0.05, seed: seed)
+        {g2, comm2} = Random.sbm_with_labels(n, k, 0.3, 0.05, seed: seed)
+        assert Yog.all_edges(g1) |> MapSet.new() == Yog.all_edges(g2) |> MapSet.new()
+        assert comm1 == comm2
+      end
+    end
   end
 end

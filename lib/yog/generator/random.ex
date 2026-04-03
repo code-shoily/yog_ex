@@ -679,4 +679,324 @@ defmodule Yog.Generator.Random do
       Yog.add_edge!(g, from, to, 1)
     end)
   end
+
+  # ============= Stochastic Block Model =============
+
+  @doc """
+  Generates a graph using the Stochastic Block Model (SBM).
+
+  Nodes are assigned to communities, and edges are added with probabilities
+  depending on community membership (higher probability within communities).
+
+  ## Parameters
+    - `n` - Number of nodes
+    - `k` - Number of communities
+    - `p_in` - Probability of edge within community
+    - `p_out` - Probability of edge between communities
+
+  ## Options
+    - `:seed` - Random seed for reproducibility
+    - `:community_sizes` - List of community sizes (must sum to `n`)
+    - `:balanced` - Whether to use equal-sized communities (default: `true`)
+
+  ## Examples
+
+      iex> sbm = Yog.Generator.Random.sbm(100, 4, 0.3, 0.05)
+      iex> Yog.Model.order(sbm)
+      100
+  """
+  @spec sbm(integer(), integer(), float(), float(), keyword()) :: Yog.graph()
+  def sbm(n, k, p_in, p_out, opts \\ []) do
+    {graph, _communities} = sbm_with_labels(n, k, p_in, p_out, opts)
+    graph
+  end
+
+  @doc """
+  Generates an SBM graph with specified graph type.
+  """
+  @spec sbm_with_type(integer(), integer(), float(), float(), Yog.graph_type(), keyword()) ::
+          Yog.graph()
+  def sbm_with_type(n, k, p_in, p_out, graph_type, opts \\ []) do
+    {graph, _communities} = sbm_with_labels_and_type(n, k, p_in, p_out, graph_type, opts)
+    graph
+  end
+
+  @doc """
+  Returns the SBM graph along with community assignments.
+
+  ## Examples
+
+      iex> {_graph, communities} = Yog.Generator.Random.sbm_with_labels(100, 4, 0.3, 0.05)
+      iex> map_size(communities)
+      100
+      iex> communities[0] in 0..3
+      true
+  """
+  @spec sbm_with_labels(integer(), integer(), float(), float(), keyword()) ::
+          {Yog.graph(), %{Yog.node_id() => integer()}}
+  def sbm_with_labels(n, k, p_in, p_out, opts \\ []) do
+    sbm_with_labels_and_type(n, k, p_in, p_out, :undirected, opts)
+  end
+
+  @spec sbm_with_labels_and_type(
+          integer(),
+          integer(),
+          float(),
+          float(),
+          Yog.graph_type(),
+          keyword()
+        ) ::
+          {Yog.graph(), %{Yog.node_id() => integer()}}
+  def sbm_with_labels_and_type(n, k, p_in, p_out, graph_type, opts \\ [])
+
+  def sbm_with_labels_and_type(n, k, p_in, p_out, graph_type, opts)
+      when n > 0 and k >= 1 and p_in >= 0.0 and p_in <= 1.0 and p_out >= 0.0 and p_out <= 1.0 do
+    with_seed(opts[:seed], fn ->
+      community_sizes = get_community_sizes(n, k, opts)
+
+      valid =
+        length(community_sizes) == k and Enum.sum(community_sizes) == n and
+          Enum.all?(community_sizes, &(&1 >= 0))
+
+      if valid do
+        base = Yog.new(graph_type)
+
+        graph =
+          Enum.reduce(0..(n - 1), base, fn i, g ->
+            Yog.add_node(g, i, nil)
+          end)
+
+        communities = build_communities(community_sizes)
+
+        edges =
+          case graph_type do
+            :undirected ->
+              for u <- 0..(n - 1),
+                  v <- (u + 1)..(n - 1)//1,
+                  p = if(communities[u] == communities[v], do: p_in, else: p_out),
+                  :rand.uniform() <= p,
+                  do: {u, v}
+
+            :directed ->
+              for u <- 0..(n - 1),
+                  v <- 0..(n - 1)//1,
+                  u != v,
+                  p = if(communities[u] == communities[v], do: p_in, else: p_out),
+                  :rand.uniform() <= p,
+                  do: {u, v}
+          end
+
+        final_graph =
+          Enum.reduce(edges, graph, fn {from, to}, g ->
+            Yog.add_edge!(g, from, to, 1)
+          end)
+
+        {final_graph, communities}
+      else
+        {Yog.new(:undirected), %{}}
+      end
+    end)
+  end
+
+  def sbm_with_labels_and_type(_n, _k, _p_in, _p_out, _graph_type, _opts),
+    do: {Yog.new(:undirected), %{}}
+
+  defp get_community_sizes(n, k, opts) when n > 0 and k > 0 do
+    case Keyword.get(opts, :community_sizes) do
+      nil ->
+        base_size = div(n, k)
+        remainder = rem(n, k)
+        List.duplicate(base_size + 1, remainder) ++ List.duplicate(base_size, k - remainder)
+
+      sizes ->
+        sizes
+    end
+  end
+
+  defp get_community_sizes(_n, _k, _opts), do: []
+
+  defp build_communities(community_sizes) do
+    community_sizes
+    |> Enum.with_index()
+    |> Enum.flat_map(fn {size, comm} ->
+      start = Enum.sum(Enum.take(community_sizes, comm))
+      Enum.map(start..(start + size - 1), fn node -> {node, comm} end)
+    end)
+    |> Map.new()
+  end
+
+  @doc """
+  Generates a Degree-Corrected Stochastic Block Model (DCSBM).
+
+  Extends SBM with node-specific degree parameters, allowing more realistic
+  degree distributions while preserving community structure.
+
+  ## Options
+    - `:degree_dist` - Degree distribution: `:power_law`, `:poisson`, or custom list
+    - `:gamma` - Power-law exponent (default: 2.5)
+    - `:seed` - Random seed
+    - `:community_sizes` - List of community sizes (must sum to `n`)
+
+  ## Examples
+
+      iex> dcsbm = Yog.Generator.Random.dcsbm(100, 3, 0.3, 0.02,
+      ...>   degree_dist: :power_law, gamma: 2.5)
+      iex> Yog.Model.order(dcsbm)
+      100
+  """
+  @spec dcsbm(integer(), integer(), float(), float(), keyword()) :: Yog.graph()
+  def dcsbm(n, k, p_in, p_out, opts \\ []) do
+    with_seed(opts[:seed], fn ->
+      community_sizes = get_community_sizes(n, k, opts)
+
+      valid =
+        n > 0 and k >= 1 and p_in >= 0.0 and p_in <= 1.0 and p_out >= 0.0 and p_out <= 1.0 and
+          length(community_sizes) == k and Enum.sum(community_sizes) == n
+
+      if valid do
+        base = Yog.new(:undirected)
+
+        graph =
+          Enum.reduce(0..(n - 1), base, fn i, g ->
+            Yog.add_node(g, i, nil)
+          end)
+
+        communities = build_communities(community_sizes)
+        thetas = generate_thetas(n, opts) |> Enum.shuffle()
+
+        edges =
+          for u <- 0..(n - 1),
+              v <- (u + 1)..(n - 1)//1,
+              p_base = if(communities[u] == communities[v], do: p_in, else: p_out),
+              p = min(1.0, Enum.at(thetas, u) * Enum.at(thetas, v) * p_base),
+              :rand.uniform() <= p,
+              do: {u, v}
+
+        Enum.reduce(edges, graph, fn {from, to}, g ->
+          Yog.add_edge!(g, from, to, 1)
+        end)
+      else
+        Yog.new(:undirected)
+      end
+    end)
+  end
+
+  defp generate_thetas(n, opts) do
+    degree_dist = Keyword.get(opts, :degree_dist, :power_law)
+    gamma = Keyword.get(opts, :gamma, 2.5)
+
+    thetas =
+      case degree_dist do
+        :power_law ->
+          for i <- 1..n, do: :math.pow(i, -gamma)
+
+        :poisson ->
+          for _ <- 1..n, do: 0.5 + :rand.uniform()
+
+        list when is_list(list) ->
+          if length(list) == n, do: list, else: List.duplicate(1.0, n)
+
+        _ ->
+          List.duplicate(1.0, n)
+      end
+
+    mean = Enum.sum(thetas) / n
+    if mean > 0, do: Enum.map(thetas, fn t -> t / mean end), else: thetas
+  end
+
+  @doc """
+  Generates a hierarchical SBM with nested communities.
+
+  ## Options
+    - `:levels` - Number of hierarchy levels (default: 2)
+    - `:branching` - Branching factor at each level (default: 2)
+    - `:p_in` - Probability within leaf communities (default: 0.3)
+    - `:p_out` - Probability between root communities (default: 0.01)
+    - `:probs` - Explicit probability list of length `levels + 1`
+    - `:seed` - Random seed
+
+  ## Examples
+
+      iex> hsbm = Yog.Generator.Random.hsbm(80,
+      ...>   levels: 2, branching: 2, p_in: 0.4, p_mid: 0.1, p_out: 0.01)
+      iex> Yog.Model.order(hsbm)
+      80
+  """
+  @spec hsbm(integer(), keyword()) :: Yog.graph()
+  def hsbm(n, opts \\ []) do
+    with_seed(opts[:seed], fn ->
+      levels = Keyword.get(opts, :levels, 2)
+      branching = Keyword.get(opts, :branching, 2)
+
+      valid = n > 0 and levels >= 1 and branching >= 2
+
+      if valid do
+        leaf_blocks = Integer.pow(branching, levels)
+        base_leaf_size = div(n, leaf_blocks)
+
+        if base_leaf_size >= 1 do
+          probs = get_hsbm_probs(levels, opts)
+          powers = for l <- 0..levels, do: Integer.pow(branching, l)
+
+          graph =
+            Enum.reduce(0..(n - 1), Yog.new(:undirected), fn i, g ->
+              Yog.add_node(g, i, nil)
+            end)
+
+          edges =
+            for u <- 0..(n - 1),
+                v <- (u + 1)..(n - 1)//1,
+                lca_level = hsbm_lca_level(u, v, base_leaf_size, n, powers),
+                p = Enum.at(probs, lca_level, 0.0),
+                :rand.uniform() <= p,
+                do: {u, v}
+
+          Enum.reduce(edges, graph, fn {from, to}, g ->
+            Yog.add_edge!(g, from, to, 1)
+          end)
+        else
+          Yog.new(:undirected)
+        end
+      else
+        Yog.new(:undirected)
+      end
+    end)
+  end
+
+  defp get_hsbm_probs(levels, opts) do
+    case Keyword.get(opts, :probs) do
+      nil ->
+        p_in = Keyword.get(opts, :p_in, 0.3)
+        p_out = Keyword.get(opts, :p_out, 0.01)
+
+        if levels == 2 and Keyword.has_key?(opts, :p_mid) do
+          [p_in, opts[:p_mid], p_out]
+        else
+          for l <- 0..levels//1 do
+            p_in + (p_out - p_in) * l / levels
+          end
+        end
+
+      probs when is_list(probs) ->
+        probs
+    end
+  end
+
+  defp hsbm_lca_level(u, v, leaf_size, n, powers) do
+    _leaf_blocks = div(n, leaf_size)
+    bu = div(u, leaf_size)
+    bv = div(v, leaf_size)
+
+    if bu == bv do
+      0
+    else
+      find_lca_level(bu, bv, powers)
+    end
+  end
+
+  defp find_lca_level(bu, bv, powers) do
+    Enum.find(1..(length(powers) - 1), length(powers) - 1, fn l ->
+      div(bu, Enum.at(powers, l)) == div(bv, Enum.at(powers, l))
+    end)
+  end
 end

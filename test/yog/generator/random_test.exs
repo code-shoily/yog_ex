@@ -264,4 +264,106 @@ defmodule Yog.Generator.RandomTest do
     # was properly saved and restored around the seeded generator
     assert seq_without == seq_with
   end
+
+  # ============= SBM Tests =============
+
+  test "sbm/5 creates graph with n nodes" do
+    g = Random.sbm(50, 4, 0.3, 0.05)
+    assert Yog.Model.order(g) == 50
+  end
+
+  test "sbm/5 with p_in=1.0, p_out=0.0 creates disconnected cliques" do
+    g = Random.sbm(12, 3, 1.0, 0.0)
+    assert Yog.Model.order(g) == 12
+    # 3 communities of 4 nodes each -> 3 * 6 = 18 edges
+    assert Yog.Model.edge_count(g) == 18
+  end
+
+  test "sbm/5 with custom community sizes" do
+    g = Random.sbm(10, 2, 1.0, 0.0, community_sizes: [3, 7])
+    assert Yog.Model.order(g) == 10
+    # Community 0: 3 nodes -> 3 edges, Community 1: 7 nodes -> 21 edges
+    assert Yog.Model.edge_count(g) == 24
+  end
+
+  test "sbm_with_labels/5 returns correct community assignments" do
+    {g, communities} = Random.sbm_with_labels(10, 2, 0.5, 0.1)
+    assert Yog.Model.order(g) == 10
+    assert map_size(communities) == 10
+    assert communities[0] == 0
+    assert communities[9] == 1
+  end
+
+  test "sbm_with_type/6 directed variant" do
+    g = Random.sbm_with_type(10, 2, 0.5, 0.1, :directed)
+    assert Yog.Model.type(g) == :directed
+    assert Yog.Model.order(g) == 10
+  end
+
+  test "sbm/5 with same seed is reproducible" do
+    {g1, comm1} = Random.sbm_with_labels(20, 2, 0.4, 0.05, seed: 42)
+    {g2, comm2} = Random.sbm_with_labels(20, 2, 0.4, 0.05, seed: 42)
+    assert Yog.all_edges(g1) |> MapSet.new() == Yog.all_edges(g2) |> MapSet.new()
+    assert comm1 == comm2
+  end
+
+  test "sbm/5 invalid args returns empty graph" do
+    g = Random.sbm(0, 2, 0.3, 0.05)
+    assert Yog.Model.order(g) == 0
+
+    g = Random.sbm(10, 0, 0.3, 0.05)
+    assert Yog.Model.order(g) == 0
+  end
+
+  # ============= DCSBM Tests =============
+
+  test "dcsbm/5 creates graph with n nodes" do
+    g = Random.dcsbm(50, 4, 0.3, 0.05)
+    assert Yog.Model.order(g) == 50
+  end
+
+  test "dcsbm/5 with power_law degree distribution" do
+    g = Random.dcsbm(30, 3, 0.5, 0.05, degree_dist: :power_law, gamma: 2.5)
+    assert Yog.Model.order(g) == 30
+  end
+
+  test "dcsbm/5 with custom degree list" do
+    g = Random.dcsbm(20, 2, 0.5, 0.05, degree_dist: List.duplicate(1.0, 20))
+    assert Yog.Model.order(g) == 20
+  end
+
+  test "dcsbm/5 invalid args returns empty graph" do
+    g = Random.dcsbm(-1, 2, 0.3, 0.05)
+    assert Yog.Model.order(g) == 0
+  end
+
+  # ============= HSBM Tests =============
+
+  test "hsbm/2 creates graph with n nodes" do
+    g = Random.hsbm(80, levels: 2, branching: 2, p_in: 0.4, p_mid: 0.1, p_out: 0.01)
+    assert Yog.Model.order(g) == 80
+  end
+
+  test "hsbm/2 with custom probs" do
+    g = Random.hsbm(16, levels: 2, branching: 2, probs: [1.0, 0.0, 0.0])
+    assert Yog.Model.order(g) == 16
+    # Only edges within leaf blocks of size 4 -> 4 blocks * 6 edges = 24
+    assert Yog.Model.edge_count(g) == 24
+  end
+
+  test "hsbm/2 with p_in=1.0 and p_out=0.0 creates cliques at leaf level" do
+    g = Random.hsbm(8, levels: 1, branching: 2, p_in: 1.0, p_out: 0.0)
+    assert Yog.Model.order(g) == 8
+    # 2 leaf blocks of 4 -> 2 * 6 = 12 edges
+    assert Yog.Model.edge_count(g) == 12
+  end
+
+  test "hsbm/2 invalid args returns empty graph" do
+    g = Random.hsbm(0, levels: 2, branching: 2)
+    assert Yog.Model.order(g) == 0
+
+    g = Random.hsbm(8, levels: 2, branching: 5)
+    # 5^2 = 25 leaf blocks, but only 8 nodes -> base_leaf_size = 0
+    assert Yog.Model.order(g) == 0
+  end
 end
