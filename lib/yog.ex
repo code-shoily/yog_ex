@@ -515,6 +515,12 @@ defmodule Yog do
 
   @doc """
   Returns all neighbor node IDs (without weights).
+
+  ## Example
+
+      iex> graph = Yog.directed() |> Yog.add_edge_ensure(1, 2, 10) |> Yog.add_edge_ensure(1, 3, 20)
+      iex> Yog.neighbor_ids(graph, 1) |> Enum.sort()
+      [2, 3]
   """
   @spec neighbor_ids(graph(), node_id()) :: [node_id()]
   defdelegate neighbor_ids(graph, id), to: Model
@@ -556,43 +562,113 @@ defmodule Yog do
   defdelegate all_nodes(graph), to: Model
 
   @doc """
-  Returns all node IDs in the graph.
+  Returns all unique node IDs in the graph.
+
+  ## Example
+
+      iex> graph = Yog.directed() |> Yog.add_node(1, "A") |> Yog.add_node(2, "B")
+      iex> Yog.node_ids(graph) |> Enum.sort()
+      [1, 2]
   """
   @spec node_ids(graph()) :: [node_id()]
   defdelegate node_ids(graph), to: Model, as: :all_nodes
 
   @doc """
   Returns all edges in the graph as triplets `{from, to, weight}`.
+
+  ## Example
+
+      iex> graph = Yog.directed() |> Yog.add_edge_ensure(1, 2, 10)
+      iex> Yog.all_edges(graph)
+      [{1, 2, 10}]
   """
   @spec all_edges(graph()) :: [{node_id(), node_id(), any()}]
   defdelegate all_edges(graph), to: Model
 
   @doc """
   Returns the number of nodes in the graph.
+
+  ## Example
+
+      iex> graph = Yog.directed() |> Yog.add_node(1, "A") |> Yog.add_node(2, "B")
+      iex> Yog.node_count(graph)
+      2
   """
   @spec node_count(graph()) :: integer()
   defdelegate node_count(graph), to: Model
 
   @doc """
+  Returns the number of nodes in the graph (graph order).
+
+  ## Example
+
+      iex> graph = Yog.directed() |> Yog.add_node(1, "A") |> Yog.add_node(2, "B")
+      iex> Yog.order(graph)
+      2
+  """
+  @spec order(graph()) :: integer()
+  defdelegate order(graph), to: Model
+
+  @doc """
   Returns the number of edges in the graph.
+
+  ## Example
+
+      iex> graph = Yog.directed() |> Yog.add_edge_ensure(1, 2, 10) |> Yog.add_edge_ensure(2, 3, 5)
+      iex> Yog.edge_count(graph)
+      2
   """
   @spec edge_count(graph()) :: integer()
   defdelegate edge_count(graph), to: Model
 
   @doc """
+  Gets the type of the graph (`:directed` or `:undirected`).
+
+  ## Example
+
+      iex> graph = Yog.directed()
+      iex> Yog.type(graph)
+      :directed
+  """
+  @spec type(graph()) :: graph_type()
+  defdelegate type(graph), to: Model
+
+  @doc """
   Gets the data associated with a node.
+
+  ## Example
+
+      iex> graph = Yog.directed() |> Yog.add_node(1, "A")
+      iex> Yog.node(graph, 1)
+      "A"
   """
   @spec node(graph(), node_id()) :: term() | nil
   defdelegate node(graph, id), to: Model
 
   @doc """
   Checks if the graph contains a node with the given ID.
+
+  ## Example
+
+      iex> graph = Yog.directed() |> Yog.add_node(1, "A")
+      iex> Yog.has_node?(graph, 1)
+      true
+      iex> Yog.has_node?(graph, 2)
+      false
   """
   @spec has_node?(graph(), node_id()) :: boolean()
   defdelegate has_node?(graph, id), to: Model
 
   @doc """
   Checks if the graph contains an edge between `src` and `dst`.
+
+  ## Example
+
+      iex> graph = Yog.directed() |> Yog.add_edge_ensure(1, 2, 10)
+      iex> Yog.has_edge?(graph, 1, 2)
+      true
+      iex> Yog.has_edge?(graph, 2, 1)
+      false
   """
   @spec has_edge?(graph(), node_id(), node_id()) :: boolean()
   defdelegate has_edge?(graph, src, dst), to: Model

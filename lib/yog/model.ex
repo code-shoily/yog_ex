@@ -20,13 +20,14 @@ defmodule Yog.Model do
   ## Quick Start
 
       iex> graph =
-      ...>   Yog.Model.new(:undirected)
-      ...>   |> Yog.Model.add_node(1, "Alice")
-      ...>   |> Yog.Model.add_node(2, "Bob")
-      ...>   |> Yog.Model.add_edge(1, 2, 10)
-      iex> {:ok, g} = graph
-      iex> Yog.Model.successors(g, 1)
+      ...>   Yog.Model.new(:directed)
+      ...>   |> Yog.Model.add_node(1, "A")
+      ...>   |> Yog.Model.add_node(2, "B")
+      ...>   |> Yog.Model.add_edge!(1, 2, 10)
+      iex> Yog.Model.successors(graph, 1)
       [{2, 10}]
+      iex> Yog.Model.node(graph, 1)
+      "A"
 
   ## Design Notes
 
@@ -247,21 +248,20 @@ defmodule Yog.Model do
 
   ## Example
 
-      iex> # Nodes 1 and 2 are created automatically with data "unknown"
+      iex> # Nodes 1 and 2 are created automatically with data "anon"
       iex> graph =
       ...>   Yog.Model.new(:directed)
-      ...>   |> Yog.Model.add_edge_ensure(1, 2, 10, "unknown")
+      ...>   |> Yog.Model.add_edge_ensure(1, 2, 10, "anon")
       iex> Yog.Model.node(graph, 1)
-      "unknown"
+      "anon"
 
-      iex> # Existing nodes keep their data; only missing ones get the default
+      iex> # Existing nodes keep their data
       iex> graph =
       ...>   Yog.Model.new(:directed)
-      ...>   |> Yog.Model.add_node(1, "Alice")
-      ...>   |> Yog.Model.add_edge_ensure(1, 2, 5, "anon")
-      iex> # Node 1 is still "Alice", node 2 is "anon"
+      ...>   |> Yog.Model.add_node(1, "A")
+      ...>   |> Yog.Model.add_edge_ensure(1, 2, 5, "B")
       iex> {Yog.Model.node(graph, 1), Yog.Model.node(graph, 2)}
-      {"Alice", "anon"}
+      {"A", "B"}
   """
   @spec add_edge_ensure(graph(), node_id(), node_id(), term(), term()) :: graph()
   def add_edge_ensure(graph, src, dst, weight, default \\ nil) do
@@ -700,12 +700,11 @@ defmodule Yog.Model do
   ## Example
 
       iex> graph =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 3, with: 20)
+      ...>   Yog.Model.new(:directed)
+      ...>   |> Yog.Model.add_node(1, "A")
+      ...>   |> Yog.Model.add_node(2, "B")
+      ...>   |> Yog.Model.add_edge_ensure(1, 2, 10)
+      ...>   |> Yog.Model.add_edge_ensure(1, 3, 20)
       iex> Yog.Model.neighbor_ids(graph, 1) |> Enum.sort()
       [2, 3]
   """
