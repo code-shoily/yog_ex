@@ -103,29 +103,34 @@ defmodule Yog.DisjointSet do
       ...>   |> Yog.DisjointSet.add(1)
       ...>   |> Yog.DisjointSet.add(2)
       ...>   |> Yog.DisjointSet.union(1, 2)
-      iex> {_, root} = Yog.DisjointSet.find(dsu, 1)
-      iex> # Root is the representative of the set containing 1
-      iex> is_integer(root)
-      true
+      ...>   |> Yog.DisjointSet.union(1, 3)
+      iex> {_, root} = Yog.DisjointSet.find(dsu, 3)
+      iex> root
+      1
   """
   @spec find(t(), term()) :: {t(), term()}
   def find(%__MODULE__{parents: parents, ranks: ranks} = dsu, element) do
     case Map.fetch(parents, element) do
       :error ->
-        # Element not found, add it and return as its own root
         new_dsu = add(dsu, element)
         {new_dsu, element}
 
       {:ok, parent} when parent == element ->
-        # Element is its own parent (root)
         {dsu, element}
 
       {:ok, parent} ->
-        # Recursively find root with path compression
-        {updated_dsu, root} = find(%__MODULE__{parents: parents, ranks: ranks}, parent)
-        # Compress path: point element directly to root
+        {updated_dsu, root} =
+          find(
+            %__MODULE__{parents: parents, ranks: ranks},
+            parent
+          )
+
         new_parents = Map.put(updated_dsu.parents, element, root)
-        {%__MODULE__{parents: new_parents, ranks: updated_dsu.ranks}, root}
+
+        {
+          %__MODULE__{parents: new_parents, ranks: updated_dsu.ranks},
+          root
+        }
     end
   end
 
@@ -276,8 +281,12 @@ defmodule Yog.DisjointSet do
   # Private Helper Functions
   # =============================================================================
 
-  # Unions two sets by their ranks (internal helper).
-  # Precondition: root_x and root_y are different roots.
+  # Unions two sets by their ranks.
+  # 1. If both roots are the same, the structure is unchanged
+  # 2. The tree with the smaller rank is attached to the tree with the larger rank
+  # 3. If ranks are equal, root_x wins, and its rank is incremented
+  defp do_union_by_rank(dsu, root, root), do: dsu
+
   defp do_union_by_rank(%__MODULE__{parents: parents, ranks: ranks}, root_x, root_y) do
     rank_x = Map.get(ranks, root_x, 0)
     rank_y = Map.get(ranks, root_y, 0)
@@ -292,7 +301,7 @@ defmodule Yog.DisjointSet do
         # Attach y's tree under x's tree
         new_parents = Map.put(parents, root_y, root_x)
 
-        # If ranks are equal, increment x's rank
+        # If ranks are equal, increment x's rank, first argument wins.
         new_ranks =
           if rank_x == rank_y do
             Map.put(ranks, root_x, rank_x + 1)
