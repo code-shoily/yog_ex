@@ -164,13 +164,13 @@ defmodule Yog.Model do
       {:error, "Nodes 1 and 2 do not exist"}
   """
   @spec add_edge(graph(), node_id(), node_id(), term()) :: {:ok, graph()} | {:error, String.t()}
-  def add_edge(%Graph{nodes: nodes} = graph, src, dst, weight) do
+  def add_edge(%Graph{nodes: nodes} = graph, src, dst, edge_data) do
     has_src = Map.has_key?(nodes, src)
     has_dst = Map.has_key?(nodes, dst)
 
     cond do
       has_src and has_dst ->
-        {:ok, add_edge_unchecked(graph, src, dst, weight)}
+        {:ok, add_edge_unchecked(graph, src, dst, edge_data)}
 
       not has_src and not has_dst ->
         {:error, "Nodes #{src} and #{dst} do not exist"}
@@ -197,8 +197,8 @@ defmodule Yog.Model do
       [{2, 10}]
   """
   @spec add_edge!(graph(), node_id(), node_id(), term()) :: graph()
-  def add_edge!(graph, from, to, weight) do
-    case add_edge(graph, from, to, weight) do
+  def add_edge!(graph, from, to, edge_data) do
+    case add_edge(graph, from, to, edge_data) do
       {:ok, g} -> g
       {:error, reason} -> raise ArgumentError, reason
     end
@@ -234,8 +234,8 @@ defmodule Yog.Model do
   def add_edge(graph, opts) when is_list(opts) do
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
-    weight = Keyword.fetch!(opts, :with)
-    add_edge(graph, from, to, weight)
+    edge_data = Keyword.fetch!(opts, :with)
+    add_edge(graph, from, to, edge_data)
   end
 
   @doc """
@@ -252,8 +252,8 @@ defmodule Yog.Model do
   def add_edge!(graph, opts) do
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
-    weight = Keyword.fetch!(opts, :with)
-    add_edge!(graph, from, to, weight)
+    edge_data = Keyword.fetch!(opts, :with)
+    add_edge!(graph, from, to, edge_data)
   end
 
   @doc """
@@ -278,9 +278,9 @@ defmodule Yog.Model do
   def add_edge_ensure(graph, opts) when is_list(opts) do
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
-    weight = Keyword.fetch!(opts, :with)
+    edge_data = Keyword.fetch!(opts, :with)
     default = Keyword.get(opts, :default, nil)
-    add_edge_ensure(graph, from, to, weight, default)
+    add_edge_ensure(graph, from, to, edge_data, default)
   end
 
   @doc """
@@ -288,7 +288,8 @@ defmodule Yog.Model do
 
   If `src` or `dst` is not already in the graph, it is created with
   the supplied `default` node data before the edge is added. Nodes
-  that already exist are left unchanged.
+  that already exist are left unchanged. If no default is submitted `nil`
+  is used as the default node data.
 
   Always succeeds and returns a `Graph` (never fails).
 
@@ -370,11 +371,11 @@ defmodule Yog.Model do
       {"1", "2:new"}
   """
   @spec add_edge_with(graph(), node_id(), node_id(), term(), (node_id() -> term())) :: graph()
-  def add_edge_with(graph, src, dst, weight, make_fn) do
+  def add_edge_with(graph, src, dst, edge_data, make_fn) do
     graph
     |> ensure_node_with(src, make_fn)
     |> ensure_node_with(dst, make_fn)
-    |> add_edge_unchecked(src, dst, weight)
+    |> add_edge_unchecked(src, dst, edge_data)
   end
 
   @doc """
@@ -400,8 +401,8 @@ defmodule Yog.Model do
   @spec add_edges(graph(), [{node_id(), node_id(), term()}]) ::
           {:ok, graph()} | {:error, String.t()}
   def add_edges(graph, edges) do
-    Enum.reduce_while(edges, {:ok, graph}, fn {src, dst, weight}, {:ok, g} ->
-      case add_edge(g, src, dst, weight) do
+    Enum.reduce_while(edges, {:ok, graph}, fn {src, dst, edge_data}, {:ok, g} ->
+      case add_edge(g, src, dst, edge_data) do
         {:ok, new_g} -> {:cont, {:ok, new_g}}
         {:error, reason} -> {:halt, {:error, reason}}
       end
@@ -1052,8 +1053,8 @@ defmodule Yog.Model do
       "A"
   """
   @spec node(graph(), node_id()) :: term() | nil
-  def node(graph, id) do
-    graph |> nodes() |> Map.get(id)
+  def node(%Graph{nodes: nodes}, id) do
+    Map.get(nodes, id)
   end
 
   @doc """
