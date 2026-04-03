@@ -120,5 +120,25 @@ defmodule Yog.PBT.TraversalTest do
         end
       end
     end
+
+    property "Topological Sort: Order preserves dependencies in a DAG" do
+      check all(graph <- directed_graph_gen()) do
+        case Yog.Traversal.topological_sort(graph) do
+          {:ok, sorted_nodes} ->
+            pos_map = Enum.with_index(sorted_nodes) |> Enum.into(%{})
+
+            edges = Yog.all_edges(graph)
+
+            for {u, v, _} <- edges do
+              if u != v do
+                assert pos_map[u] < pos_map[v]
+              end
+            end
+
+          {:error, _} ->
+            assert Yog.cyclic?(graph)
+        end
+      end
+    end
   end
 end

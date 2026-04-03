@@ -1,10 +1,10 @@
-defmodule Yog.PBT.AlgorithmTest do
+defmodule Yog.PBT.ComponentTest do
   use ExUnit.Case, async: true
   use ExUnitProperties
 
   import Yog.Generators
 
-  describe "Algorithm Correctness" do
+  describe "Connectivity and Component Properties" do
     property "SCC partitioning: Strongly Connected Components partition the nodes" do
       check all(graph <- directed_graph_gen()) do
         sccs = Yog.Connectivity.strongly_connected_components(graph)
@@ -35,26 +35,6 @@ defmodule Yog.PBT.AlgorithmTest do
 
             assert k_weight == p_weight
           end
-        end
-      end
-    end
-
-    property "Topological Sort: Order preserves dependencies in a DAG" do
-      check all(graph <- directed_graph_gen()) do
-        case Yog.Traversal.topological_sort(graph) do
-          {:ok, sorted_nodes} ->
-            pos_map = Enum.with_index(sorted_nodes) |> Enum.into(%{})
-
-            edges = Yog.all_edges(graph)
-
-            for {u, v, _} <- edges do
-              if u != v do
-                assert pos_map[u] < pos_map[v]
-              end
-            end
-
-          {:error, _} ->
-            assert Yog.cyclic?(graph)
         end
       end
     end
