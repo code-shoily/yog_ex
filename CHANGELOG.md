@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Pathfinding**: Added `all_pair_shortest_path_unweighted/1` - computes shortest path distances between all pairs of nodes in unweighted graphs using BFS.
+- **Operations**: Added `Yog.Operation.line_graph/2` - constructs the line graph (or line digraph) of a graph, where each edge becomes a node and adjacency is determined by shared endpoints (undirected) or head-to-tail matching (directed).
 
 ### Changed
 

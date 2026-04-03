@@ -275,6 +275,116 @@ defmodule Yog.OperationTest do
     end
   end
 
+  describe "line_graph/2" do
+    test "line graph of undirected path is a path" do
+      path =
+        Yog.undirected()
+        |> Yog.add_node(0, nil)
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 10)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 20)
+
+      lg = Operation.line_graph(path, 1)
+
+      assert Yog.Model.order(lg) == 2
+      assert Yog.Model.has_edge?(lg, {0, 1}, {1, 2})
+      assert Yog.Model.edge_count(lg) == 1
+      assert Yog.Model.node(lg, {0, 1}) == 10
+      assert Yog.Model.node(lg, {1, 2}) == 20
+    end
+
+    test "line graph of undirected triangle is a triangle" do
+      triangle =
+        Yog.undirected()
+        |> Yog.add_node(0, nil)
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 2, to: 0, with: 1)
+
+      lg = Operation.line_graph(triangle, 1)
+
+      assert Yog.Model.order(lg) == 3
+      assert Yog.Model.edge_count(lg) == 3
+    end
+
+    test "line graph of undirected star is a clique" do
+      star =
+        Yog.undirected()
+        |> Yog.add_node(0, nil)
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_node(3, nil)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
+        |> Yog.add_edge_ensure(from: 0, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 0, to: 3, with: 1)
+
+      lg = Operation.line_graph(star, 1)
+
+      assert Yog.Model.order(lg) == 3
+      assert Yog.Model.edge_count(lg) == 3
+    end
+
+    test "line graph of directed path follows edge direction" do
+      path =
+        Yog.directed()
+        |> Yog.add_node(0, nil)
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+
+      lg = Operation.line_graph(path, 1)
+
+      assert Yog.Model.order(lg) == 2
+      assert Yog.Model.has_edge?(lg, {0, 1}, {1, 2})
+      refute Yog.Model.has_edge?(lg, {1, 2}, {0, 1})
+    end
+
+    test "line graph of directed cycle is a directed cycle" do
+      cycle =
+        Yog.directed()
+        |> Yog.add_node(0, nil)
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 2, to: 0, with: 1)
+
+      lg = Operation.line_graph(cycle, 1)
+
+      assert Yog.Model.order(lg) == 3
+      assert Yog.Model.edge_count(lg) == 3
+      assert Yog.Model.has_edge?(lg, {0, 1}, {1, 2})
+      assert Yog.Model.has_edge?(lg, {1, 2}, {2, 0})
+      assert Yog.Model.has_edge?(lg, {2, 0}, {0, 1})
+    end
+
+    test "line graph of empty graph is empty" do
+      empty = Yog.undirected()
+      lg = Operation.line_graph(empty, 1)
+
+      assert Yog.Model.order(lg) == 0
+      assert Yog.Model.edge_count(lg) == 0
+    end
+
+    test "line graph of single edge is single node" do
+      g =
+        Yog.undirected()
+        |> Yog.add_node(0, nil)
+        |> Yog.add_node(1, nil)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 5)
+
+      lg = Operation.line_graph(g, 1)
+
+      assert Yog.Model.order(lg) == 1
+      assert Yog.Model.edge_count(lg) == 0
+      assert Yog.Model.node(lg, {0, 1}) == 5
+    end
+  end
+
   describe "power/2" do
     test "k=1 returns original graph" do
       g =

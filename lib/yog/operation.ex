@@ -366,6 +366,80 @@ defmodule Yog.Operation do
   end
 
   @doc """
+  Returns the line graph of a graph.
+
+  The line graph L(G) is a graph where each node represents an edge of G,
+  and two nodes are adjacent if and only if their corresponding edges share
+  a common endpoint in G.
+
+  For **directed graphs**, two edges `(u, v)` and `(x, y)` are adjacent in the
+  line graph if and only if `v == x` (the head of the first edge matches the
+  tail of the second edge). This is the standard line digraph definition.
+
+  For **undirected graphs**, two edges `{u, v}` and `{x, y}` are adjacent if
+  and only if they share at least one endpoint.
+
+  Line graph nodes are represented as `{u, v}` tuples. For undirected graphs,
+  the tuple follows the same ordering convention as `Yog.Model.all_edges/1`
+  (`u <= v` using Erlang term ordering).
+
+  **Time Complexity:** O(E²) where E is the number of edges in the original graph
+
+  ## Parameters
+
+  - `graph` - The input graph
+  - `default_weight` - Weight for edges in the line graph (default: 1)
+
+  ## Examples
+
+      iex> path = Yog.undirected()
+      ...> |> Yog.add_node(0, nil)
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_edge_ensure(from: 0, to: 1, with: 10)
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 20)
+      iex> lg = Yog.Operation.line_graph(path, 1)
+      iex> # Line graph of a path has 2 nodes ({0,1} and {1,2}) and 1 edge
+      iex> Yog.Model.order(lg)
+      2
+      iex> Yog.Model.has_edge?(lg, {0, 1}, {1, 2})
+      true
+  """
+  @spec line_graph(Graph.t(), term()) :: Graph.t()
+  def line_graph(%Graph{kind: kind} = graph, default_weight \\ 1) do
+    edges = Model.all_edges(graph)
+
+    lg =
+      Enum.reduce(edges, Graph.new(kind), fn {u, v, w}, acc ->
+        Model.add_node(acc, {u, v}, w)
+      end)
+
+    case kind do
+      :directed ->
+        Enum.reduce(edges, lg, fn {u, v, _w}, acc ->
+          Enum.reduce(edges, acc, fn {x, y, _w2}, inner_acc ->
+            if v == x and {u, v} != {x, y} do
+              Model.add_edge!(inner_acc, {u, v}, {x, y}, default_weight)
+            else
+              inner_acc
+            end
+          end)
+        end)
+
+      :undirected ->
+        Enum.reduce(edges, lg, fn {u, v, _w}, acc ->
+          Enum.reduce(edges, acc, fn {x, y, _w2}, inner_acc ->
+            if {u, v} != {x, y} and shares_endpoint?(u, v, x, y) do
+              Model.add_edge!(inner_acc, {u, v}, {x, y}, default_weight)
+            else
+              inner_acc
+            end
+          end)
+        end)
+    end
+  end
+
+  @doc """
   Returns the k-th power of a graph.
 
   The k-th power of a graph G, denoted G^k, is a graph where two nodes are
@@ -547,6 +621,11 @@ defmodule Yog.Operation do
   # =============================================================================
   # Private Helper Functions
   # =============================================================================
+
+  # Returns true if two edges share at least one endpoint
+  defp shares_endpoint?(u, v, x, y) do
+    u == x or u == y or v == x or v == y
+  end
 
   # Reindex edges with a tag to avoid ID collisions
   defp add_tagged_component(target_graph, source_graph, tag) do

@@ -103,5 +103,41 @@ defmodule Yog.PBT.OperationTest do
         end
       end
     end
+
+    property "line_graph node count equals edge count of original" do
+      check all(graph <- graph_gen()) do
+        lg = Yog.Operation.line_graph(graph, 1)
+        assert Yog.node_count(lg) == Yog.edge_count(graph)
+      end
+    end
+
+    property "line_graph edge count for simple undirected graphs" do
+      check all(graph <- undirected_graph_gen()) do
+        graph = Yog.filter_edges(graph, fn u, v, _ -> u != v end)
+        lg = Yog.Operation.line_graph(graph, 1)
+
+        expected_edges =
+          Yog.all_nodes(graph)
+          |> Enum.map(&Yog.Model.degree(graph, &1))
+          |> Enum.map(fn d -> div(d * (d - 1), 2) end)
+          |> Enum.sum()
+
+        assert Yog.edge_count(lg) == expected_edges
+      end
+    end
+
+    property "line_graph edge count for simple directed graphs (line digraph)" do
+      check all(graph <- directed_graph_gen()) do
+        graph = Yog.filter_edges(graph, fn u, v, _ -> u != v end)
+        lg = Yog.Operation.line_graph(graph, 1)
+
+        expected_edges =
+          Yog.all_nodes(graph)
+          |> Enum.map(fn v -> Yog.Model.in_degree(graph, v) * Yog.Model.out_degree(graph, v) end)
+          |> Enum.sum()
+
+        assert Yog.edge_count(lg) == expected_edges
+      end
+    end
   end
 end
