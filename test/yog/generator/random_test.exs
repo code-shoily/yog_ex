@@ -5,6 +5,108 @@ defmodule Yog.Generator.RandomTest do
 
   doctest Yog.Generator.Random
 
+  # ============= Erdős-Rényi G(n, p) Tests =============
+
+  test "erdos_renyi_gnp/2 creates graph with n nodes" do
+    g = Random.erdos_renyi_gnp(10, 0.3)
+    assert Yog.Model.order(g) == 10
+  end
+
+  test "erdos_renyi_gnp/2 with p=0 has no edges" do
+    g = Random.erdos_renyi_gnp(10, 0.0)
+    assert Yog.Model.edge_count(g) == 0
+  end
+
+  test "erdos_renyi_gnp/2 with p=1 is complete graph" do
+    g = Random.erdos_renyi_gnp(5, 1.0)
+    assert Yog.Model.edge_count(g) == 10
+  end
+
+  test "erdos_renyi_gnp/2 directed variant" do
+    g = Random.erdos_renyi_gnp_with_type(5, 0.5, :directed)
+    assert Yog.Model.type(g) == :directed
+    assert Yog.Model.order(g) == 5
+  end
+
+  # ============= Erdős-Rényi G(n, m) Tests =============
+
+  test "erdos_renyi_gnm/2 creates graph with exactly m edges" do
+    g = Random.erdos_renyi_gnm(10, 15)
+    assert Yog.Model.order(g) == 10
+    assert Yog.Model.edge_count(g) == 15
+  end
+
+  test "erdos_renyi_gnm/2 clamps m to max possible" do
+    g = Random.erdos_renyi_gnm(5, 100)
+    # Max edges in K5 = 10
+    assert Yog.Model.edge_count(g) == 10
+  end
+
+  test "erdos_renyi_gnm/2 with m=0 has no edges" do
+    g = Random.erdos_renyi_gnm(10, 0)
+    assert Yog.Model.edge_count(g) == 0
+  end
+
+  # ============= Barabási-Albert Tests =============
+
+  test "barabasi_albert/2 creates graph with n nodes" do
+    g = Random.barabasi_albert(20, 2)
+    assert Yog.Model.order(g) == 20
+  end
+
+  test "barabasi_albert/2 m >= n returns isolated nodes" do
+    g = Random.barabasi_albert(5, 10)
+    assert Yog.Model.order(g) == 5
+    assert Yog.Model.edge_count(g) == 0
+  end
+
+  test "barabasi_albert/2 directed variant" do
+    g = Random.barabasi_albert_with_type(10, 2, :directed)
+    assert Yog.Model.type(g) == :directed
+    assert Yog.Model.order(g) == 10
+  end
+
+  # ============= Watts-Strogatz Tests =============
+
+  test "watts_strogatz/3 creates graph with n nodes" do
+    g = Random.watts_strogatz(20, 4, 0.1)
+    assert Yog.Model.order(g) == 20
+  end
+
+  test "watts_strogatz/3 p=0 is regular lattice" do
+    g = Random.watts_strogatz(10, 4, 0.0)
+    assert Yog.Model.order(g) == 10
+    # Each node should have degree 4
+    degrees = for v <- 0..9, do: length(Yog.neighbors(g, v))
+    assert Enum.all?(degrees, fn d -> d == 4 end)
+  end
+
+  test "watts_strogatz/3 directed variant" do
+    g = Random.watts_strogatz_with_type(10, 4, 0.1, :directed)
+    assert Yog.Model.type(g) == :directed
+    assert Yog.Model.order(g) == 10
+  end
+
+  # ============= Random Tree Tests =============
+
+  test "random_tree/1 creates tree with n-1 edges" do
+    g = Random.random_tree(10)
+    assert Yog.Model.order(g) == 10
+    assert Yog.Model.edge_count(g) == 9
+  end
+
+  test "random_tree/1 single node" do
+    g = Random.random_tree(1)
+    assert Yog.Model.order(g) == 1
+    assert Yog.Model.edge_count(g) == 0
+  end
+
+  test "random_tree/1 directed variant" do
+    g = Random.random_tree_with_type(10, :directed)
+    assert Yog.Model.type(g) == :directed
+    assert Yog.Model.order(g) == 10
+  end
+
   # ============= Random Regular Graph Tests =============
 
   test "random_regular/2 generates d-regular graph" do
@@ -97,5 +199,69 @@ defmodule Yog.Generator.RandomTest do
       # Check no duplicates
       assert length(neigh) == length(Enum.uniq(neigh))
     end
+  end
+
+  # ============= Reproducibility (Seed) Tests =============
+
+  test "erdos_renyi_gnp/3 with same seed is reproducible" do
+    g1 = Random.erdos_renyi_gnp(20, 0.3, 42)
+    g2 = Random.erdos_renyi_gnp(20, 0.3, 42)
+    assert Yog.all_edges(g1) |> MapSet.new() == Yog.all_edges(g2) |> MapSet.new()
+  end
+
+  test "erdos_renyi_gnm/3 with same seed is reproducible" do
+    g1 = Random.erdos_renyi_gnm(20, 50, 42)
+    g2 = Random.erdos_renyi_gnm(20, 50, 42)
+    assert Yog.all_edges(g1) |> MapSet.new() == Yog.all_edges(g2) |> MapSet.new()
+  end
+
+  test "barabasi_albert/3 with same seed is reproducible" do
+    g1 = Random.barabasi_albert(20, 2, 42)
+    g2 = Random.barabasi_albert(20, 2, 42)
+    assert Yog.all_edges(g1) |> MapSet.new() == Yog.all_edges(g2) |> MapSet.new()
+  end
+
+  test "watts_strogatz/4 with same seed is reproducible" do
+    g1 = Random.watts_strogatz(20, 4, 0.1, 42)
+    g2 = Random.watts_strogatz(20, 4, 0.1, 42)
+    assert Yog.all_edges(g1) |> MapSet.new() == Yog.all_edges(g2) |> MapSet.new()
+  end
+
+  test "random_tree/2 with same seed is reproducible" do
+    g1 = Random.random_tree(20, 42)
+    g2 = Random.random_tree(20, 42)
+    assert Yog.all_edges(g1) |> MapSet.new() == Yog.all_edges(g2) |> MapSet.new()
+  end
+
+  test "random_regular/3 with same seed is reproducible" do
+    g1 = Random.random_regular(10, 3, 42)
+    g2 = Random.random_regular(10, 3, 42)
+    assert Yog.all_edges(g1) |> MapSet.new() == Yog.all_edges(g2) |> MapSet.new()
+  end
+
+  test "seed does not pollute global RNG state" do
+    # Fix the global RNG to a known seed
+    :rand.seed(:exsss, 12345)
+
+    # Generate a sequence without any seeded generator interruption
+    seq_without = [:rand.uniform(), :rand.uniform(), :rand.uniform()]
+
+    # Reset to the same seed and generate the same sequence,
+    # but insert a seeded generator call in the middle
+    :rand.seed(:exsss, 12345)
+
+    seq_with = [
+      :rand.uniform(),
+      # This should temporarily use seed 99999, then restore global state
+      (fn ->
+         _ = Random.erdos_renyi_gnp(10, 0.5, 99999)
+         :rand.uniform()
+       end).(),
+      :rand.uniform()
+    ]
+
+    # The sequences should be identical - proving the global RNG state
+    # was properly saved and restored around the seeded generator
+    assert seq_without == seq_with
   end
 end
