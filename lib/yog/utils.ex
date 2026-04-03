@@ -57,8 +57,19 @@ defmodule Yog.Utils do
   - `:l1`  - Manhattan Distance (Sum of absolute differences)
   - `:l2`  - Euclidean Distance (Square root of sum of squares)
   - `:max` - Chebyshev Distance (Maximum absolute difference)
+
+  ## Examples
+
+      iex> Utils.norm_diff(%{a: 1, b: 2}, %{a: 3, b: 4}, :l1)
+      4.0
+
+      iex> Utils.norm_diff(%{a: 1, b: 2}, %{a: 3, b: 4}, :l2)
+      2.8284271247461903
+
+      iex> Utils.norm_diff(%{a: 1.1, b: 2}, %{a: 3, b: 4}, :max)
+      2
   """
-  @spec norm_diff(map(), map(), :l1 | :l2 | :max) :: float()
+  @spec norm_diff(map(), map(), :l1 | :l2 | :max) :: number()
   def norm_diff(m1, m2, type) do
     case type do
       :l1 ->
@@ -90,7 +101,7 @@ defmodule Yog.Utils do
   ## Examples
 
       iex> Yog.Utils.fisher_yates([1, 2, 3, 4, 5], 42)
-      [3, 5, 1, 4, 2]
+      [3, 2, 5, 4, 1]
 
       iex> Yog.Utils.fisher_yates([], 123)
       []
@@ -102,22 +113,16 @@ defmodule Yog.Utils do
     if n <= 1 do
       list
     else
-      # Convert to array for O(1) random access
       arr = :array.from_list(list)
-
-      # LCG parameters for deterministic randomness
       a = 1_103_515_245
       c = 12_345
       m = 2_147_483_648
 
-      # Fisher-Yates: swap each element with a random later element
       {shuffled_arr, _final_seed} =
         Enum.reduce(0..(n - 2), {arr, seed}, fn i, {arr_acc, current_seed} ->
-          # Generate random index j in [i, n-1]
           next_seed = rem(a * current_seed + c, m)
           j = i + rem(next_seed, n - i)
 
-          # Swap elements at i and j
           val_i = :array.get(i, arr_acc)
           val_j = :array.get(j, arr_acc)
           arr_acc = :array.set(i, val_j, arr_acc)
