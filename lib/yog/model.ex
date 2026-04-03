@@ -94,6 +94,52 @@ defmodule Yog.Model do
   end
 
   @doc """
+  Removes a node and all its connected edges (incoming and outgoing).
+
+  **Time Complexity:** O(deg(v)) - proportional to the number of edges
+  connected to the node, not the whole graph.
+
+  ## Example
+
+      iex> {:ok, graph} =
+      ...>   Yog.Model.new(:directed)
+      ...>   |> Yog.Model.add_node(1, "A")
+      ...>   |> Yog.Model.add_node(2, "B")
+      ...>   |> Yog.Model.add_node(3, "C")
+      ...>   |> Yog.Model.add_edges([{1, 2, 10}, {2, 3, 20}])
+      iex> graph = Yog.Model.remove_node(graph, 2)
+      iex> # Node 2 is removed, along with edges 1->2 and 2->3
+      iex> Yog.Model.order(graph)
+      2
+  """
+  @spec remove_node(graph(), node_id()) :: graph()
+  def remove_node(%Graph{} = graph, id) do
+    target_ids = successor_ids(graph, id)
+    source_ids = predecessor_ids(graph, id)
+
+    new_nodes = Map.delete(graph.nodes, id)
+    new_out = Map.delete(graph.out_edges, id)
+
+    new_in_cleaned =
+      Enum.reduce(target_ids, graph.in_edges, fn target_id, acc_in ->
+        Map.replace_lazy(acc_in, target_id, &Map.delete(&1, id))
+      end)
+
+    new_in = Map.delete(new_in_cleaned, id)
+
+    new_out_cleaned =
+      Enum.reduce(source_ids, new_out, fn source_id, acc_out ->
+        Map.replace_lazy(acc_out, source_id, &Map.delete(&1, id))
+      end)
+
+    %{graph | nodes: new_nodes, out_edges: new_out_cleaned, in_edges: new_in}
+  end
+
+  # =============================================================================
+  # EDGES
+  # =============================================================================
+
+  @doc """
   Adds an edge to the graph with the given weight.
 
   For directed graphs, adds a single edge from `src` to `dst`.
@@ -524,48 +570,6 @@ defmodule Yog.Model do
   end
 
   @doc """
-  Removes a node and all its connected edges (incoming and outgoing).
-
-  **Time Complexity:** O(deg(v)) - proportional to the number of edges
-  connected to the node, not the whole graph.
-
-  ## Example
-
-      iex> {:ok, graph} =
-      ...>   Yog.Model.new(:directed)
-      ...>   |> Yog.Model.add_node(1, "A")
-      ...>   |> Yog.Model.add_node(2, "B")
-      ...>   |> Yog.Model.add_node(3, "C")
-      ...>   |> Yog.Model.add_edges([{1, 2, 10}, {2, 3, 20}])
-      iex> graph = Yog.Model.remove_node(graph, 2)
-      iex> # Node 2 is removed, along with edges 1->2 and 2->3
-      iex> Yog.Model.order(graph)
-      2
-  """
-  @spec remove_node(graph(), node_id()) :: graph()
-  def remove_node(%Graph{} = graph, id) do
-    target_ids = successor_ids(graph, id)
-    source_ids = predecessor_ids(graph, id)
-
-    new_nodes = Map.delete(graph.nodes, id)
-    new_out = Map.delete(graph.out_edges, id)
-
-    new_in_cleaned =
-      Enum.reduce(target_ids, graph.in_edges, fn target_id, acc_in ->
-        Map.replace_lazy(acc_in, target_id, &Map.delete(&1, id))
-      end)
-
-    new_in = Map.delete(new_in_cleaned, id)
-
-    new_out_cleaned =
-      Enum.reduce(source_ids, new_out, fn source_id, acc_out ->
-        Map.replace_lazy(acc_out, source_id, &Map.delete(&1, id))
-      end)
-
-    %{graph | nodes: new_nodes, out_edges: new_out_cleaned, in_edges: new_in}
-  end
-
-  @doc """
   Removes a directed edge from `src` to `dst`.
 
   For **directed graphs**, this removes the single directed edge from `src` to `dst`.
@@ -610,7 +614,148 @@ defmodule Yog.Model do
   end
 
   # =============================================================================
-  # GRAPH QUERIES
+  # BASIC QUERIES
+  # =============================================================================
+
+  @doc """
+  Gets the type of the graph (`:directed` or `:undirected`).
+
+  ## Example
+
+      iex> graph = Yog.Model.new(:directed)
+      iex> Yog.Model.type(graph)
+      :directed
+  """
+  @spec type(graph()) :: graph_type()
+  def type(%Graph{kind: kind}) do
+    kind
+  end
+
+  @doc """
+  Returns the number of nodes in the graph (graph order).
+
+  **Time Complexity:** O(1)
+
+  ## Example
+
+      iex> graph =
+      ...>   Yog.Model.new(:directed)
+      ...>   |> Yog.Model.add_node(1, "A")
+      ...>   |> Yog.Model.add_node(2, "B")
+      iex> Yog.Model.order(graph)
+      2
+  """
+  @spec order(graph()) :: integer()
+  def order(%Graph{nodes: nodes}) do
+    map_size(nodes)
+  end
+
+  @doc """
+  Returns the number of nodes in the graph.
+  Equivalent to `order/1`.
+
+  **Time Complexity:** O(1)
+
+  ## Example
+
+      iex> graph =
+      ...>   Yog.Model.new(:directed)
+      ...>   |> Yog.Model.add_node(1, "A")
+      ...>   |> Yog.Model.add_node(2, "B")
+      iex> Yog.Model.node_count(graph)
+      2
+  """
+  @spec node_count(graph()) :: integer()
+  def node_count(graph) do
+    order(graph)
+  end
+
+  @doc """
+  Returns the number of edges in the graph.
+
+  For undirected graphs, each edge is counted once (the pair {u, v}).
+  For directed graphs, each directed edge (u -> v) is counted once.
+
+  **Time Complexity:** O(V)
+
+  ## Example
+
+      iex> {:ok, graph} =
+      ...>   Yog.Model.new(:directed)
+      ...>   |> Yog.Model.add_node(1, "A")
+      ...>   |> Yog.Model.add_node(2, "B")
+      ...>   |> Yog.Model.add_edge(1, 2, 10)
+      iex> Yog.Model.edge_count(graph)
+      1
+
+  """
+  @spec edge_count(graph()) :: integer()
+  def edge_count(%Graph{kind: :directed, out_edges: out_edges}) do
+    Enum.reduce(out_edges, 0, fn {_src, targets}, acc ->
+      acc + map_size(targets)
+    end)
+  end
+
+  def edge_count(%Graph{kind: :undirected, out_edges: out_edges}) do
+    {total, self_loops} =
+      Enum.reduce(out_edges, {0, 0}, fn {src, targets}, {acc_total, acc_self} ->
+        new_total = acc_total + map_size(targets)
+        new_self = if Map.has_key?(targets, src), do: acc_self + 1, else: acc_self
+        {new_total, new_self}
+      end)
+
+    div(total - self_loops, 2) + self_loops
+  end
+
+  @doc """
+  Checks if the graph contains a node with the given ID.
+
+  ## Example
+
+      iex> graph = Yog.undirected() |> Yog.add_node(1, nil)
+      iex> Yog.Model.has_node?(graph, 1)
+      true
+      iex> Yog.Model.has_node?(graph, 2)
+      false
+
+  **Time Complexity:** O(1)
+  """
+  @spec has_node?(graph(), node_id()) :: boolean()
+  def has_node?(%Graph{nodes: nodes}, id) do
+    Map.has_key?(nodes, id)
+  end
+
+  @doc """
+  Checks if the graph contains an edge between `src` and `dst`.
+
+  Returns `true` if an edge exists, `false` otherwise.
+
+  ## Examples
+
+      iex> graph = Yog.from_edges(:directed, [{1, 2, 10}, {1, 3, 20}, {3, 4, 2}])
+      iex> Yog.Model.has_edge?(graph, 1, 2)
+      true
+      iex> Yog.Model.has_edge?(graph, 2, 1)
+      false
+
+      iex> graph = Yog.from_edges(:undirected, [{1, 2, 10}, {1, 3, 20}])
+      iex> Yog.Model.has_edge?(graph, 2, 1)
+      true
+      iex> Yog.Model.has_edge?(graph, 2, 4)
+      false
+
+  **Time Complexity:** O(1)
+  """
+  @spec has_edge?(graph(), node_id(), node_id()) :: boolean()
+  def has_edge?(%Graph{out_edges: out}, src, dst) do
+    case Map.fetch(out, src) do
+      {:ok, inner} -> Map.has_key?(inner, dst)
+      :error -> false
+    end
+  end
+
+  # =============================================================================
+  # TOPOLOGY
   # =============================================================================
 
   @doc """
@@ -762,100 +907,6 @@ defmodule Yog.Model do
   end
 
   @doc """
-  Returns all node IDs in the graph.
-  This includes all nodes, even isolated nodes with no edges.
-
-  ## Example
-
-      iex> graph =
-      ...>   Yog.Model.new(:directed)
-      ...>   |> Yog.Model.add_node(1, "A")
-      ...>   |> Yog.Model.add_node(2, "B")
-      iex> Yog.Model.all_nodes(graph)
-      [1, 2]
-  """
-  @spec all_nodes(graph()) :: [node_id()]
-  def all_nodes(%Graph{nodes: nodes}) do
-    Map.keys(nodes)
-  end
-
-  @doc """
-  Returns the number of nodes in the graph (graph order).
-
-  **Time Complexity:** O(1)
-
-  ## Example
-
-      iex> graph =
-      ...>   Yog.Model.new(:directed)
-      ...>   |> Yog.Model.add_node(1, "A")
-      ...>   |> Yog.Model.add_node(2, "B")
-      iex> Yog.Model.order(graph)
-      2
-  """
-  @spec order(graph()) :: integer()
-  def order(%Graph{nodes: nodes}) do
-    map_size(nodes)
-  end
-
-  @doc """
-  Returns the number of nodes in the graph.
-  Equivalent to `order/1`.
-
-  **Time Complexity:** O(1)
-
-  ## Example
-
-      iex> graph =
-      ...>   Yog.Model.new(:directed)
-      ...>   |> Yog.Model.add_node(1, "A")
-      ...>   |> Yog.Model.add_node(2, "B")
-      iex> Yog.Model.node_count(graph)
-      2
-  """
-  @spec node_count(graph()) :: integer()
-  def node_count(graph) do
-    order(graph)
-  end
-
-  @doc """
-  Returns the number of edges in the graph.
-
-  For undirected graphs, each edge is counted once (the pair {u, v}).
-  For directed graphs, each directed edge (u -> v) is counted once.
-
-  **Time Complexity:** O(V)
-
-  ## Example
-
-      iex> {:ok, graph} =
-      ...>   Yog.Model.new(:directed)
-      ...>   |> Yog.Model.add_node(1, "A")
-      ...>   |> Yog.Model.add_node(2, "B")
-      ...>   |> Yog.Model.add_edge(1, 2, 10)
-      iex> Yog.Model.edge_count(graph)
-      1
-
-  """
-  @spec edge_count(graph()) :: integer()
-  def edge_count(%Graph{kind: :directed, out_edges: out_edges}) do
-    Enum.reduce(out_edges, 0, fn {_src, targets}, acc ->
-      acc + map_size(targets)
-    end)
-  end
-
-  def edge_count(%Graph{kind: :undirected, out_edges: out_edges}) do
-    {total, self_loops} =
-      Enum.reduce(out_edges, {0, 0}, fn {src, targets}, {acc_total, acc_self} ->
-        new_total = acc_total + map_size(targets)
-        new_self = if Map.has_key?(targets, src), do: acc_self + 1, else: acc_self
-        {new_total, new_self}
-      end)
-
-    div(total - self_loops, 2) + self_loops
-  end
-
-  @doc """
   Returns the out-degree of a node (number of outgoing edges).
 
   For undirected graphs, this returns the total degree (same as `in_degree/2`).
@@ -947,18 +998,26 @@ defmodule Yog.Model do
     in_degree(graph, id) + out_degree(graph, id)
   end
 
+  # =============================================================================
+  # DATA ACCESS
+  # =============================================================================
+
   @doc """
-  Gets the type of the graph (`:directed` or `:undirected`).
+  Returns all node IDs in the graph.
+  This includes all nodes, even isolated nodes with no edges.
 
   ## Example
 
-      iex> graph = Yog.Model.new(:directed)
-      iex> Yog.Model.type(graph)
-      :directed
+      iex> graph =
+      ...>   Yog.Model.new(:directed)
+      ...>   |> Yog.Model.add_node(1, "A")
+      ...>   |> Yog.Model.add_node(2, "B")
+      iex> Yog.Model.all_nodes(graph) |> Enum.sort()
+      [1, 2]
   """
-  @spec type(graph()) :: graph_type()
-  def type(%Graph{kind: kind}) do
-    kind
+  @spec all_nodes(graph()) :: [node_id()]
+  def all_nodes(%Graph{nodes: nodes}) do
+    Map.keys(nodes)
   end
 
   @doc """
@@ -995,53 +1054,6 @@ defmodule Yog.Model do
   @spec node(graph(), node_id()) :: term() | nil
   def node(graph, id) do
     graph |> nodes() |> Map.get(id)
-  end
-
-  @doc """
-  Checks if the graph contains a node with the given ID.
-
-  ## Example
-
-      iex> graph = Yog.undirected() |> Yog.add_node(1, nil)
-      iex> Yog.Model.has_node?(graph, 1)
-      true
-      iex> Yog.Model.has_node?(graph, 2)
-      false
-
-  **Time Complexity:** O(1)
-  """
-  @spec has_node?(graph(), node_id()) :: boolean()
-  def has_node?(%Graph{nodes: nodes}, id) do
-    Map.has_key?(nodes, id)
-  end
-
-  @doc """
-  Checks if the graph contains an edge between `src` and `dst`.
-
-  Returns `true` if an edge exists, `false` otherwise.
-
-  ## Examples
-
-      iex> graph = Yog.from_edges(:directed, [{1, 2, 10}, {1, 3, 20}, {3, 4, 2}])
-      iex> Yog.Model.has_edge?(graph, 1, 2)
-      true
-      iex> Yog.Model.has_edge?(graph, 2, 1)
-      false
-
-      iex> graph = Yog.from_edges(:undirected, [{1, 2, 10}, {1, 3, 20}])
-      iex> Yog.Model.has_edge?(graph, 2, 1)
-      true
-      iex> Yog.Model.has_edge?(graph, 2, 4)
-      false
-
-  **Time Complexity:** O(1)
-  """
-  @spec has_edge?(graph(), node_id(), node_id()) :: boolean()
-  def has_edge?(%Graph{out_edges: out}, src, dst) do
-    case Map.fetch(out, src) do
-      {:ok, inner} -> Map.has_key?(inner, dst)
-      :error -> false
-    end
   end
 
   @doc """

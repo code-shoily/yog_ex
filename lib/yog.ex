@@ -46,6 +46,8 @@ defmodule Yog do
   @type edge_tuple() :: {node_id(), node_id(), any()}
   @type graph() :: any()
 
+  # ============= CREATION & BUILDERS =============
+
   @doc """
   Returns true if the given value is a Yog graph.
 
@@ -60,8 +62,6 @@ defmodule Yog do
   @spec graph?(any()) :: boolean()
   def graph?(%Yog.Graph{}), do: true
   def graph?(_), do: false
-
-  # ============= Creation =============
 
   @doc """
   Creates a new empty directed graph.
@@ -110,6 +110,126 @@ defmodule Yog do
   def new(type) do
     Model.new(type)
   end
+
+  @doc """
+  Creates a graph from a list of edges.
+
+  Auto-creates nodes with `nil` data as needed.
+
+  ## Example
+
+      iex> edges = [{1, 2, 10}, {2, 3, 20}]
+      iex> graph = Yog.from_edges(:directed, edges)
+      iex> length(Yog.successors(graph, 1))
+      1
+  """
+  @spec from_edges(:directed | :undirected, [{node_id(), node_id(), any()}]) :: graph()
+  def from_edges(type, edges) do
+    Enum.reduce(edges, new(type), fn {src, dst, weight}, g ->
+      Model.add_edge_ensure(g, src, dst, weight, nil)
+    end)
+  end
+
+  @doc """
+  Creates a graph from a list of unweighted edges (weight will be nil).
+
+  ## Example
+
+      iex> edges = [{1, 2}, {2, 3}]
+      iex> graph = Yog.from_unweighted_edges(:directed, edges)
+      iex> Yog.successors(graph, 1)
+      [{2, nil}]
+  """
+  @spec from_unweighted_edges(:directed | :undirected, [{node_id(), node_id()}]) :: graph()
+  def from_unweighted_edges(type, edges) do
+    Enum.reduce(edges, new(type), fn {src, dst}, g ->
+      Model.add_edge_ensure(g, src, dst, nil, nil)
+    end)
+  end
+
+  @doc """
+  Creates a graph from an adjacency matrix.
+
+  Delegates to `Yog.IO.Matrix.from_matrix/2`.
+
+  ## Example
+
+      iex> matrix = [[0, 1, 1], [1, 0, 0], [1, 0, 0]]
+      iex> graph = Yog.from_adjacency_matrix(:undirected, matrix)
+      iex> Yog.Model.order(graph)
+      3
+  """
+  defdelegate from_adjacency_matrix(type, matrix), to: Yog.IO.Matrix, as: :from_matrix
+
+  @doc """
+  Exports a graph to an adjacency matrix representation.
+
+  Delegates to `Yog.IO.Matrix.to_matrix/1`.
+
+  ## Example
+
+      iex> graph = Yog.undirected() |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      iex> {_nodes, matrix} = Yog.to_adjacency_matrix(graph)
+      iex> matrix
+      [[0, 5], [5, 0]]
+  """
+  defdelegate to_adjacency_matrix(graph), to: Yog.IO.Matrix, as: :to_matrix
+
+  @doc """
+  Creates a graph from an adjacency list.
+
+  Delegates to `Yog.IO.List.from_list/2`.
+
+  ## Example
+
+      iex> entries = [{1, [{2, 1}, {3, 1}]}, {2, [{3, 1}]}, {3, []}]
+      iex> graph = Yog.from_adjacency_list(:undirected, entries)
+      iex> Yog.Model.order(graph)
+      3
+  """
+  defdelegate from_adjacency_list(type, entries), to: Yog.IO.List, as: :from_list
+
+  @doc """
+  Creates a graph from an adjacency list string.
+
+  Delegates to `Yog.IO.List.from_string/3`.
+
+  ## Example
+
+      iex> text = \"1: 2 3\\n2: 3\\n3:\"
+      iex> graph = Yog.from_adjacency_list_string(:undirected, text)
+      iex> Yog.Model.order(graph)
+      3
+  """
+  defdelegate from_adjacency_list_string(type, string, opts \\ []),
+    to: Yog.IO.List,
+    as: :from_string
+
+  @doc """
+  Exports a graph to an adjacency list.
+
+  Delegates to `Yog.IO.List.to_list/1`.
+
+  ## Example
+
+      iex> graph = Yog.undirected() |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      iex> Yog.to_adjacency_list(graph)
+      [{1, [{2, 5}]}, {2, [{1, 5}]}]
+  """
+  defdelegate to_adjacency_list(graph), to: Yog.IO.List, as: :to_list
+
+  @doc """
+  Exports a graph to an adjacency list string.
+
+  Delegates to `Yog.IO.List.to_string/2`.
+
+  ## Example
+
+      iex> graph = Yog.undirected() |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      iex> Yog.to_adjacency_list_string(graph)
+      "1: 2\\n2: 1"
+  """
+  defdelegate to_adjacency_list_string(graph, opts \\ []), to: Yog.IO.List, as: :to_string
 
   # ============= Modification =============
 
@@ -458,6 +578,30 @@ defmodule Yog do
           {:ok, graph()} | {:error, String.t()}
   defdelegate add_unweighted_edges(graph, edges), to: Model
 
+  @doc """
+  Removes a node and all its connected edges.
+
+  ## Example
+
+      iex> graph = Yog.directed() |> Yog.add_node(1, "A") |> Yog.remove_node(1)
+      iex> Yog.has_node?(graph, 1)
+      false
+  """
+  @spec remove_node(graph(), node_id()) :: graph()
+  defdelegate remove_node(graph, id), to: Model
+
+  @doc """
+  Removes an edge from the graph.
+
+  ## Example
+
+      iex> graph = Yog.directed() |> Yog.add_edge_ensure(1, 2, 10) |> Yog.remove_edge(1, 2)
+      iex> Yog.has_edge?(graph, 1, 2)
+      false
+  """
+  @spec remove_edge(graph(), node_id(), node_id()) :: graph()
+  defdelegate remove_edge(graph, src, dst), to: Model
+
   # ============= Query =============
 
   @doc """
@@ -672,6 +816,24 @@ defmodule Yog do
   """
   @spec has_edge?(graph(), node_id(), node_id()) :: boolean()
   defdelegate has_edge?(graph, src, dst), to: Model
+
+  @doc """
+  Returns the in-degree of a node (number of incoming edges).
+  """
+  @spec in_degree(graph(), node_id()) :: non_neg_integer()
+  defdelegate in_degree(graph, id), to: Model
+
+  @doc """
+  Returns the out-degree of a node (number of outgoing edges).
+  """
+  @spec out_degree(graph(), node_id()) :: non_neg_integer()
+  defdelegate out_degree(graph, id), to: Model
+
+  @doc """
+  Returns the total degree of a node.
+  """
+  @spec degree(graph(), node_id()) :: non_neg_integer()
+  defdelegate degree(graph, id), to: Model
 
   # ============= Analysis =============
 
@@ -977,130 +1139,4 @@ defmodule Yog do
   """
   @spec contract(graph(), node_id(), node_id(), (any(), any() -> any())) :: graph()
   defdelegate contract(graph, merge_a, merge_b, combine_fn), to: Transform
-
-  # ============= Construction from various formats =============
-
-  @doc """
-  Creates a graph from a list of edges.
-
-  Auto-creates nodes with `nil` data as needed.
-
-  ## Example
-
-      iex> edges = [{1, 2, 10}, {2, 3, 20}]
-      iex> graph = Yog.from_edges(:directed, edges)
-      iex> length(Yog.successors(graph, 1))
-      1
-  """
-  @spec from_edges(:directed | :undirected, [{node_id(), node_id(), any()}]) :: graph()
-  def from_edges(type, edges) do
-    Enum.reduce(edges, new(type), fn {src, dst, weight}, g ->
-      Model.add_edge_ensure(g, src, dst, weight, nil)
-    end)
-  end
-
-  @doc """
-  Creates a graph from a list of unweighted edges (weight will be nil).
-
-  ## Example
-
-      iex> edges = [{1, 2}, {2, 3}]
-      iex> graph = Yog.from_unweighted_edges(:directed, edges)
-      iex> Yog.successors(graph, 1)
-      [{2, nil}]
-  """
-  @spec from_unweighted_edges(:directed | :undirected, [{node_id(), node_id()}]) :: graph()
-  def from_unweighted_edges(type, edges) do
-    Enum.reduce(edges, new(type), fn {src, dst}, g ->
-      Model.add_edge_ensure(g, src, dst, nil, nil)
-    end)
-  end
-
-  # ============= Adjacency Matrix =============
-
-  @doc """
-  Creates a graph from an adjacency matrix.
-
-  Delegates to `Yog.IO.Matrix.from_matrix/2`.
-
-  ## Example
-
-      iex> matrix = [[0, 1, 1], [1, 0, 0], [1, 0, 0]]
-      iex> graph = Yog.from_adjacency_matrix(:undirected, matrix)
-      iex> Yog.Model.order(graph)
-      3
-  """
-  defdelegate from_adjacency_matrix(type, matrix), to: Yog.IO.Matrix, as: :from_matrix
-
-  @doc """
-  Exports a graph to an adjacency matrix representation.
-
-  Delegates to `Yog.IO.Matrix.to_matrix/1`.
-
-  ## Example
-
-      iex> graph = Yog.undirected() |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
-      iex> {_nodes, matrix} = Yog.to_adjacency_matrix(graph)
-      iex> matrix
-      [[0, 5], [5, 0]]
-  """
-  defdelegate to_adjacency_matrix(graph), to: Yog.IO.Matrix, as: :to_matrix
-
-  # ============= Adjacency List (Facade) =============
-
-  @doc """
-  Creates a graph from an adjacency list.
-
-  Delegates to `Yog.IO.List.from_list/2`.
-
-  ## Example
-
-      iex> entries = [{1, [{2, 1}, {3, 1}]}, {2, [{3, 1}]}, {3, []}]
-      iex> graph = Yog.from_adjacency_list(:undirected, entries)
-      iex> Yog.Model.order(graph)
-      3
-  """
-  defdelegate from_adjacency_list(type, entries), to: Yog.IO.List, as: :from_list
-
-  @doc """
-  Creates a graph from an adjacency list string.
-
-  Delegates to `Yog.IO.List.from_string/3`.
-
-  ## Example
-
-      iex> text = \"1: 2 3\\n2: 3\\n3:\"
-      iex> graph = Yog.from_adjacency_list_string(:undirected, text)
-      iex> Yog.Model.order(graph)
-      3
-  """
-  defdelegate from_adjacency_list_string(type, string, opts \\ []),
-    to: Yog.IO.List,
-    as: :from_string
-
-  @doc """
-  Exports a graph to an adjacency list.
-
-  Delegates to `Yog.IO.List.to_list/1`.
-
-  ## Example
-
-      iex> graph = Yog.undirected() |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
-      iex> Yog.to_adjacency_list(graph)
-      [{1, [{2, 5}]}, {2, [{1, 5}]}]
-  """
-  defdelegate to_adjacency_list(graph), to: Yog.IO.List, as: :to_list
-
-  @doc """
-  Exports a graph to an adjacency list string.
-
-  Delegates to `Yog.IO.List.to_string/2`.
-
-  ## Example
-
-      iex> graph = Yog.undirected() |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
-      iex> Yog.to_adjacency_list_string(graph)
-      "1: 2\\n2: 1"
-  """
-  defdelegate to_adjacency_list_string(graph, opts \\ []), to: Yog.IO.List, as: :to_string
 end
