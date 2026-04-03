@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **MST Result Struct**: `Yog.MST.kruskal/2` and `Yog.MST.prim/2` now return `{:ok, %Yog.MST.Result{}}` instead of a raw edge list. The struct contains `edges`, `total_weight`, `node_count`, `edge_count`, and `algorithm` fields.
+- **Prim's `:from` option**: `Yog.MST.prim/1` now accepts a `:from` keyword to specify the starting node.
 - **Renamed `Yog.Flow.NetworkSimplex` to `Yog.Flow.SuccessiveShortestPath`** to accurately reflect the implemented algorithm (Successive Shortest Path, not Network Simplex).
 - **Flow Algorithms**: `Yog.Flow.SuccessiveShortestPath.min_cost_flow/4` now uses Dijkstra with node potentials instead of Bellman-Ford on every iteration, improving complexity from O(F · V · E) to O(F · (E + V log V)).
 - **Transform**: Major performance optimization for `Yog.Transform.contract/4` — replaced repeated `Model.add_edge_with_combine` / `Model.remove_node` calls with direct map surgery, eliminating per-edge node-existence checks and redundant graph struct reconstructions.

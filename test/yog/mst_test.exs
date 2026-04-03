@@ -2,6 +2,7 @@ defmodule Yog.MSTTest do
   use ExUnit.Case
 
   doctest Yog.MST
+  doctest Yog.MST.Result
 
   alias Yog.MST
 
@@ -24,19 +25,12 @@ defmodule Yog.MSTTest do
       |> Yog.add_edge_ensure(from: 2, to: 3, with: 2)
       |> Yog.add_edge_ensure(from: 1, to: 3, with: 3)
 
-    result = MST.kruskal(in: graph, compare: &compare/2)
+    {:ok, result} = MST.kruskal(in: graph, compare: &compare/2)
 
-    # MST should have 2 edges (n-1 for n nodes)
-    assert length(result) == 2
-
-    # Total weight should be 1+2=3 (edges 1-2 and 2-3)
-    total_weight = Enum.reduce(result, 0, fn edge, acc -> acc + edge.weight end)
-
-    assert total_weight == 3
-
-    # Should include edges 1-2 and 2-3
-    assert Enum.any?(result, fn e -> e.from == 1 and e.to == 2 and e.weight == 1 end)
-    assert Enum.any?(result, fn e -> e.from == 2 and e.to == 3 and e.weight == 2 end)
+    assert result.edge_count == 2
+    assert result.total_weight == 3
+    assert Enum.any?(result.edges, fn e -> e.from == 1 and e.to == 2 and e.weight == 1 end)
+    assert Enum.any?(result.edges, fn e -> e.from == 2 and e.to == 3 and e.weight == 2 end)
   end
 
   # Linear chain
@@ -49,15 +43,10 @@ defmodule Yog.MSTTest do
       |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
       |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
 
-    result = MST.kruskal(in: graph, compare: &compare/2)
+    {:ok, result} = MST.kruskal(in: graph, compare: &compare/2)
 
-    # Should have 2 edges
-    assert length(result) == 2
-
-    # Total weight should be 15
-    total_weight = Enum.reduce(result, 0, fn edge, acc -> acc + edge.weight end)
-
-    assert total_weight == 15
+    assert result.edge_count == 2
+    assert result.total_weight == 15
   end
 
   # Single edge
@@ -68,11 +57,10 @@ defmodule Yog.MSTTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
 
-    result = MST.kruskal(in: graph, compare: &compare/2)
+    {:ok, result} = MST.kruskal(in: graph, compare: &compare/2)
 
-    assert length(result) == 1
-
-    [edge] = result
+    assert result.edge_count == 1
+    [edge] = result.edges
     assert edge.from == 1
     assert edge.to == 2
     assert edge.weight == 10
@@ -84,18 +72,24 @@ defmodule Yog.MSTTest do
       Yog.undirected()
       |> Yog.add_node(1, "A")
 
-    result = MST.kruskal(in: graph, compare: &compare/2)
+    {:ok, result} = MST.kruskal(in: graph, compare: &compare/2)
 
-    assert result == []
+    assert result.edges == []
+    assert result.total_weight == 0
+    assert result.edge_count == 0
+    assert result.node_count == 1
   end
 
   # Empty graph
   test "mst_empty_graph_test" do
     graph = Yog.undirected()
 
-    result = MST.kruskal(in: graph, compare: &compare/2)
+    {:ok, result} = MST.kruskal(in: graph, compare: &compare/2)
 
-    assert result == []
+    assert result.edges == []
+    assert result.total_weight == 0
+    assert result.edge_count == 0
+    assert result.node_count == 0
   end
 
   # ============= Classic MST Test Cases =============
@@ -120,15 +114,10 @@ defmodule Yog.MSTTest do
       |> Yog.add_edge_ensure(from: 1, to: 4, with: 5)
       |> Yog.add_edge_ensure(from: 2, to: 3, with: 5)
 
-    result = MST.kruskal(in: graph, compare: &compare/2)
+    {:ok, result} = MST.kruskal(in: graph, compare: &compare/2)
 
-    # Should have 3 edges (4 nodes)
-    assert length(result) == 3
-
-    # Total weight should be 3 (three edges of weight 1)
-    total_weight = Enum.reduce(result, 0, fn edge, acc -> acc + edge.weight end)
-
-    assert total_weight == 3
+    assert result.edge_count == 3
+    assert result.total_weight == 3
   end
 
   # Classic example where greedy fails but Kruskal works
@@ -145,14 +134,10 @@ defmodule Yog.MSTTest do
       |> Yog.add_edge_ensure(from: 1, to: 4, with: 4)
       |> Yog.add_edge_ensure(from: 2, to: 4, with: 5)
 
-    result = MST.kruskal(in: graph, compare: &compare/2)
+    {:ok, result} = MST.kruskal(in: graph, compare: &compare/2)
 
-    assert length(result) == 3
-
-    # Should select edges 1-2 (1), 2-3 (2), 3-4 (3) for total weight 6
-    total_weight = Enum.reduce(result, 0, fn edge, acc -> acc + edge.weight end)
-
-    assert total_weight == 6
+    assert result.edge_count == 3
+    assert result.total_weight == 6
   end
 
   # Pentagon graph
@@ -171,15 +156,10 @@ defmodule Yog.MSTTest do
       |> Yog.add_edge_ensure(from: 4, to: 5, with: 4)
       |> Yog.add_edge_ensure(from: 5, to: 1, with: 5)
 
-    result = MST.kruskal(in: graph, compare: &compare/2)
+    {:ok, result} = MST.kruskal(in: graph, compare: &compare/2)
 
-    # Should have 4 edges (5 nodes)
-    assert length(result) == 4
-
-    # Should select edges 1,2,3,4 (not 5) for total weight 10
-    total_weight = Enum.reduce(result, 0, fn edge, acc -> acc + edge.weight end)
-
-    assert total_weight == 10
+    assert result.edge_count == 4
+    assert result.total_weight == 10
   end
 
   # ============= Disconnected Graph Tests =============
@@ -196,15 +176,10 @@ defmodule Yog.MSTTest do
       # Component 2: 3-4
       |> Yog.add_edge_ensure(from: 3, to: 4, with: 2)
 
-    result = MST.kruskal(in: graph, compare: &compare/2)
+    {:ok, result} = MST.kruskal(in: graph, compare: &compare/2)
 
-    # Should have 2 edges (one per component)
-    assert length(result) == 2
-
-    # Should be a forest, not a tree
-    total_weight = Enum.reduce(result, 0, fn edge, acc -> acc + edge.weight end)
-
-    assert total_weight == 3
+    assert result.edge_count == 2
+    assert result.total_weight == 3
   end
 
   test "mst_disconnected_three_components_test" do
@@ -223,10 +198,9 @@ defmodule Yog.MSTTest do
       # Component 3: 5-6
       |> Yog.add_edge_ensure(from: 5, to: 6, with: 3)
 
-    result = MST.kruskal(in: graph, compare: &compare/2)
+    {:ok, result} = MST.kruskal(in: graph, compare: &compare/2)
 
-    # Should have 3 edges (one per component)
-    assert length(result) == 3
+    assert result.edge_count == 3
   end
 
   # Isolated nodes
@@ -241,10 +215,9 @@ defmodule Yog.MSTTest do
 
     # Nodes 3 and 4 are isolated
 
-    result = MST.kruskal(in: graph, compare: &compare/2)
+    {:ok, result} = MST.kruskal(in: graph, compare: &compare/2)
 
-    # Should only have 1 edge
-    assert length(result) == 1
+    assert result.edge_count == 1
   end
 
   # ============= Weight Variation Tests =============
@@ -261,15 +234,10 @@ defmodule Yog.MSTTest do
       |> Yog.add_edge_ensure(from: 3, to: 4, with: 5)
       |> Yog.add_edge_ensure(from: 1, to: 4, with: 5)
 
-    result = MST.kruskal(in: graph, compare: &compare/2)
+    {:ok, result} = MST.kruskal(in: graph, compare: &compare/2)
 
-    # Should have 3 edges
-    assert length(result) == 3
-
-    # All edges have weight 5, so total is 15
-    total_weight = Enum.reduce(result, 0, fn edge, acc -> acc + edge.weight end)
-
-    assert total_weight == 15
+    assert result.edge_count == 3
+    assert result.total_weight == 15
   end
 
   test "mst_zero_weight_edges_test" do
@@ -281,13 +249,10 @@ defmodule Yog.MSTTest do
       |> Yog.add_edge_ensure(from: 1, to: 2, with: 0)
       |> Yog.add_edge_ensure(from: 2, to: 3, with: 0)
 
-    result = MST.kruskal(in: graph, compare: &compare/2)
+    {:ok, result} = MST.kruskal(in: graph, compare: &compare/2)
 
-    assert length(result) == 2
-
-    total_weight = Enum.reduce(result, 0, fn edge, acc -> acc + edge.weight end)
-
-    assert total_weight == 0
+    assert result.edge_count == 2
+    assert result.total_weight == 0
   end
 
   # ============= Complete Graph Tests =============
@@ -307,15 +272,10 @@ defmodule Yog.MSTTest do
       |> Yog.add_edge_ensure(from: 2, to: 4, with: 5)
       |> Yog.add_edge_ensure(from: 3, to: 4, with: 6)
 
-    result = MST.kruskal(in: graph, compare: &compare/2)
+    {:ok, result} = MST.kruskal(in: graph, compare: &compare/2)
 
-    # MST of K4 has 3 edges
-    assert length(result) == 3
-
-    # Should select edges with weights 1, 2, 3
-    total_weight = Enum.reduce(result, 0, fn edge, acc -> acc + edge.weight end)
-
-    assert total_weight == 6
+    assert result.edge_count == 3
+    assert result.total_weight == 6
   end
 
   test "mst_complete_graph_k5_test" do
@@ -338,15 +298,10 @@ defmodule Yog.MSTTest do
       |> Yog.add_edge_ensure(from: 3, to: 5, with: 9)
       |> Yog.add_edge_ensure(from: 4, to: 5, with: 10)
 
-    result = MST.kruskal(in: graph, compare: &compare/2)
+    {:ok, result} = MST.kruskal(in: graph, compare: &compare/2)
 
-    # MST of K5 has 4 edges
-    assert length(result) == 4
-
-    # Should select edges with weights 1, 2, 3, 4
-    total_weight = Enum.reduce(result, 0, fn edge, acc -> acc + edge.weight end)
-
-    assert total_weight == 10
+    assert result.edge_count == 4
+    assert result.total_weight == 10
   end
 
   # ============= Cycle Detection Tests =============
@@ -361,13 +316,39 @@ defmodule Yog.MSTTest do
       |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
       |> Yog.add_edge_ensure(from: 3, to: 1, with: 100)
 
-    result = MST.kruskal(in: graph, compare: &compare/2)
+    {:ok, result} = MST.kruskal(in: graph, compare: &compare/2)
 
-    # Should have 2 edges (avoiding the cycle)
-    assert length(result) == 2
+    assert result.edge_count == 2
+    assert not Enum.any?(result.edges, fn e -> e.weight == 100 end)
+  end
 
-    # Should not include the heavy edge
-    assert not Enum.any?(result, fn e -> e.weight == 100 end)
+  test "mst_is_cycle_free_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_node(4, "D")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 2)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 3)
+      |> Yog.add_edge_ensure(from: 1, to: 4, with: 4)
+      |> Yog.add_edge_ensure(from: 2, to: 4, with: 5)
+
+    {:ok, result} = MST.kruskal(in: graph, compare: &compare/2)
+
+    # Build a set of undirected edge pairs
+    edge_pairs =
+      Enum.map(result.edges, fn e ->
+        [e.from, e.to] |> Enum.sort() |> List.to_tuple()
+      end)
+
+    # For a cycle-free graph on V nodes, edges == nodes - connected_components
+    # Here graph is connected, so edges should be V - 1 = 3
+    assert result.edge_count == 3
+
+    # No duplicates
+    assert length(edge_pairs) == length(Enum.uniq(edge_pairs))
   end
 
   # ============= Large Graph Tests =============
@@ -400,15 +381,10 @@ defmodule Yog.MSTTest do
       |> Yog.add_edge_ensure(from: 1, to: 10, with: 100)
       |> Yog.add_edge_ensure(from: 5, to: 10, with: 50)
 
-    result = MST.kruskal(in: graph, compare: &compare/2)
+    {:ok, result} = MST.kruskal(in: graph, compare: &compare/2)
 
-    # Should have exactly 9 edges (n-1 for n=10)
-    assert length(result) == 9
-
-    # Should have total weight 1+2+3+4+5+6+7+8+9 = 45
-    total_weight = Enum.reduce(result, 0, fn edge, acc -> acc + edge.weight end)
-
-    assert total_weight == 45
+    assert result.edge_count == 9
+    assert result.total_weight == 45
   end
 
   # ============= Edge Case: Self Loops =============
@@ -421,15 +397,54 @@ defmodule Yog.MSTTest do
       |> Yog.add_edge_ensure(from: 1, to: 1, with: 1)
       |> Yog.add_edge_ensure(from: 1, to: 2, with: 2)
 
-    result = MST.kruskal(in: graph, compare: &compare/2)
+    {:ok, result} = MST.kruskal(in: graph, compare: &compare/2)
 
-    # Self-loops should be ignored (they create cycles)
-    # Should only have 1 edge connecting 1 and 2
-    assert length(result) == 1
-
-    [edge] = result
+    assert result.edge_count == 1
+    [edge] = result.edges
     assert edge.from == 1
     assert edge.to == 2
+  end
+
+  # ============= Tie-Breaking Consistency =============
+
+  test "kruskal_and_prim_agree_on_total_weight_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_node(4, "D")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 2)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 3)
+      |> Yog.add_edge_ensure(from: 1, to: 4, with: 4)
+      |> Yog.add_edge_ensure(from: 2, to: 4, with: 5)
+
+    {:ok, kruskal_result} = MST.kruskal(in: graph, compare: &compare/2)
+    {:ok, prim_result} = MST.prim(in: graph, compare: &compare/2)
+
+    assert kruskal_result.total_weight == prim_result.total_weight
+    assert kruskal_result.edge_count == prim_result.edge_count
+  end
+
+  test "kruskal_and_prim_agree_on_tied_weights_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_node(4, "D")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 5)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 5)
+      |> Yog.add_edge_ensure(from: 1, to: 4, with: 5)
+
+    {:ok, kruskal_result} = MST.kruskal(in: graph, compare: &compare/2)
+    {:ok, prim_result} = MST.prim(in: graph, compare: &compare/2)
+
+    assert kruskal_result.total_weight == prim_result.total_weight
+    assert kruskal_result.edge_count == prim_result.edge_count
+    assert kruskal_result.total_weight == 15
   end
 
   # ============= Prim's Algorithm Tests =============
@@ -444,11 +459,10 @@ defmodule Yog.MSTTest do
       |> Yog.add_edge_ensure(from: 2, to: 3, with: 2)
       |> Yog.add_edge_ensure(from: 1, to: 3, with: 3)
 
-    result = MST.prim(in: graph, compare: &compare/2)
+    {:ok, result} = MST.prim(in: graph, compare: &compare/2)
 
-    assert length(result) == 2
-    total_weight = Enum.reduce(result, 0, fn e, acc -> acc + e.weight end)
-    assert total_weight == 3
+    assert result.edge_count == 2
+    assert result.total_weight == 3
   end
 
   test "prim_linear_chain_test" do
@@ -460,11 +474,10 @@ defmodule Yog.MSTTest do
       |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
       |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
 
-    result = MST.prim(in: graph, compare: &compare/2)
+    {:ok, result} = MST.prim(in: graph, compare: &compare/2)
 
-    assert length(result) == 2
-    total_weight = Enum.reduce(result, 0, fn e, acc -> acc + e.weight end)
-    assert total_weight == 15
+    assert result.edge_count == 2
+    assert result.total_weight == 15
   end
 
   test "prim_single_edge_test" do
@@ -474,11 +487,10 @@ defmodule Yog.MSTTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
 
-    result = MST.prim(in: graph, compare: &compare/2)
+    {:ok, result} = MST.prim(in: graph, compare: &compare/2)
 
-    assert length(result) == 1
-    [edge] = result
-    # We don't guarantee direction but from/to must be 1 and 2
+    assert result.edge_count == 1
+    [edge] = result.edges
     nodes = [edge.from, edge.to] |> Enum.sort()
     assert nodes == [1, 2]
     assert edge.weight == 10
@@ -486,14 +498,16 @@ defmodule Yog.MSTTest do
 
   test "prim_single_node_test" do
     graph = Yog.undirected() |> Yog.add_node(1, "A")
-    result = MST.prim(in: graph, compare: &compare/2)
-    assert result == []
+    {:ok, result} = MST.prim(in: graph, compare: &compare/2)
+    assert result.edges == []
+    assert result.node_count == 1
   end
 
   test "prim_empty_graph_test" do
     graph = Yog.undirected()
-    result = MST.prim(in: graph, compare: &compare/2)
-    assert result == []
+    {:ok, result} = MST.prim(in: graph, compare: &compare/2)
+    assert result.edges == []
+    assert result.node_count == 0
   end
 
   test "prim_square_with_diagonal_test" do
@@ -510,11 +524,10 @@ defmodule Yog.MSTTest do
       |> Yog.add_edge_ensure(from: 1, to: 4, with: 5)
       |> Yog.add_edge_ensure(from: 2, to: 3, with: 5)
 
-    result = MST.prim(in: graph, compare: &compare/2)
+    {:ok, result} = MST.prim(in: graph, compare: &compare/2)
 
-    assert length(result) == 3
-    total_weight = Enum.reduce(result, 0, fn e, acc -> acc + e.weight end)
-    assert total_weight == 3
+    assert result.edge_count == 3
+    assert result.total_weight == 3
   end
 
   test "prim_classic_kruskal_test" do
@@ -530,11 +543,10 @@ defmodule Yog.MSTTest do
       |> Yog.add_edge_ensure(from: 1, to: 4, with: 4)
       |> Yog.add_edge_ensure(from: 2, to: 4, with: 5)
 
-    result = MST.prim(in: graph, compare: &compare/2)
+    {:ok, result} = MST.prim(in: graph, compare: &compare/2)
 
-    assert length(result) == 3
-    total_weight = Enum.reduce(result, 0, fn e, acc -> acc + e.weight end)
-    assert total_weight == 6
+    assert result.edge_count == 3
+    assert result.total_weight == 6
   end
 
   test "prim_disconnected_test" do
@@ -547,15 +559,38 @@ defmodule Yog.MSTTest do
       |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
       |> Yog.add_edge_ensure(from: 3, to: 4, with: 2)
 
-    # Prim's only spans a single component. If it's completely disconnected, it returns empty list
-    # or the tree for just one component, but our Elixir wrapper doesn't provide a starting node,
-    # it lets the Gleam impl pick the first node. In the Gleam test `prim_disconnected_test` is not defined
-    # but let's test behavior: it should return for the first component it builds
-    # Since map iteration order is not guaranteed, it might be 1->2 or 3->4
-    result = MST.prim(in: graph, compare: &compare/2)
-    assert length(result) == 1
-    edge = hd(result)
+    {:ok, result} = MST.prim(in: graph, compare: &compare/2)
+    assert result.edge_count == 1
+    [edge] = result.edges
     assert edge.weight in [1, 2]
+  end
+
+  test "prim_from_specific_node_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 2)
+
+    {:ok, result} = MST.prim(in: graph, from: 3, compare: &compare/2)
+
+    assert result.edge_count == 2
+    assert result.total_weight == 3
+  end
+
+  test "prim_from_nonexistent_node_returns_empty_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+
+    {:ok, result} = MST.prim(in: graph, from: 99, compare: &compare/2)
+
+    assert result.edges == []
+    assert result.node_count == 2
   end
 
   # ============= Directed Graph Tests =============

@@ -30,7 +30,7 @@ defmodule Yog.MST do
 
   ## Properties of MSTs
 
-  - Connects all nodes with exactly `V - 1` edges (for a graph with V nodes)
+  - Connects all nodes with exactly `V - 1` edges (for a connected graph with V nodes)
   - Contains no cycles
   - Minimizes the sum of edge weights
   - May not be unique if multiple edges have the same weight
@@ -47,12 +47,11 @@ defmodule Yog.MST do
   - [Wikipedia: Minimum Spanning Tree](https://en.wikipedia.org/wiki/Minimum_spanning_tree)
   - [CP-Algorithms: MST](https://cp-algorithms.com/graph/mst_kruskal.html)
   - [Wikipedia: Edmonds' Algorithm](https://en.wikipedia.org/wiki/Edmonds%27_algorithm) (for directed graphs)
-
-
   """
 
   alias Yog.DisjointSet
   alias Yog.Model
+  alias Yog.MST.Result
   alias Yog.PriorityQueue, as: PQ
 
   @typedoc """
@@ -67,8 +66,8 @@ defmodule Yog.MST do
   @doc """
   Finds the Minimum Spanning Tree (MST) using Kruskal's algorithm.
 
-  Returns a list of edges that form the MST. The total weight of these edges
-  is minimized while ensuring all nodes are connected.
+  Returns `{:ok, %Yog.MST.Result{}}` containing the edges that form the MST.
+  The total weight of these edges is minimized while ensuring all nodes are connected.
 
   **Time Complexity:** O(E log E) where E is the number of edges
 
@@ -88,19 +87,19 @@ defmodule Yog.MST do
       ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
       ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 2)
       ...>   |> Yog.add_edge_ensure(from: 1, to: 3, with: 3)
-      iex> mst_edges = Yog.MST.kruskal(in: graph, compare: fn a, b ->
+      iex> {:ok, result} = Yog.MST.kruskal(in: graph, compare: fn a, b ->
       ...>   cond do
       ...>     a < b -> :lt
       ...>     a > b -> :gt
       ...>     true -> :eq
       ...>   end
       ...> end)
-      iex> length(mst_edges)
+      iex> result.edge_count
       2
-      iex> Enum.reduce(mst_edges, 0, fn e, acc -> acc + e.weight end)
+      iex> result.total_weight
       3
   """
-  @spec kruskal(keyword()) :: [edge()] | {:error, :undirected_only}
+  @spec kruskal(keyword()) :: {:ok, Result.t()} | {:error, :undirected_only}
   def kruskal(opts) when is_list(opts) do
     graph = Keyword.fetch!(opts, :in)
     compare = opts[:compare] || (&Yog.Utils.compare/2)
@@ -122,18 +121,18 @@ defmodule Yog.MST do
       ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
       ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 2)
       ...>   |> Yog.add_edge_ensure(from: 1, to: 3, with: 3)
-      iex> mst_edges = graph |> Yog.MST.kruskal(fn a, b ->
+      iex> {:ok, result} = graph |> Yog.MST.kruskal(fn a, b ->
       ...>   cond do
       ...>     a < b -> :lt
       ...>     a > b -> :gt
       ...>     true -> :eq
       ...>   end
       ...> end)
-      iex> length(mst_edges)
+      iex> result.edge_count
       2
   """
   @spec kruskal(Yog.graph(), (term(), term() -> :lt | :eq | :gt)) ::
-          [edge()] | {:error, :undirected_only}
+          {:ok, Result.t()} | {:error, :undirected_only}
   def kruskal(graph, compare \\ &Yog.Utils.compare/2)
 
   def kruskal(%Yog.Graph{kind: :directed}, _compare) do
@@ -144,27 +143,31 @@ defmodule Yog.MST do
     edges = extract_edges(graph)
     sorted_edges = Enum.sort(edges, fn a, b -> compare.(a.weight, b.weight) == :lt end)
 
-    do_kruskal(sorted_edges, DisjointSet.new(), [])
+    result = do_kruskal(sorted_edges, DisjointSet.new(), [])
+    {:ok, Result.new(result, :kruskal, Model.order(graph))}
   end
 
   @doc """
   Finds the Minimum Spanning Tree (MST) using Prim's algorithm.
 
-  Returns a list of edges that form the MST. Unlike Kruskal's which processes
-  all edges globally, Prim's grows the MST from a starting node by repeatedly
-  adding the minimum-weight edge that connects a visited node to an unvisited node.
+  Returns `{:ok, %Yog.MST.Result{}}` containing the edges that form the MST.
+  Unlike Kruskal's which processes all edges globally, Prim's grows the MST
+  from a starting node by repeatedly adding the minimum-weight edge that
+  connects a visited node to an unvisited node.
 
   **Time Complexity:** O(E log V) where E is the number of edges and V is the number of vertices
 
   **Disconnected Graphs:** For disconnected graphs, Prim's only returns edges
-  for the connected component containing the starting node (the first node in the graph).
-  Use Kruskal's if you need a minimum spanning forest that covers all components.
+  for the connected component containing the starting node (or the first node
+  in the graph if no start node is provided). Use Kruskal's if you need a
+  minimum spanning forest that covers all components.
 
   ## Options
 
   - `:in` - The graph to find the MST in
   - `:compare` - A comparison function that takes two weights and returns
     `:lt`, `:eq`, or `:gt`
+  - `:from` - The starting node ID (optional; defaults to the first node in the graph)
 
   ## Example
 
@@ -176,23 +179,24 @@ defmodule Yog.MST do
       ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
       ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 2)
       ...>   |> Yog.add_edge_ensure(from: 1, to: 3, with: 3)
-      iex> mst_edges = Yog.MST.prim(in: graph, compare: fn a, b ->
+      iex> {:ok, result} = Yog.MST.prim(in: graph, compare: fn a, b ->
       ...>   cond do
       ...>     a < b -> :lt
       ...>     a > b -> :gt
       ...>     true -> :eq
       ...>   end
       ...> end)
-      iex> length(mst_edges)
+      iex> result.edge_count
       2
-      iex> Enum.reduce(mst_edges, 0, fn e, acc -> acc + e.weight end)
+      iex> result.total_weight
       3
   """
-  @spec prim(keyword()) :: [edge()] | {:error, :undirected_only}
+  @spec prim(keyword()) :: {:ok, Result.t()} | {:error, :undirected_only}
   def prim(opts) when is_list(opts) do
     graph = Keyword.fetch!(opts, :in)
     compare = opts[:compare] || (&Yog.Utils.compare/2)
-    prim(graph, compare)
+    start_node = opts[:from]
+    prim(graph, compare, start_node)
   end
 
   @doc """
@@ -210,41 +214,43 @@ defmodule Yog.MST do
       ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
       ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 2)
       ...>   |> Yog.add_edge_ensure(from: 1, to: 3, with: 3)
-      iex> mst_edges = graph |> Yog.MST.prim(fn a, b ->
+      iex> {:ok, result} = graph |> Yog.MST.prim(fn a, b ->
       ...>   cond do
       ...>     a < b -> :lt
       ...>     a > b -> :gt
       ...>     true -> :eq
       ...>   end
       ...> end)
-      iex> length(mst_edges)
+      iex> result.edge_count
       2
   """
   @spec prim(Yog.graph(), (term(), term() -> :lt | :eq | :gt)) ::
-          [edge()] | {:error, :undirected_only}
-  def prim(graph, compare \\ &Yog.Utils.compare/2)
+          {:ok, Result.t()} | {:error, :undirected_only}
+  def prim(graph, compare \\ &Yog.Utils.compare/2) do
+    prim(graph, compare, nil)
+  end
 
-  def prim(%Yog.Graph{kind: :directed}, _compare) do
+  def prim(%Yog.Graph{kind: :directed}, _compare, _start_node) do
     {:error, :undirected_only}
   end
 
-  def prim(graph, compare) do
+  def prim(graph, compare, nil) do
     node_ids = Model.all_nodes(graph)
 
     case node_ids do
       [] ->
-        []
+        {:ok, Result.new([], :prim, 0)}
 
       [start | _] ->
-        initial_edges = get_all_edges_from_node(graph, start)
+        do_prim(graph, start, compare)
+    end
+  end
 
-        initial_pq =
-          PQ.new(fn a, b -> compare.(a.weight, b.weight) == :lt end)
-          |> push_all(initial_edges)
-
-        initial_visited = MapSet.new([start])
-
-        do_prim(graph, initial_pq, initial_visited, [], compare)
+  def prim(graph, compare, start_node) do
+    if Model.has_node?(graph, start_node) do
+      do_prim(graph, start_node, compare)
+    else
+      {:ok, Result.new([], :prim, Model.order(graph))}
     end
   end
 
@@ -291,23 +297,33 @@ defmodule Yog.MST do
   # =============================================================================
   # Private Helper Functions - Prim's Algorithm
   # =============================================================================
-  # Gets all outgoing edges from a specific node.
-  defp get_all_edges_from_node(graph, from_id) do
-    Model.successors(graph, from_id)
-    |> Enum.map(fn {to_id, weight} ->
-      %{from: from_id, to: to_id, weight: weight}
-    end)
+
+  defp do_prim(graph, start, compare) do
+    initial_edges = get_all_edges_from_node(graph, start)
+
+    initial_pq =
+      PQ.new(fn a, b -> compare.(a.weight, b.weight) == :lt end)
+      |> push_all(initial_edges)
+
+    initial_visited = MapSet.new([start])
+
+    result = do_prim_loop(graph, initial_pq, initial_visited, [], compare)
+    {:ok, Result.new(result, :prim, Model.order(graph))}
   end
 
   # Main Prim loop - grows MST from starting node.
-  defp do_prim(graph, pq, visited, acc, compare) do
+  defp do_prim_loop(_graph, pq, _visited, acc, _compare) when pq == %{} do
+    Enum.reverse(acc)
+  end
+
+  defp do_prim_loop(graph, pq, visited, acc, compare) do
     if PQ.empty?(pq) do
       Enum.reverse(acc)
     else
       {:ok, edge, rest_pq} = PQ.pop(pq)
 
       if MapSet.member?(visited, edge.to) do
-        do_prim(graph, rest_pq, visited, acc, compare)
+        do_prim_loop(graph, rest_pq, visited, acc, compare)
       else
         new_visited = MapSet.put(visited, edge.to)
         new_acc = [edge | acc]
@@ -318,8 +334,16 @@ defmodule Yog.MST do
           Enum.reject(new_edges, fn e -> MapSet.member?(new_visited, e.to) end)
           |> Enum.reduce(rest_pq, fn e, acc_pq -> PQ.push(acc_pq, e) end)
 
-        do_prim(graph, new_pq, new_visited, new_acc, compare)
+        do_prim_loop(graph, new_pq, new_visited, new_acc, compare)
       end
     end
+  end
+
+  # Gets all outgoing edges from a specific node.
+  defp get_all_edges_from_node(graph, from_id) do
+    Model.successors(graph, from_id)
+    |> Enum.map(fn {to_id, weight} ->
+      %{from: from_id, to: to_id, weight: weight}
+    end)
   end
 end

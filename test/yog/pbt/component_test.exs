@@ -26,14 +26,14 @@ defmodule Yog.PBT.ComponentTest do
           sub = Yog.subgraph(graph, component)
 
           if length(component) > 1 do
-            kruskal_edges = Yog.MST.kruskal(in: sub, compare: &Yog.Utils.compare/2)
-            k_weight = Enum.reduce(kruskal_edges, 0, fn e, acc -> acc + e.weight end)
+            {:ok, kruskal_result} = Yog.MST.kruskal(in: sub, compare: &Yog.Utils.compare/2)
 
             [start_node | _] = component
-            prim_edges = Yog.MST.prim(in: sub, from: start_node, compare: &Yog.Utils.compare/2)
-            p_weight = Enum.reduce(prim_edges, 0, fn e, acc -> acc + e.weight end)
 
-            assert k_weight == p_weight
+            {:ok, prim_result} =
+              Yog.MST.prim(in: sub, from: start_node, compare: &Yog.Utils.compare/2)
+
+            assert kruskal_result.total_weight == prim_result.total_weight
           end
         end
       end
