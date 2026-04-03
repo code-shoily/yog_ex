@@ -25,12 +25,26 @@ defmodule Yog.Health do
       # High assortativity = nodes cluster with similar nodes
       assort = Yog.Health.assortativity(graph)
 
-
   """
 
   alias Yog.Model
   alias Yog.Pathfinding.Dijkstra
   alias Yog.Transform
+
+  @typedoc """
+  Options for health metrics that operate on weighted graphs.
+  """
+  @type metric_opts :: keyword()
+
+  @typedoc """
+  A metric value returned by health functions. May be `nil` for
+  disconnected or empty graphs.
+  """
+  @type metric_value :: term() | nil
+
+  # =============================================================================
+  # Distance Metrics
+  # =============================================================================
 
   @doc """
   The diameter is the maximum eccentricity (longest shortest path).
@@ -44,6 +58,15 @@ defmodule Yog.Health do
   - `:with_add` - Function to add two weights (e.g., `&Kernel.+/2`)
   - `:with_compare` - Function comparing two weights returning `:lt`, `:eq`, or `:gt`
   - `:with` - Function to extract/transform edge weight
+
+  ## Interpreting Diameter
+
+  | Value | Meaning |
+  |-------|---------|
+  | `1` | Complete graph — everyone is directly connected |
+  | `2` | Small world — at most one hop between any pair |
+  | `> log(V)` | Relatively sparse or stretched topology |
+  | `nil` | Disconnected or empty graph |
 
   ## Example
 
@@ -65,14 +88,13 @@ defmodule Yog.Health do
       iex> Yog.Health.diameter(graph, opts)
       3
   """
-  @spec diameter(Yog.graph(), keyword()) :: term() | nil
+  @spec diameter(Yog.graph(), metric_opts()) :: metric_value()
   def diameter(graph, opts \\ []) do
     zero = opts[:with_zero] || 0
     add = opts[:with_add] || (&Kernel.+/2)
     compare = opts[:with_compare] || (&Yog.Utils.compare/2)
     weight_fn = opts[:with] || (&Function.identity/1)
 
-    # Reweight graph ONCE
     reweighted_graph =
       if weight_fn != (&Function.identity/1),
         do: Transform.map_edges(graph, weight_fn),
@@ -127,6 +149,15 @@ defmodule Yog.Health do
   - `:with_compare` - Function comparing two weights returning `:lt`, `:eq`, or `:gt`
   - `:with` - Function to extract/transform edge weight
 
+  ## Interpreting Radius
+
+  | Value | Meaning |
+  |-------|---------|
+  | `= diameter` | Highly symmetric structure (e.g., cycle, complete graph) |
+  | `<< diameter` | Centralized topology with a clear hub (e.g., star) |
+  | `1` | There exists a central node one hop from everyone else |
+  | `nil` | Disconnected or empty graph |
+
   ## Example
 
       iex> graph =
@@ -146,14 +177,13 @@ defmodule Yog.Health do
       iex> Yog.Health.radius(graph, opts)
       1
   """
-  @spec radius(Yog.graph(), keyword()) :: term() | nil
+  @spec radius(Yog.graph(), metric_opts()) :: metric_value()
   def radius(graph, opts \\ []) do
     zero = opts[:with_zero] || 0
     add = opts[:with_add] || (&Kernel.+/2)
     compare = opts[:with_compare] || (&Yog.Utils.compare/2)
     weight_fn = opts[:with] || (&Function.identity/1)
 
-    # Reweight graph ONCE
     reweighted_graph =
       if weight_fn != (&Function.identity/1),
         do: Transform.map_edges(graph, weight_fn),
@@ -208,6 +238,16 @@ defmodule Yog.Health do
   - `:with_compare` - Function comparing two weights returning `:lt`, `:eq`, or `:gt`
   - `:with` - Function to extract/transform edge weight
 
+  ## Interpreting Eccentricity
+
+  | Value | Meaning |
+  |-------|---------|
+  | `= radius` | The node is in the graph center |
+  | `= diameter` | The node is on the periphery (worst-case reachability) |
+  | `1` | The node is adjacent to every other node |
+  | `0` | Single-node graph |
+  | `nil` | The node cannot reach all others (disconnected component) |
+
   ## Example
 
       iex> graph =
@@ -232,14 +272,13 @@ defmodule Yog.Health do
       iex> Yog.Health.eccentricity(graph, 2, opts)
       2
   """
-  @spec eccentricity(Yog.graph(), Yog.node_id(), keyword()) :: term() | nil
+  @spec eccentricity(Yog.graph(), Yog.node_id(), metric_opts()) :: metric_value()
   def eccentricity(graph, node, opts \\ []) do
     zero = opts[:with_zero] || 0
     add = opts[:with_add] || (&Kernel.+/2)
     compare = opts[:with_compare] || (&Yog.Utils.compare/2)
     weight_fn = opts[:with] || (&Function.identity/1)
 
-    # Reweight graph if needed (usually already reweighted by callers)
     reweighted_graph =
       if weight_fn != (&Function.identity/1),
         do: Transform.map_edges(graph, weight_fn),
@@ -253,11 +292,9 @@ defmodule Yog.Health do
     else
       distances = Dijkstra.single_source_distances(reweighted_graph, node, zero, add, compare)
 
-      # Check if all nodes are reachable
       if map_size(distances) < num_nodes do
         nil
       else
-        # Find maximum distance
         distances
         |> Map.values()
         |> Enum.reduce(fn dist, max_dist ->
@@ -267,14 +304,26 @@ defmodule Yog.Health do
     end
   end
 
+  # =============================================================================
+  # Structural Metrics
+  # =============================================================================
+
   @doc """
   Assortativity coefficient measures degree correlation.
 
-  - **Positive**: high-degree nodes connect to high-degree nodes (assortative)
-  - **Negative**: high-degree nodes connect to low-degree nodes (disassortative)
-  - **Zero**: random mixing
-
   **Time Complexity:** O(V+E)
+
+  ## Interpreting Assortativity
+
+  | Value | Meaning |
+  |-------|---------|
+  | **Positive** | High-degree nodes preferentially connect to other high-degree nodes (assortative) |
+  | **Negative** | High-degree nodes connect to low-degree nodes (disassortative) |
+  | **Zero** | Random mixing, or all nodes have the same degree (regular graph) |
+
+  Common real-world patterns:
+  - Social networks tend to be **assortative** (people with many friends know each other)
+  - Biological and technological networks tend to be **disassortative** (hubs serve many leaves)
 
   ## Example
 
@@ -298,7 +347,6 @@ defmodule Yog.Health do
   def assortativity(graph) do
     nodes = Model.all_nodes(graph)
 
-    # 1. Pre-calculate degrees
     degrees =
       Enum.reduce(nodes, %{}, fn node, acc ->
         deg = Model.out_degree(graph, node)
@@ -328,8 +376,6 @@ defmodule Yog.Health do
         end)
 
       # Simplified Newman formula for symmetric edge lists
-      # r = [ Σ(jk) - (Σ(j+k)/2)^2 / M ] / [ Σ(j^2+k^2)/2 - (Σ(j+k)/2)^2 / M ]
-
       term1 = sum_j_plus_k / 2.0
       numerator = sum_jk / m - :math.pow(term1 / m, 2)
       denominator = sum_j2_plus_k2 / (2.0 * m) - :math.pow(term1 / m, 2)
@@ -353,6 +399,18 @@ defmodule Yog.Health do
   - `:with` - Function to extract/transform edge weight
   - `:with_to_float` - Function to convert weight to float
 
+  ## Interpreting Average Path Length
+
+  | Value | Meaning |
+  |-------|---------|
+  | `≈ 1.0` | Dense or highly connected graph (e.g., complete graph) |
+  | `≈ 2.0` | Star-like or small-world structure |
+  | `≈ V/3` | Chain-like or path-like topology |
+  | `nil` | Disconnected or empty graph |
+
+  A low APL relative to the number of nodes indicates a **small-world** structure:
+  the graph achieves global connectivity through a small number of hops.
+
   ## Example
 
       iex> graph =
@@ -375,7 +433,7 @@ defmodule Yog.Health do
       iex> abs(avg - 1.0) < 0.001
       true
   """
-  @spec average_path_length(Yog.graph(), keyword()) :: float() | nil
+  @spec average_path_length(Yog.graph(), metric_opts()) :: float() | nil
   def average_path_length(graph, opts \\ []) do
     zero = opts[:with_zero] || 0
     add = opts[:with_add] || (&Kernel.+/2)
@@ -383,7 +441,6 @@ defmodule Yog.Health do
     weight_fn = opts[:with] || (&Function.identity/1)
     to_float = opts[:with_to_float] || fn x -> x * 1.0 end
 
-    # Reweight graph ONCE
     reweighted_graph =
       if weight_fn != (&Function.identity/1),
         do: Transform.map_edges(graph, weight_fn),
@@ -400,7 +457,6 @@ defmodule Yog.Health do
         timeout: :infinity
       ]
 
-      # Calculate all-pairs shortest paths in parallel
       all_distances =
         nodes
         |> Task.async_stream(
@@ -411,14 +467,12 @@ defmodule Yog.Health do
         )
         |> Enum.map(fn {:ok, distances} -> distances end)
 
-      # Check if graph is fully connected
       all_reachable =
         Enum.all?(all_distances, fn distances ->
           map_size(distances) == num_nodes
         end)
 
       if all_reachable do
-        # Sum all distances (including self-distances which are zero)
         total =
           Enum.reduce(all_distances, 0.0, fn distances, acc ->
             sum =
@@ -429,7 +483,6 @@ defmodule Yog.Health do
             acc + sum
           end)
 
-        # Subtract self-distances (all zeros) and divide by number of pairs (n * (n-1))
         zero_distances = num_nodes * to_float.(zero) * 1.0
         num_pairs = num_nodes * (num_nodes - 1) * 1.0
 
