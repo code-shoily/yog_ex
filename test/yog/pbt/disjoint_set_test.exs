@@ -11,7 +11,13 @@ defmodule Yog.PBT.DisjointSetTest do
 
   describe "DisjointSet Properties" do
     property "Reflexivity: Every element is connected to itself" do
-      check all(elements <- StreamData.uniq_list_of(StreamData.integer(), min_length: 1)) do
+      check all(
+              elements <-
+                StreamData.uniq_list_of(StreamData.integer(-10000..10000),
+                  min_length: 1,
+                  max_length: 100
+                )
+            ) do
         dsu = Enum.reduce(elements, DisjointSet.new(), &DisjointSet.add(&2, &1))
 
         for x <- elements do
@@ -24,7 +30,10 @@ defmodule Yog.PBT.DisjointSetTest do
     property "Symmetry: connectedness is bidirectional" do
       check all(
               elements <-
-                StreamData.uniq_list_of(StreamData.integer(), min_length: 2, max_length: 20),
+                StreamData.uniq_list_of(StreamData.integer(-10000..10000),
+                  min_length: 2,
+                  max_length: 20
+                ),
               pairs <-
                 StreamData.list_of(
                   {
@@ -48,7 +57,10 @@ defmodule Yog.PBT.DisjointSetTest do
       check all(
               # Small enough to brute-force all triplets
               elements <-
-                StreamData.uniq_list_of(StreamData.integer(), min_length: 3, max_length: 15),
+                StreamData.uniq_list_of(StreamData.integer(-10000..10000),
+                  min_length: 3,
+                  max_length: 15
+                ),
               pairs <-
                 StreamData.list_of(
                   {
@@ -75,7 +87,10 @@ defmodule Yog.PBT.DisjointSetTest do
     property "Union reduces set count by exactly 1 for distinct sets" do
       check all(
               elements <-
-                StreamData.uniq_list_of(StreamData.integer(), min_length: 2, max_length: 50),
+                StreamData.uniq_list_of(StreamData.integer(-10000..10000),
+                  min_length: 2,
+                  max_length: 50
+                ),
               ops <-
                 StreamData.list_of(
                   {
@@ -109,7 +124,10 @@ defmodule Yog.PBT.DisjointSetTest do
     property "Partitioning: to_lists produces disjoint sets covering all elements" do
       check all(
               elements <-
-                StreamData.uniq_list_of(StreamData.integer(), min_length: 1, max_length: 50),
+                StreamData.uniq_list_of(StreamData.integer(-10000..10000),
+                  min_length: 1,
+                  max_length: 50
+                ),
               pairs <-
                 StreamData.list_of(
                   {
