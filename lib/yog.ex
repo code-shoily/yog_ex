@@ -41,10 +41,10 @@ defmodule Yog do
 
   # Re-exporting core types
   @type t() :: Graph.t()
-  @type node_id() :: integer()
+  @type node_id() :: term()
   @type graph_type() :: :directed | :undirected
   @type edge_tuple() :: {node_id(), node_id(), any()}
-  @type graph() :: any()
+  @type graph() :: Graph.t()
 
   # ============= CREATION & BUILDERS =============
 
