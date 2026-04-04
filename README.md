@@ -25,18 +25,18 @@
 [![Hex Version](https://img.shields.io/hexpm/v/yog_ex.svg)](https://hex.pm/packages/yog_ex)
 [![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/yog_ex/)
 
-A comprehensive **pure Elixir** graph algorithm and network analysis library providing implementations of classic graph algorithms with a functional API.
+Yog is a set of Graph and Network algorithms and data structures implemented in Elixir and packaged as a common API.
 
-🔷 **Pure Elixir** — It started off as a wrapper around the Gleam [Yog](https://hex.pm/packages/yog) library, YogEx is now fully implemented in Elixir with no external runtime dependencies.
+It started off as a wrapper around the Gleam [Yog](https://hex.pm/packages/yog) library, but now YogEx is now fully implemented in Elixir and a superset of the original Gleam version.
  
 > [!WARNING]
 > **API Stability**: Until the version reaches `1.0.0`, there may be breaking changes. While I'll try my best to keep the API stable, there's no guarantee. The primary focus is on **performance**, **documentation**, and **bugfixes**.
 
 ## Features
 
-YogEx provides comprehensive graph algorithms organized into focused modules:
+YogEx provides comprehensive graph algorithms organized into modules:
 
-### 🚀 Core Capabilities
+### Core Capabilities
 
 **[Pathfinding & Flow](https://hexdocs.pm/yog_ex/Yog.Pathfinding.html)** — Shortest paths (Dijkstra, A*, Bellman-Ford, Floyd-Warshall, Johnson's), maximum flow (Edmonds-Karp), min-cut (Stoer-Wagner), and implicit state-space search for on-demand graphs.
 
@@ -288,7 +288,7 @@ pajek_string = Pajek.serialize(graph)
 
 ### Functional Inductive Graphs (Experimental)
 
-YogEx now includes an experimental implementation of Martin Erwig's Functional Graph Library (FGL) natively in Elixir under the `Yog.Functional` namespace. This provides an elegant, purely functional approach to graph algorithms using inductive decomposition (`match/2`) instead of mutable references or explicit "visited" sets.
+YogEx includes an experimental implementation of Martin Erwig's Functional Graph Library (FGL) natively in Elixir under `Yog.Functional`. This provides a purely functional approach to graph algorithms using inductive decomposition (`match/2`).
 
 ```elixir
 alias Yog.Functional.{Algorithms, Model}
@@ -311,49 +311,11 @@ Algorithms.shortest_path(graph, 1, 3)
 # => {:ok, [1, 2, 3], 3}
 ```
 
-📖 **Learn more**: See the [Functional Graphs README](lib/yog/functional/README.md) for a deep dive into the build/burn pattern, context-based traversal, and the philosophy of inductive graph decomposition.
+See the [Functional Graphs README](lib/yog/functional/README.md) for a deep dive into the build/burn pattern, context-based traversal, and the philosophy of inductive graph decomposition.
 
 ## Examples
 
-Detailed examples are located in the [examples/](https://github.com/code-shoily/yog_ex/tree/main/examples) directory:
-
-### Pathfinding & Optimization
-
-- [GPS Navigation](examples/gps_navigation.exs) - Shortest path using A* and heuristics
-- [City Distance Matrix](examples/city_distance_matrix.exs) - Floyd-Warshall for all-pairs shortest paths
-- [Network Bandwidth](examples/network_bandwidth.exs) - ⭐ Max flow for bandwidth optimization with bottleneck analysis
-- [Network Cable Layout](examples/network_cable_layout.exs) - Minimum Spanning Tree using Kruskal's
-
-### Matching & Assignment
-
-- [Job Matching](examples/job_matching.exs) - ⭐ Max flow for bipartite matching and assignment problems
-- [Job Assignment](examples/job_assignment.exs) - Bipartite maximum matching
-- [Medical Residency](examples/medical_residency.exs) - Stable marriage matching (Gale-Shapley algorithm)
-
-### Graph Analysis
-
-- [Social Network Analysis](examples/social_network_analysis.exs) - Finding communities using SCCs
-- [Global Minimum Cut](examples/global_min_cut.exs) - Stoer-Wagner algorithm
-- [Bridges of Königsberg](examples/bridges_of_konigsberg.exs) - Eulerian circuit and path detection
-
-### Ordering & Scheduling
-
-- [Task Scheduling](examples/task_scheduling.exs) - Basic topological sorting
-- [Task Ordering](examples/task_ordering.exs) - Lexicographical topological sort
-
-### Traversal & Exploration
-
-- [Cave Path Counting](examples/cave_path_counting.exs) - Custom DFS with backtracking
-- [Flood Fill](examples/flood_fill.exs) - BFS-based region exploration
-- [Number of Islands](examples/number_of_islands.exs) - Connected component counting
-
-### Graph Construction & Visualization
-
-- [Graph Creation](examples/graph_creation.exs) - Comprehensive guide to 10+ ways of creating graphs
-- [Graph Generation Showcase](examples/graph_generation_showcase.exs) - ⭐ All classic graph patterns with statistics
-- [DOT rendering](examples/render_dot.exs) - Exporting graphs to Graphviz format
-- [Mermaid rendering](examples/render_mermaid.exs) - Generating Mermaid diagrams
-- [Graph I/O](examples/render_json.exs) - Exporting matrices and objects to JSON and other formats for interoperability
+Detailed examples are located in the [examples/](https://github.com/code-shoily/yog_ex/tree/main/examples) directory
 
 ### Running Examples
 
@@ -365,20 +327,9 @@ mix run examples/network_bandwidth.exs
 
 ### Advent of Code Solutions
 
-YogEx is extensively used to solve [Advent of Code](https://adventofcode.com/) challenges. Check out the [Advent of Code repository](https://github.com/code-shoily/advent_of_code) for complete solutions using YogEx:
+YogEx is used to solve [Advent of Code](https://adventofcode.com/) challenges. 
 
-| Year | Day | Problem | Algorithm Used |
-|------|-----|---------|----------------|
-| 2019 | 18 | [Many-Worlds Interpretation](https://adventofcode.com/2019/day/18) | `Yog.Pathfinding.Dijkstra` with implicit state-space search |
-| 2023 | 10 | [Pipe Maze](https://adventofcode.com/2023/day/10) | `Yog.Builder.Grid` + `Yog.Pathfinding.Dijkstra` |
-| 2023 | 25 | [Snowverload](https://adventofcode.com/2023/day/25) | `Yog.Flow.MinCut` (Stoer-Wagner global min-cut) |
-
-📊 **[Full list of graph-based solutions](https://github.com/code-shoily/advent_of_code/blob/main/wiki/tags/graph.md)** — See all Advent of Code solutions tagged with `graph` that demonstrate real-world usage of YogEx algorithms.
-
-These solutions showcase:
-- **Implicit graph search** — State-space exploration without explicit graph construction
-- **Grid-based pathfinding** — Maze solving with custom connectivity predicates
-- **Network flow algorithms** — Graph partitioning and minimum cut problems
+See all Advent of Code solutions tagged with `graph` that demonstrate usage of YogEx algorithms in the [Advent of Code repository](https://github.com/code-shoily/advent_of_code).
 
 ## Algorithm Selection Guide
 
@@ -434,20 +385,6 @@ Beyond graph algorithms, YogEx implements several fundamental computer science t
 |-----------|---------|---------|
 | **HyperLogLog** | `Reachability.counts_estimate/2` | Memory-efficient cardinality estimation (O(V) vs O(V²)) for reachability counting with ~3% error |
 
-### Classic Algorithms
-
-| Algorithm | Used In | Purpose |
-|-----------|---------|---------|
-| **Kahn's Algorithm** | Topological sort, cycle detection | O(V+E) topological ordering and DAG validation |
-| **Union-Find (Disjoint Set)** | Kruskal's MST, cycle detection | O(α(V)) amortized set operations with path compression |
-| **Bron-Kerbosch** | Maximal clique enumeration | Backtracking algorithm for finding all maximal cliques |
-| **Gale-Shapley** | Stable marriage matching | O(n²) stable matching for assignment problems |
-| **Hierholzer's Algorithm** | Eulerian path/circuit | O(E) algorithm for finding Eulerian trails |
-| **Tarjan's Algorithm** | SCCs, bridges, articulation points | O(V+E) single-pass strongly connected components |
-| **Kosaraju's Algorithm** | SCCs (alternative) | O(V+E) two-pass strongly connected components |
-| **Network Simplex** | Minimum cost flow | Specialized simplex for network flow optimization |
-| **Stoer-Wagner** | Global minimum cut | O(V³) algorithm for graph partitioning |
-
 ### Data Structures
 
 | Structure | Used In | Purpose |
@@ -482,7 +419,9 @@ Beyond graph algorithms, YogEx implements several fundamental computer science t
 
 ## Property-Based Testing
 
-This library uses property-based testing (PBT) via `StreamData` to ensure that algorithms hold up against a wide range of automatically generated graph structures. See the [PROPERTIES.md](PROPERTIES.md) for a complete catalog of all algorithmic invariants (hypotheses) verified by the test suite.
+This library uses property-based testing (PBT) via `StreamData` to ensure that algorithms hold up against a wide range of automatically generated graph structures. 
+
+See the [PROPERTIES.md](PROPERTIES.md) for a complete catalog of all algorithmic invariants (hypotheses) verified by the test suite.
 
 ## Development
 
@@ -507,7 +446,3 @@ mix test test/yog/pathfinding/dijkstra_test.exs
 ## AI Assistance
 
 Parts of this project were developed with the assistance of AI coding tools. All AI-generated code has been reviewed, tested, and validated by the maintainer.
-
----
-
-**YogEx** — Graph algorithms for Elixir 🌳
