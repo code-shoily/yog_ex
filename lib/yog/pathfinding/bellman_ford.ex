@@ -218,11 +218,9 @@ defmodule Yog.Pathfinding.BellmanFord do
     nodes = Model.all_nodes(graph)
     node_count = length(nodes)
 
-    # Initialize distances
     initial_distances = %{from => zero}
     initial_predecessors = %{}
 
-    # Relax edges |V| - 1 times
     {distances, predecessors} =
       if node_count <= 1 do
         {initial_distances, initial_predecessors}
@@ -234,7 +232,6 @@ defmodule Yog.Pathfinding.BellmanFord do
         end)
       end
 
-    # Check for negative cycles with one more relaxation
     {final_distances, _} =
       relax_all_edges_from_graph(graph, distances, predecessors, add, compare)
 
@@ -308,13 +305,11 @@ defmodule Yog.Pathfinding.BellmanFord do
 
     initial_distances = %{from => zero}
 
-    # Relax |V| - 1 times
     distances =
       Enum.reduce(1..(node_count - 1), initial_distances, fn _, dist ->
         relax_all_edges_from_graph_no_pred(graph, dist, add, compare)
       end)
 
-    # One more relaxation to check for negative cycles
     final_distances = relax_all_edges_from_graph_no_pred(graph, distances, add, compare)
 
     negative_cycle_detected?(nodes, distances, final_distances, compare)
@@ -435,8 +430,6 @@ defmodule Yog.Pathfinding.BellmanFord do
         compare \\ &Yog.Utils.compare/2,
         max_iterations \\ 1000
       ) do
-    # For implicit graphs, we don't know the total node count
-    # So we use a limit on iterations and detect when distances stabilize
     initial_distances = %{key_fn.(from) => {from, zero}}
 
     do_implicit_bellman_ford(
@@ -450,10 +443,10 @@ defmodule Yog.Pathfinding.BellmanFord do
     )
   end
 
+  # ============================================================
   # Helper functions
+  # ============================================================
 
-  # Relax all edges using Model.successors for protocol compatibility
-  # Only processes edges from nodes that have known distances
   defp relax_all_edges_from_graph(graph, distances, predecessors, add, compare) do
     nodes = Model.all_nodes(graph)
 

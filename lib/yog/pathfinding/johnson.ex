@@ -143,10 +143,8 @@ defmodule Yog.Pathfinding.Johnson do
       ) do
     nodes = Model.all_nodes(graph)
 
-    # Step 1 & 2: Run Bellman-Ford from temporary source to get potentials h(v)
     case compute_potentials(graph, nodes, zero, add, compare) do
       {:ok, potentials} ->
-        # Step 3, 4, 5: Run Dijkstra from each node with reweighted edges
         distances = run_dijkstra_from_all(graph, nodes, potentials, zero, add, subtract, compare)
         {:ok, distances}
 
@@ -155,26 +153,23 @@ defmodule Yog.Pathfinding.Johnson do
     end
   end
 
-  # Step 1 & 2: Compute potentials h(v) using Bellman-Ford from temporary source
+  # ============================================================
+  # Helper functions
+  # ============================================================
+
   defp compute_potentials(graph, nodes, zero, add, compare) do
-    # Create temporary source with 0-weight edges to all nodes
-    # Using make_ref() ensures no collision with user node IDs
     temp_source = make_ref()
 
-    # Initialize distances: temp_source = 0, others = nil (infinity)
     initial_distances = %{temp_source => zero}
 
-    # Get all edges including from temporary source
     edges = get_all_edges_with_temp_source(graph, nodes, temp_source, zero)
 
-    # Relax edges |V| times (where |V| includes temp_source, so length(nodes) + 1)
     node_count = length(nodes) + 1
 
     distances =
       Enum.reduce(1..node_count, initial_distances, fn iteration, dist ->
         new_dist = relax_all_edges(edges, dist, add, compare)
 
-        # Check for negative cycle on last iteration
         if iteration == node_count do
           if distances_changed?(dist, new_dist, compare) do
             :negative_cycle
@@ -192,12 +187,9 @@ defmodule Yog.Pathfinding.Johnson do
     end
   end
 
-  # Get all edges from graph plus 0-weight edges from temp source to all nodes
   defp get_all_edges_with_temp_source(graph, nodes, temp_source, zero) do
-    # Edges from temporary source to all nodes (weight = 0)
     temp_edges = Enum.map(nodes, fn node -> {temp_source, node, zero} end)
 
-    # Regular edges from graph
     regular_edges =
       Enum.flat_map(nodes, fn u ->
         successors = Model.successors(graph, u)
@@ -244,12 +236,10 @@ defmodule Yog.Pathfinding.Johnson do
 
   # Run Dijkstra from each node with reweighted edges
   defp run_dijkstra_from_all(graph, nodes, potentials, zero, add, subtract, compare) do
-    # Reweight the graph ONCE using map_edges_indexed
     reweighted_graph =
       Transform.map_edges_indexed(graph, fn u, v, w ->
         h_u = Map.get(potentials, u, zero)
         h_v = Map.get(potentials, v, zero)
-        # w'(u,v) = w(u,v) + h(u) - h(v)
         add.(w, h_u) |> subtract.(h_v)
       end)
 
@@ -261,11 +251,9 @@ defmodule Yog.Pathfinding.Johnson do
     nodes
     |> Task.async_stream(
       fn source ->
-        # Run Dijkstra on reweighted graph using the standard implementation
         reweighted_distances =
           Dijkstra.single_source_distances(reweighted_graph, source, zero, add, compare)
 
-        # Adjust distances back: dist(u,v) = dist'(u,v) - h(u) + h(v)
         h_source = Map.get(potentials, source, zero)
 
         Enum.reduce(reweighted_distances, %{}, fn {dest, dist_prime}, inner_acc ->

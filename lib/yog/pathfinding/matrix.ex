@@ -179,6 +179,10 @@ defmodule Yog.Pathfinding.Matrix do
     end
   end
 
+  # ============================================================
+  # Helper functions
+  # ============================================================
+
   # Run Johnson's algorithm and filter to POIs
   defp run_johnson(graph, _points_of_interest, poi_set, zero, add, subtract, compare) do
     case Johnson.johnson(graph, zero, add, subtract, compare) do
@@ -214,7 +218,6 @@ defmodule Yog.Pathfinding.Matrix do
         fn from ->
           distances = Dijkstra.single_source_distances(graph, from, zero, add, compare)
 
-          # Add entries for this source to all reachable POIs
           Enum.reduce(points_of_interest, %{}, fn to, acc ->
             case Map.fetch(distances, to) do
               {:ok, dist} -> Map.put(acc, {from, to}, dist)

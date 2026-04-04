@@ -123,10 +123,8 @@ defmodule Yog.Pathfinding.FloydWarshall do
   def floyd_warshall(graph, zero \\ 0, add \\ &Kernel.+/2, compare \\ &Yog.Utils.compare/2) do
     nodes = Model.all_nodes(graph)
 
-    # Initialize distance matrix
     initial_dist = initialize_distances(nodes, graph, zero)
 
-    # Floyd-Warshall main algorithm
     final_dist =
       Enum.reduce(nodes, initial_dist, fn k, acc_dist ->
         Enum.reduce(nodes, acc_dist, fn i, acc_dist_i ->
@@ -136,7 +134,6 @@ defmodule Yog.Pathfinding.FloydWarshall do
         end)
       end)
 
-    # Check for negative cycles
     if has_negative_cycle?(nodes, final_dist, compare) do
       {:error, :negative_cycle}
     else
@@ -165,10 +162,8 @@ defmodule Yog.Pathfinding.FloydWarshall do
     nodes = Model.all_nodes(graph)
     initial_dist = initialize_distances(nodes, graph, zero)
 
-    # Early-exit Floyd-Warshall: stop as soon as any dist[i][i] < 0
     result =
       Enum.reduce_while(nodes, initial_dist, fn k, acc_dist ->
-        # Perform the k-th iteration of Floyd-Warshall
         new_dist =
           Enum.reduce(nodes, acc_dist, fn i, acc_dist_i ->
             Enum.reduce(nodes, acc_dist_i, fn j, acc_dist_j ->
@@ -176,8 +171,6 @@ defmodule Yog.Pathfinding.FloydWarshall do
             end)
           end)
 
-        # Check for negative cycle after this k iteration
-        # A negative cycle exists if any node has negative distance to itself
         has_negative =
           Enum.any?(nodes, fn i ->
             case Map.fetch(new_dist, {i, i}) do
@@ -196,20 +189,21 @@ defmodule Yog.Pathfinding.FloydWarshall do
     result == :negative_cycle
   end
 
+  # ============================================================
+  # Helper functions
+  # ============================================================
+
   # Initialize distance matrix with direct edge weights
   defp initialize_distances(nodes, graph, zero) do
-    # Start with diagonal (self-distances = zero)
     initial =
       Enum.reduce(nodes, %{}, fn i, acc ->
         Map.put(acc, {i, i}, zero)
       end)
 
-    # Add direct edges
     Enum.reduce(nodes, initial, fn i, acc ->
       successors = Model.successors(graph, i)
 
       Enum.reduce(successors, acc, fn {j, weight}, acc_inner ->
-        # Keep the minimum weight if multiple edges exist
         case Map.fetch(acc_inner, {i, j}) do
           {:ok, existing} ->
             if compare_weights(weight, existing, &Yog.Utils.compare/2) == :lt do

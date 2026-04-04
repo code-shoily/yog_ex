@@ -423,6 +423,10 @@ defmodule Yog.Pathfinding.Dijkstra do
     )
   end
 
+  # ============================================================
+  # Helper functions
+  # ============================================================
+
   # Main Dijkstra implementation
   # Returns :error | {path, weight} if to is specified
   # Returns :error | {[], zero, distances} if to is nil (single source distances)
@@ -452,8 +456,6 @@ defmodule Yog.Pathfinding.Dijkstra do
         if to do
           :error
         else
-          # For single source distances, return the distances map
-          # The zero value is the distance of the source node (which is always present)
           zero_val = zero_from_distances(distances)
           {[], zero_val, distances}
         end
@@ -462,10 +464,8 @@ defmodule Yog.Pathfinding.Dijkstra do
         current_best = Map.get(distances, node)
 
         if current_best != nil and compare.(dist, current_best) == :gt do
-          # Outdated entry, skip
           do_dijkstra_loop(graph, rest, to, add, compare, distances, predecessors)
         else
-          # Check if we reached the target
           if node == to do
             extract_result(distances, predecessors, to, dist)
           else
@@ -543,13 +543,11 @@ defmodule Yog.Pathfinding.Dijkstra do
         current_best = Map.get(visited, key)
 
         if current_best != nil and compare.(dist, current_best) == :gt do
-          # Skip outdated entry
           do_implicit_dijkstra(rest, successors, key_fn, is_goal, add, compare, visited)
         else
           if is_goal.(state) do
             {:ok, dist}
           else
-            # Expand successors
             next_states = successors.(state)
 
             {new_queue, new_visited} =

@@ -198,6 +198,10 @@ defmodule Yog.Pathfinding.Bidirectional do
     end
   end
 
+  # ============================================================
+  # Helper functions
+  # ============================================================
+
   # Bidirectional BFS implementation
   defp do_bidirectional_bfs(graph, from, to) do
     queue_fwd = [{from, [from]}]
@@ -217,12 +221,9 @@ defmodule Yog.Pathfinding.Bidirectional do
   end
 
   defp do_bfs_step(graph, queue_fwd, queue_bwd, visited_fwd, visited_bwd) do
-    # Always expand the smaller frontier for optimal performance
     if length(queue_fwd) <= length(queue_bwd) do
       case expand_bfs_level(graph, queue_fwd, visited_fwd, visited_bwd) do
         {:found, new_path, other_path} ->
-          # Expanding forward: new_path goes [meeting_point...from],
-          # other_path goes [meeting_point...to]
           full_path = Enum.reverse(new_path) ++ tl(other_path)
           weight = length(new_path) + length(other_path) - 2
           {:ok, Path.new(full_path, weight, :bidirectional_bfs)}
@@ -233,8 +234,6 @@ defmodule Yog.Pathfinding.Bidirectional do
     else
       case expand_bfs_level(graph, queue_bwd, visited_bwd, visited_fwd) do
         {:found, new_path, other_path} ->
-          # Expanding backward: new_path goes [meeting_point...to],
-          # other_path goes [meeting_point...from]
           full_path = Enum.reverse(other_path) ++ tl(new_path)
           weight = length(new_path) + length(other_path) - 2
           {:ok, Path.new(full_path, weight, :bidirectional_bfs)}
@@ -289,11 +288,8 @@ defmodule Yog.Pathfinding.Bidirectional do
   # Bidirectional Dijkstra implementation - simplified version
   # Since proper bidirectional Dijkstra is complex, we use regular Dijkstra for now
   defp do_bidirectional_dijkstra(graph, from, to, zero, add, compare) do
-    # For simplicity, use regular Dijkstra
-    # A full bidirectional implementation is complex and error-prone
     alias Yog.Pathfinding.Dijkstra
 
-    # Try regular Dijkstra
     Dijkstra.shortest_path(graph, from, to, zero, add, compare)
   end
 end

@@ -259,9 +259,6 @@ defmodule Yog.Pathfinding.AStar do
         add \\ &Kernel.+/2,
         compare \\ &Yog.Utils.compare/2
       ) do
-    # Priority queue: {f_score, g_score, node}
-    # f(n) = g(n) + h(n)
-    # Predecessors map stored separately for O(1) path tracking
     h0 = heuristic.(from, to)
 
     initial_queue =
@@ -402,7 +399,7 @@ defmodule Yog.Pathfinding.AStar do
         compare \\ &Yog.Utils.compare/2
       ) do
     h0 = heuristic.(from)
-    # Queue: {f_score, g_score, state}
+
     initial_queue =
       PQ.new(fn {f1, _, _}, {f2, _, _} ->
         compare.(f1, f2) != :gt
@@ -423,6 +420,10 @@ defmodule Yog.Pathfinding.AStar do
     )
   end
 
+  # ============================================================
+  # Helper functions
+  # ============================================================
+
   # Main A* implementation for materialized graphs
   defp do_a_star(graph, queue, to, add, compare, heuristic, g_scores, predecessors) do
     case PQ.pop(queue) do
@@ -432,7 +433,6 @@ defmodule Yog.Pathfinding.AStar do
       {:ok, {_f, g, node}, rest} ->
         key = node
 
-        # Check if this entry is outdated
         case Map.fetch(g_scores, key) do
           {:ok, best_g} ->
             if compare.(g, best_g) == :gt do
@@ -442,7 +442,6 @@ defmodule Yog.Pathfinding.AStar do
                 path = reconstruct_path(predecessors, to, [to])
                 {:ok, Path.new(path, g, :a_star)}
               else
-                # Expand neighbors
                 successors = Model.successors(graph, node)
 
                 {new_queue, new_g_scores, new_predecessors} =
@@ -518,7 +517,6 @@ defmodule Yog.Pathfinding.AStar do
       {:ok, {_f, g, state}, rest} ->
         key = key_fn.(state)
 
-        # Check if this entry is outdated
         case Map.fetch(g_scores, key) do
           {:ok, best_g} ->
             if compare.(g, best_g) == :gt do
@@ -536,7 +534,6 @@ defmodule Yog.Pathfinding.AStar do
               if is_goal.(state) do
                 {:ok, g}
               else
-                # Expand successors
                 next_states = successors.(state)
 
                 {new_queue, new_g_scores} =
