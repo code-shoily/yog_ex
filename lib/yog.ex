@@ -36,8 +36,8 @@ defmodule Yog do
   alias Yog.Connectivity
   alias Yog.Graph
   alias Yog.Model
+  alias Yog.Property.Cyclicity
   alias Yog.Transform
-  alias Yog.Traversal
 
   # Re-exporting core types
   @type t() :: Graph.t()
@@ -858,7 +858,7 @@ defmodule Yog do
       true
   """
   @spec cyclic?(graph()) :: boolean()
-  defdelegate cyclic?(graph), to: Traversal.Cycle
+  defdelegate cyclic?(graph), to: Cyclicity
 
   @doc """
   Returns true if the graph is a tree (undirected, connected, and acyclic).
@@ -916,7 +916,7 @@ defmodule Yog do
       true
   """
   @spec acyclic?(graph()) :: boolean()
-  defdelegate acyclic?(graph), to: Traversal
+  defdelegate acyclic?(graph), to: Cyclicity
 
   # ============= Transform =============
 

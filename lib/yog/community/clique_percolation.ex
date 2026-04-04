@@ -52,6 +52,7 @@ defmodule Yog.Community.CliquePercolation do
 
   alias Yog.Community.{Overlapping, Result}
   alias Yog.Property.Clique
+  alias Yog.Utils
 
   # Maximum number of k-cliques to process before raising an error
   # Prevents memory exhaustion on graphs with large maximal cliques
@@ -221,22 +222,8 @@ defmodule Yog.Community.CliquePercolation do
   # Generate MapSets directly without intermediate list allocations
   defp combinations_to_mapsets(items, k) do
     items
-    |> combinations(k)
+    |> Utils.combinations(k)
     |> Enum.map(&MapSet.new/1)
-  end
-
-  # Generate all k-combinations of a list
-  defp combinations(_items, 0), do: [[]]
-  defp combinations([], _k), do: []
-
-  defp combinations([first | rest], k) do
-    with_first =
-      combinations(rest, k - 1)
-      |> Enum.map(fn c -> [first | c] end)
-
-    without_first = combinations(rest, k)
-
-    with_first ++ without_first
   end
 
   # Build clique adjacency using inverted index for O(C) instead of O(C^2)
@@ -248,7 +235,7 @@ defmodule Yog.Community.CliquePercolation do
         clique_list = MapSet.to_list(clique)
 
         # Generate all (k-1)-subsets
-        subcliques = combinations(clique_list, k - 1)
+        subcliques = Utils.combinations(clique_list, k - 1)
 
         Enum.reduce(subcliques, acc, fn subclique, inner_acc ->
           sub_key = MapSet.new(subclique)
@@ -260,7 +247,7 @@ defmodule Yog.Community.CliquePercolation do
     Enum.reduce(0..(num_cliques - 1), %{}, fn i, acc ->
       clique = elem(k_cliques_tuple, i)
       clique_list = MapSet.to_list(clique)
-      subcliques = combinations(clique_list, k - 1)
+      subcliques = Utils.combinations(clique_list, k - 1)
 
       # Find all neighbors via shared (k-1)-subcliques
       neighbors =

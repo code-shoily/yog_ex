@@ -176,14 +176,12 @@ defmodule Yog.Property.Clique do
     if nodes == [] do
       []
     else
-      # Build adjacency map for fast lookup
       adj =
         Map.new(nodes, fn u ->
           neighbors = Model.neighbor_ids(graph, u) |> MapSet.new()
           {u, neighbors}
         end)
 
-      # Bron-Kerbosch with pivot
       p = MapSet.new(nodes)
       r = MapSet.new()
       x = MapSet.new()
@@ -205,20 +203,16 @@ defmodule Yog.Property.Clique do
   end
 
   defp bron_kerbosch_pivot(_r, p, _x, _adj, acc) when map_size(p) == 0 do
-    # P empty but X not empty - no maximal clique here
     acc
   end
 
   defp bron_kerbosch_pivot(r, p, x, adj, acc) do
-    # Choose pivot from P union X with maximum degree to P
     pivot = choose_pivot(p, x, adj)
 
-    # Get candidates: P \ N(pivot)
     pivot_neighbors = Map.get(adj, pivot, MapSet.new())
     candidates = MapSet.difference(p, pivot_neighbors)
 
     if MapSet.size(candidates) == 0 do
-      # No candidates to process - check if R is maximal
       if MapSet.size(p) == 0 and MapSet.size(x) == 0 and MapSet.size(r) > 0 do
         [r | acc]
       else
@@ -243,20 +237,25 @@ defmodule Yog.Property.Clique do
     end
   end
 
-  # Choose pivot with maximum degree to P
+  # Choose pivot from P union X with maximum degree to P
   defp choose_pivot(p, x, adj) do
-    candidates = MapSet.union(p, x)
+    max_p = find_max_degree_to_p(p, p, adj, {nil, -1})
+    {pivot_x, _} = find_max_degree_to_p(x, p, adj, max_p)
+    pivot_x
+  end
 
-    if MapSet.size(candidates) == 0 do
-      nil
-    else
-      candidates
-      |> MapSet.to_list()
-      |> Enum.max_by(fn u ->
-        neighbors = Map.get(adj, u, MapSet.new())
-        MapSet.intersection(neighbors, p) |> MapSet.size()
-      end)
-    end
+  defp find_max_degree_to_p(search_set, p, adj, {_current_best, _current_max} = acc) do
+    Enum.reduce(search_set, acc, fn u, {_best_u, max_deg} = inner_acc ->
+      neighbors = Map.get(adj, u, MapSet.new())
+      # Degree to P
+      deg = MapSet.intersection(neighbors, p) |> MapSet.size()
+
+      if deg > max_deg do
+        {u, deg}
+      else
+        inner_acc
+      end
+    end)
   end
 
   @doc """
@@ -291,36 +290,39 @@ defmodule Yog.Property.Clique do
 
   O(3^(n/3)) worst case
   """
-  @spec k_cliques(Yog.graph(), integer()) :: [MapSet.t(Yog.node_id())]
   def k_cliques(_graph, k) when k <= 0, do: []
+  def k_cliques(graph, 1), do: Model.all_nodes(graph) |> Enum.map(&MapSet.new([&1]))
 
   def k_cliques(graph, k) do
-    all_cliques = all_maximal_cliques(graph)
+    nodes = Model.all_nodes(graph) |> Enum.sort()
 
-    # Generate all k-cliques from maximal cliques
-    all_cliques
-    |> Enum.flat_map(fn clique ->
-      size = MapSet.size(clique)
+    adj =
+      Map.new(nodes, fn u ->
+        neighbors = Model.neighbor_ids(graph, u) |> MapSet.new()
+        {u, neighbors}
+      end)
 
-      if size >= k do
-        clique
-        |> MapSet.to_list()
-        |> combinations(k)
-        |> Enum.map(&MapSet.new/1)
-      else
-        []
-      end
-    end)
-    |> Enum.uniq()
+    find_k_cliques_recursive(nodes, k, [], adj, [])
   end
 
-  # Generate all k-combinations from a list
-  defp combinations(_list, 0), do: [[]]
-  defp combinations([], _k), do: []
+  defp find_k_cliques_recursive(_candidates, 0, current_clique, _adj, acc) do
+    [MapSet.new(current_clique) | acc]
+  end
 
-  defp combinations([h | t], k) do
-    with_h = for(l <- combinations(t, k - 1), do: [h | l])
-    without_h = combinations(t, k)
-    with_h ++ without_h
+  defp find_k_cliques_recursive([], _k, _current, _adj, acc), do: acc
+
+  defp find_k_cliques_recursive([u | tail], k, current, adj, acc) do
+    u_neighbors = Map.get(adj, u, MapSet.new())
+
+    new_candidates = Enum.filter(tail, fn v -> MapSet.member?(u_neighbors, v) end)
+
+    acc =
+      if length(new_candidates) >= k - 1 do
+        find_k_cliques_recursive(new_candidates, k - 1, [u | current], adj, acc)
+      else
+        acc
+      end
+
+    find_k_cliques_recursive(tail, k, current, adj, acc)
   end
 end

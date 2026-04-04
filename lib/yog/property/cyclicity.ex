@@ -82,6 +82,9 @@ defmodule Yog.Property.Cyclicity do
   - [CP-Algorithms: Finding Cycles](https://cp-algorithms.com/graph/finding-cycle.html)
   """
 
+  alias Yog.Model
+  alias Yog.Traversal.Sort
+
   @doc """
   Checks if the graph is a Directed Acyclic Graph (DAG) or has no cycles if undirected.
 
@@ -133,7 +136,9 @@ defmodule Yog.Property.Cyclicity do
   O(V + E)
   """
   @spec acyclic?(Yog.graph()) :: boolean()
-  defdelegate acyclic?(graph), to: Yog.Traversal, as: :acyclic?
+  def acyclic?(graph) do
+    not cyclic?(graph)
+  end
 
   @doc """
   Checks if the graph contains at least one cycle.
@@ -162,5 +167,60 @@ defmodule Yog.Property.Cyclicity do
   O(V + E)
   """
   @spec cyclic?(Yog.graph()) :: boolean()
-  defdelegate cyclic?(graph), to: Yog.Traversal, as: :cyclic?
+  def cyclic?(graph) do
+    case graph.kind do
+      :directed ->
+        case Sort.topological_sort(graph) do
+          {:error, :contains_cycle} -> true
+          _ -> false
+        end
+
+      :undirected ->
+        has_undirected_cycle?(graph)
+    end
+  end
+
+  # =============================================================================
+  # Helpers
+  # =============================================================================
+
+  defp has_undirected_cycle?(graph) do
+    nodes = Model.all_nodes(graph)
+
+    # Manual DFS to detect back-edges while ignoring the immediate parent
+    {has_cycle?, _visited} =
+      Enum.reduce_while(nodes, {false, MapSet.new()}, fn node, {_, visited} ->
+        if MapSet.member?(visited, node) do
+          {:cont, {false, visited}}
+        else
+          case dfs_check_cycle(graph, node, nil, visited) do
+            {true, new_visited} -> {:halt, {true, new_visited}}
+            {false, new_visited} -> {:cont, {false, new_visited}}
+          end
+        end
+      end)
+
+    has_cycle?
+  end
+
+  defp dfs_check_cycle(graph, u, parent, visited) do
+    visited = MapSet.put(visited, u)
+    neighbors = Model.neighbor_ids(graph, u)
+
+    Enum.reduce_while(neighbors, {false, visited}, fn v, {_, current_visited} ->
+      cond do
+        v == parent ->
+          {:cont, {false, current_visited}}
+
+        MapSet.member?(current_visited, v) ->
+          {:halt, {true, current_visited}}
+
+        true ->
+          case dfs_check_cycle(graph, v, u, current_visited) do
+            {true, next_visited} -> {:halt, {true, next_visited}}
+            {false, next_visited} -> {:cont, {false, next_visited}}
+          end
+      end
+    end)
+  end
 end

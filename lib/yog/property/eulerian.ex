@@ -88,6 +88,7 @@ defmodule Yog.Property.Eulerian do
   - [CP-Algorithms: Eulerian Path](https://cp-algorithms.com/graph/euler_path.html)
   """
 
+  alias Yog.Connectivity.Components
   alias Yog.Model
 
   @doc """
@@ -146,7 +147,6 @@ defmodule Yog.Property.Eulerian do
   end
 
   defp has_eulerian_circuit_undirected?(graph, nodes) do
-    # All nodes must have even parity
     all_even =
       Enum.all?(nodes, fn node ->
         rem(Model.degree(graph, node), 2) == 0
@@ -156,7 +156,6 @@ defmodule Yog.Property.Eulerian do
   end
 
   defp has_eulerian_circuit_directed?(graph, nodes) do
-    # All nodes must have in_degree == out_degree
     all_balanced =
       Enum.all?(nodes, fn node ->
         Model.in_degree(graph, node) == Model.out_degree(graph, node)
@@ -221,7 +220,6 @@ defmodule Yog.Property.Eulerian do
   end
 
   defp has_eulerian_path_undirected?(graph, nodes) do
-    # 0 or 2 odd degree nodes
     odd_count =
       Enum.count(nodes, fn node ->
         rem(Model.degree(graph, node), 2) == 1
@@ -231,7 +229,6 @@ defmodule Yog.Property.Eulerian do
   end
 
   defp has_eulerian_path_directed?(graph, nodes) do
-    # At most one start (out - in = 1), at most one end (in - out = 1)
     stats =
       Enum.reduce(nodes, {0, 0, true}, fn node, {starts, ends, valid} ->
         diff = Model.out_degree(graph, node) - Model.in_degree(graph, node)
@@ -253,37 +250,20 @@ defmodule Yog.Property.Eulerian do
     end
   end
 
-  # Check if all non-isolated nodes are in a single connected component
-  # Isolated nodes (degree 0) are ignored - they don't affect Eulerian property
-  defp connected?(graph, nodes) do
-    # Filter out isolated nodes (nodes with no edges)
-    non_isolated =
-      Enum.reject(nodes, fn node ->
-        Enum.empty?(Model.neighbor_ids(graph, node))
+  # Check if all nodes with degree > 0 are in the same weakly connected component
+  defp connected?(graph, _nodes) do
+    # Get all weakly connected components
+    components = Components.weakly_connected_components(graph)
+
+    # Filter for components that contain at least one edge (non-isolated)
+    # A component has an edge if any node in it has degree > 0
+    non_isolated_components =
+      Enum.filter(components, fn component ->
+        Enum.any?(component, fn node -> Model.degree(graph, node) > 0 end)
       end)
 
-    case non_isolated do
-      [] ->
-        # All nodes are isolated - vacuously connected
-        true
-
-      [source | _] ->
-        visited = bfs_visited(graph, source)
-        Enum.all?(non_isolated, fn n -> n in visited end)
-    end
-  end
-
-  defp bfs_visited(graph, source) do
-    Yog.Traversal.fold_walk(
-      over: graph,
-      from: source,
-      using: :breadth_first,
-      initial: MapSet.new(),
-      with: fn acc, node_id, _meta ->
-        {:continue, MapSet.put(acc, node_id)}
-      end
-    )
-    |> MapSet.to_list()
+    # An Eulerian graph must have at most one such component
+    length(non_isolated_components) <= 1
   end
 
   @doc """
@@ -332,8 +312,6 @@ defmodule Yog.Property.Eulerian do
       {:error, :no_eulerian_circuit}
     end
   end
-
-  defdelegate find_eulerian_circuit(graph), to: __MODULE__, as: :eulerian_circuit
 
   @doc """
   Finds an Eulerian path in the graph using Hierholzer's algorithm.
@@ -387,93 +365,88 @@ defmodule Yog.Property.Eulerian do
     end
   end
 
-  defdelegate find_eulerian_path(graph), to: __MODULE__, as: :eulerian_path
+  # =============================================================================
+  # Helpers
+  # =============================================================================
 
-  # Find the start vertex for an Eulerian path
   defp find_path_start(graph) do
     nodes = Model.all_nodes(graph)
 
     case Model.type(graph) do
       :undirected ->
-        # Find odd degree vertex
         Enum.find(nodes, fn node ->
-          degree = length(Model.neighbor_ids(graph, node))
-          rem(degree, 2) == 1
+          Model.degree(graph, node) |> rem(2) == 1
         end) || hd(nodes)
 
       :directed ->
-        # Find vertex with out - in = 1
         Enum.find(nodes, fn node ->
-          in_deg = length(Model.predecessors(graph, node))
-          out_deg = length(Model.successors(graph, node))
-          out_deg - in_deg == 1
+          Model.out_degree(graph, node) - Model.in_degree(graph, node) == 1
         end) || hd(nodes)
     end
   end
 
-  # Hierholzer's algorithm implementation
   defp hierholzer(graph, start) do
-    # Build mutable edge map
-    # edge_map: {from, to} -> count (for undirected we store both directions)
-    edge_map = build_edge_map(graph)
+    {adj_stacks, edge_counts} = build_hierholzer_data(graph)
 
-    # Run Hierholzer
-    {_map, circuit} = do_hierholzer(graph, start, edge_map, [])
-
-    # circuit is built in correct order via post-order accumulation
+    {_adj, _counts, circuit} = do_hierholzer(graph, start, adj_stacks, edge_counts, [])
     circuit
   end
 
-  defp build_edge_map(graph) do
-    Enum.reduce(Model.all_nodes(graph), %{}, fn from, acc ->
-      successors = Model.successor_ids(graph, from)
+  defp build_hierholzer_data(graph) do
+    nodes = Model.all_nodes(graph)
 
-      Enum.reduce(successors, acc, fn to, acc2 ->
-        key = {from, to}
-        Map.update(acc2, key, 1, &(&1 + 1))
-      end)
+    Enum.reduce(nodes, {%{}, %{}}, fn u, {adj_acc, count_acc} ->
+      successors = Model.successor_ids(graph, u)
+
+      new_adj = Map.put(adj_acc, u, successors)
+
+      new_counts =
+        Enum.reduce(successors, count_acc, fn v, acc ->
+          Map.update(acc, {u, v}, 1, &(&1 + 1))
+        end)
+
+      {new_adj, new_counts}
     end)
   end
 
-  defp do_hierholzer(graph, current, edge_map, path) do
-    case find_unused_edge(graph, current, edge_map) do
-      nil ->
-        {edge_map, [current | path]}
+  defp do_hierholzer(graph, current, adj_stacks, edge_counts, path) do
+    case get_unused_edge(graph, current, adj_stacks, edge_counts) do
+      {nil, adj_stacks, edge_counts} ->
+        {adj_stacks, edge_counts, [current | path]}
 
-      next ->
-        # Use this edge
-        key = {current, next}
-        new_map = Map.update!(edge_map, key, &(&1 - 1))
-        new_map = if new_map[key] == 0, do: Map.delete(new_map, key), else: new_map
+      {:ok, next, adj_stacks, edge_counts} ->
+        {adj_stacks, edge_counts, path_after_branch} =
+          do_hierholzer(graph, next, adj_stacks, edge_counts, path)
 
-        # For undirected, also remove reverse edge
-        new_map =
-          if Model.type(graph) == :undirected and current != next do
-            rev_key = {next, current}
-            new_map = Map.update!(new_map, rev_key, &(&1 - 1))
-            if new_map[rev_key] == 0, do: Map.delete(new_map, rev_key), else: new_map
-          else
-            new_map
-          end
-
-        # 1. Take the branch deep
-        {m2, p2} = do_hierholzer(graph, next, new_map, path)
-
-        # 2. Backtrack and continue search from current for other cycles
-        do_hierholzer(graph, current, m2, p2)
+        do_hierholzer(graph, current, adj_stacks, edge_counts, path_after_branch)
     end
   end
 
-  defp find_unused_edge(graph, current, edge_map) do
-    candidates =
-      case Model.type(graph) do
-        :undirected -> Model.neighbor_ids(graph, current)
-        :directed -> Model.successor_ids(graph, current)
-      end
+  defp get_unused_edge(graph, u, adj_stacks, edge_counts) do
+    case Map.get(adj_stacks, u, []) do
+      [] ->
+        {nil, adj_stacks, edge_counts}
 
-    Enum.find(candidates, fn to ->
-      key = {current, to}
-      Map.get(edge_map, key, 0) > 0
-    end)
+      [v | rest_v] ->
+        key = {u, v}
+        count = Map.get(edge_counts, key, 0)
+
+        updated_stacks = Map.put(adj_stacks, u, rest_v)
+
+        if count > 0 do
+          edge_counts = Map.update!(edge_counts, key, &(&1 - 1))
+
+          edge_counts =
+            if Model.type(graph) == :undirected and u != v do
+              Map.update!(edge_counts, {v, u}, &(&1 - 1))
+            else
+              edge_counts
+            end
+
+          {:ok, v, updated_stacks, edge_counts}
+        else
+          get_unused_edge(graph, u, updated_stacks, edge_counts)
+        end
+    end
   end
 end

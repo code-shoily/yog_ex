@@ -134,4 +134,28 @@ defmodule Yog.Utils do
       :array.to_list(shuffled_arr)
     end
   end
+
+  @doc """
+  Generates all k-combinations of a list.
+
+  A k-combination is a subset of k distinct elements from the list,
+  where order does not matter.
+
+  ## Examples
+
+      iex> Yog.Utils.combinations([1, 2, 3], 2)
+      [[1, 2], [1, 3], [2, 3]]
+
+      iex> Yog.Utils.combinations([1, 2, 3], 0)
+      [[]]
+  """
+  @spec combinations([a], integer()) :: [[a]] when a: var
+  def combinations(_list, 0), do: [[]]
+  def combinations([], _k), do: []
+
+  def combinations([h | t], k) do
+    with_h = for(l <- combinations(t, k - 1), do: [h | l])
+    without_h = combinations(t, k)
+    with_h ++ without_h
+  end
 end

@@ -176,23 +176,15 @@ defmodule Yog.Property.Bipartite do
     if nodes == [] do
       {:ok, %{left: MapSet.new(), right: MapSet.new()}}
     else
-      # BFS coloring: 0 = unvisited, 1 = color A, 2 = color B
-      # Use a map to track colors
       case bfs_color_all(graph, nodes, %{}) do
         {:ok, colors} ->
-          left =
-            colors
-            |> Enum.filter(fn {_, color} -> color == 1 end)
-            |> Enum.map(&elem(&1, 0))
-            |> MapSet.new()
+          {left, right} =
+            Enum.reduce(colors, {[], []}, fn
+              {id, 1}, {l, r} -> {[id | l], r}
+              {id, 2}, {l, r} -> {l, [id | r]}
+            end)
 
-          right =
-            colors
-            |> Enum.filter(fn {_, color} -> color == 2 end)
-            |> Enum.map(&elem(&1, 0))
-            |> MapSet.new()
-
-          {:ok, %{left: left, right: right}}
+          {:ok, %{left: MapSet.new(left), right: MapSet.new(right)}}
 
         {:error, reason} ->
           {:error, reason}
@@ -200,7 +192,6 @@ defmodule Yog.Property.Bipartite do
     end
   end
 
-  # Process all components (handles disconnected graphs)
   defp bfs_color_all(graph, nodes, colors) do
     Enum.reduce_while(nodes, {:ok, colors}, fn node, {:ok, acc_colors} ->
       if Map.has_key?(acc_colors, node) do
@@ -214,52 +205,39 @@ defmodule Yog.Property.Bipartite do
     end)
   end
 
-  # BFS color a single connected component starting from source
   defp bfs_color_component(graph, source, colors) do
-    # Build a color map using fold_walk
-    # Track colors and any conflict in the accumulator
-    result =
-      Yog.Traversal.fold_walk(
-        over: graph,
-        from: source,
-        using: :breadth_first,
-        initial: {:ok, Map.put(colors, source, 1)},
-        with: fn {:ok, cols}, node_id, _meta ->
-          current_color = Map.get(cols, node_id)
-          next_color = if(current_color == 1, do: 2, else: 1)
+    do_bfs_coloring(graph, :queue.from_list([source]), Map.put(colors, source, 1))
+  end
 
-          # Check all neighbors
-          neighbors = Model.neighbor_ids(graph, node_id)
+  defp do_bfs_coloring(graph, queue, colors) do
+    case :queue.out(queue) do
+      {:empty, _} ->
+        {:ok, colors}
 
-          # Process neighbors and detect conflicts
-          conflict =
-            Enum.find(neighbors, fn neighbor ->
-              Map.get(cols, neighbor) == current_color
-            end)
+      {{:value, u}, rest_q} ->
+        current_color = Map.get(colors, u)
+        next_color = if(current_color == 1, do: 2, else: 1)
+        neighbors = Model.neighbor_ids(graph, u)
 
-          if conflict do
-            # Found a conflict - halt immediately
-            {:halt, {:error, :not_bipartite}}
-          else
-            # Assign colors to unvisited neighbors
-            new_cols =
-              Enum.reduce(neighbors, cols, fn neighbor, acc ->
-                if Map.has_key?(acc, neighbor) do
-                  acc
-                else
-                  Map.put(acc, neighbor, next_color)
-                end
-              end)
-
-            {:continue, {:ok, new_cols}}
-          end
+        case process_neighbors(neighbors, current_color, next_color, colors, rest_q) do
+          {:ok, new_colors, new_q} -> do_bfs_coloring(graph, new_q, new_colors)
+          {:error, reason} -> {:error, reason}
         end
-      )
+    end
+  end
 
-    # Extract result
-    case result do
-      {:ok, final_colors} -> {:ok, final_colors}
-      {:error, reason} -> {:error, reason}
+  defp process_neighbors([], _curr, _next, colors, queue), do: {:ok, colors, queue}
+
+  defp process_neighbors([v | tail], curr, next, colors, queue) do
+    case Map.get(colors, v) do
+      nil ->
+        process_neighbors(tail, curr, next, Map.put(colors, v, next), :queue.in(v, queue))
+
+      ^curr ->
+        {:error, :not_bipartite}
+
+      _ ->
+        process_neighbors(tail, curr, next, colors, queue)
     end
   end
 
@@ -344,16 +322,13 @@ defmodule Yog.Property.Bipartite do
     left = MapSet.to_list(partition_map.left)
     _right = MapSet.to_list(partition_map.right)
 
-    # Build adjacency list for left set
     adj =
       Map.new(left, fn u ->
         neighbors = Model.neighbor_ids(graph, u)
-        # Only keep neighbors in right set
         valid = Enum.filter(neighbors, fn v -> MapSet.member?(partition_map.right, v) end)
         {u, valid}
       end)
 
-    # Hopcroft-Karp / augmenting path algorithm
     match_r = %{}
 
     {matching, _} =
@@ -384,11 +359,9 @@ defmodule Yog.Property.Bipartite do
 
         case Map.get(match_r, v) do
           nil ->
-            # v is free - match with u
             {:halt, {:ok, v, Map.put(match_r, v, u)}}
 
           u2 ->
-            # v is matched to u2 - try to find alternate path for u2
             case find_augmenting_path(u2, adj, match_r, new_visited) do
               {:ok, v2, new_match} ->
                 {:halt, {:ok, v2, Map.put(new_match, v, u)}}
@@ -438,11 +411,6 @@ defmodule Yog.Property.Bipartite do
           %{(k2 :: any()) => [k1 :: any()]}
         ) :: %{(k1 :: any()) => k2 :: any(), (k2 :: any()) => k1 :: any()}
   def stable_marriage(left_prefs, right_prefs) when is_map(left_prefs) and is_map(right_prefs) do
-    # Gale-Shapley algorithm
-    # left proposes to right
-
-    # Pre-process right preferences for O(1) lookup
-    # Transform %{right => [left1, left2, ...]} into %{right => %{left1 => rank1, left2 => rank2, ...}}
     right_prefs_indexed =
       Map.new(right_prefs, fn {right, pref_list} ->
         indexed =
@@ -453,16 +421,14 @@ defmodule Yog.Property.Bipartite do
         {right, indexed}
       end)
 
-    # Initialize: all left are free
     free_left = Map.keys(left_prefs)
 
-    # Current matches: right -> left
     matches = %{}
 
-    # Track proposals made by each left
-    proposals = %{}
+    # Track the index of the next person to propose to in the preference list
+    next_proposal_idx = Map.new(left_prefs, fn {id, _} -> {id, 0} end)
 
-    do_stable_marriage(free_left, left_prefs, right_prefs_indexed, matches, proposals)
+    do_stable_marriage(free_left, left_prefs, right_prefs_indexed, matches, next_proposal_idx)
   end
 
   def stable_marriage(opts) when is_list(opts) do
@@ -473,49 +439,50 @@ defmodule Yog.Property.Bipartite do
 
   defp do_stable_marriage([], _, _, matches, _), do: make_bidirectional(matches)
 
-  defp do_stable_marriage([left | rest], left_prefs, right_prefs_indexed, matches, proposals) do
-    # Get left's preference list minus already proposed
+  defp do_stable_marriage(
+         [left | rest],
+         left_prefs,
+         right_prefs_indexed,
+         matches,
+         next_proposal_idx
+       ) do
     prefs = Map.get(left_prefs, left, [])
-    proposed = Map.get(proposals, left, [])
-    remaining = prefs -- proposed
+    idx = Map.get(next_proposal_idx, left, 0)
 
-    case remaining do
-      [] ->
-        # No more preferences - stays unmatched
-        do_stable_marriage(rest, left_prefs, right_prefs_indexed, matches, proposals)
+    # Get the next person to propose to (O(1) access by index)
+    case Enum.at(prefs, idx) do
+      nil ->
+        # No more preferences left
+        do_stable_marriage(rest, left_prefs, right_prefs_indexed, matches, next_proposal_idx)
 
-      [preferred | _] ->
-        new_proposals = Map.put(proposals, left, [preferred | proposed])
+      preferred ->
+        new_idx_map = Map.put(next_proposal_idx, left, idx + 1)
 
         case Map.get(matches, preferred) do
           nil ->
-            # Right is free - match them
             new_matches = Map.put(matches, preferred, left)
-            do_stable_marriage(rest, left_prefs, right_prefs_indexed, new_matches, new_proposals)
+            do_stable_marriage(rest, left_prefs, right_prefs_indexed, new_matches, new_idx_map)
 
           current_left ->
-            # Right is matched - check if prefers new left using O(1) lookup
             right_pref_index = Map.get(right_prefs_indexed, preferred, %{})
 
             if prefers_indexed?(right_pref_index, left, current_left) do
-              # Right prefers new left - switch
               new_matches = Map.put(matches, preferred, left)
-              # Previous match becomes free
+
               do_stable_marriage(
                 [current_left | rest],
                 left_prefs,
                 right_prefs_indexed,
                 new_matches,
-                new_proposals
+                new_idx_map
               )
             else
-              # Right keeps current - left stays free but with updated proposals
               do_stable_marriage(
                 [left | rest],
                 left_prefs,
                 right_prefs_indexed,
                 matches,
-                new_proposals
+                new_idx_map
               )
             end
         end
@@ -536,7 +503,6 @@ defmodule Yog.Property.Bipartite do
   end
 
   defp make_bidirectional(matches) do
-    # Convert right -> left to bidirectional
     Enum.reduce(matches, %{}, fn {right, left}, acc ->
       acc
       |> Map.put(left, right)

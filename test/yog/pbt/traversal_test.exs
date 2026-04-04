@@ -96,8 +96,8 @@ defmodule Yog.PBT.TraversalTest do
 
     property "Topological operations invariant holds for directed graphs" do
       check all(graph <- graph_gen()) do
-        is_cyclic = Yog.Traversal.cyclic?(graph)
-        is_acyclic = Yog.Traversal.acyclic?(graph)
+        is_cyclic = Yog.Property.Cyclicity.cyclic?(graph)
+        is_acyclic = Yog.Property.Cyclicity.acyclic?(graph)
 
         assert is_cyclic == not is_acyclic
 

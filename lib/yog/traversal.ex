@@ -45,7 +45,6 @@ defmodule Yog.Traversal do
   - [Wikipedia: Topological Sorting](https://en.wikipedia.org/wiki/Topological_sorting)
   """
 
-  alias Yog.Traversal.Cycle
   alias Yog.Traversal.Implicit
   alias Yog.Traversal.Sort
   alias Yog.Traversal.Walk
@@ -338,46 +337,6 @@ defmodule Yog.Traversal do
   defdelegate reachable?(graph, from, to), to: Walk
 
   # ============= Cycle Detection =============
-
-  @doc """
-  Determines if a graph contains any cycles.
-
-  For directed graphs, a cycle exists if there is a path from a node back to itself.
-  For undirected graphs, a cycle exists if there is a path of length >= 3 from a node back to itself,
-  or a self-loop.
-
-  **Time Complexity:** O(V + E)
-
-  ## Example
-
-      iex> graph =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}, {3, 1, 1}])
-      iex> Yog.cyclic?(graph)
-      true
-  """
-  @spec cyclic?(Yog.graph()) :: boolean()
-  defdelegate cyclic?(graph), to: Cycle
-
-  @doc """
-  Determines if a graph is acyclic (contains no cycles).
-
-  ## Example
-
-      iex> graph =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}])
-      iex> Yog.Traversal.acyclic?(graph)
-      true
-  """
-  @spec acyclic?(Yog.graph()) :: boolean()
-  defdelegate acyclic?(graph), to: Cycle
 
   # ============= Topological Sort =============
 

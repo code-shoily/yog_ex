@@ -164,7 +164,7 @@ defmodule Yog.Property.EulerianTest do
       |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
       |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
 
-    assert {:ok, path} = Eulerian.find_eulerian_circuit(graph)
+    assert {:ok, path} = Eulerian.eulerian_circuit(graph)
     # Path should start and end at same vertex
     assert List.first(path) == List.last(path)
     # Path should have 4 vertices (3 edges + return to start)
@@ -183,7 +183,7 @@ defmodule Yog.Property.EulerianTest do
       |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
       |> Yog.add_edge_ensure(from: 4, to: 1, with: 1)
 
-    assert {:ok, path} = Eulerian.find_eulerian_circuit(graph)
+    assert {:ok, path} = Eulerian.eulerian_circuit(graph)
     assert List.first(path) == List.last(path)
     assert length(path) == 5
   end
@@ -197,7 +197,7 @@ defmodule Yog.Property.EulerianTest do
       |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
       |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
 
-    assert Eulerian.find_eulerian_circuit(graph) == {:error, :no_eulerian_circuit}
+    assert Eulerian.eulerian_circuit(graph) == {:error, :no_eulerian_circuit}
   end
 
   # ============= Find Eulerian Path Tests =============
@@ -211,7 +211,7 @@ defmodule Yog.Property.EulerianTest do
       |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
       |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
 
-    assert {:ok, path} = Eulerian.find_eulerian_path(graph)
+    assert {:ok, path} = Eulerian.eulerian_path(graph)
     # Path should have 3 vertices (2 edges)
     assert length(path) == 3
 
@@ -230,7 +230,7 @@ defmodule Yog.Property.EulerianTest do
       |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
       |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
 
-    assert {:ok, path} = Eulerian.find_eulerian_path(graph)
+    assert {:ok, path} = Eulerian.eulerian_path(graph)
     assert length(path) == 4
   end
 
@@ -245,7 +245,7 @@ defmodule Yog.Property.EulerianTest do
       |> Yog.add_edge_ensure(from: 1, to: 3, with: 1)
       |> Yog.add_edge_ensure(from: 1, to: 4, with: 1)
 
-    assert Eulerian.find_eulerian_path(graph) == {:error, :no_eulerian_path}
+    assert Eulerian.eulerian_path(graph) == {:error, :no_eulerian_path}
   end
 
   # ============= Directed Graph Tests =============
@@ -303,7 +303,7 @@ defmodule Yog.Property.EulerianTest do
       |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
       |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
 
-    assert {:ok, path} = Eulerian.find_eulerian_circuit(graph)
+    assert {:ok, path} = Eulerian.eulerian_circuit(graph)
     assert List.first(path) == List.last(path)
     assert length(path) == 4
   end
@@ -317,7 +317,7 @@ defmodule Yog.Property.EulerianTest do
       |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
       |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
 
-    assert {:ok, path} = Eulerian.find_eulerian_path(graph)
+    assert {:ok, path} = Eulerian.eulerian_path(graph)
     assert length(path) == 3
     assert List.first(path) == 1
     assert List.last(path) == 3
