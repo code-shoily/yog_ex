@@ -84,7 +84,6 @@ defmodule Yog.Multi.Model do
     in_ids = Map.get(graph.in_edge_ids, id, MapSet.new())
     ids_to_remove = MapSet.union(out_ids, in_ids)
 
-    # Use proper accumulator ordering for reduce
     graph = Enum.reduce(ids_to_remove, graph, fn eid, g -> do_remove_edge(g, eid) end)
 
     %{
@@ -272,7 +271,6 @@ defmodule Yog.Multi.Model do
         Map.put(g, id, data)
       end)
 
-    # Build edges map, combining parallel edges
     edges =
       Enum.reduce(graph.edges, %{}, fn {_eid, {src, dst, data}}, acc ->
         key = {src, dst}
@@ -289,7 +287,6 @@ defmodule Yog.Multi.Model do
         Map.put(acc, key, new_data)
       end)
 
-    # Convert to simple graph format
     forward_edges =
       Enum.reduce(edges, %{}, fn {{src, dst}, data}, acc ->
         Map.update(acc, src, %{dst => data}, fn existing ->
@@ -304,7 +301,6 @@ defmodule Yog.Multi.Model do
         end)
       end)
 
-    # Return as Graph struct
     %Yog.Graph{kind: graph.kind, nodes: base, out_edges: forward_edges, in_edges: reverse_edges}
   end
 

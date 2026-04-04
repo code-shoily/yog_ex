@@ -115,7 +115,6 @@ defmodule Yog.DAG.Model do
   @spec add_edge(t(), Yog.node_id(), Yog.node_id(), any()) ::
           {:ok, t()} | {:error, :cycle_detected}
   def add_edge(%DAG{graph: graph}, from, to, weight) do
-    # add_edge! returns the graph directly (or raises on error like missing node)
     new_graph = Yog.add_edge!(graph, from, to, weight)
 
     if Cyclicity.acyclic?(new_graph) do

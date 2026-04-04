@@ -116,11 +116,9 @@ defmodule Yog.Multi.Graph do
       edge_key = {from, to}
       new_edge = {edge_id, weight}
 
-      # Add edge to the edges map
       updated_edges =
         Map.update(edges, edge_key, [new_edge], fn existing -> [new_edge | existing] end)
 
-      # For undirected graphs, also add reverse edge
       final_edges =
         if kind == :undirected and from != to do
           reverse_key = {to, from}
@@ -156,14 +154,12 @@ defmodule Yog.Multi.Graph do
   def remove_edge(%__MODULE__{edges: edges, kind: kind} = multi, from, to, edge_id) do
     edge_key = {from, to}
 
-    # Remove from forward direction
     updated_edges =
       Map.update(edges, edge_key, [], fn edge_list ->
         Enum.reject(edge_list, fn {eid, _} -> eid == edge_id end)
       end)
       |> remove_empty_edge_list(edge_key)
 
-    # For undirected, also remove from reverse direction
     final_edges =
       if kind == :undirected and from != to do
         reverse_key = {to, from}
@@ -238,27 +234,23 @@ defmodule Yog.Multi.Graph do
   """
   @spec to_simple_graph(t()) :: Yog.graph()
   def to_simple_graph(%__MODULE__{kind: kind, nodes: nodes, edges: edges}) do
-    # Create base graph
     base_graph =
       case kind do
         :directed -> Yog.directed()
         :undirected -> Yog.undirected()
       end
 
-    # Add all nodes
     graph_with_nodes =
       Enum.reduce(nodes, base_graph, fn {node_id, data}, g ->
         Yog.add_node(g, node_id, data)
       end)
 
-    # Add edges (keeping only first edge for each pair)
     Enum.reduce(edges, graph_with_nodes, fn {{from, to}, edge_list}, g ->
       case edge_list do
         [] ->
           g
 
         [{_edge_id, weight} | _rest] ->
-          # For undirected graphs, only process edge once (from <= to)
           if kind == :undirected and from > to do
             g
           else
@@ -288,22 +280,18 @@ defmodule Yog.Multi.Graph do
   @spec to_simple_graph_with(t(), (number(), number() -> number())) :: Yog.graph()
   def to_simple_graph_with(%__MODULE__{kind: kind, nodes: nodes, edges: edges}, combine_fn)
       when is_function(combine_fn, 2) do
-    # Create base graph
     base_graph =
       case kind do
         :directed -> Yog.directed()
         :undirected -> Yog.undirected()
       end
 
-    # Add all nodes
     graph_with_nodes =
       Enum.reduce(nodes, base_graph, fn {node_id, data}, g ->
         Yog.add_node(g, node_id, data)
       end)
 
-    # Add edges, combining weights
     Enum.reduce(edges, graph_with_nodes, fn {{from, to}, edge_list}, g ->
-      # For undirected graphs, only process edge once (from <= to)
       if kind == :undirected and from > to do
         g
       else
@@ -337,7 +325,6 @@ defmodule Yog.Multi.Graph do
   def total_edge_count(%__MODULE__{edges: edges, kind: kind}) do
     edges
     |> Enum.reduce(0, fn {{from, to}, edge_list}, acc ->
-      # For undirected, only count once per unique pair
       if kind == :undirected and from > to do
         acc
       else

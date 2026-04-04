@@ -244,11 +244,9 @@ defmodule Yog.DAG.Algorithm do
     ancestors_a = get_ancestors_set(dag, node_a)
     ancestors_b = get_ancestors_set(dag, node_b)
 
-    # Find intersection
     common_ancestors =
       Enum.filter(ancestors_a, fn a -> a in ancestors_b end)
 
-    # Find "lowest" common ancestors (not ancestors of another common ancestor)
     Enum.filter(common_ancestors, fn candidate ->
       is_ancestor_of_another =
         Enum.any?(common_ancestors, fn other ->

@@ -334,7 +334,6 @@ defmodule Yog.Multi.Eulerian do
   defp do_bfs_visited(_graph, [], visited), do: MapSet.to_list(visited)
 
   defp do_bfs_visited(graph, [current | rest], visited) do
-    # For weak connectivity, consider both successors and predecessors
     successors =
       Model.successors(graph, current)
       |> Enum.map(fn {n, _, _} -> n end)
@@ -363,7 +362,6 @@ defmodule Yog.Multi.Eulerian do
   end
 
   defp find_undirected_path_start(graph) do
-    # Start at any node with odd degree, or any node if all even
     case Enum.find(Model.all_nodes(graph), fn n ->
            rem(Model.out_degree(graph, n), 2) == 1
          end) do
@@ -373,7 +371,6 @@ defmodule Yog.Multi.Eulerian do
   end
 
   defp find_directed_path_start(graph) do
-    # Start at node with out_degree = in_degree + 1, or any balanced node
     case Enum.find(Model.all_nodes(graph), fn n ->
            Model.out_degree(graph, n) == Model.in_degree(graph, n) + 1
          end) do
@@ -403,11 +400,8 @@ defmodule Yog.Multi.Eulerian do
         {available, path}
 
       {next_node, eid} ->
-        # 1. Consume one edge and explore deeply
         {av2, p2} = do_hierholzer(graph, next_node, MapSet.delete(available, eid), path)
 
-        # 2. When we return to 'current', check for more edges (detours)
-        # Prepend the edge we just used to the post-order path
         do_hierholzer(graph, current, av2, [eid | p2])
     end
   end

@@ -63,7 +63,9 @@ defmodule Yog.DAG do
   @spec to_graph(t()) :: Yog.Graph.t()
   def to_graph(%__MODULE__{graph: graph}), do: graph
 
-  # ============= Modification =============
+  # ============================================================
+  # Modification
+  # ============================================================
 
   @doc "Adds a node to the DAG."
   defdelegate add_node(dag, id, data), to: Yog.DAG.Model
@@ -77,7 +79,9 @@ defmodule Yog.DAG do
   @doc "Removes an edge from the DAG."
   defdelegate remove_edge(dag, from, to), to: Yog.DAG.Model
 
-  # ============= Algorithms =============
+  # ============================================================
+  # Algorithms
+  # ============================================================
 
   @doc "Returns a topological ordering of all nodes in the DAG."
   defdelegate topological_sort(dag), to: Yog.DAG.Algorithm
