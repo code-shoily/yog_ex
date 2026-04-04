@@ -5,12 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.95.0] - 2026-04-04
 
 ### Added
 
 - **Pathfinding**: Added `all_pair_shortest_path_unweighted/1` - computes shortest path distances between all pairs of nodes in unweighted graphs using BFS.
 - **Operations**: Added `Yog.Operation.line_graph/2` - constructs the line graph (or line digraph) of a graph, where each edge becomes a node and adjacency is determined by shared endpoints (undirected) or head-to-tail matching (directed).
+- **I/O**: Added `Yog.IO.Libgraph` module for bidirectional conversion with the [libgraph](https://hex.pm/packages/libgraph) library. Supports automatic type detection (Graph, Multi.Graph, DAG) based on graph structure.
 
 ### Changed
 
