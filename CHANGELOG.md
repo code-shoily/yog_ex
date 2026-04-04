@@ -36,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `Yog.Flow.MinCutResult.total_nodes/1` - total node count
 
 ### Breaking
-
+- `Yog.Traversal.Cycle` module has been removed. Use `Yog.Property.Cyclicity` instead.
 - `Yog.Flow.MinCutResult` struct fields changed:
   - Removed: `source_side`, `sink_side` (MapSets)
   - Added: `source_side_size`, `sink_side_size` (integers)
