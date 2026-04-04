@@ -407,7 +407,6 @@ defmodule Yog.Centrality do
     nodes = Model.all_nodes(graph)
     n = length(nodes)
 
-    # Precompute in-neighbors and out-degrees to avoid redundant map/list ops in iteration
     in_neighbors_map =
       Enum.reduce(nodes, %{}, fn id, acc ->
         Map.put(acc, id, get_in_neighbor_ids(graph, id))
@@ -481,13 +480,11 @@ defmodule Yog.Centrality do
         Map.put(acc, id, 1.0)
       end)
     else
-      # Precompute in-neighbors map
       in_neighbors_map =
         Enum.reduce(nodes, %{}, fn id, acc ->
           Map.put(acc, id, get_in_neighbor_ids(graph, id))
         end)
 
-      # Initialize with small perturbation based on node ID to break symmetry
       initial_scores =
         Enum.reduce(nodes, %{}, fn id, acc ->
           perturbation = :erlang.phash2(id) / 1_000_000_000.0
@@ -543,7 +540,6 @@ defmodule Yog.Centrality do
     alpha = Keyword.fetch!(opts, :alpha)
     beta = Keyword.get(opts, :beta, 1.0)
 
-    # Katz is Alpha Centrality where the 'initial' (exogenous) vector is beta
     alpha(graph, Keyword.merge(opts, alpha: alpha, initial: beta))
   end
 
@@ -615,20 +611,12 @@ defmodule Yog.Centrality do
   # Brandes' algorithm for betweenness centrality
   # Returns {stack, predecessors, sigma}
   defp brandes_dijkstra(graph, source, zero, add, compare) do
-    # Priority queue: [{distance, node}], ordered by distance
     pq = PQ.new(fn {d1, _}, {d2, _} -> compare.(d1, d2) != :gt end)
     queue = PQ.push(pq, {zero, source})
 
-    # Distance map
     dist = %{source => zero}
-
-    # Sigma (number of shortest paths)
     sigma = %{source => 1}
-
-    # Predecessors
     preds = %{}
-
-    # Stack for accumulation phase
     stack = []
 
     do_brandes_dijkstra(graph, queue, dist, sigma, preds, stack, add, compare)
@@ -642,7 +630,6 @@ defmodule Yog.Centrality do
       current_best = Map.get(dist, v)
 
       if compare.(d_v, current_best) == :gt do
-        # Outdated entry
         do_brandes_dijkstra(graph, rest_q, dist, sigma, preds, stack, add, compare)
       else
         new_stack = [v | stack]
@@ -769,7 +756,6 @@ defmodule Yog.Centrality do
        ) do
     n_float = n * 1.0
 
-    # Calculate sink contribution: distribute among all nodes
     sink_total =
       Enum.reduce(sinks, 0.0, fn sink, sum ->
         sum + Map.get(ranks, sink, 0.0)
@@ -836,7 +822,6 @@ defmodule Yog.Centrality do
         Map.put(acc, node, neighbor_sum)
       end)
 
-    # Normalize to prevent growth
     l2_sum =
       Enum.reduce(new_scores, 0.0, fn {_, s}, acc ->
         acc + s * s
@@ -851,10 +836,8 @@ defmodule Yog.Centrality do
         new_scores
       end
 
-    # Check convergence (L2 distance from previous)
     diff_norm = Yog.Utils.norm_diff(scores, normalized_scores, :l2)
 
-    # Anti-oscillation (check if we are in a 2-cycle)
     is_oscillating =
       if map_size(prev_prev) > 0 do
         Yog.Utils.norm_diff(prev_prev, normalized_scores, :l2) < tolerance
@@ -921,14 +904,12 @@ defmodule Yog.Centrality do
 
     case kind do
       :undirected ->
-        # Direct map access avoids intermediate list from Model.neighbors
         case Map.fetch(out_edges, node) do
           {:ok, inner} -> Map.keys(inner)
           :error -> []
         end
 
       :directed ->
-        # Direct map access avoids intermediate list from Model.predecessors
         case Map.fetch(in_edges, node) do
           {:ok, inner} -> Map.keys(inner)
           :error -> []
