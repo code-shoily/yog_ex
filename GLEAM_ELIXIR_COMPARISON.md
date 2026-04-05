@@ -125,8 +125,6 @@ This document compares the Gleam and Elixir (YogEx) implementations of the Yog g
 | ----------- | ------- | ----- | ------- |
 | **Kruskal's MST** | ✅ | ✅ | O(E log E) |
 | **Prim's MST** | ✅ | ✅ | O(E log V) |
-| **Borůvka's MST** | ❌ | ✅ | **Elixir only** - Parallel-friendly |
-| **Reverse-Delete MST** | ❌ | ✅ | **Elixir only** |
 
 **Status**: ✅ Elixir has additional MST algorithms
 
@@ -146,10 +144,6 @@ This document compares the Gleam and Elixir (YogEx) implementations of the Yog g
 | **Complete Bipartite** | ✅ | ✅ | K_{m,n} |
 | **Petersen Graph** | ✅ | ✅ | Famous 10-node graph |
 | **Empty Graph** | ✅ | ✅ | Isolated nodes |
-| **Circular Ladder** | ❌ | ✅ | **Elixir only** - Prism graphs |
-| **Circular Ladder (Prism)** | ❌ | ✅ | **Elixir only** |
-| **Kneser Graph** | ❌ | ✅ | **Elixir only** - Intersection graphs |
-| **Mycielski Graph** | ❌ | ✅ | **Elixir only** - Triangle-free with high chromatic number |
 
 **Status**: ✅ Elixir has additional classic generators
 
@@ -163,9 +157,6 @@ This document compares the Gleam and Elixir (YogEx) implementations of the Yog g
 | **Watts-Strogatz** | ✅ | ✅ | Small-world networks |
 | **Random Trees** | ✅ | ✅ | Uniformly random spanning trees |
 | **Stochastic Block Model** | ❌ | ✅ | **Elixir only** - Planted communities |
-| **Chung-Lu Model** | ❌ | ✅ | **Elixir only** - Expected degree sequence |
-| **Kronecker Graphs** | ❌ | ✅ | **Elixir only** - Recursive self-similar |
-| **Forest Fire** | ❌ | ✅ | **Elixir only** - Evolving networks |
 
 **Status**: ✅ Elixir has additional random graph models
 
@@ -183,9 +174,6 @@ This document compares the Gleam and Elixir (YogEx) implementations of the Yog g
 | **Subgraph** | ✅ | ✅ | Extract by node set |
 | **Merge** | ✅ | ✅ | Combine graphs |
 | **Contract Edges** | ✅ | ✅ | Merge nodes |
-| **Graph Join** | ❌ | ✅ | **Elixir only** |
-| **Corona Product** | ❌ | ✅ | **Elixir only** |
-| **Lexicographic Product** | ❌ | ✅ | **Elixir only** |
 
 **Status**: ✅ Elixir has additional graph products
 
@@ -202,6 +190,7 @@ This document compares the Gleam and Elixir (YogEx) implementations of the Yog g
 | **LEDA (.gw)** | ❌ | ✅ | **Elixir only** - GraphWin format |
 | **TGF** | ❌ | ✅ | **Elixir only** - Trivial Graph Format |
 | **ASCII Rendering** | ❌ | ✅ | **Elixir only** - Terminal visualization |
+| **Libgraph** | ❌ | ✅ | **Elixir only** - Libgraph conversion |
 
 **Status**: ✅ Elixir has broader I/O format support
 
@@ -214,7 +203,6 @@ This document compares the Gleam and Elixir (YogEx) implementations of the Yog g
 | **Topological Sort** | ✅ | ✅ | Guaranteed success on DAG |
 | **Transitive Closure** | ✅ | ✅ | Reachability matrix |
 | **Transitive Reduction** | ✅ | ✅ | Minimal equivalent DAG |
-| **Chain Decomposition** | ❌ | ✅ | **Elixir only** - Dilworth's theorem |
 
 **Status**: ✅ Elixir has chain decomposition for DAGs
 
@@ -370,24 +358,6 @@ communities = Louvain.detect(graph)
 
 ## Recommendations
 
-### Choose Gleam If
-
-- ✅ Prefer **static typing** with compile-time guarantees
-- ✅ Want **simpler, more focused** API surface
-- ✅ Building **type-safe** graph processing pipelines
-- ✅ Prefer **functional purity** enforced by the type system
-- ✅ Want **stable, battle-tested** release (5.0.0+)
-
-### Choose Elixir (YogEx) If
-
-- ✅ Working in **Elixir/Phoenix ecosystem**
-- ✅ Need **advanced algorithms** (Johnson's, FGL, HyperLogLog)
-- ✅ Want **extensive I/O support** (GraphML, GDF, Pajek, etc.)
-- ✅ Need **probabilistic data structures** for massive graphs
-- ✅ Prefer **dynamic typing** with rapid prototyping
-- ✅ Want **more graph generators** (SBM, Chung-Lu, etc.)
-- ✅ Building **fault-tolerant distributed systems** with OTP
-
 ## Version History
 
 | Version | Gleam | Elixir |
@@ -410,7 +380,7 @@ communities = Louvain.detect(graph)
 ### Elixir Planned
 
 - [ ] **1.0.0 Stable Release** - API stabilization
-- [ ] Performance benchmarks vs Gleam
+- [ ] Performance benchmarks
 - [ ] Additional centrality measures
 - [ ] Graph isomorphism detection
 - [ ] Graph coloring algorithms
@@ -440,7 +410,6 @@ Both implementations are **high-quality, feature-rich graph libraries** running 
 - ✅ **Functional Graphs (FGL)** - Pure inductive graph library
 - ✅ **HyperLogLog** - Probabilistic cardinality estimation
 - ✅ **Extensive I/O** - GraphML, GDF, Pajek, LEDA, TGF, ASCII
-- ✅ **More generators** - SBM, Chung-Lu, Kronecker, Forest Fire
 - ✅ **Additional MST algorithms** - Borůvka, Reverse-Delete
 - ✅ **Phoenix/OTP native** - Seamless integration with Elixir ecosystem
 - ✅ **More graph products** - Join, Corona, Lexicographic
