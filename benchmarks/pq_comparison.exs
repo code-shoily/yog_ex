@@ -5,7 +5,7 @@ defmodule PQBenchmark do
   Priority Queue Benchmark: Pairing Heap vs :gb_trees using Benchee.
   """
 
-  alias Yog.PriorityQueue, as: YogPQ
+  alias Yog.PairingHeap, as: YogPQ
 
   def run do
     IO.puts("Priority Queue Benchmark: Pairing Heap vs :gb_trees")
