@@ -51,9 +51,9 @@ defmodule ComprehensiveBenchmark do
   # Topological Sort Benchmark
   # =============================================================================
   defp bench_topological_sort(yog_s, lib_s, dg_s, yog_m, lib_m, dg_m) do
-    IO.puts("━" |> String.duplicate(70))
+    IO.puts("======================================================================")
     IO.puts("TOPOLOGICAL SORT")
-    IO.puts("━" |> String.duplicate(70))
+    IO.puts("======================================================================")
 
     # Small graph
     IO.puts("\nSmall Graph (100 nodes, ~150 edges, DAG):")
@@ -84,9 +84,9 @@ defmodule ComprehensiveBenchmark do
   # Connected Components Benchmark
   # =============================================================================
   defp bench_connected_components(yog_s, lib_s, dg_s, yog_m, lib_m, dg_m) do
-    IO.puts("\n" <> "━" |> String.duplicate(70))
+    IO.puts("\n======================================================================")
     IO.puts("CONNECTED COMPONENTS (Undirected)")
-    IO.puts("━" |> String.duplicate(70))
+    IO.puts("======================================================================")
 
     # Convert to undirected for this benchmark
     yog_s_u = to_undirected_yog(yog_s)
@@ -124,9 +124,9 @@ defmodule ComprehensiveBenchmark do
   # Strongly Connected Components Benchmark
   # =============================================================================
   defp bench_strongly_connected_components(yog_s, lib_s, dg_s, yog_m, lib_m, dg_m) do
-    IO.puts("\n" <> "━" |> String.duplicate(70))
+    IO.puts("\n======================================================================")
     IO.puts("STRONGLY CONNECTED COMPONENTS (Directed)")
-    IO.puts("━" |> String.duplicate(70))
+    IO.puts("======================================================================")
 
     IO.puts("\nSmall Graph (100 nodes, ~150 edges):")
     
@@ -155,9 +155,9 @@ defmodule ComprehensiveBenchmark do
   # Shortest Path Benchmark
   # =============================================================================
   defp bench_shortest_path(yog_s, lib_s, dg_s, yog_m, lib_m, dg_m) do
-    IO.puts("\n" <> "━" |> String.duplicate(70))
+    IO.puts("\n======================================================================")
     IO.puts("SHORTEST PATH (50 random queries)")
-    IO.puts("━" |> String.duplicate(70))
+    IO.puts("======================================================================")
 
     IO.puts("\nSmall Graph (100 nodes, ~150 edges):")
     
@@ -226,9 +226,9 @@ defmodule ComprehensiveBenchmark do
   # Graph Creation Benchmark
   # =============================================================================
   defp bench_graph_creation(nodes_s, edges_s, nodes_m, edges_m) do
-    IO.puts("\n" <> "━" |> String.duplicate(70))
+    IO.puts("\n======================================================================")
     IO.puts("GRAPH CREATION")
-    IO.puts("━" |> String.duplicate(70))
+    IO.puts("======================================================================")
 
     IO.puts("\nSmall Graph (#{nodes_s} nodes, ~#{edges_s} edges):")
     
@@ -257,9 +257,9 @@ defmodule ComprehensiveBenchmark do
   # Memory Usage Benchmark
   # =============================================================================
   defp bench_memory_usage(yog, lib, dg) do
-    IO.puts("\n" <> "━" |> String.duplicate(70))
+    IO.puts("\n======================================================================")
     IO.puts("MEMORY USAGE (Large Graph - 1000 nodes, ~3000 edges)")
-    IO.puts("━" |> String.duplicate(70))
+    IO.puts("======================================================================")
 
     # Estimate memory using :erts_debug.size/1
     yog_size = :erts_debug.size(yog)
