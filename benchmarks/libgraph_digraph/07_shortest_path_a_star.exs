@@ -2,7 +2,6 @@
 # Benchmark: Shortest Path (A*)
 # Comparing Yog and libgraph on grid graphs
 
-code = """
 # Grid graph for A* (better suited for heuristic)
 grid_graphs = fn size ->
   # Yog
@@ -10,31 +9,37 @@ grid_graphs = fn size ->
   nodes = for x <- 0..(size - 1), y <- 0..(size - 1), do: {x, y}
   yog = Enum.reduce(nodes, yog, fn pos, g -> Yog.add_node(g, pos, nil) end)
 
-  yog = Enum.reduce(nodes, yog, fn {x, y}, g ->
-    g = if x < size - 1 do
-      {:ok, ng} = Yog.add_edge(g, {x, y}, {x + 1, y}, 1)
-      ng
-    else
+  yog =
+    Enum.reduce(nodes, yog, fn {x, y}, g ->
+      g =
+        if x < size - 1 do
+          {:ok, ng} = Yog.add_edge(g, {x, y}, {x + 1, y}, 1)
+          ng
+        else
+          g
+        end
+
+      g =
+        if y < size - 1 do
+          {:ok, ng} = Yog.add_edge(g, {x, y}, {x, y + 1}, 1)
+          ng
+        else
+          g
+        end
+
       g
-    end
-    g = if y < size - 1 do
-      {:ok, ng} = Yog.add_edge(g, {x, y}, {x, y + 1}, 1)
-      ng
-    else
-      g
-    end
-    g
-  end)
+    end)
 
   # libgraph
   lib = Graph.new(type: :directed)
   lib = Enum.reduce(nodes, lib, fn pos, g -> Graph.add_vertex(g, pos) end)
 
-  lib = Enum.reduce(nodes, lib, fn {x, y}, g ->
-    g = if x < size - 1, do: Graph.add_edge(g, {x, y}, {x + 1, y}, weight: 1), else: g
-    g = if y < size - 1, do: Graph.add_edge(g, {x, y}, {x, y + 1}, weight: 1), else: g
-    g
-  end)
+  lib =
+    Enum.reduce(nodes, lib, fn {x, y}, g ->
+      g = if x < size - 1, do: Graph.add_edge(g, {x, y}, {x + 1, y}, weight: 1), else: g
+      g = if y < size - 1, do: Graph.add_edge(g, {x, y}, {x, y + 1}, weight: 1), else: g
+      g
+    end)
 
   start_pos = {0, 0}
   goal_pos = {size - 1, size - 1}
@@ -54,6 +59,15 @@ inputs = %{
   "Medium (20x20 grid)" => {yog_m, lib_m, start_m, goal_m, h_yog_m, h_lib_m}
 }
 
+# Define compare function once
+compare_fn = fn a, b ->
+  cond do
+    a < b -> :lt
+    a > b -> :gt
+    true -> :eq
+  end
+end
+
 IO.puts("\n== Shortest Path (A*) ==\n")
 
 Benchee.run(
@@ -66,13 +80,7 @@ Benchee.run(
         heuristic: h,
         zero: 0,
         combine: &(&1 + &2),
-        compare: fn a, b ->
-          cond do
-            a < b -> :lt
-            a > b -> :gt
-            true -> :eq
-          end
-        end
+        compare: compare_fn
       )
     end,
     "libgraph (A*)" => fn {_, lib, start, goal, _, h} ->
@@ -83,6 +91,3 @@ Benchee.run(
   time: 3,
   warmup: 1
 )
-"""
-
-Code.eval_string(code, [], __ENV__)

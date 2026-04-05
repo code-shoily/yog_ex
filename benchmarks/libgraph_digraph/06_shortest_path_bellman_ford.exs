@@ -2,7 +2,6 @@
 # Benchmark: Shortest Path (Bellman-Ford with negative weights)
 # Comparing Yog and libgraph
 
-code = """
 alias Yog.Generator.Random
 
 # Generate graphs with negative weights
@@ -13,21 +12,26 @@ bellman_graphs = fn n, m ->
   # Yog with negative weights
   yog = Yog.directed()
   yog = Enum.reduce(0..(n - 1), yog, fn i, g -> Yog.add_node(g, i, nil) end)
-  yog = Enum.reduce(edges, yog, fn {u, v, w}, g ->
-    new_weight = if rem(u, 5) == 0, do: -w, else: w
-    case Yog.add_edge(g, u, v, new_weight) do
-      {:ok, ng} -> ng
-      {:error, _} -> g
-    end
-  end)
+
+  yog =
+    Enum.reduce(edges, yog, fn {u, v, w}, g ->
+      new_weight = if rem(u, 5) == 0, do: -w, else: w
+
+      case Yog.add_edge(g, u, v, new_weight) do
+        {:ok, ng} -> ng
+        {:error, _} -> g
+      end
+    end)
 
   # libgraph with negative weights
   lib = Graph.new(type: :directed)
   lib = Enum.reduce(0..(n - 1), lib, fn i, g -> Graph.add_vertex(g, i) end)
-  lib = Enum.reduce(edges, lib, fn {u, v, w}, g ->
-    new_weight = if rem(u, 5) == 0, do: -w, else: w
-    Graph.add_edge(g, u, v, weight: new_weight)
-  end)
+
+  lib =
+    Enum.reduce(edges, lib, fn {u, v, w}, g ->
+      new_weight = if rem(u, 5) == 0, do: -w, else: w
+      Graph.add_edge(g, u, v, weight: new_weight)
+    end)
 
   {yog, lib}
 end
@@ -40,6 +44,15 @@ inputs = %{
   "Medium (100n, 150e)" => {yog_m, lib_m}
 }
 
+# Define compare function once
+compare_fn = fn a, b ->
+  cond do
+    a < b -> :lt
+    a > b -> :gt
+    true -> :eq
+  end
+end
+
 IO.puts("\n== Shortest Path (Bellman-Ford with negative weights) ==\n")
 
 Benchee.run(
@@ -51,13 +64,7 @@ Benchee.run(
         to: 25,
         zero: 0,
         combine: &(&1 + &2),
-        compare: fn a, b ->
-          cond do
-            a < b -> :lt
-            a > b -> :gt
-            true -> :eq
-          end
-        end
+        compare: compare_fn
       )
     end,
     "libgraph (Bellman-Ford)" => fn {_, lib} ->
@@ -68,6 +75,3 @@ Benchee.run(
   time: 3,
   warmup: 1
 )
-"""
-
-Code.eval_string(code, [], __ENV__)

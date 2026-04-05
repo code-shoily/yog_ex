@@ -2,7 +2,6 @@
 # Benchmark: Graph Creation & Memory Usage
 # Comparing Yog, libgraph, and :digraph for building graphs from edge lists
 
-code = """
 alias Yog.Generator.Random
 
 # Generate edge lists from Yog graphs
@@ -21,6 +20,7 @@ Benchee.run(
     "Yog" => fn {edges, n} ->
       g = Yog.directed()
       g = Enum.reduce(0..(n - 1), g, fn i, acc -> Yog.add_node(acc, i, nil) end)
+
       Enum.reduce(edges, g, fn {u, v, w}, acc ->
         case Yog.add_edge(acc, u, v, w) do
           {:ok, ng} -> ng
@@ -50,8 +50,8 @@ Benchee.run(
 
 IO.puts("\n== Memory Usage (1000 nodes, 3000 edges) ==\n")
 
-yog_size = :erts_debug.size(small_yog)
-lib_size = :erts_debug.size(small_yog)
+yog_size = :erts_debug.size(large_yog)
+lib_size = :erts_debug.size(large_yog)
 dg_test = :digraph.new()
 Enum.each(0..999, fn i -> :digraph.add_vertex(dg_test, i) end)
 Enum.each(large_edges, fn {u, v, _w} -> :digraph.add_edge(dg_test, u, v) end)
@@ -62,6 +62,3 @@ IO.puts("Memory (in words, 1 word = 8 bytes on 64-bit):")
 IO.puts("  Yog:      #{yog_size} words (~#{Float.round(yog_size * 8 / 1024, 2)} KB)")
 IO.puts("  libgraph: #{lib_size} words (~#{Float.round(lib_size * 8 / 1024, 2)} KB)")
 IO.puts("  :digraph: #{dg_size} words (~#{Float.round(dg_size * 8 / 1024, 2)} KB)")
-"""
-
-Code.eval_string(code, [], __ENV__)

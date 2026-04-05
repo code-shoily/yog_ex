@@ -5,7 +5,7 @@
 alias Yog.Generator.Random
 
 # Generate directed graphs
-medium = Random.erdos_renyi_gnp_with_type(500, 1000 / (500 * 499), :directed, 42)
+medium = Random.erdos_renyi_gnp_with_type(500, 1000 / (500 * 499), :directed, 1)
 
 # libgraph
 lib_medium = Graph.new(type: :directed)
