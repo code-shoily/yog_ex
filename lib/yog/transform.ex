@@ -165,9 +165,11 @@ defmodule Yog.Transform do
   end
 
   def to_undirected(%Graph{kind: :directed} = graph, resolve) do
+    out_edges = graph.out_edges
+
     symmetric_out =
-      Enum.reduce(graph.out_edges, graph.out_edges, fn {src, inner}, acc_outer ->
-        Enum.reduce(inner, acc_outer, fn {dst, weight}, acc ->
+      List.foldl(Map.to_list(out_edges), out_edges, fn {src, inner}, acc_outer ->
+        List.foldl(Map.to_list(inner), acc_outer, fn {dst, weight}, acc ->
           dst_inner = Map.get(acc, dst, %{})
 
           updated_inner =
@@ -1005,16 +1007,19 @@ defmodule Yog.Transform do
   def transitive_closure(%Graph{} = graph) do
     case Yog.Traversal.topological_sort(graph) do
       {:ok, sorted} ->
-        solve_transitive_reachability(graph, Enum.reverse(sorted))
-        |> Enum.reduce(graph, fn {node, targets}, g ->
+        reachability_map = solve_transitive_reachability(graph, Enum.reverse(sorted))
+
+        List.foldl(Map.to_list(reachability_map), graph, fn {node, targets}, g ->
           add_closure_edges(g, node, targets)
         end)
 
       {:error, :contains_cycle} ->
-        Enum.reduce(Yog.all_nodes(graph), graph, fn src, g_acc ->
+        nodes = Map.keys(graph.nodes)
+
+        List.foldl(nodes, graph, fn src, g_acc ->
           reachable = Yog.Traversal.walk(in: graph, from: src, using: :breadth_first) |> tl()
 
-          Enum.reduce(reachable, g_acc, fn dst, g ->
+          List.foldl(reachable, g_acc, fn dst, g ->
             if Model.has_edge?(g, src, dst) do
               g
             else
@@ -1052,16 +1057,28 @@ defmodule Yog.Transform do
   def transitive_reduction(%Graph{} = graph) do
     case Yog.Traversal.topological_sort(graph) do
       {:ok, _sorted} ->
-        nodes = Model.all_nodes(graph)
+        nodes = Map.keys(graph.nodes)
+        out_edges = graph.out_edges
 
         edges_to_remove =
-          for node <- nodes,
-              {target, _weight} <- Model.successors(graph, node),
-              has_indirect_path?(graph, node, target),
-              do: {node, target}
+          List.foldl(nodes, [], fn node, acc ->
+            case Map.fetch(out_edges, node) do
+              {:ok, inner} ->
+                List.foldl(Map.to_list(inner), acc, fn {target, _weight}, inner_acc ->
+                  if has_indirect_path?(graph, node, target) do
+                    [{node, target} | inner_acc]
+                  else
+                    inner_acc
+                  end
+                end)
+
+              :error ->
+                acc
+            end
+          end)
 
         new_graph =
-          Enum.reduce(edges_to_remove, graph, fn {from, to}, g ->
+          List.foldl(edges_to_remove, graph, fn {from, to}, g ->
             Model.remove_edge(g, from, to)
           end)
 
@@ -1098,7 +1115,7 @@ defmodule Yog.Transform do
 
   # Redirects edges pointing to b so they point to a instead
   defp redirect_neighbors(adj_map, edges_to_redirect, a, b, combine_weight) do
-    Enum.reduce(edges_to_redirect, adj_map, fn {nb, w}, acc ->
+    List.foldl(Map.to_list(edges_to_redirect), adj_map, fn {nb, w}, acc ->
       if nb == a or nb == b do
         acc
       else
@@ -1114,11 +1131,15 @@ defmodule Yog.Transform do
   defp solve_transitive_reachability(graph, sorted_nodes) do
     out_edges = graph.out_edges
 
-    Enum.reduce(sorted_nodes, %{}, fn node, acc ->
-      successors = Map.get(out_edges, node, %{}) |> Map.keys()
+    List.foldl(sorted_nodes, %{}, fn node, acc ->
+      successors =
+        case Map.fetch(out_edges, node) do
+          {:ok, inner} -> Map.keys(inner)
+          :error -> []
+        end
 
       all_reachable =
-        Enum.reduce(successors, MapSet.new(successors), fn child, set_acc ->
+        List.foldl(successors, MapSet.new(successors), fn child, set_acc ->
           child_reachable = Map.get(acc, child, MapSet.new())
           MapSet.union(set_acc, child_reachable)
         end)
@@ -1128,9 +1149,13 @@ defmodule Yog.Transform do
   end
 
   defp add_closure_edges(graph, node, targets) do
-    existing = Model.successor_ids(graph, node) |> MapSet.new()
+    existing =
+      case Map.fetch(graph.out_edges, node) do
+        {:ok, edges} -> Map.keys(edges) |> MapSet.new()
+        :error -> MapSet.new()
+      end
 
-    Enum.reduce(targets, graph, fn target, g_acc ->
+    List.foldl(MapSet.to_list(targets), graph, fn target, g_acc ->
       if MapSet.member?(existing, target) do
         g_acc
       else
@@ -1140,13 +1165,21 @@ defmodule Yog.Transform do
   end
 
   defp has_indirect_path?(graph, from, to) do
-    # To check for an indirect path from 'from' to 'to', we look for any
-    # path that doesn't use the direct edge (from -> to).
-    # We do this by checking if any successor of 'from' (other than 'to') can reach 'to'.
-    Model.successor_ids(graph, from)
-    |> Enum.reject(&(&1 == to))
-    |> Enum.any?(fn successor ->
-      Yog.Traversal.reachable?(graph, successor, to)
-    end)
+    successors =
+      case Map.fetch(graph.out_edges, from) do
+        {:ok, edges} -> Map.keys(edges)
+        :error -> []
+      end
+
+    has_indirect? =
+      List.foldl(successors, false, fn successor, found? ->
+        if found? or successor == to do
+          found?
+        else
+          Yog.Traversal.reachable?(graph, successor, to) or found?
+        end
+      end)
+
+    has_indirect?
   end
 end

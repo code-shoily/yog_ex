@@ -166,40 +166,44 @@ defmodule Yog.Flow.MaxFlow do
   end
 
   # Extract all edges and their capacities from the graph
+  # Uses direct out_edges access for performance
   defp build_residual_graph(graph, _zero) do
-    nodes = Model.all_nodes(graph)
+    nodes = Map.keys(graph.nodes)
+    out_edges = graph.out_edges
 
-    Enum.reduce(nodes, %{}, fn from, acc ->
-      successors = Model.successors(graph, from)
+    List.foldl(nodes, %{}, fn from, acc ->
+      case Map.fetch(out_edges, from) do
+        {:ok, successors} when map_size(successors) > 0 ->
+          node_edges =
+            List.foldl(Map.to_list(successors), %{}, fn {to, capacity}, acc2 ->
+              Map.put(acc2, to, capacity)
+            end)
 
-      node_edges =
-        Enum.reduce(successors, %{}, fn {to, capacity}, acc2 ->
-          Map.put(acc2, to, capacity)
-        end)
+          if map_size(node_edges) > 0 do
+            Map.put(acc, from, node_edges)
+          else
+            acc
+          end
 
-      if map_size(node_edges) > 0 do
-        Map.put(acc, from, node_edges)
-      else
-        acc
+        _ ->
+          acc
       end
     end)
   end
 
   # Convert internal residual map back to a Yog.Graph structure
-  # Direct construction is faster than using Model.add_edge for bulk operations
   defp residual_to_graph(original_graph, residual_map) do
-    # Build residual graph using Model API for protocol compatibility
-    # Start with empty directed graph
-    # Add all nodes from original graph with their metadata
+    nodes = Map.keys(original_graph.nodes)
+    original_nodes = original_graph.nodes
+
     graph =
-      Enum.reduce(Model.all_nodes(original_graph), Model.new(:directed), fn node, acc ->
-        data = Model.node(original_graph, node)
+      List.foldl(nodes, Model.new(:directed), fn node, acc ->
+        data = Map.get(original_nodes, node)
         Model.add_node(acc, node, data)
       end)
 
-    # Add edges from residual map
-    Enum.reduce(residual_map, graph, fn {u, edges}, acc ->
-      Enum.reduce(edges, acc, fn {v, cap}, inner_acc ->
+    List.foldl(Map.to_list(residual_map), graph, fn {u, edges}, acc ->
+      List.foldl(Map.to_list(edges), acc, fn {v, cap}, inner_acc ->
         if cap != 0 do
           case Model.add_edge(inner_acc, u, v, cap) do
             {:ok, new_graph} -> new_graph
@@ -220,10 +224,10 @@ defmodule Yog.Flow.MaxFlow do
 
       {path, bottleneck} ->
         new_residual =
-          Enum.reduce(path, residual, fn {from, to}, acc ->
+          List.foldl(path, residual, fn {from, to}, acc ->
             # Update forward edge
-            from_edges = Map.get(acc, from, %{})
-            old_cap = Map.get(from_edges, to, zero)
+            from_edges = Map.get(acc, from, %{}) |> Map.put_new(to, zero)
+            old_cap = Map.fetch!(from_edges, to)
             new_cap = subtract.(old_cap, bottleneck)
 
             acc =
@@ -240,13 +244,12 @@ defmodule Yog.Flow.MaxFlow do
               end
 
             # Update backward edge
-            to_edges = Map.get(acc, to, %{})
-            old_back = Map.get(to_edges, from, zero)
+            to_edges = Map.get(acc, to, %{}) |> Map.put_new(from, zero)
+            old_back = Map.fetch!(to_edges, from)
             new_back = add.(old_back, bottleneck)
             Map.put(acc, to, Map.put(to_edges, from, new_back))
           end)
 
-        # TAIL CALL: accumulated flow passed as argument
         do_edmonds_karp(
           new_residual,
           source,
@@ -262,13 +265,9 @@ defmodule Yog.Flow.MaxFlow do
   end
 
   # Find augmenting path using BFS with bottleneck tracking
-  # Uses :queue for O(1) enqueue/dequeue operations
-  # Returns {path_edges, bottleneck} or nil
   defp find_augmenting_path(residual, source, sink, zero, compare, min_fn) do
-    # Use Erlang's :queue for O(1) operations
     queue = :queue.in(source, :queue.new())
 
-    # State tracks parents, bottlenecks, and visited nodes
     state = %{
       parents: %{source => nil},
       bottlenecks: %{source => :infinity},
@@ -285,22 +284,19 @@ defmodule Yog.Flow.MaxFlow do
 
       {{:value, current}, rest_q} ->
         if current == sink do
-          # Found sink - reconstruct path and return with bottleneck
           path_edges = reconstruct_path_edges(state.parents, sink, [])
           bottleneck = Map.fetch!(state.bottlenecks, sink)
           {path_edges, bottleneck}
         else
-          # Process neighbors
           neighbors = Map.get(residual, current, %{})
           current_bot = Map.get(state.bottlenecks, current)
 
           {next_q, next_state} =
-            Enum.reduce(neighbors, {rest_q, state}, fn {to, cap}, {q_acc, s_acc} = acc ->
-              # Skip if already visited or no residual capacity
+            List.foldl(Map.to_list(neighbors), {rest_q, state}, fn {to, cap},
+                                                                   {q_acc, s_acc} = acc ->
               if MapSet.member?(s_acc.visited, to) or compare.(cap, zero) == :eq do
                 acc
               else
-                # Calculate bottleneck to this neighbor
                 path_bottleneck =
                   if current_bot == :infinity,
                     do: cap,
@@ -319,7 +315,6 @@ defmodule Yog.Flow.MaxFlow do
               end
             end)
 
-          # TAIL CALL: continue BFS
           do_bfs(next_q, residual, sink, zero, compare, min_fn, next_state)
         end
     end
@@ -361,7 +356,7 @@ defmodule Yog.Flow.MaxFlow do
         source: source,
         max_flow: max_flow
       }) do
-    nodes = Model.all_nodes(residual) |> MapSet.new()
+    nodes = Map.keys(residual.nodes) |> MapSet.new()
     source_side = bfs_reachable_with_compare(residual, source, nodes, 0, &Yog.Utils.compare/2)
     sink_side = MapSet.difference(nodes, source_side)
 
@@ -403,7 +398,7 @@ defmodule Yog.Flow.MaxFlow do
         zero \\ 0,
         compare \\ &Yog.Utils.compare/2
       ) do
-    nodes = Model.all_nodes(residual) |> MapSet.new()
+    nodes = Map.keys(residual.nodes) |> MapSet.new()
     source_side = bfs_reachable_with_compare(residual, source, nodes, zero, compare)
     sink_side = MapSet.difference(nodes, source_side)
 
@@ -416,25 +411,35 @@ defmodule Yog.Flow.MaxFlow do
   end
 
   # BFS to find all nodes reachable from source in residual graph
+  # Uses direct out_edges access for performance
   defp bfs_reachable_with_compare(residual, source, _all_nodes, zero, compare) do
     queue = :queue.in(source, :queue.new())
     visited = MapSet.new([source])
-    do_reachable_bfs(queue, residual, zero, compare, visited)
+    out_edges = residual.out_edges
+
+    do_reachable_bfs(queue, out_edges, zero, compare, visited)
   end
 
-  defp do_reachable_bfs(queue, residual, zero, compare, visited) do
+  defp do_reachable_bfs(queue, out_edges, zero, compare, visited) do
     case :queue.out(queue) do
       {:empty, _} ->
         visited
 
       {{:value, current}, rest_q} ->
         neighbors =
-          Model.successors(residual, current)
-          |> Enum.filter(fn {_to, cap} -> compare.(cap, zero) != :eq end)
-          |> Enum.map(fn {to, _} -> to end)
+          case Map.fetch(out_edges, current) do
+            {:ok, edges} ->
+              edges
+              |> Map.to_list()
+              |> Enum.filter(fn {_to, cap} -> compare.(cap, zero) != :eq end)
+              |> Enum.map(fn {to, _} -> to end)
+
+            :error ->
+              []
+          end
 
         {next_q, next_visited} =
-          Enum.reduce(neighbors, {rest_q, visited}, fn neighbor, {q_acc, visited_acc} ->
+          List.foldl(neighbors, {rest_q, visited}, fn neighbor, {q_acc, visited_acc} ->
             if MapSet.member?(visited_acc, neighbor) do
               {q_acc, visited_acc}
             else
@@ -442,7 +447,7 @@ defmodule Yog.Flow.MaxFlow do
             end
           end)
 
-        do_reachable_bfs(next_q, residual, zero, compare, next_visited)
+        do_reachable_bfs(next_q, out_edges, zero, compare, next_visited)
     end
   end
 end

@@ -97,7 +97,7 @@ defmodule Yog.Flow.MinCut do
   """
   @spec global_min_cut(Yog.graph()) :: MinCutResult.t()
   def global_min_cut(graph) do
-    nodes = Model.all_nodes(graph)
+    nodes = Map.keys(graph.nodes)
 
     case length(nodes) do
       n when n <= 1 ->
@@ -110,13 +110,13 @@ defmodule Yog.Flow.MinCut do
   end
 
   defp do_min_cut(graph, best_cut, total_nodes) do
-    if Model.node_count(graph) <= 1 do
+    if map_size(graph.nodes) <= 1 do
       best_cut
     else
       {s, t, cut_weight} = maximum_adjacency_search(graph)
 
-      t_size = Model.node(graph, t) || 1
-      s_size = Model.node(graph, s) || 1
+      t_size = Map.get(graph.nodes, t) || 1
+      s_size = Map.get(graph.nodes, s) || 1
 
       current_cut =
         if is_nil(best_cut) or cut_weight < best_cut.cut_value do
@@ -141,17 +141,25 @@ defmodule Yog.Flow.MinCut do
   # - t: last node added
   # - cut_weight: accumulated weight in the MAS weights dict for t
   defp maximum_adjacency_search(graph) do
-    nodes = Model.all_nodes(graph)
+    nodes = Map.keys(graph.nodes)
     [start | rest] = nodes
 
+    # Direct edge access for performance
+    out_edges = graph.out_edges
+
     initial_dists =
-      Model.neighbors(graph, start)
-      |> Enum.reduce(%{}, fn {neighbor, weight}, acc ->
-        Map.put(acc, neighbor, weight)
-      end)
+      case Map.fetch(out_edges, start) do
+        {:ok, neighbors} ->
+          List.foldl(Map.to_list(neighbors), %{}, fn {neighbor, weight}, acc ->
+            Map.put(acc, neighbor, weight)
+          end)
+
+        :error ->
+          %{}
+      end
 
     pq =
-      Enum.reduce(rest, PriorityQueue.new(fn a, b -> a >= b end), fn node, acc ->
+      List.foldl(rest, PriorityQueue.new(fn a, b -> a >= b end), fn node, acc ->
         dist = Map.get(initial_dists, node, 0)
         PriorityQueue.push(acc, {dist, node})
       end)
@@ -160,7 +168,7 @@ defmodule Yog.Flow.MinCut do
 
     {final_order, final_weights} =
       build_mas_order(
-        graph,
+        out_edges,
         [start],
         remaining,
         initial_dists,
@@ -175,7 +183,8 @@ defmodule Yog.Flow.MinCut do
   end
 
   # Builds the MAS ordering by greedily adding the most tightly connected node.
-  defp build_mas_order(graph, current_order, remaining, weights, queue) do
+  # Uses direct out_edges access for performance.
+  defp build_mas_order(out_edges, current_order, remaining, weights, queue) do
     if MapSet.size(remaining) == 0 do
       {current_order, weights}
     else
@@ -183,24 +192,29 @@ defmodule Yog.Flow.MinCut do
       new_remaining = MapSet.delete(remaining, node)
 
       {new_weights, updated_queue} =
-        graph
-        |> Model.neighbors(node)
-        |> Enum.reduce({weights, new_queue}, fn {neighbor, weight}, {weights_acc, queue_acc} ->
-          if MapSet.member?(new_remaining, neighbor) do
-            existing_w = Map.get(weights_acc, neighbor, 0)
-            new_w = existing_w + weight
+        case Map.fetch(out_edges, node) do
+          {:ok, neighbors} ->
+            List.foldl(Map.to_list(neighbors), {weights, new_queue}, fn {neighbor, weight},
+                                                                        {weights_acc, queue_acc} ->
+              if MapSet.member?(new_remaining, neighbor) do
+                existing_w = Map.get(weights_acc, neighbor, 0)
+                new_w = existing_w + weight
 
-            new_weights_acc = Map.put(weights_acc, neighbor, new_w)
-            new_queue_acc = PriorityQueue.push(queue_acc, {new_w, neighbor})
+                new_weights_acc = Map.put(weights_acc, neighbor, new_w)
+                new_queue_acc = PriorityQueue.push(queue_acc, {new_w, neighbor})
 
-            {new_weights_acc, new_queue_acc}
-          else
-            {weights_acc, queue_acc}
-          end
-        end)
+                {new_weights_acc, new_queue_acc}
+              else
+                {weights_acc, queue_acc}
+              end
+            end)
+
+          :error ->
+            {weights, new_queue}
+        end
 
       build_mas_order(
-        graph,
+        out_edges,
         [node | current_order],
         new_remaining,
         new_weights,

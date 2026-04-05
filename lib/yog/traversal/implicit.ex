@@ -161,8 +161,10 @@ defmodule Yog.Traversal.Implicit do
               do_implicit_bfs(rest, new_visited, new_acc, successors, folder)
 
             :continue ->
+              succ_list = successors.(node_id)
+
               next_queue =
-                Enum.reduce(successors.(node_id), rest, fn next_id, q2 ->
+                List.foldl(succ_list, rest, fn next_id, q2 ->
                   :queue.in(
                     {next_id, %{depth: metadata.depth + 1, parent: node_id}},
                     q2
@@ -196,8 +198,10 @@ defmodule Yog.Traversal.Implicit do
               do_implicit_dfs(tail, new_visited, new_acc, successors, folder)
 
             :continue ->
+              succ_list = successors.(node_id)
+
               next_stack =
-                Enum.reduce(Enum.reverse(successors.(node_id)), tail, fn next_id, stk ->
+                List.foldl(Enum.reverse(succ_list), tail, fn next_id, stk ->
                   [{next_id, %{depth: metadata.depth + 1, parent: node_id}} | stk]
                 end)
 
@@ -230,8 +234,10 @@ defmodule Yog.Traversal.Implicit do
               do_implicit_bfs_by(rest, new_visited, new_acc, successors, key_fn, folder)
 
             :continue ->
+              succ_list = successors.(node_id)
+
               next_queue =
-                Enum.reduce(successors.(node_id), rest, fn next_id, q2 ->
+                List.foldl(succ_list, rest, fn next_id, q2 ->
                   :queue.in(
                     {next_id, %{depth: metadata.depth + 1, parent: node_id}},
                     q2
@@ -267,8 +273,10 @@ defmodule Yog.Traversal.Implicit do
               do_implicit_dfs_by(tail, new_visited, new_acc, successors, key_fn, folder)
 
             :continue ->
+              succ_list = successors.(node_id)
+
               next_stack =
-                Enum.reduce(Enum.reverse(successors.(node_id)), tail, fn next_id, stk ->
+                List.foldl(Enum.reverse(succ_list), tail, fn next_id, stk ->
                   [{next_id, %{depth: metadata.depth + 1, parent: node_id}} | stk]
                 end)
 
@@ -298,8 +306,10 @@ defmodule Yog.Traversal.Implicit do
             do_implicit_best_first(rest_pq, new_visited, new_acc, successors, folder, priority_fn)
 
           :continue ->
+            succ_list = successors.(node_id)
+
             next_pq =
-              Enum.reduce(successors.(node_id), rest_pq, fn next_id, q_acc ->
+              List.foldl(succ_list, rest_pq, fn next_id, q_acc ->
                 next_meta = %{depth: meta.depth + 1, parent: node_id}
                 p = priority_fn.(next_id, next_meta)
                 PQ.push(q_acc, {p, {next_id, next_meta}})
@@ -340,8 +350,10 @@ defmodule Yog.Traversal.Implicit do
             )
 
           :continue ->
+            succ_list = successors.(node_id)
+
             next_pq =
-              Enum.reduce(successors.(node_id), rest_pq, fn next_id, q_acc ->
+              List.foldl(succ_list, rest_pq, fn next_id, q_acc ->
                 next_meta = %{depth: meta.depth + 1, parent: node_id}
                 p = priority_fn.(next_id, next_meta)
                 PQ.push(q_acc, {p, {next_id, next_meta}})
