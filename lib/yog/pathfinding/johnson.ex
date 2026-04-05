@@ -76,7 +76,6 @@ defmodule Yog.Pathfinding.Johnson do
   - [Wikipedia: Johnson's Algorithm](https://en.wikipedia.org/wiki/Johnson%27s_algorithm)
   """
 
-  alias Yog.Model
   alias Yog.Pathfinding.Dijkstra
   alias Yog.Transform
 
@@ -141,7 +140,7 @@ defmodule Yog.Pathfinding.Johnson do
         subtract \\ &Kernel.-/2,
         compare \\ &Yog.Utils.compare/2
       ) do
-    nodes = Model.all_nodes(graph)
+    nodes = Map.keys(graph.nodes)
 
     case compute_potentials(graph, nodes, zero, add, compare) do
       {:ok, potentials} ->
@@ -162,12 +161,12 @@ defmodule Yog.Pathfinding.Johnson do
 
     initial_distances = %{temp_source => zero}
 
-    edges = get_all_edges_with_temp_source(graph, nodes, temp_source, zero)
+    edges = get_all_edges_with_temp_source(graph.out_edges, nodes, temp_source, zero)
 
     node_count = length(nodes) + 1
 
     distances =
-      Enum.reduce(1..node_count, initial_distances, fn iteration, dist ->
+      List.foldl(Enum.to_list(1..node_count), initial_distances, fn iteration, dist ->
         new_dist = relax_all_edges(edges, dist, add, compare)
 
         if iteration == node_count do
@@ -187,13 +186,18 @@ defmodule Yog.Pathfinding.Johnson do
     end
   end
 
-  defp get_all_edges_with_temp_source(graph, nodes, temp_source, zero) do
-    temp_edges = Enum.map(nodes, fn node -> {temp_source, node, zero} end)
+  defp get_all_edges_with_temp_source(out_edges, nodes, temp_source, zero) do
+    temp_edges = List.foldl(nodes, [], fn node, acc -> [{temp_source, node, zero} | acc] end)
 
     regular_edges =
-      Enum.flat_map(nodes, fn u ->
-        successors = Model.successors(graph, u)
-        Enum.map(successors, fn {v, weight} -> {u, v, weight} end)
+      List.foldl(nodes, [], fn u, acc ->
+        successors =
+          case Map.fetch(out_edges, u) do
+            {:ok, edges} -> Map.to_list(edges)
+            :error -> []
+          end
+
+        List.foldl(successors, acc, fn {v, weight}, inner_acc -> [{u, v, weight} | inner_acc] end)
       end)
 
     temp_edges ++ regular_edges
@@ -201,7 +205,7 @@ defmodule Yog.Pathfinding.Johnson do
 
   # Relax all edges once
   defp relax_all_edges(edges, distances, add, compare) do
-    Enum.reduce(edges, distances, fn {u, v, weight}, dist ->
+    List.foldl(edges, distances, fn {u, v, weight}, dist ->
       case Map.fetch(dist, u) do
         {:ok, dist_u} ->
           new_dist_v = add.(dist_u, weight)
@@ -226,10 +230,14 @@ defmodule Yog.Pathfinding.Johnson do
 
   # Check if distances changed (for negative cycle detection)
   defp distances_changed?(old_dist, new_dist, compare) do
-    Enum.any?(new_dist, fn {node, new_val} ->
-      case Map.fetch(old_dist, node) do
-        {:ok, old_val} -> compare.(new_val, old_val) == :lt
-        :error -> true
+    List.foldl(Map.to_list(new_dist), false, fn {node, new_val}, changed? ->
+      if changed? do
+        true
+      else
+        case Map.fetch(old_dist, node) do
+          {:ok, old_val} -> compare.(new_val, old_val) == :lt
+          :error -> true
+        end
       end
     end)
   end
@@ -256,7 +264,7 @@ defmodule Yog.Pathfinding.Johnson do
 
         h_source = Map.get(potentials, source, zero)
 
-        Enum.reduce(reweighted_distances, %{}, fn {dest, dist_prime}, inner_acc ->
+        List.foldl(Map.to_list(reweighted_distances), %{}, fn {dest, dist_prime}, inner_acc ->
           h_dest = Map.get(potentials, dest, zero)
           # dist = dist' - h(u) + h(v)
           adjusted_dist = add.(subtract.(dist_prime, h_source), h_dest)

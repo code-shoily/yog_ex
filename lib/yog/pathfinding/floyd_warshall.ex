@@ -66,8 +66,6 @@ defmodule Yog.Pathfinding.FloydWarshall do
   - [CP-Algorithms: Floyd-Warshall](https://cp-algorithms.com/graph/all-pair-shortest-path-floyd-warshall.html)
   """
 
-  alias Yog.Model
-
   @typedoc """
   Distance matrix: map from `{from, to}` tuple to distance.
   """
@@ -121,14 +119,14 @@ defmodule Yog.Pathfinding.FloydWarshall do
           (any(), any() -> :lt | :eq | :gt)
         ) :: {:ok, distance_matrix()} | {:error, :negative_cycle}
   def floyd_warshall(graph, zero \\ 0, add \\ &Kernel.+/2, compare \\ &Yog.Utils.compare/2) do
-    nodes = Model.all_nodes(graph)
+    nodes = Map.keys(graph.nodes)
 
     initial_dist = initialize_distances(nodes, graph, zero)
 
     final_dist =
-      Enum.reduce(nodes, initial_dist, fn k, acc_dist ->
-        Enum.reduce(nodes, acc_dist, fn i, acc_dist_i ->
-          Enum.reduce(nodes, acc_dist_i, fn j, acc_dist_j ->
+      List.foldl(nodes, initial_dist, fn k, acc_dist ->
+        List.foldl(nodes, acc_dist, fn i, acc_dist_i ->
+          List.foldl(nodes, acc_dist_i, fn j, acc_dist_j ->
             relax_via_intermediate(i, j, k, acc_dist_j, add, compare)
           end)
         end)
@@ -159,23 +157,27 @@ defmodule Yog.Pathfinding.FloydWarshall do
         add \\ &Kernel.+/2,
         compare \\ &Yog.Utils.compare/2
       ) do
-    nodes = Model.all_nodes(graph)
+    nodes = Map.keys(graph.nodes)
     initial_dist = initialize_distances(nodes, graph, zero)
 
     result =
       Enum.reduce_while(nodes, initial_dist, fn k, acc_dist ->
         new_dist =
-          Enum.reduce(nodes, acc_dist, fn i, acc_dist_i ->
-            Enum.reduce(nodes, acc_dist_i, fn j, acc_dist_j ->
+          List.foldl(nodes, acc_dist, fn i, acc_dist_i ->
+            List.foldl(nodes, acc_dist_i, fn j, acc_dist_j ->
               relax_via_intermediate(i, j, k, acc_dist_j, add, compare)
             end)
           end)
 
         has_negative =
-          Enum.any?(nodes, fn i ->
-            case Map.fetch(new_dist, {i, i}) do
-              {:ok, d} -> compare_weights(d, zero, compare) == :lt
-              :error -> false
+          List.foldl(nodes, false, fn i, found? ->
+            if found? do
+              true
+            else
+              case Map.fetch(new_dist, {i, i}) do
+                {:ok, d} -> compare_weights(d, zero, compare) == :lt
+                :error -> false
+              end
             end
           end)
 
@@ -195,15 +197,21 @@ defmodule Yog.Pathfinding.FloydWarshall do
 
   # Initialize distance matrix with direct edge weights
   defp initialize_distances(nodes, graph, zero) do
+    out_edges = graph.out_edges
+
     initial =
-      Enum.reduce(nodes, %{}, fn i, acc ->
+      List.foldl(nodes, %{}, fn i, acc ->
         Map.put(acc, {i, i}, zero)
       end)
 
-    Enum.reduce(nodes, initial, fn i, acc ->
-      successors = Model.successors(graph, i)
+    List.foldl(nodes, initial, fn i, acc ->
+      successors =
+        case Map.fetch(out_edges, i) do
+          {:ok, edges} -> Map.to_list(edges)
+          :error -> []
+        end
 
-      Enum.reduce(successors, acc, fn {j, weight}, acc_inner ->
+      List.foldl(successors, acc, fn {j, weight}, acc_inner ->
         case Map.fetch(acc_inner, {i, j}) do
           {:ok, existing} ->
             if compare_weights(weight, existing, &Yog.Utils.compare/2) == :lt do
@@ -243,10 +251,14 @@ defmodule Yog.Pathfinding.FloydWarshall do
 
   # Check if any node has negative distance to itself
   defp has_negative_cycle?(nodes, dist, compare) do
-    Enum.any?(nodes, fn i ->
-      case Map.fetch(dist, {i, i}) do
-        {:ok, d} -> compare_weights(d, 0, compare) == :lt
-        :error -> false
+    List.foldl(nodes, false, fn i, found? ->
+      if found? do
+        true
+      else
+        case Map.fetch(dist, {i, i}) do
+          {:ok, d} -> compare_weights(d, 0, compare) == :lt
+          :error -> false
+        end
       end
     end)
   end

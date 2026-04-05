@@ -69,7 +69,6 @@ defmodule Yog.Pathfinding.Matrix do
   - See `Yog.Pathfinding.Dijkstra` for single-source algorithm details (O((V+E) log V))
   """
 
-  alias Yog.Model
   alias Yog.Pathfinding.Dijkstra
   alias Yog.Pathfinding.FloydWarshall
   alias Yog.Pathfinding.Johnson
@@ -145,11 +144,11 @@ defmodule Yog.Pathfinding.Matrix do
         subtract \\ nil
       ) do
     poi_set = MapSet.new(points_of_interest)
-    node_count = Model.node_count(graph)
-    edge_count = Model.edge_count(graph)
+    node_count = map_size(graph.nodes)
+    edge_count = Yog.Graph.edge_count(graph)
 
     # Check if any POI is not in the graph
-    all_nodes = Model.all_nodes(graph)
+    all_nodes = Map.keys(graph.nodes)
     all_node_set = MapSet.new(all_nodes)
 
     _check_pois =
@@ -218,7 +217,7 @@ defmodule Yog.Pathfinding.Matrix do
         fn from ->
           distances = Dijkstra.single_source_distances(graph, from, zero, add, compare)
 
-          Enum.reduce(points_of_interest, %{}, fn to, acc ->
+          List.foldl(points_of_interest, %{}, fn to, acc ->
             case Map.fetch(distances, to) do
               {:ok, dist} -> Map.put(acc, {from, to}, dist)
               :error -> acc
@@ -236,7 +235,7 @@ defmodule Yog.Pathfinding.Matrix do
 
   # Filter a full distance matrix to only include POI pairs
   defp filter_to_pois(all_distances, poi_set) do
-    Enum.reduce(all_distances, %{}, fn {{from, to}, dist}, acc ->
+    List.foldl(Map.to_list(all_distances), %{}, fn {{from, to}, dist}, acc ->
       if MapSet.member?(poi_set, from) and MapSet.member?(poi_set, to) do
         Map.put(acc, {from, to}, dist)
       else

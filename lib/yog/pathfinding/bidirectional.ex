@@ -18,7 +18,6 @@ defmodule Yog.Pathfinding.Bidirectional do
 
   # credo:disable-for-this-file Credo.Check.Refactor.AppendSingleItem
 
-  alias Yog.Model
   alias Yog.Pathfinding.Path
 
   @typedoc "Result type for shortest path queries"
@@ -247,14 +246,20 @@ defmodule Yog.Pathfinding.Bidirectional do
   # Expands one BFS level, checking for intersection with the opposite visited set
   # as soon as each new node is discovered.
   defp expand_bfs_level(graph, queue, visited, other_visited) do
+    out_edges = graph.out_edges
+
     {new_queue_rev, new_visited, result} =
-      Enum.reduce(queue, {[], visited, nil}, fn {node, path}, {nq, nv, res} ->
+      List.foldl(queue, {[], visited, nil}, fn {node, path}, {nq, nv, res} ->
         if res != nil do
           {nq, nv, res}
         else
-          successors = Model.successor_ids(graph, node)
+          successors =
+            case Map.fetch(out_edges, node) do
+              {:ok, edges} -> Map.keys(edges)
+              :error -> []
+            end
 
-          Enum.reduce(successors, {nq, nv, res}, fn neighbor, {nq_acc, nv_acc, res_acc} ->
+          List.foldl(successors, {nq, nv, res}, fn neighbor, {nq_acc, nv_acc, res_acc} ->
             cond do
               res_acc != nil ->
                 {nq_acc, nv_acc, res_acc}

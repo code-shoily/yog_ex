@@ -38,7 +38,6 @@ defmodule Yog.Pathfinding.Dijkstra do
       #=> %{:a => 0, :b => 4, :c => 5}
   """
 
-  alias Yog.Model
   alias Yog.Pathfinding.Path
   alias Yog.PriorityQueue, as: PQ
 
@@ -469,11 +468,16 @@ defmodule Yog.Pathfinding.Dijkstra do
           if node == to do
             extract_result(distances, predecessors, to, dist)
           else
-            successors = Model.successors(graph, node)
+            # Direct edge access for performance
+            successors =
+              case Map.fetch(graph.out_edges, node) do
+                {:ok, edges} -> Map.to_list(edges)
+                :error -> []
+              end
 
             {new_queue, new_distances, new_predecessors} =
-              Enum.reduce(successors, {rest, distances, predecessors}, fn {neighbor, weight},
-                                                                          {q, d, p} ->
+              List.foldl(successors, {rest, distances, predecessors}, fn {neighbor, weight},
+                                                                         {q, d, p} ->
                 new_dist = add.(dist, weight)
 
                 case Map.fetch(d, neighbor) do
@@ -551,7 +555,7 @@ defmodule Yog.Pathfinding.Dijkstra do
             next_states = successors.(state)
 
             {new_queue, new_visited} =
-              Enum.reduce(next_states, {rest, visited}, fn {next_state, cost}, {q, v} ->
+              List.foldl(next_states, {rest, visited}, fn {next_state, cost}, {q, v} ->
                 next_key = key_fn.(next_state)
                 new_dist = add.(dist, cost)
 

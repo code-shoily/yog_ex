@@ -38,7 +38,6 @@ defmodule Yog.Pathfinding.BellmanFord do
       #=> {:shortest_path, {:path, [:a, :b, :c], 1}}
   """
 
-  alias Yog.Model
   alias Yog.Pathfinding.Path
 
   @typedoc "Result type for Bellman-Ford shortest path queries"
@@ -215,7 +214,7 @@ defmodule Yog.Pathfinding.BellmanFord do
         add \\ &Kernel.+/2,
         compare \\ &Yog.Utils.compare/2
       ) do
-    nodes = Model.all_nodes(graph)
+    nodes = Map.keys(graph.nodes)
     node_count = length(nodes)
 
     initial_distances = %{from => zero}
@@ -225,11 +224,13 @@ defmodule Yog.Pathfinding.BellmanFord do
       if node_count <= 1 do
         {initial_distances, initial_predecessors}
       else
-        Enum.reduce(1..(node_count - 1), {initial_distances, initial_predecessors}, fn _,
-                                                                                       {dist,
-                                                                                        pred} ->
-          relax_all_edges_from_graph(graph, dist, pred, add, compare)
-        end)
+        List.foldl(
+          Enum.to_list(1..(node_count - 1)),
+          {initial_distances, initial_predecessors},
+          fn _, {dist, pred} ->
+            relax_all_edges_from_graph(graph, dist, pred, add, compare)
+          end
+        )
       end
 
     {final_distances, _} =
@@ -268,17 +269,20 @@ defmodule Yog.Pathfinding.BellmanFord do
         add \\ &Kernel.+/2,
         compare \\ &Yog.Utils.compare/2
       ) do
-    nodes = Model.all_nodes(graph)
+    nodes = Map.keys(graph.nodes)
     node_count = length(nodes)
 
     initial_distances = %{from => zero}
     initial_predecessors = %{}
 
     {distances, _} =
-      Enum.reduce(1..(node_count - 1), {initial_distances, initial_predecessors}, fn _,
-                                                                                     {dist, pred} ->
-        relax_all_edges_from_graph(graph, dist, pred, add, compare)
-      end)
+      List.foldl(
+        Enum.to_list(1..(node_count - 1)),
+        {initial_distances, initial_predecessors},
+        fn _, {dist, pred} ->
+          relax_all_edges_from_graph(graph, dist, pred, add, compare)
+        end
+      )
 
     distances
   end
@@ -300,13 +304,13 @@ defmodule Yog.Pathfinding.BellmanFord do
         add \\ &Kernel.+/2,
         compare \\ &Yog.Utils.compare/2
       ) do
-    nodes = Model.all_nodes(graph)
+    nodes = Map.keys(graph.nodes)
     node_count = length(nodes)
 
     initial_distances = %{from => zero}
 
     distances =
-      Enum.reduce(1..(node_count - 1), initial_distances, fn _, dist ->
+      List.foldl(Enum.to_list(1..(node_count - 1)), initial_distances, fn _, dist ->
         relax_all_edges_from_graph_no_pred(graph, dist, add, compare)
       end)
 
@@ -448,14 +452,19 @@ defmodule Yog.Pathfinding.BellmanFord do
   # ============================================================
 
   defp relax_all_edges_from_graph(graph, distances, predecessors, add, compare) do
-    nodes = Model.all_nodes(graph)
+    out_edges = graph.out_edges
+    nodes = Map.keys(graph.nodes)
 
-    Enum.reduce(nodes, {distances, predecessors}, fn u, {dist, pred} ->
+    List.foldl(nodes, {distances, predecessors}, fn u, {dist, pred} ->
       case Map.fetch(dist, u) do
         {:ok, dist_u} ->
-          successors = Model.successors(graph, u)
+          successors =
+            case Map.fetch(out_edges, u) do
+              {:ok, edges} -> Map.to_list(edges)
+              :error -> []
+            end
 
-          Enum.reduce(successors, {dist, pred}, fn {v, weight}, {d, p} ->
+          List.foldl(successors, {dist, pred}, fn {v, weight}, {d, p} ->
             new_dist_v = add.(dist_u, weight)
 
             case Map.fetch(d, v) do
@@ -479,14 +488,19 @@ defmodule Yog.Pathfinding.BellmanFord do
 
   # Relax all edges without tracking predecessors (protocol-compatible)
   defp relax_all_edges_from_graph_no_pred(graph, distances, add, compare) do
-    nodes = Model.all_nodes(graph)
+    out_edges = graph.out_edges
+    nodes = Map.keys(graph.nodes)
 
-    Enum.reduce(nodes, distances, fn u, dist ->
+    List.foldl(nodes, distances, fn u, dist ->
       case Map.fetch(dist, u) do
         {:ok, dist_u} ->
-          successors = Model.successors(graph, u)
+          successors =
+            case Map.fetch(out_edges, u) do
+              {:ok, edges} -> Map.to_list(edges)
+              :error -> []
+            end
 
-          Enum.reduce(successors, dist, fn {v, weight}, d ->
+          List.foldl(successors, dist, fn {v, weight}, d ->
             new_dist_v = add.(dist_u, weight)
 
             case Map.fetch(d, v) do
@@ -509,14 +523,18 @@ defmodule Yog.Pathfinding.BellmanFord do
   end
 
   defp negative_cycle_detected?(nodes, old_distances, new_distances, compare) do
-    Enum.any?(nodes, fn node ->
-      old_val = Map.get(old_distances, node)
-      new_val = Map.get(new_distances, node)
-
-      if old_val == nil or new_val == nil do
-        false
+    List.foldl(nodes, false, fn node, found? ->
+      if found? do
+        true
       else
-        compare.(new_val, old_val) == :lt
+        old_val = Map.get(old_distances, node)
+        new_val = Map.get(new_distances, node)
+
+        if old_val == nil or new_val == nil do
+          false
+        else
+          compare.(new_val, old_val) == :lt
+        end
       end
     end)
   end
@@ -556,15 +574,18 @@ defmodule Yog.Pathfinding.BellmanFord do
         {:error, :negative_cycle}
       else
         # Build a list of all state-distance pairs to process
-        state_dist_pairs = Enum.map(distances, fn {_, {state, dist}} -> {state, dist} end)
+        state_dist_pairs =
+          List.foldl(Map.to_list(distances), [], fn {_, {state, dist}}, acc ->
+            [{state, dist} | acc]
+          end)
 
         # Relax all edges from all current states
         {next_distances, any_change} =
-          Enum.reduce(state_dist_pairs, {distances, false}, fn {state, state_dist},
-                                                               {dists, changed} ->
+          List.foldl(state_dist_pairs, {distances, false}, fn {state, state_dist},
+                                                              {dists, changed} ->
             next_states = successors.(state)
 
-            Enum.reduce(next_states, {dists, changed}, fn {next_state, cost}, {acc, ch} ->
+            List.foldl(next_states, {dists, changed}, fn {next_state, cost}, {acc, ch} ->
               key = key_fn.(next_state)
               new_dist = add.(state_dist, cost)
 

@@ -33,7 +33,6 @@ defmodule Yog.Pathfinding.AStar do
       Yog.Pathfinding.AStar.a_star(graph, start, goal, 0, &(&1+&2), &Integer.compare/2, heuristic)
   """
 
-  alias Yog.Model
   alias Yog.Pathfinding.Path
   alias Yog.PriorityQueue, as: PQ
 
@@ -442,11 +441,16 @@ defmodule Yog.Pathfinding.AStar do
                 path = reconstruct_path(predecessors, to, [to])
                 {:ok, Path.new(path, g, :a_star)}
               else
-                successors = Model.successors(graph, node)
+                # Direct edge access for performance
+                successors =
+                  case Map.fetch(graph.out_edges, node) do
+                    {:ok, edges} -> Map.to_list(edges)
+                    :error -> []
+                  end
 
                 {new_queue, new_g_scores, new_predecessors} =
-                  Enum.reduce(successors, {rest, g_scores, predecessors}, fn {neighbor, cost},
-                                                                             {q, gs, preds} ->
+                  List.foldl(successors, {rest, g_scores, predecessors}, fn {neighbor, cost},
+                                                                            {q, gs, preds} ->
                     new_g = add.(g, cost)
                     neighbor_key = neighbor
 
@@ -537,7 +541,7 @@ defmodule Yog.Pathfinding.AStar do
                 next_states = successors.(state)
 
                 {new_queue, new_g_scores} =
-                  Enum.reduce(next_states, {rest, g_scores}, fn {next_state, cost}, {q, gs} ->
+                  List.foldl(next_states, {rest, g_scores}, fn {next_state, cost}, {q, gs} ->
                     new_g = add.(g, cost)
                     next_key = key_fn.(next_state)
 
