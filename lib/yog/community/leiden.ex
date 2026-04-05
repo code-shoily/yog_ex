@@ -427,6 +427,7 @@ defmodule Yog.Community.Leiden do
         if MapSet.member?(b, neighbor) do
           {q, b, c}
         else
+          # credo:disable-for-this-file Credo.Check.Refactor.AppendSingleItem
           {q ++ [neighbor], MapSet.put(b, neighbor), MapSet.put(c, neighbor)}
         end
       end)
