@@ -240,11 +240,13 @@ defmodule Yog.DisjointSet do
   """
   @spec count_sets(t()) :: non_neg_integer()
   def count_sets(%__MODULE__{parents: parents} = dsu) do
-    parents
-    |> Map.keys()
-    |> Enum.map(fn element -> find_root_readonly(dsu, element) end)
-    |> Enum.uniq()
-    |> length()
+    roots =
+      List.foldl(Map.keys(parents), %{}, fn element, acc ->
+        root = find_root_readonly(dsu, element)
+        Map.put(acc, root, true)
+      end)
+
+    map_size(roots)
   end
 
   @doc """
@@ -265,16 +267,13 @@ defmodule Yog.DisjointSet do
   """
   @spec to_lists(t()) :: [[term()]]
   def to_lists(%__MODULE__{parents: parents} = dsu) do
-    parents
-    |> Map.keys()
-    |> List.foldl(%{}, fn element, acc ->
-      root = find_root_readonly(dsu, element)
-
-      Map.update(acc, root, [element], fn members ->
-        [element | members]
+    groups =
+      List.foldl(Map.keys(parents), %{}, fn element, acc ->
+        root = find_root_readonly(dsu, element)
+        Map.update(acc, root, [element], fn members -> [element | members] end)
       end)
-    end)
-    |> Map.values()
+
+    Map.values(groups)
   end
 
   # =============================================================================
@@ -285,6 +284,7 @@ defmodule Yog.DisjointSet do
   # 1. If both roots are the same, the structure is unchanged
   # 2. The tree with the smaller rank is attached to the tree with the larger rank
   # 3. If ranks are equal, root_x wins, and its rank is incremented
+  # Direct struct pattern matching for performance
   defp do_union_by_rank(dsu, root, root), do: dsu
 
   defp do_union_by_rank(%__MODULE__{parents: parents, ranks: ranks}, root_x, root_y) do
@@ -294,22 +294,18 @@ defmodule Yog.DisjointSet do
     cond do
       rank_x < rank_y ->
         # Attach x's tree under y's tree
-        new_parents = Map.put(parents, root_x, root_y)
-        %__MODULE__{parents: new_parents, ranks: ranks}
+        %__MODULE__{parents: Map.put(parents, root_x, root_y), ranks: ranks}
 
-      rank_x >= rank_y ->
+      rank_x > rank_y ->
         # Attach y's tree under x's tree
-        new_parents = Map.put(parents, root_y, root_x)
+        %__MODULE__{parents: Map.put(parents, root_y, root_x), ranks: ranks}
 
-        # If ranks are equal, increment x's rank, first argument wins.
-        new_ranks =
-          if rank_x == rank_y do
-            Map.put(ranks, root_x, rank_x + 1)
-          else
-            ranks
-          end
-
-        %__MODULE__{parents: new_parents, ranks: new_ranks}
+      true ->
+        # Ranks are equal, attach y under x and increment x's rank
+        %__MODULE__{
+          parents: Map.put(parents, root_y, root_x),
+          ranks: Map.put(ranks, root_x, rank_x + 1)
+        }
     end
   end
 

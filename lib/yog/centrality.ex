@@ -20,7 +20,6 @@ defmodule Yog.Centrality do
 
   """
 
-  alias Yog.Model
   alias Yog.Pathfinding.Dijkstra
   alias Yog.PriorityQueue, as: PQ
 
@@ -70,14 +69,14 @@ defmodule Yog.Centrality do
   """
   @spec degree(Yog.graph(), degree_mode()) :: centrality_scores()
   def degree(graph, mode \\ :total_degree) do
-    n = Model.order(graph)
-    nodes = Model.all_nodes(graph)
+    n = map_size(graph.nodes)
+    nodes = Map.keys(graph.nodes)
 
     factor = if n > 1, do: (n - 1) * 1.0, else: 1.0
 
     %Yog.Graph{kind: kind, out_edges: out_edges, in_edges: in_edges} = graph
 
-    Enum.reduce(nodes, %{}, fn id, acc ->
+    List.foldl(nodes, %{}, fn id, acc ->
       count =
         case kind do
           :undirected ->
@@ -149,11 +148,11 @@ defmodule Yog.Centrality do
     compare = opts[:compare] || (&Yog.Utils.compare/2)
     to_float = opts[:to_float] || fn x -> x * 1.0 end
 
-    nodes = Model.all_nodes(graph)
-    n = length(nodes)
+    nodes = Map.keys(graph.nodes)
+    n = map_size(graph.nodes)
 
     if n <= 1 do
-      Enum.reduce(nodes, %{}, fn id, acc ->
+      List.foldl(nodes, %{}, fn id, acc ->
         Map.put(acc, id, 0.0)
       end)
     else
@@ -172,7 +171,7 @@ defmodule Yog.Centrality do
             {source, 0.0}
           else
             total_distance =
-              Enum.reduce(distances, zero, fn {_node, dist}, sum ->
+              List.foldl(Map.to_list(distances), zero, fn {_node, dist}, sum ->
                 add.(sum, dist)
               end)
 
@@ -233,11 +232,11 @@ defmodule Yog.Centrality do
     compare = opts[:compare] || (&Yog.Utils.compare/2)
     to_float = opts[:to_float] || fn x -> x * 1.0 end
 
-    nodes = Model.all_nodes(graph)
-    n = length(nodes)
+    nodes = Map.keys(graph.nodes)
+    n = map_size(graph.nodes)
 
     if n <= 1 do
-      Enum.reduce(nodes, %{}, fn id, acc ->
+      List.foldl(nodes, %{}, fn id, acc ->
         Map.put(acc, id, 0.0)
       end)
     else
@@ -254,7 +253,7 @@ defmodule Yog.Centrality do
           distances = dijkstra_single_source(graph, source, zero, add, compare)
 
           sum_of_reciprocals =
-            Enum.reduce(distances, 0.0, fn {node, dist}, sum ->
+            List.foldl(Map.to_list(distances), 0.0, fn {node, dist}, sum ->
               if node == source do
                 sum
               else
@@ -320,10 +319,10 @@ defmodule Yog.Centrality do
     compare = opts[:compare] || (&Yog.Utils.compare/2)
     _to_float = opts[:to_float] || fn x -> x * 1.0 end
 
-    nodes = Model.all_nodes(graph)
+    nodes = Map.keys(graph.nodes)
 
     initial =
-      Enum.reduce(nodes, %{}, fn id, acc ->
+      List.foldl(nodes, %{}, fn id, acc ->
         Map.put(acc, id, 0.0)
       end)
 
@@ -404,17 +403,19 @@ defmodule Yog.Centrality do
     max_iterations = Keyword.get(opts, :max_iterations, 100)
     tolerance = Keyword.get(opts, :tolerance, 0.0001)
 
-    nodes = Model.all_nodes(graph)
+    nodes = Map.keys(graph.nodes)
     n = length(nodes)
 
+    %Yog.Graph{kind: kind, out_edges: out_edges, in_edges: in_edges} = graph
+
     in_neighbors_map =
-      Enum.reduce(nodes, %{}, fn id, acc ->
-        Map.put(acc, id, get_in_neighbor_ids(graph, id))
+      List.foldl(nodes, %{}, fn id, acc ->
+        Map.put(acc, id, get_in_neighbor_ids_fast(kind, out_edges, in_edges, id))
       end)
 
     out_degrees_map =
-      Enum.reduce(nodes, %{}, fn id, acc ->
-        Map.put(acc, id, get_out_degree(graph, id))
+      List.foldl(nodes, %{}, fn id, acc ->
+        Map.put(acc, id, get_out_degree_fast(kind, out_edges, id))
       end)
 
     sinks =
@@ -423,7 +424,7 @@ defmodule Yog.Centrality do
     initial_rank = 1.0 / n
 
     ranks =
-      Enum.reduce(nodes, %{}, fn id, acc ->
+      List.foldl(nodes, %{}, fn id, acc ->
         Map.put(acc, id, initial_rank)
       end)
 
@@ -472,21 +473,23 @@ defmodule Yog.Centrality do
     max_iterations = Keyword.get(opts, :max_iterations, 100)
     tolerance = Keyword.get(opts, :tolerance, 0.0001)
 
-    nodes = Model.all_nodes(graph)
-    n = length(nodes)
+    nodes = Map.keys(graph.nodes)
+    n = map_size(graph.nodes)
+
+    %Yog.Graph{kind: kind, out_edges: out_edges, in_edges: in_edges} = graph
 
     if n <= 1 do
-      Enum.reduce(nodes, %{}, fn id, acc ->
+      List.foldl(nodes, %{}, fn id, acc ->
         Map.put(acc, id, 1.0)
       end)
     else
       in_neighbors_map =
-        Enum.reduce(nodes, %{}, fn id, acc ->
-          Map.put(acc, id, get_in_neighbor_ids(graph, id))
+        List.foldl(nodes, %{}, fn id, acc ->
+          Map.put(acc, id, get_in_neighbor_ids_fast(kind, out_edges, in_edges, id))
         end)
 
       initial_scores =
-        Enum.reduce(nodes, %{}, fn id, acc ->
+        List.foldl(nodes, %{}, fn id, acc ->
           perturbation = :erlang.phash2(id) / 1_000_000_000.0
           Map.put(acc, id, 1.0 + perturbation)
         end)
@@ -580,12 +583,12 @@ defmodule Yog.Centrality do
     max_iter = Keyword.get(opts, :max_iterations, 100)
     tol = Keyword.get(opts, :tolerance, 1.0e-6)
 
-    nodes = Model.all_nodes(graph)
+    nodes = Map.keys(graph.nodes)
 
     initial_scores =
       opts
       |> Keyword.get(:initial, 1.0)
-      |> normalize_initial_scores(graph, nodes)
+      |> normalize_initial_scores(nodes)
 
     iterate_alpha(graph, nodes, initial_scores, initial_scores, alpha, max_iter, tol)
   end
@@ -623,6 +626,8 @@ defmodule Yog.Centrality do
   end
 
   defp do_brandes_dijkstra(graph, pq, dist, sigma, preds, stack, add, compare) do
+    out_edges = graph.out_edges
+
     if PQ.empty?(pq) do
       {stack, preds, sigma}
     else
@@ -634,9 +639,14 @@ defmodule Yog.Centrality do
       else
         new_stack = [v | stack]
 
+        successors =
+          case Map.fetch(out_edges, v) do
+            {:ok, edges} -> Map.to_list(edges)
+            :error -> []
+          end
+
         {new_q, new_dist, new_sigma, new_preds} =
-          Model.successors(graph, v)
-          |> Enum.reduce({rest_q, dist, sigma, preds}, fn {w, weight}, {q, ds, ss, ps} ->
+          List.foldl(successors, {rest_q, dist, sigma, preds}, fn {w, weight}, {q, ds, ss, ps} ->
             new_dist_w = add.(d_v, weight)
 
             case Map.fetch(ds, w) do
@@ -702,7 +712,7 @@ defmodule Yog.Centrality do
   end
 
   defp merge_scores(acc, dependencies, source) do
-    Enum.reduce(dependencies, acc, fn {node, delta}, acc2 ->
+    List.foldl(Map.to_list(dependencies), acc, fn {node, delta}, acc2 ->
       if node == source do
         acc2
       else
@@ -715,9 +725,7 @@ defmodule Yog.Centrality do
   defp apply_undirected_scaling(scores, %Yog.Graph{kind: kind}) do
     case kind do
       :undirected ->
-        Map.new(scores, fn {node, score} ->
-          {node, score * 0.5}
-        end)
+        Map.new(scores, fn {node, score} -> {node, score * 0.5} end)
 
       :directed ->
         scores
@@ -757,16 +765,16 @@ defmodule Yog.Centrality do
     n_float = n * 1.0
 
     sink_total =
-      Enum.reduce(sinks, 0.0, fn sink, sum ->
+      List.foldl(sinks, 0.0, fn sink, sum ->
         sum + Map.get(ranks, sink, 0.0)
       end)
 
     new_ranks =
-      Enum.reduce(nodes, %{}, fn node, acc ->
+      List.foldl(nodes, %{}, fn node, acc ->
         in_neighbors = Map.get(in_map, node, [])
 
         rank_sum =
-          Enum.reduce(in_neighbors, 0.0, fn neighbor, sum ->
+          List.foldl(in_neighbors, 0.0, fn neighbor, sum ->
             neighbor_rank = Map.get(ranks, neighbor, 0.0)
             out_degree = Map.get(out_map, neighbor, 0)
 
@@ -780,7 +788,6 @@ defmodule Yog.Centrality do
         teleport_const = (1.0 - damping) / n_float + damping * sink_total / n_float
 
         new_rank = teleport_const + damping * rank_sum
-        # new_rank = (1.0 - damping) / n_float + damping * (sink_sum + rank_sum)
         Map.put(acc, node, new_rank)
       end)
 
@@ -811,10 +818,10 @@ defmodule Yog.Centrality do
   defp iterate_eigenvector(nodes, scores, prev_prev, max_iterations, tolerance, iter, in_map) do
     # Compute new scores: x_v = Σ A_uv * x_u for neighbors u
     new_scores =
-      Enum.reduce(nodes, %{}, fn node, acc ->
+      List.foldl(nodes, %{}, fn node, acc ->
         neighbor_sum =
           Map.get(in_map, node, [])
-          |> Enum.reduce(0.0, fn neighbor, sum ->
+          |> List.foldl(0.0, fn neighbor, sum ->
             neighbor_score = Map.get(scores, neighbor, 0.0)
             sum + neighbor_score
           end)
@@ -823,7 +830,7 @@ defmodule Yog.Centrality do
       end)
 
     l2_sum =
-      Enum.reduce(new_scores, 0.0, fn {_, s}, acc ->
+      List.foldl(Map.to_list(new_scores), 0.0, fn {_, s}, acc ->
         acc + s * s
       end)
 
@@ -860,13 +867,13 @@ defmodule Yog.Centrality do
     end
   end
 
-  defp normalize_initial_scores(val, _graph, nodes) when is_number(val) do
+  defp normalize_initial_scores(val, nodes) when is_number(val) do
     val_float = val / 1.0
     Map.new(nodes, fn node -> {node, val_float} end)
   end
 
-  defp normalize_initial_scores(map, _graph, nodes) when is_map(map) do
-    Enum.reduce(nodes, map, fn node, acc ->
+  defp normalize_initial_scores(map, nodes) when is_map(map) do
+    List.foldl(nodes, map, fn node, acc ->
       Map.put_new(acc, node, 1.0)
     end)
   end
@@ -875,11 +882,18 @@ defmodule Yog.Centrality do
   defp iterate_alpha(_graph, _nodes, scores, _initial, _alpha, 0, _tol), do: scores
 
   defp iterate_alpha(graph, nodes, scores, initial_scores, alpha, iterations, tol) do
+    in_edges = graph.in_edges
+
     new_scores =
-      Enum.reduce(nodes, %{}, fn node, acc ->
+      List.foldl(nodes, %{}, fn node, acc ->
+        predecessors =
+          case Map.fetch(in_edges, node) do
+            {:ok, edges} -> Map.keys(edges)
+            :error -> []
+          end
+
         neighbor_influence =
-          Model.predecessors(graph, node)
-          |> Enum.reduce(0.0, fn {pred, _weight}, sum ->
+          List.foldl(predecessors, 0.0, fn pred, sum ->
             sum + Map.get(scores, pred, 0.0)
           end)
 
@@ -899,33 +913,32 @@ defmodule Yog.Centrality do
     Yog.Utils.norm_diff(old_scores, new_scores, :l1) < tolerance
   end
 
-  defp get_in_neighbor_ids(graph, node) do
-    %Yog.Graph{kind: kind, in_edges: in_edges, out_edges: out_edges} = graph
-
-    case kind do
-      :undirected ->
-        case Map.fetch(out_edges, node) do
-          {:ok, inner} -> Map.keys(inner)
-          :error -> []
-        end
-
-      :directed ->
-        case Map.fetch(in_edges, node) do
-          {:ok, inner} -> Map.keys(inner)
-          :error -> []
-        end
+  # Fast direct access versions for internal use
+  defp get_in_neighbor_ids_fast(:undirected, out_edges, _in_edges, node) do
+    case Map.fetch(out_edges, node) do
+      {:ok, inner} -> Map.keys(inner)
+      :error -> []
     end
   end
 
-  defp get_out_degree(graph, node) do
-    %Yog.Graph{kind: kind} = graph
+  defp get_in_neighbor_ids_fast(:directed, _out_edges, in_edges, node) do
+    case Map.fetch(in_edges, node) do
+      {:ok, inner} -> Map.keys(inner)
+      :error -> []
+    end
+  end
 
-    case kind do
-      :undirected ->
-        length(Model.neighbors(graph, node))
+  defp get_out_degree_fast(:undirected, out_edges, node) do
+    case Map.fetch(out_edges, node) do
+      {:ok, inner} -> map_size(inner)
+      :error -> 0
+    end
+  end
 
-      :directed ->
-        length(Model.successors(graph, node))
+  defp get_out_degree_fast(:directed, out_edges, node) do
+    case Map.fetch(out_edges, node) do
+      {:ok, inner} -> map_size(inner)
+      :error -> 0
     end
   end
 end

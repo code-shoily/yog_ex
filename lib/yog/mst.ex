@@ -50,7 +50,6 @@ defmodule Yog.MST do
   """
 
   alias Yog.DisjointSet
-  alias Yog.Model
   alias Yog.MST.Result
   alias Yog.PriorityQueue, as: PQ
 
@@ -144,7 +143,7 @@ defmodule Yog.MST do
     sorted_edges = Enum.sort(edges, fn a, b -> compare.(a.weight, b.weight) == :lt end)
 
     result = do_kruskal(sorted_edges, DisjointSet.new(), [])
-    {:ok, Result.new(result, :kruskal, Model.order(graph))}
+    {:ok, Result.new(result, :kruskal, map_size(graph.nodes))}
   end
 
   @doc """
@@ -235,7 +234,7 @@ defmodule Yog.MST do
   end
 
   def prim(graph, compare, nil) do
-    node_ids = Model.all_nodes(graph)
+    node_ids = Map.keys(graph.nodes)
 
     case node_ids do
       [] ->
@@ -247,16 +246,16 @@ defmodule Yog.MST do
   end
 
   def prim(graph, compare, start_node) do
-    if Model.has_node?(graph, start_node) do
+    if Map.has_key?(graph.nodes, start_node) do
       do_prim(graph, start_node, compare)
     else
-      {:ok, Result.new([], :prim, Model.order(graph))}
+      {:ok, Result.new([], :prim, map_size(graph.nodes))}
     end
   end
 
   # Helper to push all edges into the priority queue
   defp push_all(pq, edges) do
-    Enum.reduce(edges, pq, fn edge, acc -> PQ.push(acc, edge) end)
+    List.foldl(edges, pq, fn edge, acc -> PQ.push(acc, edge) end)
   end
 
   # =============================================================================
@@ -266,12 +265,12 @@ defmodule Yog.MST do
   # Extracts all edges from a graph.
   # For undirected graphs, only includes each edge once (when from_id <= to_id).
   defp extract_edges(%Yog.Graph{kind: kind, out_edges: out_edges}) do
-    Enum.flat_map(out_edges, fn {from_id, targets} ->
-      Enum.flat_map(targets, fn {to_id, weight} ->
+    List.foldl(Map.to_list(out_edges), [], fn {from_id, targets}, acc ->
+      List.foldl(Map.to_list(targets), acc, fn {to_id, weight}, inner_acc ->
         if kind == :undirected && from_id > to_id do
-          []
+          inner_acc
         else
-          [%{from: from_id, to: to_id, weight: weight}]
+          [%{from: from_id, to: to_id, weight: weight} | inner_acc]
         end
       end)
     end)
@@ -284,13 +283,24 @@ defmodule Yog.MST do
 
   defp do_kruskal([edge | rest], disjoint_set, acc) do
     {ds1, root_from} = DisjointSet.find(disjoint_set, edge.from)
-    {ds2, root_to} = DisjointSet.find(ds1, edge.to)
 
-    if root_from == root_to do
-      do_kruskal(rest, ds2, acc)
-    else
-      ds3 = DisjointSet.union(ds2, edge.from, edge.to)
-      do_kruskal(rest, ds3, [edge | acc])
+    # Optimization: early check if from and to are same set before second find
+    case Map.fetch(ds1.parents, edge.to) do
+      :error ->
+        # to not in DS yet, add it and include edge
+        ds2 = DisjointSet.add(ds1, edge.to)
+        ds3 = DisjointSet.union(ds2, edge.from, edge.to)
+        do_kruskal(rest, ds3, [edge | acc])
+
+      {:ok, _} ->
+        {ds2, root_to} = DisjointSet.find(ds1, edge.to)
+
+        if root_from == root_to do
+          do_kruskal(rest, ds2, acc)
+        else
+          ds3 = DisjointSet.union(ds2, edge.from, edge.to)
+          do_kruskal(rest, ds3, [edge | acc])
+        end
     end
   end
 
@@ -305,10 +315,10 @@ defmodule Yog.MST do
       PQ.new(fn a, b -> compare.(a.weight, b.weight) == :lt end)
       |> push_all(initial_edges)
 
-    initial_visited = MapSet.new([start])
+    initial_visited = %{start => true}
 
     result = do_prim_loop(graph, initial_pq, initial_visited, [], compare)
-    {:ok, Result.new(result, :prim, Model.order(graph))}
+    {:ok, Result.new(result, :prim, map_size(graph.nodes))}
   end
 
   # Main Prim loop - grows MST from starting node.
@@ -322,17 +332,23 @@ defmodule Yog.MST do
     else
       {:ok, edge, rest_pq} = PQ.pop(pq)
 
-      if MapSet.member?(visited, edge.to) do
+      if Map.has_key?(visited, edge.to) do
         do_prim_loop(graph, rest_pq, visited, acc, compare)
       else
-        new_visited = MapSet.put(visited, edge.to)
+        new_visited = Map.put(visited, edge.to, true)
         new_acc = [edge | acc]
 
         new_edges = get_all_edges_from_node(graph, edge.to)
 
+        # Filter and push edges in one pass using List.foldl
         new_pq =
-          Enum.reject(new_edges, fn e -> MapSet.member?(new_visited, e.to) end)
-          |> Enum.reduce(rest_pq, fn e, acc_pq -> PQ.push(acc_pq, e) end)
+          List.foldl(new_edges, rest_pq, fn e, acc_pq ->
+            if Map.has_key?(new_visited, e.to) do
+              acc_pq
+            else
+              PQ.push(acc_pq, e)
+            end
+          end)
 
         do_prim_loop(graph, new_pq, new_visited, new_acc, compare)
       end
@@ -341,9 +357,14 @@ defmodule Yog.MST do
 
   # Gets all outgoing edges from a specific node.
   defp get_all_edges_from_node(graph, from_id) do
-    Model.successors(graph, from_id)
-    |> Enum.map(fn {to_id, weight} ->
-      %{from: from_id, to: to_id, weight: weight}
-    end)
+    case Map.fetch(graph.out_edges, from_id) do
+      {:ok, edges} ->
+        List.foldl(Map.to_list(edges), [], fn {to_id, weight}, acc ->
+          [%{from: from_id, to: to_id, weight: weight} | acc]
+        end)
+
+      :error ->
+        []
+    end
   end
 end

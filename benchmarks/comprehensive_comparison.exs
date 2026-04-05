@@ -36,6 +36,7 @@ defmodule ComprehensiveBenchmark do
     bench_shortest_path(yog_small, libgraph_small, digraph_small, yog_medium, libgraph_medium, digraph_medium)
     bench_graph_creation(100, 150, 500, 1000)
     bench_k_core(yog_small, libgraph_small, yog_medium, libgraph_medium)
+    bench_mst(yog_small, libgraph_small, yog_medium, libgraph_medium)
     bench_memory_usage(yog_large, libgraph_large, digraph_large)
 
     # Cleanup
@@ -285,6 +286,83 @@ defmodule ComprehensiveBenchmark do
     print_comparison("Yog (bucket-based)", yog_stats)
     print_comparison("libgraph", lib_stats)
     print_winner([{"Yog", yog_stats.avg}, {"libgraph", lib_stats.avg}])
+  end
+
+  # =============================================================================
+  # MST Benchmark (Kruskal & Prim) - libgraph doesn't have built-in MST
+  # =============================================================================
+  defp bench_mst(_yog_s, _lib_s, _yog_m, _lib_m) do
+    IO.puts("\n======================================================================")
+    IO.puts("MINIMUM SPANNING TREE (Undirected)")
+    IO.puts("======================================================================")
+
+    # Create undirected weighted graphs for MST
+    yog_s_u = create_yog_undirected_weighted(100, 150)
+    yog_m_u = create_yog_undirected_weighted(500, 1000)
+
+    IO.puts("\nSmall Graph (100 nodes, ~150 edges, undirected weighted):")
+    
+    IO.puts("  Kruskal's Algorithm:")
+    yog_stats = benchmark(fn -> Yog.MST.kruskal(yog_s_u, &mst_compare/2) end)
+    print_comparison("Yog (Kruskal)", yog_stats)
+    IO.puts("  (Note: libgraph doesn't have built-in MST)")
+    
+    IO.puts("  Prim's Algorithm:")
+    yog_stats = benchmark(fn -> Yog.MST.prim(yog_s_u, &mst_compare/2) end)
+    print_comparison("Yog (Prim)", yog_stats)
+
+    IO.puts("\nMedium Graph (500 nodes, ~1000 edges, undirected weighted):")
+    
+    IO.puts("  Kruskal's Algorithm:")
+    yog_stats = benchmark(fn -> Yog.MST.kruskal(yog_m_u, &mst_compare/2) end)
+    print_comparison("Yog (Kruskal)", yog_stats)
+    
+    IO.puts("  Prim's Algorithm:")
+    yog_stats = benchmark(fn -> Yog.MST.prim(yog_m_u, &mst_compare/2) end)
+    print_comparison("Yog (Prim)", yog_stats)
+  end
+
+  defp mst_compare(a, b) do
+    cond do
+      a < b -> :lt
+      a > b -> :gt
+      true -> :eq
+    end
+  end
+
+  defp create_yog_undirected_weighted(nodes, edges) do
+    # Create Yog undirected graph with weights
+    yog_graph = 
+      1..nodes
+      |> Enum.reduce(Yog.undirected(), fn i, g -> Yog.add_node(g, i, nil) end)
+
+    added = :ets.new(:edges, [:set, :private])
+    
+    yog_graph =
+      Enum.reduce(1..edges, yog_graph, fn i, g ->
+        u = Enum.random(1..nodes)
+        v = Enum.random(1..nodes)
+        
+        if u != v do
+          # Normalize for undirected (store smaller first)
+          key = if u < v, do: {u, v}, else: {v, u}
+          
+          if :ets.insert_new(added, {key, true}) do
+            weight = rem(i, 100) + 1  # Random-ish weight 1-100
+            case Yog.add_edge(g, u, v, weight) do
+              {:ok, ng} -> ng
+              {:error, _} -> g
+            end
+          else
+            g
+          end
+        else
+          g
+        end
+      end)
+    
+    :ets.delete(added)
+    yog_graph
   end
 
   # =============================================================================

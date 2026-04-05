@@ -27,7 +27,6 @@ defmodule Yog.Health do
 
   """
 
-  alias Yog.Model
   alias Yog.Pathfinding.Dijkstra
   alias Yog.Transform
 
@@ -100,11 +99,13 @@ defmodule Yog.Health do
         do: Transform.map_edges(graph, weight_fn),
         else: graph
 
-    nodes = Model.all_nodes(reweighted_graph)
+    nodes = Map.keys(reweighted_graph.nodes)
 
     if nodes == [] do
       nil
     else
+      n = length(nodes)
+
       parallel_opts = [
         max_concurrency: System.schedulers_online(),
         timeout: :infinity
@@ -126,7 +127,7 @@ defmodule Yog.Health do
         |> Enum.map(fn {:ok, ecc} -> ecc end)
         |> Enum.reject(&is_nil/1)
 
-      if length(eccentricities) < length(nodes) do
+      if length(eccentricities) < n do
         nil
       else
         Enum.reduce(eccentricities, fn ecc, max ->
@@ -189,11 +190,13 @@ defmodule Yog.Health do
         do: Transform.map_edges(graph, weight_fn),
         else: graph
 
-    nodes = Model.all_nodes(reweighted_graph)
+    nodes = Map.keys(reweighted_graph.nodes)
 
     if nodes == [] do
       nil
     else
+      n = length(nodes)
+
       parallel_opts = [
         max_concurrency: System.schedulers_online(),
         timeout: :infinity
@@ -215,7 +218,7 @@ defmodule Yog.Health do
         |> Enum.map(fn {:ok, ecc} -> ecc end)
         |> Enum.reject(&is_nil/1)
 
-      if length(eccentricities) < length(nodes) do
+      if length(eccentricities) < n do
         nil
       else
         Enum.reduce(eccentricities, fn ecc, min ->
@@ -284,7 +287,7 @@ defmodule Yog.Health do
         do: Transform.map_edges(graph, weight_fn),
         else: graph
 
-    all_nodes = Model.all_nodes(reweighted_graph)
+    all_nodes = Map.keys(reweighted_graph.nodes)
     num_nodes = length(all_nodes)
 
     if num_nodes <= 1 do
@@ -345,19 +348,30 @@ defmodule Yog.Health do
   """
   @spec assortativity(Yog.graph()) :: float()
   def assortativity(graph) do
-    nodes = Model.all_nodes(graph)
+    nodes = Map.keys(graph.nodes)
+    out_edges = graph.out_edges
 
     degrees =
-      Enum.reduce(nodes, %{}, fn node, acc ->
-        deg = Model.out_degree(graph, node)
+      List.foldl(nodes, %{}, fn node, acc ->
+        deg =
+          case Map.fetch(out_edges, node) do
+            {:ok, inner} -> map_size(inner)
+            :error -> 0
+          end
+
         Map.put(acc, node, deg)
       end)
 
     edges_data =
-      Enum.flat_map(nodes, fn u ->
-        Model.successors(graph, u)
-        |> Enum.map(fn {v, _weight} ->
-          {Map.get(degrees, u, 0), Map.get(degrees, v, 0)}
+      List.foldl(nodes, [], fn u, acc ->
+        successors =
+          case Map.fetch(out_edges, u) do
+            {:ok, inner} -> Map.to_list(inner)
+            :error -> []
+          end
+
+        List.foldl(successors, acc, fn {v, _weight}, inner_acc ->
+          [{Map.get(degrees, u, 0), Map.get(degrees, v, 0)} | inner_acc]
         end)
       end)
 
@@ -367,7 +381,7 @@ defmodule Yog.Health do
       0.0
     else
       {sum_jk, sum_j_plus_k, sum_j2_plus_k2} =
-        Enum.reduce(edges_data, {0.0, 0.0, 0.0}, fn {j, k}, {sjk, sjk_add, sjk2_add} ->
+        List.foldl(edges_data, {0.0, 0.0, 0.0}, fn {j, k}, {sjk, sjk_add, sjk2_add} ->
           {
             sjk + j * k,
             sjk_add + (j + k),
@@ -446,7 +460,7 @@ defmodule Yog.Health do
         do: Transform.map_edges(graph, weight_fn),
         else: graph
 
-    nodes = Model.all_nodes(reweighted_graph)
+    nodes = Map.keys(reweighted_graph.nodes)
     num_nodes = length(nodes)
 
     if num_nodes <= 1 do
@@ -474,9 +488,9 @@ defmodule Yog.Health do
 
       if all_reachable do
         total =
-          Enum.reduce(all_distances, 0.0, fn distances, acc ->
+          List.foldl(all_distances, 0.0, fn distances, acc ->
             sum =
-              Enum.reduce(distances, 0.0, fn {_node, dist}, sum ->
+              List.foldl(Map.to_list(distances), 0.0, fn {_node, dist}, sum ->
                 sum + to_float.(dist)
               end)
 
