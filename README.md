@@ -54,7 +54,7 @@ YogEx provides comprehensive graph algorithms organized into modules:
 
 **[Functional Graphs](https://hexdocs.pm/yog_ex/Yog.Functional.html)** *(Experimental)* — Pure inductive graph library (FGL) for elegant recursive algorithms.
 
-📖 **[Complete Algorithm Catalog](ALGORITHMS.md)** — See all 60+ algorithms, underlying data structures (Pairing Heap, Union-Find, HyperLogLog), and selection guidance with Big-O complexities.
+**[Complete Algorithm Catalog](ALGORITHMS.md)** — See all 60+ algorithms, underlying data structures (Pairing Heap, Union-Find, HyperLogLog), and selection guidance with Big-O complexities.
 
 ## Installation
 
