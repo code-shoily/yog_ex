@@ -1,162 +1,309 @@
 defmodule Yog.Connectivity.SCC do
   @moduledoc """
   Strongly Connected Components (SCC) algorithms.
-  """
 
-  alias Yog.Model
+  This module provides algorithms for finding strongly connected components in directed
+  graphs. A strongly connected component is a maximal subgraph where every node is
+  reachable from every other node via directed edges.
+
+  ## Algorithms
+
+  - **Tarjan's Algorithm**: `strongly_connected_components/1` - Single-pass DFS with
+    low-link values. Time complexity O(V + E).
+  - **Kosaraju's Algorithm**: `kosaraju/1` - Two-pass DFS on original and transposed
+    graphs. Time complexity O(V + E).
+
+  ## When to Use
+
+  - **Tarjan's**: Preferred for most use cases; single pass, slightly more efficient
+  - **Kosaraju's**: When you need the finish order for other algorithms, or prefer
+    the conceptual simplicity of the two-pass approach
+
+  ## Use Cases
+
+  - Finding cycles in dependency graphs
+  - Identifying mutually reachable regions in networks
+  - Condensing graphs for easier analysis
+  - Detecting bottlenecks in flow networks
+
+  ## Examples
+
+      # Find SCCs in a graph with a cycle
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}, {3, 1, 1}])
+      iex> Yog.Connectivity.SCC.strongly_connected_components(graph)
+      [[1, 2, 3]]
+
+      # Find SCCs in a graph with multiple cycles
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_node(4, nil)
+      ...> |> Yog.add_edges!([{1, 2, 1}, {2, 1, 1}, {3, 4, 1}, {4, 3, 1}])
+      iex> sccs = Yog.Connectivity.SCC.strongly_connected_components(graph)
+      iex> length(sccs)
+      2
+  """
 
   @doc """
   Finds Strongly Connected Components (SCC) using Tarjan's Algorithm.
 
+  A strongly connected component is a maximal subgraph where every node is
+  reachable from every other node via directed edges.
+
   Time Complexity: O(V + E)
+
+  ## Examples
+
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}, {3, 1, 1}])
+      iex> sccs = Yog.Connectivity.SCC.strongly_connected_components(graph)
+      iex> length(sccs)
+      1
+      iex> hd(sccs) |> Enum.sort()
+      [1, 2, 3]
+
+      iex> # Two separate cycles
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_node(4, nil)
+      ...> |> Yog.add_edges!([{1, 2, 1}, {2, 1, 1}, {3, 4, 1}, {4, 3, 1}])
+      iex> sccs = Yog.Connectivity.SCC.strongly_connected_components(graph)
+      iex> length(sccs)
+      2
   """
   @spec strongly_connected_components(Yog.graph()) :: [[Yog.node_id()]]
   def strongly_connected_components(graph) do
-    all_nodes = Model.all_nodes(graph)
+    out_edges = graph.out_edges
+    nodes = Map.keys(graph.nodes)
 
-    state = %{
-      index: 0,
-      indices: %{},
-      lowlinks: %{},
-      stack: [],
-      on_stack: MapSet.new(),
-      sccs: []
-    }
+    {_, _, _, _, _, final_sccs} =
+      do_tarjan_all(nodes, out_edges, 0, %{}, %{}, [], %{}, [])
 
-    final_state =
-      Enum.reduce(all_nodes, state, fn node, acc_state ->
-        if Map.has_key?(acc_state.indices, node) do
-          acc_state
-        else
-          tarjan_dfs(graph, node, acc_state)
-        end
-      end)
-
-    final_state.sccs
+    final_sccs
   end
 
-  defp tarjan_dfs(graph, node, state) do
-    state =
-      Map.update!(state, :indices, &Map.put(&1, node, state.index))
-      |> Map.update!(:lowlinks, &Map.put(&1, node, state.index))
-      |> Map.update!(:index, &(&1 + 1))
-      |> Map.update!(:stack, &[node | &1])
-      |> Map.update!(:on_stack, &MapSet.put(&1, node))
+  defp do_tarjan_all([], _, idx, ids, lows, st, os, sccs),
+    do: {idx, ids, lows, st, os, sccs}
 
-    neighbors = Model.successor_ids(graph, node)
-
-    state_after_neighbors =
-      Enum.reduce(neighbors, state, fn neighbor, acc_state ->
-        case Map.fetch(acc_state.indices, neighbor) do
-          :error ->
-            new_state = tarjan_dfs(graph, neighbor, acc_state)
-
-            new_lowlink =
-              min(
-                Map.fetch!(new_state.lowlinks, node),
-                Map.fetch!(new_state.lowlinks, neighbor)
-              )
-
-            Map.update!(new_state, :lowlinks, &Map.put(&1, node, new_lowlink))
-
-          {:ok, _} ->
-            if MapSet.member?(acc_state.on_stack, neighbor) do
-              new_lowlink =
-                min(
-                  Map.fetch!(acc_state.lowlinks, node),
-                  Map.fetch!(acc_state.indices, neighbor)
-                )
-
-              Map.update!(acc_state, :lowlinks, &Map.put(&1, node, new_lowlink))
-            else
-              acc_state
-            end
-        end
-      end)
-
-    if Map.fetch!(state_after_neighbors.lowlinks, node) ==
-         Map.fetch!(state_after_neighbors.indices, node) do
-      {scc, new_stack, new_on_stack} =
-        pop_scc(state_after_neighbors.stack, state_after_neighbors.on_stack, node, [])
-
-      %{
-        state_after_neighbors
-        | stack: new_stack,
-          on_stack: new_on_stack,
-          sccs: [scc | state_after_neighbors.sccs]
-      }
+  defp do_tarjan_all([node | rest], out, idx, ids, lows, st, os, sccs) do
+    if is_map_key(ids, node) do
+      do_tarjan_all(rest, out, idx, ids, lows, st, os, sccs)
     else
-      state_after_neighbors
+      {idx2, ids2, lows2, st2, os2, sccs2} =
+        tarjan_dfs(out, node, idx, ids, lows, st, os, sccs)
+
+      do_tarjan_all(rest, out, idx2, ids2, lows2, st2, os2, sccs2)
     end
   end
 
-  defp pop_scc([head | rest], on_stack, target, acc) when head == target do
-    {Enum.reverse([head | acc]), rest, MapSet.delete(on_stack, head)}
+  defp tarjan_dfs(out, node, index, indices, lowlinks, stack, on_stack, sccs) do
+    neighbors = Map.get(out, node)
+
+    {next_index, indices, lowlinks, stack, on_stack, sccs} =
+      process_neighbors(
+        neighbors,
+        out,
+        node,
+        index + 1,
+        Map.put(indices, node, index),
+        Map.put(lowlinks, node, index),
+        [node | stack],
+        Map.put(on_stack, node, true),
+        sccs
+      )
+
+    if Map.fetch!(lowlinks, node) == Map.fetch!(indices, node) do
+      {new_scc, new_stack, new_on_stack} = pop_scc(stack, on_stack, node, [])
+      {next_index, indices, lowlinks, new_stack, new_on_stack, [new_scc | sccs]}
+    else
+      {next_index, indices, lowlinks, stack, on_stack, sccs}
+    end
   end
 
-  defp pop_scc([head | rest], on_stack, target, acc) do
-    pop_scc(rest, MapSet.delete(on_stack, head), target, [head | acc])
+  # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity
+  defp process_neighbors(nil, _, _, idx, ids, lows, st, os, sccs),
+    do: {idx, ids, lows, st, os, sccs}
+
+  # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity
+  defp process_neighbors(neighbors, out, node, idx, ids, lows, st, os, sccs) do
+    neighbor_list = Map.to_list(neighbors)
+
+    List.foldl(
+      neighbor_list,
+      {idx, ids, lows, st, os, sccs},
+      fn {neighbor, _}, {i, ids_acc, lows_acc, st_acc, os_acc, sccs_acc} ->
+        case Map.get(ids_acc, neighbor) do
+          nil ->
+            # Unvisited - recursive DFS
+            {i2, ids2, lows2, st2, os2, sccs2} =
+              tarjan_dfs(out, neighbor, i, ids_acc, lows_acc, st_acc, os_acc, sccs_acc)
+
+            # Update lowlink
+            node_low = Map.fetch!(lows2, node)
+            nb_low = Map.fetch!(lows2, neighbor)
+            new_lows = if nb_low < node_low, do: Map.put(lows2, node, nb_low), else: lows2
+
+            {i2, ids2, new_lows, st2, os2, sccs2}
+
+          neighbor_index ->
+            # Visited - check for back edge
+            new_lows =
+              if is_map_key(os_acc, neighbor) do
+                node_low = Map.fetch!(lows_acc, node)
+
+                if neighbor_index < node_low do
+                  Map.put(lows_acc, node, neighbor_index)
+                else
+                  lows_acc
+                end
+              else
+                lows_acc
+              end
+
+            {i, ids_acc, new_lows, st_acc, os_acc, sccs_acc}
+        end
+      end
+    )
+  end
+
+  # Pop SCC from stack
+  defp pop_scc([head | rest], os, target, acc) when head == target do
+    {[head | acc], rest, Map.delete(os, head)}
+  end
+
+  defp pop_scc([head | rest], os, target, acc) do
+    pop_scc(rest, Map.delete(os, head), target, [head | acc])
   end
 
   @doc """
-  Strongly Connected Components (SCC) using Kosaraju's Algorithm.
+  Finds Strongly Connected Components (SCC) using Kosaraju's Algorithm.
+
+  Kosaraju's algorithm performs two passes of DFS:
+  1. First pass on the original graph to get finish order
+  2. Second pass on the transposed graph in reverse finish order
 
   Time Complexity: O(V + E)
+
+  ## Examples
+
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}, {3, 1, 1}])
+      iex> sccs = Yog.Connectivity.SCC.kosaraju(graph)
+      iex> length(sccs)
+      1
+      iex> hd(sccs) |> Enum.sort()
+      [1, 2, 3]
+
+      iex> # Acyclic graph - each node is its own SCC
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}])
+      iex> sccs = Yog.Connectivity.SCC.kosaraju(graph)
+      iex> length(sccs)
+      3
   """
   @spec kosaraju(Yog.graph()) :: [[Yog.node_id()]]
   def kosaraju(graph) do
-    all_nodes = Model.all_nodes(graph)
+    out_edges = graph.out_edges
+    in_edges = graph.in_edges
+    nodes = Map.keys(graph.nodes)
 
-    {_, finish_order} =
-      Enum.reduce(all_nodes, {MapSet.new(), []}, fn node, {visited, order} ->
-        if MapSet.member?(visited, node) do
-          {visited, order}
-        else
-          dfs_finish(graph, node, visited, order)
-        end
-      end)
-
-    transposed = Yog.Transform.transpose(graph)
+    {finish_order, _} = kosaraju_first_pass(nodes, out_edges, [], %{})
 
     {_, sccs} =
-      Enum.reduce(finish_order, {MapSet.new(), []}, fn node, {visited, components} ->
-        if MapSet.member?(visited, node) do
-          {visited, components}
-        else
-          {new_visited, component} = dfs_collect(transposed, node, visited, [])
-          {new_visited, [component | components]}
+      List.foldl(
+        finish_order,
+        {%{}, []},
+        fn node, {visited, acc} ->
+          if is_map_key(visited, node) do
+            {visited, acc}
+          else
+            {new_visited, comp} = kosaraju_collect(in_edges, node, visited, [])
+            {new_visited, [comp | acc]}
+          end
         end
-      end)
+      )
 
     sccs
   end
 
-  defp dfs_finish(graph, node, visited, order) do
-    visited = MapSet.put(visited, node)
-    neighbors = Model.successor_ids(graph, node)
+  defp kosaraju_first_pass([], _, order, visited), do: {order, visited}
 
-    {final_visited, final_order} =
-      Enum.reduce(neighbors, {visited, order}, fn neighbor, {acc_visited, acc_order} ->
-        if MapSet.member?(acc_visited, neighbor) do
-          {acc_visited, acc_order}
-        else
-          dfs_finish(graph, neighbor, acc_visited, acc_order)
-        end
-      end)
-
-    {final_visited, [node | final_order]}
+  defp kosaraju_first_pass([node | rest], out, order, visited) do
+    if is_map_key(visited, node) do
+      kosaraju_first_pass(rest, out, order, visited)
+    else
+      {new_order, new_visited} = kosaraju_finish(out, node, order, visited)
+      kosaraju_first_pass(rest, out, new_order, new_visited)
+    end
   end
 
-  defp dfs_collect(graph, node, visited, component) do
-    visited = MapSet.put(visited, node)
-    neighbors = Model.successor_ids(graph, node)
+  defp kosaraju_finish(out, node, order, visited) do
+    if is_map_key(visited, node) do
+      {order, visited}
+    else
+      visited = Map.put(visited, node, true)
 
-    Enum.reduce(neighbors, {visited, [node | component]}, fn neighbor, {acc_visited, acc_comp} ->
-      if MapSet.member?(acc_visited, neighbor) do
-        {acc_visited, acc_comp}
-      else
-        dfs_collect(graph, neighbor, acc_visited, acc_comp)
-      end
-    end)
+      {new_order, new_visited} =
+        case Map.fetch(out, node) do
+          {:ok, neighbors} when map_size(neighbors) > 0 ->
+            neighbor_list = Map.to_list(neighbors)
+            kosaraju_finish_neighbors(neighbor_list, out, order, visited)
+
+          _ ->
+            {order, visited}
+        end
+
+      {[node | new_order], new_visited}
+    end
+  end
+
+  defp kosaraju_finish_neighbors([], _, order, visited), do: {order, visited}
+
+  defp kosaraju_finish_neighbors([{nb, _} | rest], out, order, visited) do
+    {new_order, new_visited} = kosaraju_finish(out, nb, order, visited)
+    kosaraju_finish_neighbors(rest, out, new_order, new_visited)
+  end
+
+  defp kosaraju_collect(in_edges, node, visited, acc) do
+    if is_map_key(visited, node) do
+      {visited, acc}
+    else
+      visited = Map.put(visited, node, true)
+
+      {new_visited, new_acc} =
+        case Map.fetch(in_edges, node) do
+          {:ok, neighbors} when map_size(neighbors) > 0 ->
+            neighbor_list = Map.to_list(neighbors)
+            kosaraju_collect_neighbors(neighbor_list, in_edges, visited, [node | acc])
+
+          _ ->
+            {visited, [node | acc]}
+        end
+
+      {new_visited, new_acc}
+    end
+  end
+
+  defp kosaraju_collect_neighbors([], _, visited, acc), do: {visited, acc}
+
+  defp kosaraju_collect_neighbors([{nb, _} | rest], in_edges, visited, acc) do
+    {new_visited, new_acc} = kosaraju_collect(in_edges, nb, visited, acc)
+    kosaraju_collect_neighbors(rest, in_edges, new_visited, new_acc)
   end
 end

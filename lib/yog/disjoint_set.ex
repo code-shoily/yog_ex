@@ -182,7 +182,7 @@ defmodule Yog.DisjointSet do
   """
   @spec from_pairs([{term(), term()}]) :: t()
   def from_pairs(pairs) do
-    Enum.reduce(pairs, new(), fn {x, y}, acc ->
+    List.foldl(pairs, new(), fn {x, y}, acc ->
       union(acc, x, y)
     end)
   end
@@ -267,7 +267,7 @@ defmodule Yog.DisjointSet do
   def to_lists(%__MODULE__{parents: parents} = dsu) do
     parents
     |> Map.keys()
-    |> Enum.reduce(%{}, fn element, acc ->
+    |> List.foldl(%{}, fn element, acc ->
       root = find_root_readonly(dsu, element)
 
       Map.update(acc, root, [element], fn members ->

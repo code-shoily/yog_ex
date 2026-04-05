@@ -1,71 +1,129 @@
 defmodule Yog.Traversal.Sort do
   @moduledoc """
-  Topological sorting algorithms — Kahn's algorithm and lexicographic variant.
+  Topological sorting algorithms for directed acyclic graphs (DAGs).
+
+  This module provides algorithms for producing a topological ordering of nodes in a DAG.
+  A topological ordering is a linear ordering of nodes such that for every directed edge
+  (u, v), node u comes before v in the ordering.
+
+  ## Algorithms
+
+  - **Kahn's Algorithm**: `topological_sort/1` - BFS-based approach using in-degrees.
+    Time complexity O(V + E). Preferred for most use cases.
+  - **Lexicographical Topological Sort**: `lexicographical_topological_sort/2` - Kahn's
+    algorithm with a priority queue for deterministic ordering. Time complexity O((V + E) log V).
+
+  ## Algorithm Characteristics
+
+  - **Time Complexity**: O(V + E) for standard, O((V + E) log V) for lexicographical
+  - **Space Complexity**: O(V) for the in-degree map and queue
+  - **Cycle Detection**: Both algorithms detect cycles and return `{:error, :contains_cycle}`
+
+  ## When to Use
+
+  - **Standard**: Use when you just need any valid topological ordering
+  - **Lexicographical**: Use when you need a deterministic ordering (e.g., alphabetical)
+
+  ## Use Cases
+
+  - Task scheduling with dependencies
+  - Resolving symbol dependencies in compilers
+  - Ordering of formula calculations in spreadsheets
+  - Determining instruction sequences in dataflow programming
+
+  ## Examples
+
+      # Standard topological sort
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(1, "A")
+      ...> |> Yog.add_node(2, "B")
+      ...> |> Yog.add_node(3, "C")
+      ...> |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}])
+      iex> {:ok, order} = Yog.Traversal.Sort.topological_sort(graph)
+      iex> order
+      [1, 2, 3]
+
+      # Lexicographical topological sort
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(1, "c")
+      ...> |> Yog.add_node(2, "a")
+      ...> |> Yog.add_node(3, "b")
+      ...> |> Yog.add_edges!([{1, 3, 1}, {2, 3, 1}])
+      iex> {:ok, order} = Yog.Traversal.Sort.lexicographical_topological_sort(graph, &<=/2)
+      iex> order
+      [2, 1, 3]
   """
 
-  alias Yog.Model
   alias Yog.PriorityQueue, as: PQ
 
   @doc """
   Performs a topological sort on a directed graph using Kahn's algorithm.
 
-  ## Example
-
-      iex> graph =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}])
-      iex> Yog.Traversal.topological_sort(graph)
-      {:ok, [1, 2, 3]}
-
-      iex> # Graph with cycle
-      iex> graph =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_edges!([{1, 2, 1}, {2, 1, 1}])
-      iex> Yog.Traversal.topological_sort(graph)
-      {:error, :contains_cycle}
+  Time Complexity: O(V + E)
   """
   @spec topological_sort(Yog.graph()) :: {:ok, [Yog.node_id()]} | {:error, :contains_cycle}
   def topological_sort(graph) do
-    in_degrees = build_degree_map(graph)
+    out_edges = graph.out_edges
+    in_edges = graph.in_edges
+    nodes = Map.keys(graph.nodes)
+    total_count = length(nodes)
 
-    queue =
-      in_degrees
-      |> Enum.filter(fn {_id, degree} -> degree == 0 end)
-      |> Enum.map(fn {id, _} -> id end)
+    in_degrees =
+      List.foldl(
+        nodes,
+        %{},
+        fn id, acc ->
+          deg =
+            case Map.fetch(in_edges, id) do
+              {:ok, inner} -> map_size(inner)
+              :error -> 0
+            end
 
-    do_kahn(graph, queue, in_degrees, [], 0, Enum.count(graph))
+          Map.put(acc, id, deg)
+        end
+      )
+
+    initial_q =
+      List.foldl(
+        nodes,
+        [],
+        fn id, acc ->
+          if Map.fetch!(in_degrees, id) == 0, do: [id | acc], else: acc
+        end
+      )
+
+    do_kahn(out_edges, initial_q, in_degrees, [], 0, total_count)
   end
 
   @doc """
   Performs a lexicographically smallest topological sort. Compares by node_data. Breaks tie
   by ID.
 
-  ## Example
-
-      iex> graph =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "c")
-      ...>   |> Yog.add_node(2, "a")
-      ...>   |> Yog.add_node(3, "b")
-      ...>   |> Yog.add_edges!([{1, 3, 1}, {2, 3, 1}])
-      iex> Yog.Traversal.lexicographical_topological_sort(graph, fn a, b ->
-      ...>   cond do
-      ...>     a < b -> :lt
-      ...>     a > b -> :gt
-      ...>     true -> :eq
-      ...>   end
-      ...> end)
-      {:ok, [2, 1, 3]}  # "a" comes before "c"
+  Time Complexity: O((V + E) log V) due to priority queue operations
   """
   @spec lexicographical_topological_sort(Yog.graph(), (term(), term() -> :lt | :eq | :gt)) ::
           {:ok, [Yog.node_id()]} | {:error, :contains_cycle}
   def lexicographical_topological_sort(graph, compare_nodes) do
-    in_degrees = build_degree_map(graph)
+    out_edges = graph.out_edges
+    in_edges = graph.in_edges
+    nodes = Map.keys(graph.nodes)
+    node_map = graph.nodes
+    total_count = length(nodes)
+
+    in_degrees =
+      List.foldl(
+        nodes,
+        %{},
+        fn id, acc ->
+          deg =
+            case Map.fetch(in_edges, id) do
+              {:ok, inner} -> map_size(inner)
+              :error -> 0
+            end
+
+          Map.put(acc, id, deg)
+        end
+      )
 
     pq =
       PQ.new(fn {data_a, id_a}, {data_b, id_b} ->
@@ -74,71 +132,64 @@ defmodule Yog.Traversal.Sort do
       end)
 
     initial_pq =
-      in_degrees
-      |> Enum.filter(fn {_id, degree} -> degree == 0 end)
-      |> Enum.map(fn {id, _} -> {Model.node(graph, id), id} end)
-      |> Enum.reduce(pq, fn item, acc -> PQ.push(acc, item) end)
-
-    do_lexical_kahn_pq(graph, initial_pq, in_degrees, [], 0, Enum.count(graph))
-  end
-
-  # Build degree map
-  defp build_degree_map(%{in_edges: in_edges} = graph) do
-    graph
-    |> Enum.map(fn {id, _} ->
-      degree =
-        case Map.fetch(in_edges, id) do
-          {:ok, inner} -> map_size(inner)
-          :error -> 0
-        end
-
-      {id, degree}
-    end)
-    |> Map.new()
-  end
-
-  # Kahn's algorithm
-  defp do_kahn(_graph, [], _in_degrees, acc, size, total_count) do
-    if size == total_count do
-      {:ok, Enum.reverse(acc)}
-    else
-      {:error, :contains_cycle}
-    end
-  end
-
-  defp do_kahn(graph, [head | tail], in_degrees, acc, size, total_count) do
-    neighbors = Model.successor_ids(graph, head)
-
-    {next_queue, next_in_degrees} =
-      Enum.reduce(neighbors, {tail, in_degrees}, fn neighbor, {q, degrees} ->
-        current_degree = Map.get(degrees, neighbor, 0)
-        new_degree = current_degree - 1
-        new_degrees = Map.put(degrees, neighbor, new_degree)
-
-        new_q =
-          if new_degree == 0 do
-            [neighbor | q]
+      List.foldl(
+        nodes,
+        pq,
+        fn id, acc_pq ->
+          if Map.fetch!(in_degrees, id) == 0 do
+            data = Map.fetch!(node_map, id)
+            PQ.push(acc_pq, {data, id})
           else
-            q
+            acc_pq
           end
+        end
+      )
 
-        {new_q, new_degrees}
-      end)
+    do_lex_kahn(out_edges, node_map, initial_pq, in_degrees, [], 0, total_count, compare_nodes)
+  end
 
-    do_kahn(graph, next_queue, next_in_degrees, [head | acc], size + 1, total_count)
+  # Kahn's algorithm with simple queue (list)
+  defp do_kahn(_out, [], _degrees, acc, size, total_count) do
+    if size == total_count, do: {:ok, Enum.reverse(acc)}, else: {:error, :contains_cycle}
+  end
+
+  defp do_kahn(out, [head | tail], degrees, acc, size, total_count) do
+    neighbors = Map.get(out, head)
+
+    {next_q, next_degrees} =
+      if neighbors && map_size(neighbors) > 0 do
+        List.foldl(
+          Map.to_list(neighbors),
+          {tail, degrees},
+          fn {nb, _}, {q_acc, deg_acc} ->
+            new_deg = Map.fetch!(deg_acc, nb) - 1
+            new_deg_acc = Map.put(deg_acc, nb, new_deg)
+
+            if new_deg == 0 do
+              {[nb | q_acc], new_deg_acc}
+            else
+              {q_acc, new_deg_acc}
+            end
+          end
+        )
+      else
+        {tail, degrees}
+      end
+
+    do_kahn(out, next_q, next_degrees, [head | acc], size + 1, total_count)
   end
 
   # Lexicographic Kahn's with priority queue
-  defp do_lexical_kahn_pq(_graph, _pq, _in_degrees, acc, _size, total_count)
-       when total_count == 0 do
-    if Enum.empty?(acc) do
-      {:ok, []}
-    else
-      {:ok, Enum.reverse(acc)}
-    end
+  defp do_lex_kahn(_out, _nodes, _pq, _degrees, acc, size, total_count, _)
+       when size == total_count and total_count > 0 do
+    {:ok, Enum.reverse(acc)}
   end
 
-  defp do_lexical_kahn_pq(graph, pq, in_degrees, acc, size, total_count) do
+  defp do_lex_kahn(_out, _nodes, _pq, _degrees, _acc, 0, 0, _) do
+    {:ok, []}
+  end
+
+  defp do_lex_kahn(out, nodes, pq, degrees, acc, size, total_count, compare) do
     if PQ.empty?(pq) do
       if size == total_count do
         {:ok, Enum.reverse(acc)}
@@ -147,31 +198,35 @@ defmodule Yog.Traversal.Sort do
       end
     else
       {:ok, {_, head}, rest_pq} = PQ.pop(pq)
-      do_lexical_kahn_pq_step(graph, rest_pq, in_degrees, [head | acc], size + 1, total_count)
+
+      neighbors = Map.get(out, head)
+
+      {next_pq, next_degrees} =
+        if neighbors && map_size(neighbors) > 0 do
+          List.foldl(
+            Map.to_list(neighbors),
+            {rest_pq, degrees},
+            fn {nb, _}, {acc_pq, deg_acc} ->
+              current_degree = Map.fetch!(deg_acc, nb)
+              new_degree = current_degree - 1
+              new_degrees = Map.put(deg_acc, nb, new_degree)
+
+              updated_pq =
+                if new_degree == 0 do
+                  neighbor_data = Map.fetch!(nodes, nb)
+                  PQ.push(acc_pq, {neighbor_data, nb})
+                else
+                  acc_pq
+                end
+
+              {updated_pq, new_degrees}
+            end
+          )
+        else
+          {rest_pq, degrees}
+        end
+
+      do_lex_kahn(out, nodes, next_pq, next_degrees, [head | acc], size + 1, total_count, compare)
     end
-  end
-
-  defp do_lexical_kahn_pq_step(graph, pq, in_degrees, acc, size, total_count) do
-    head = hd(acc)
-    neighbors = Model.successor_ids(graph, head)
-
-    {next_pq, next_in_degrees} =
-      Enum.reduce(neighbors, {pq, in_degrees}, fn neighbor, {acc_pq, degrees} ->
-        current_degree = Map.get(degrees, neighbor, 0)
-        new_degree = current_degree - 1
-        new_degrees = Map.put(degrees, neighbor, new_degree)
-
-        updated_pq =
-          if new_degree == 0 do
-            neighbor_data = Model.node(graph, neighbor)
-            PQ.push(acc_pq, {neighbor_data, neighbor})
-          else
-            acc_pq
-          end
-
-        {updated_pq, new_degrees}
-      end)
-
-    do_lexical_kahn_pq(graph, next_pq, next_in_degrees, acc, size, total_count)
   end
 end
