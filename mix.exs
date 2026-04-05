@@ -72,7 +72,7 @@ defmodule YogEx.MixProject do
     [
       name: "yog_ex",
       files:
-        ~w(lib .formatter.exs mix.exs README.md ALGORITHMS.md PROPERTIES.md LICENSE CHANGELOG.md),
+        ~w(lib .formatter.exs mix.exs README.md GLEAM_ELIXIR_COMPARISON.md ALGORITHMS.md PROPERTIES.md LICENSE CHANGELOG.md),
       licenses: ["Apache-2.0"],
       links: %{
         "GitHub" => @source_url,
@@ -89,6 +89,8 @@ defmodule YogEx.MixProject do
         "ALGORITHMS.md",
         "examples/README.md",
         "lib/yog/functional/README.md",
+        "GLEAM_ELIXIR_COMPARISON.md",
+        "benchmarks/README.md",
         "CHANGELOG.md",
         "PROPERTIES.md"
       ],

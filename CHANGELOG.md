@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Priority Queue Restructure**: Split `Yog.PriorityQueue` into two separate modules with distinct performance characteristics:
+  - `Yog.PairingHeap` - O(1) push, O(log n) amortized pop, pure Elixir (faster for Dijkstra/A* pathfinding)
+  - `Yog.BalancedTree` - O(log n) push/pop, uses `:gb_trees` (better for balanced workloads)
+  - Both modules share the same API for drop-in replacement in pathfinding algorithms
 - **Generators**: Add `Yog.Generator.Random.sbm/5` and `Yog.Generator.Random.sbm_with_labels/5` to generate graphs using the Stochastic Block Model (SBM).
 - **MST Result Struct**: `Yog.MST.kruskal/2` and `Yog.MST.prim/2` now return `{:ok, %Yog.MST.Result{}}` instead of a raw edge list. The struct contains `edges`, `total_weight`, `node_count`, `edge_count`, and `algorithm` fields.
 - **Prim's `:from` option**: `Yog.MST.prim/1` now accepts a `:from` keyword to specify the starting node.
