@@ -111,11 +111,7 @@ defmodule Yog.Community.CliquePercolation do
     options = Map.merge(default_options(), opts)
     k = options.k
 
-    # 1. Find all maximal cliques (Bron-Kerbosch)
     maximal_cliques = Clique.all_maximal_cliques(graph)
-
-    # 2. Extract all k-cliques from maximal cliques
-
     estimated_cliques = estimate_k_cliques(maximal_cliques, k)
 
     if estimated_cliques > @max_k_cliques do
@@ -140,24 +136,16 @@ defmodule Yog.Community.CliquePercolation do
     k_cliques = List.to_tuple(k_cliques_list)
     num_cliques = tuple_size(k_cliques)
 
-    # Handle edge case: no k-cliques found
     if num_cliques == 0 do
       Overlapping.new(%{})
     else
-      # 3. Build adjacency between k-cliques
-
       clique_adj = build_clique_adjacency_indexed(k_cliques, num_cliques, k)
-
-      # 4. Find connected components of cliques
       clique_components = find_clique_components(clique_adj, num_cliques)
-
-      # 5. Build node-to-communities memberships from clique components
 
       memberships =
         clique_components
         |> Enum.with_index()
         |> Enum.reduce(%{}, fn {component, comm_id}, acc ->
-          # Get all nodes in this component
           component_nodes =
             component
             |> Enum.reduce(MapSet.new(), fn clique_idx, nodes_acc ->
@@ -165,7 +153,6 @@ defmodule Yog.Community.CliquePercolation do
               MapSet.union(nodes_acc, clique)
             end)
 
-          # Add this community to each node's membership list
           Enum.reduce(component_nodes, acc, fn node, inner_acc ->
             Map.update(inner_acc, node, [comm_id], fn communities -> [comm_id | communities] end)
           end)
@@ -226,9 +213,7 @@ defmodule Yog.Community.CliquePercolation do
     |> Enum.map(&MapSet.new/1)
   end
 
-  # Build clique adjacency using inverted index for O(C) instead of O(C^2)
   defp build_clique_adjacency_indexed(k_cliques_tuple, num_cliques, k) do
-    # Build inverted index: (k-1)-subclique -> list of clique indices containing it
     inverted_index =
       Enum.reduce(0..(num_cliques - 1), %{}, fn i, acc ->
         clique = elem(k_cliques_tuple, i)
@@ -249,7 +234,6 @@ defmodule Yog.Community.CliquePercolation do
       clique_list = MapSet.to_list(clique)
       subcliques = Utils.combinations(clique_list, k - 1)
 
-      # Find all neighbors via shared (k-1)-subcliques
       neighbors =
         subcliques
         |> Enum.flat_map(fn subclique ->
@@ -263,9 +247,7 @@ defmodule Yog.Community.CliquePercolation do
     end)
   end
 
-  # Find connected components in clique adjacency graph
   defp find_clique_components(adj, n) do
-    # DFS to find connected components
     {_visited, components} =
       Enum.reduce(Enum.to_list(0..(n - 1)//1), {MapSet.new(), []}, fn i, {visited, comps} ->
         if MapSet.member?(visited, i) do

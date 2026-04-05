@@ -50,18 +50,14 @@ defmodule Yog.Community.Metrics do
       m2 = 2 * m
       gamma = Keyword.get(opts, :resolution, 1.0)
 
-      # Build community -> nodes mapping
       community_nodes =
         List.foldl(Map.to_list(communities.assignments), %{}, fn {node, comm}, acc ->
           Map.update(acc, comm, [node], &[node | &1])
         end)
 
-      # Calculate modularity using O(E) approach
       List.foldl(Map.to_list(community_nodes), 0.0, fn {_, nodes_in_comm}, acc ->
-        # Convert to MapSet for O(1) membership tests
         node_set = MapSet.new(nodes_in_comm)
 
-        # Count internal edges and sum degrees
         {internal_edges, degree_sum} =
           List.foldl(nodes_in_comm, {0, 0}, fn node, {int_acc, deg_acc} ->
             successors =
@@ -72,7 +68,6 @@ defmodule Yog.Community.Metrics do
 
             degree = List.foldl(successors, 0, fn {_, w}, sum -> sum + w end)
 
-            # Count internal edges (weighted)
             internal =
               List.foldl(successors, 0, fn {neighbor, weight}, sum ->
                 if MapSet.member?(node_set, neighbor) do
@@ -85,10 +80,8 @@ defmodule Yog.Community.Metrics do
             {int_acc + internal, deg_acc + degree}
           end)
 
-        # Internal edges counted twice (once per endpoint)
         internal_edges = internal_edges / 2.0
 
-        # Add contribution: (L_c/m) - γ*(k_c/2m)²
         term1 = internal_edges / m
         term2 = gamma * :math.pow(degree_sum / m2, 2)
         acc + (term1 - term2)
@@ -117,12 +110,8 @@ defmodule Yog.Community.Metrics do
   """
   @spec count_triangles(Yog.graph()) :: integer()
   def count_triangles(%Yog.Graph{out_edges: out_edges, nodes: nodes}) do
-    # For each edge (u,v), count |N(u) ∩ N(v)|
-    # Each triangle counted 3 times (once per edge), so divide by 3
-
     node_list = Map.keys(nodes)
 
-    # Pre-compute neighbor MapSets for O(1) intersection
     neighbor_sets =
       Map.new(node_list, fn node ->
         neighbors =
@@ -135,18 +124,15 @@ defmodule Yog.Community.Metrics do
         {node, neighbors}
       end)
 
-    # Count triangles via neighbor intersection
     triangles =
       List.foldl(node_list, 0, fn u, acc ->
         u_neighbors = Map.get(neighbor_sets, u)
 
-        # Only consider neighbors v > u to avoid double counting
         u_neighbors
         |> Enum.filter(&(&1 > u))
         |> Enum.reduce(acc, fn v, inner_acc ->
           v_neighbors = Map.get(neighbor_sets, v)
 
-          # Count common neighbors w > v to ensure each triangle counted once
           common =
             v_neighbors
             |> Enum.filter(fn w ->
@@ -180,7 +166,6 @@ defmodule Yog.Community.Metrics do
   def triangles_per_node(%Yog.Graph{out_edges: out_edges, nodes: nodes}) do
     node_list = Map.keys(nodes)
 
-    # Pre-compute ordered neighbor lists
     neighbor_sets =
       Map.new(node_list, fn node ->
         neighbors =
@@ -193,12 +178,10 @@ defmodule Yog.Community.Metrics do
         {node, neighbors}
       end)
 
-    # Count triangles per node
     List.foldl(node_list, %{}, fn node, acc ->
       neighbors = Map.get(neighbor_sets, node)
       neighbor_list = MapSet.to_list(neighbors)
 
-      # Count pairs of neighbors that are connected
       count =
         neighbor_list
         |> List.foldl(0, fn i, c1 ->
@@ -252,7 +235,6 @@ defmodule Yog.Community.Metrics do
 
       neighbor_edges =
         List.foldl(neighbors, 0, fn i, acc ->
-          # Count neighbors j > i to avoid double counting
           i_neighbors =
             case Map.fetch(out_edges, i) do
               {:ok, edges} -> Map.keys(edges)
@@ -388,8 +370,6 @@ defmodule Yog.Community.Metrics do
   end
 
   def average_community_density(graph, %{assignments: _} = communities) do
-    # Calculate for each community and average
-    # Convert assignments map to dictionary (community_id -> set of nodes)
     community_dict =
       List.foldl(Map.to_list(communities.assignments), %{}, fn {node, community}, acc ->
         current_set = Map.get(acc, community, MapSet.new())

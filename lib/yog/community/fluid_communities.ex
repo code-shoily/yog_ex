@@ -165,7 +165,6 @@ defmodule Yog.Community.FluidCommunities do
                                                                    has_changed, current_seed} ->
         current_com = Map.get(curr_asgn, node)
 
-        # Check if node can move (not the last member of its community)
         can_move =
           case current_com do
             nil ->
@@ -179,8 +178,6 @@ defmodule Yog.Community.FluidCommunities do
           end
 
         if can_move do
-          # Single-pass: find max density community without intermediate Map
-          # Incorporates edge weights: density = weight / community_size
           {best_c, new_seed, found} =
             find_max_density_community(
               graph,
@@ -198,10 +195,8 @@ defmodule Yog.Community.FluidCommunities do
               end
 
             if changing do
-              # Perform the move
               next_asgn = Map.put(curr_asgn, node, best_c)
 
-              # Decrease size of old community
               temp_sizes =
                 case current_com do
                   nil ->
@@ -212,7 +207,6 @@ defmodule Yog.Community.FluidCommunities do
                     Map.put(curr_sizes, old_c, old_size - 1)
                 end
 
-              # Increase size of new community
               best_c_size = Map.get(temp_sizes, best_c, 0)
               next_sizes = Map.put(temp_sizes, best_c, best_c_size + 1)
 
@@ -221,7 +215,6 @@ defmodule Yog.Community.FluidCommunities do
               {curr_asgn, curr_sizes, has_changed, new_seed}
             end
           else
-            # No assigned neighbors found - will be handled in fallback
             {curr_asgn, curr_sizes, has_changed, new_seed}
           end
         else
@@ -232,14 +225,11 @@ defmodule Yog.Community.FluidCommunities do
     if changed do
       do_fluid(graph, nodes, new_assignments, new_sizes, iters - 1, shuffled, final_seed)
     else
-      # Fallback: assign any unassigned nodes (disconnected component handling)
       assignments_with_fallback = assign_unassigned_nodes(nodes, new_assignments, new_sizes)
       normalize_communities(nodes, assignments_with_fallback, new_sizes)
     end
   end
 
-  # Single-pass reduction to find max density community without intermediate Map
-  # Returns {best_community, new_seed, found?}
   defp find_max_density_community(
          %Yog.Graph{out_edges: out_edges},
          node,
@@ -262,16 +252,13 @@ defmodule Yog.Community.FluidCommunities do
 
         neighbor_com ->
           com_size = Map.get(sizes, neighbor_com, 1)
-          # Weighted density: weight / community_size
           density = weight / com_size
 
           cond do
             density > max_d ->
-              # New max found
               {neighbor_com, density, [neighbor_com], current_seed}
 
             density == max_d ->
-              # Tie - accumulate candidates
               {best_c, max_d, [neighbor_com | tie_candidates || []], current_seed}
 
             true ->
@@ -281,15 +268,12 @@ defmodule Yog.Community.FluidCommunities do
     end)
     |> case do
       {nil, _, _, new_seed} ->
-        # No assigned neighbors found
         {nil, new_seed, false}
 
       {best_c, _, nil, new_seed} ->
-        # Single best community
         {best_c, new_seed, true}
 
       {best_c, _, candidates, new_seed} ->
-        # Tie-breaking with random selection
         unique_candidates = Enum.uniq([best_c | candidates])
 
         {chosen, updated_seed} =
@@ -298,7 +282,6 @@ defmodule Yog.Community.FluidCommunities do
               {single, new_seed}
 
             multi ->
-              # LCG: simple deterministic pseudo-random
               r = rem(1_103_515_245 * new_seed + 12_345, 2_147_483_648)
               r_pos = abs(r)
               idx = rem(r_pos, length(multi))
@@ -310,21 +293,17 @@ defmodule Yog.Community.FluidCommunities do
     end
   end
 
-  # Fallback: assign unassigned nodes to their own communities or nearest seed
   defp assign_unassigned_nodes(nodes, assignments, _sizes) do
-    # Find unassigned nodes
     unassigned = Enum.filter(nodes, fn n -> Map.get(assignments, n) == nil end)
 
     if unassigned == [] do
       assignments
     else
-      # Get max existing community ID
       max_comm =
         assignments
         |> Map.values()
         |> Enum.max(fn -> -1 end)
 
-      # Assign each unassigned node to a new community
       Enum.reduce(Enum.with_index(unassigned), assignments, fn {node, idx}, acc ->
         Map.put(acc, node, max_comm + idx + 1)
       end)
@@ -336,7 +315,6 @@ defmodule Yog.Community.FluidCommunities do
   # =============================================================================
 
   defp normalize_communities(nodes, assignments, sizes) do
-    # Re-index community IDs to be contiguous
     active_communities =
       sizes
       |> Enum.filter(fn {_, size} -> size > 0 end)

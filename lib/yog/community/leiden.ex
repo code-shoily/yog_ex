@@ -143,7 +143,6 @@ defmodule Yog.Community.Leiden do
       _ ->
         total_weight = calculate_total_weight(graph)
 
-        # Initialize: each node in its own community
         initial_assignments = Map.new(Enum.with_index(nodes), fn {node, i} -> {node, i} end)
         node_weights = calculate_node_weights(graph)
 
@@ -218,13 +217,9 @@ defmodule Yog.Community.Leiden do
   end
 
   defp do_leiden(graph, state, iteration, options) do
-    # Phase 1: Local optimization (same as Louvain)
     {improved_after_local, state_after_local} = phase1_local_optimize(graph, state, options)
 
-    # Phase 1.5: Refinement (key difference from Louvain)
     state_after_refinement = phase15_refinement(graph, state_after_local)
-
-    # Check for convergence
     new_num_comms = count_unique_communities(state_after_refinement.assignments)
     old_num_comms = count_unique_communities(state.assignments)
 
@@ -233,14 +228,11 @@ defmodule Yog.Community.Leiden do
     if converged do
       {state_after_refinement, false}
     else
-      # Phase 2: Aggregation
       aggregated = phase2_aggregate(graph, state_after_refinement.assignments)
 
-      # Rebuild state for aggregated graph and continue
       new_state = rebuild_state(aggregated)
       {next_level_state, _} = do_leiden(aggregated, new_state, iteration + 1, options)
 
-      # Compose: map current level nodes to next level communities
       composed_assignments =
         Map.new(state_after_refinement.assignments, fn {node, comm_id} ->
           {node, Map.get(next_level_state.assignments, comm_id, comm_id)}
@@ -256,18 +248,12 @@ defmodule Yog.Community.Leiden do
   end
 
   defp do_leiden_hierarchical(graph, state, levels, iteration, options) do
-    # Phase 1: Local optimization
     {improved_after_local, state_after_local} = phase1_local_optimize(graph, state, options)
 
-    # Phase 1.5: Refinement
     state_after_refinement = phase15_refinement(graph, state_after_local)
-
-    # Save current level
     current_communities = Result.new(state_after_refinement.assignments)
-
     new_levels = [current_communities | levels]
 
-    # Check for convergence
     new_num_comms = count_unique_communities(state_after_refinement.assignments)
     old_num_comms = count_unique_communities(state.assignments)
 
@@ -277,10 +263,7 @@ defmodule Yog.Community.Leiden do
     if converged do
       Dendrogram.new(Enum.reverse(new_levels), [])
     else
-      # Phase 2: Aggregation
       aggregated = phase2_aggregate(graph, state_after_refinement.assignments)
-
-      # Rebuild state and continue
       new_state = rebuild_state(aggregated)
       do_leiden_hierarchical(aggregated, new_state, new_levels, iteration + 1, options)
     end
@@ -311,7 +294,6 @@ defmodule Yog.Community.Leiden do
   end
 
   defp do_phase1_pass(graph, state, nodes, options) do
-    # Shuffle nodes for randomization - use iteration-specific seed
     shuffled =
       Yog.Utils.fisher_yates(
         nodes,
@@ -322,10 +304,8 @@ defmodule Yog.Community.Leiden do
       current_comm = Map.get(current_state.assignments, node, node)
       node_weight = Map.get(current_state.node_weights, node, 0.0)
 
-      # Get neighbor communities
       neighbor_comms = get_neighbor_communities(graph, current_state, node)
 
-      # Find best community
       {best_comm, best_gain} =
         Enum.reduce(neighbor_comms, {current_comm, 0.0}, fn neighbor_comm, {best_c, best_g} ->
           gain =
@@ -424,9 +404,7 @@ defmodule Yog.Community.Leiden do
     components
   end
 
-  # BFS using adjacency map instead of graph struct (memory efficient)
   defp bfs_component_adj(adjacency, start, initial_visited) do
-    # Skip if start node already visited
     if MapSet.member?(initial_visited, start) do
       MapSet.new()
     else
@@ -447,10 +425,8 @@ defmodule Yog.Community.Leiden do
     {new_queue, new_blocked, new_component} =
       Enum.reduce(neighbors, {queue, blocked, component}, fn neighbor, {q, b, c} ->
         if MapSet.member?(b, neighbor) do
-          # Already visited or blocked, skip
           {q, b, c}
         else
-          # credo:disable-for-this-file Credo.Check.Refactor.AppendSingleItem
           {q ++ [neighbor], MapSet.put(b, neighbor), MapSet.put(c, neighbor)}
         end
       end)
@@ -463,23 +439,19 @@ defmodule Yog.Community.Leiden do
   end
 
   defp split_community(state, components) do
-    # Get max community ID
     max_comm_id =
       state.assignments
       |> Map.values()
       |> Enum.max()
 
-    # Assign new IDs to all components except first
     {new_assignments, _next_id} =
       components
       |> Enum.with_index()
       |> Enum.reduce({state.assignments, max_comm_id + 1}, fn {component, idx},
                                                               {assigns, next_id} ->
         if idx == 0 do
-          # First component keeps current assignments
           {assigns, next_id}
         else
-          # Other components get new IDs
           new_assigns =
             Enum.reduce(component, assigns, fn node, a ->
               Map.put(a, node, next_id)
@@ -489,7 +461,6 @@ defmodule Yog.Community.Leiden do
         end
       end)
 
-    # Recalculate community totals
     new_totals = calculate_community_totals(new_assignments, state.node_weights)
 
     %{
@@ -547,12 +518,9 @@ defmodule Yog.Community.Leiden do
     else
       two_m_sq = 2.0 * m * m
 
-      # Gain of adding to target community
       ki_in_target = calculate_ki_in(graph, state, node, target_comm)
       sigma_tot_target = Map.get(state.community_totals, target_comm, 0.0)
       delta_q_add = ki_in_target / m - gamma * (sigma_tot_target * ki / two_m_sq)
-
-      # Gain of leaving current community
       ki_in_current = calculate_ki_in(graph, state, node, current_comm)
       sigma_tot_current = Map.get(state.community_totals, current_comm, 0.0)
       sigma_tot_c_minus_i = sigma_tot_current - ki
@@ -612,7 +580,6 @@ defmodule Yog.Community.Leiden do
         acc + weight_sum
       end)
 
-    # Only divide by 2 for undirected graphs (each edge counted twice)
     case kind do
       :undirected -> total / 2.0
       :directed -> total
@@ -651,20 +618,17 @@ defmodule Yog.Community.Leiden do
   end
 
   defp normalize_assignments(assignments) do
-    # Get all unique community IDs and sort them
     unique_communities =
       assignments
       |> Map.values()
       |> Enum.uniq()
       |> Enum.sort()
 
-    # Create mapping from old ID to new contiguous ID
     id_mapping =
       unique_communities
       |> Enum.with_index()
       |> Map.new(fn {old_id, new_id} -> {old_id, new_id} end)
 
-    # Remap all assignments
     Map.new(assignments, fn {node, old_community_id} ->
       {node, Map.get(id_mapping, old_community_id, 0)}
     end)
@@ -673,16 +637,13 @@ defmodule Yog.Community.Leiden do
   defp phase2_aggregate(graph, assignments) do
     communities = get_community_nodes(assignments)
 
-    # Start with empty undirected graph
     new_graph = Yog.undirected()
 
-    # Add super-nodes
     new_graph_with_nodes =
       Enum.reduce(communities, new_graph, fn {comm_id, _nodes}, g ->
         Yog.add_node(g, comm_id, nil)
       end)
 
-    # Aggregate edges
     aggregate_edges(graph, new_graph_with_nodes, assignments)
   end
 
@@ -700,8 +661,6 @@ defmodule Yog.Community.Leiden do
        ) do
     nodes = Map.keys(original_graph.nodes)
 
-    # Step 1: Accumulate weights in a Map %{{u_comm, v_comm} => weight}
-    # This avoids O(degree) search for each edge - uses O(1) Map operations instead
     edge_weights =
       List.foldl(nodes, %{}, fn u, acc ->
         comm_u = Map.get(assignments, u, u)
@@ -715,8 +674,6 @@ defmodule Yog.Community.Leiden do
         List.foldl(successors, acc, fn {v, weight}, inner_acc ->
           comm_v = Map.get(assignments, v, v)
 
-          # For undirected graphs, use stable key {min, max} to avoid double-counting
-          # Self-loops naturally handled (comm_u == comm_v)
           edge_key =
             if kind == :undirected and comm_u > comm_v do
               {comm_v, comm_u}
@@ -728,7 +685,6 @@ defmodule Yog.Community.Leiden do
         end)
       end)
 
-    # Step 2: Bulk add all accumulated edges to the new graph
     List.foldl(Map.to_list(edge_weights), new_graph, fn {{u, v}, weight}, g ->
       {:ok, new_g} = Yog.add_edge(g, u, v, weight)
       new_g

@@ -87,13 +87,11 @@ defmodule Yog.Community.GirvanNewman do
         discovery = run_discovery(graph, s)
         edge_dependencies = accumulate_edge_dependencies(discovery)
 
-        # Merge edge_dependencies into acc using List.foldl with Map.update
         List.foldl(Map.to_list(edge_dependencies), acc, fn {edge, score}, inner_acc ->
           Map.update(inner_acc, edge, score, &(&1 + score))
         end)
       end)
 
-    # Scale for undirected graphs
     case graph do
       %Yog.Graph{kind: :undirected} ->
         Map.new(edge_scores, fn {k, v} -> {k, v / 2.0} end)
@@ -331,7 +329,6 @@ defmodule Yog.Community.GirvanNewman do
           Enum.filter(ebc, fn {_edge, score} -> score == max_val end)
           |> Enum.map(fn {{u, v}, _score} -> {u, v} end)
 
-        # Remove all edges with max betweenness
         new_graph =
           List.foldl(edges_to_remove, graph, fn {u, v}, g ->
             Yog.remove_edge(g, u, v)

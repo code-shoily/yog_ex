@@ -138,16 +138,13 @@ defmodule Yog.Community.Infomap do
         Result.new(%{node => 0})
 
       _ ->
-        # 1. Calculate steady-state PageRank probabilities
         pagerank = calculate_pagerank(graph, nodes, options)
 
-        # 2. Initial partition: each node in its own community
         initial_assignments =
           nodes
           |> Enum.with_index()
           |> Map.new()
 
-        # 3. Greedy optimization of Map Equation
         final_assignments = optimize_map_equation(graph, pagerank, initial_assignments, nodes)
 
         Result.new(final_assignments)
@@ -220,23 +217,17 @@ defmodule Yog.Community.Infomap do
         total_weight = Map.get(node_weights, u, 0.0)
         u_pr = Map.get(pr, u, 0.0)
 
-        # Handle case where node has no outgoing edges (dangling node)
-        # Guard against overflow from extreme PageRank values
         if total_weight > 0.0 and u_pr < 1.0e200 and is_number(u_pr) and u_pr > 0.0 do
-          # Pre-check to prevent overflow: if u_pr/total_weight would be too large, skip
           ratio = u_pr / total_weight
 
           if is_number(ratio) and ratio < 1.0e200 do
             contribution_per_weight = min(ratio * (1.0 - alpha), 1.0e200)
 
             List.foldl(neighbors, acc, fn {v, weight}, inner_acc ->
-              # Guard against overflow from extreme weight values
-              # Also guard against contribution_per_weight being infinity/NaN
               if is_number(contribution_per_weight) and contribution_per_weight < 1.0e200 do
                 safe_weight = min(max(weight, 0.0), 1.0e100)
                 flow = contribution_per_weight * safe_weight
 
-                # Final overflow check
                 if is_number(flow) and flow < 1.0e200 do
                   Map.update(inner_acc, v, flow, &(&1 + flow))
                 else
@@ -250,12 +241,9 @@ defmodule Yog.Community.Infomap do
             acc
           end
         else
-          # Dangling node: no outgoing flow (handled via dangling_pr)
           acc
         end
       end)
-
-    # Combine flow, teleportation, and dangling node contribution
 
     final_pr =
       Enum.reduce(nodes, %{}, fn u, acc ->
@@ -290,7 +278,6 @@ defmodule Yog.Community.Infomap do
          assignments,
          nodes
        ) do
-    # Greedy optimization: try moving each node to maximize internal flow
     Enum.reduce(nodes, assignments, fn u, current_assignments ->
       current_comm = Map.get(current_assignments, u)
 
@@ -306,16 +293,10 @@ defmodule Yog.Community.Infomap do
         |> Enum.uniq()
         |> Enum.filter(fn c -> c != current_comm end)
 
-      # Try moving to each candidate community
       {best_comm, _best_score} =
         Enum.reduce(neighbor_comms, {current_comm, :infinity}, fn candidate, {best_c, best_s} ->
-          # Simulate moving u to candidate community
           _new_assignments = Map.put(current_assignments, u, candidate)
-          # Note: Full implementation would recalculate stats incrementally
-          # For now, use flow-based heuristic
           flow = calculate_flow_to_comm(graph, u, candidate, current_assignments, pagerank)
-
-          # Convert flow to "score" (lower is better, so negate)
           score = -flow
 
           if score < best_s do
@@ -333,36 +314,6 @@ defmodule Yog.Community.Infomap do
     end)
   end
 
-  # Build statistics for each community needed for full Map Equation L(M) calculation.
-  # This is reference code for future Shannon Entropy-based optimization.
-  # defp build_community_stats(graph, pagerank, assignments, nodes) do
-  #   Enum.reduce(nodes, %{}, fn u, acc ->
-  #     comm = Map.get(assignments, u)
-  #     u_pr = Map.get(pagerank, u, 0.0)
-  #     neighbors = Model.successors(graph, u)
-  #     total_weight = Enum.reduce(neighbors, 0.0, fn {_, w}, sum -> sum + w end)
-  #
-  #     Enum.reduce(neighbors, acc, fn {v, weight}, inner_acc ->
-  #       v_comm = Map.get(assignments, v)
-  #       flow = u_pr * weight / max(total_weight, 1.0e-10)
-  #
-  #       if comm == v_comm do
-  #         # Internal flow
-  #         inner_acc
-  #         |> Map.update({comm, :internal}, flow, &(&1 + flow))
-  #         |> Map.update({comm, :total}, flow, &(&1 + flow))
-  #       else
-  #         # Exit flow (from comm to outside)
-  #         inner_acc
-  #         |> Map.update({comm, :exit}, flow, &(&1 + flow))
-  #         |> Map.update({comm, :total}, flow, &(&1 + flow))
-  #         |> Map.update({v_comm, :enter}, flow, &(&1 + flow))
-  #         |> Map.update({v_comm, :total}, flow, &(&1 + flow))
-  #       end
-  #     end)
-  #   end)
-  # end
-
   defp calculate_flow_to_comm(%Yog.Graph{out_edges: out_edges}, u, comm_id, assignments, pagerank) do
     neighbors =
       case Map.fetch(out_edges, u) do
@@ -376,14 +327,12 @@ defmodule Yog.Community.Infomap do
     if total_weight == 0 do
       0.0
     else
-      # Clamp u_pr to avoid overflow with extreme values
       safe_u_pr = min(u_pr, 1.0e200)
 
       List.foldl(neighbors, 0.0, fn {v, weight}, acc ->
         v_comm = Map.get(assignments, v, -1)
 
         if v_comm == comm_id do
-          # Clamp weight to avoid overflow
           safe_weight = min(weight, 1.0e100)
           acc + safe_u_pr * safe_weight / total_weight
         else

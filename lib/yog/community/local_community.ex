@@ -117,12 +117,10 @@ defmodule Yog.Community.LocalCommunity do
     seeds_set = MapSet.new(seeds)
     initial_s = seeds_set
 
-    # Compute initial degrees
     {k_in, k_out} = compute_k_out_in(graph, initial_s, weight_fn)
 
     {frontier, internal_weights} = initialize_frontier_and_weights(graph, initial_s, weight_fn)
 
-    # Start with empty degrees cache
     degrees_cache = %{}
 
     do_detect(
@@ -176,13 +174,10 @@ defmodule Yog.Community.LocalCommunity do
         w_float = weight_fn.(w)
 
         if MapSet.member?(s, neighbor_id) do
-          # Internal edge - update internal weight cache (only for nodes in S)
           new_wacc = Map.update(wacc, node, w_float, &(&1 + w_float))
           {front, new_wacc}
         else
-          # External edge - add to frontier AND update internal weight of frontier node
           new_front = MapSet.put(front, neighbor_id)
-          # The internal weight of neighbor_id is the sum of weights to S
           new_wacc = Map.update(wacc, neighbor_id, w_float, &(&1 + w_float))
           {new_front, new_wacc}
         end
@@ -198,10 +193,8 @@ defmodule Yog.Community.LocalCommunity do
          new_node,
          weight_fn
        ) do
-    # Remove added node from frontier
     frontier = MapSet.delete(frontier, new_node)
 
-    # Scan neighbors of new_node
     successors =
       case Map.fetch(out_edges, new_node) do
         {:ok, edges} -> Map.to_list(edges)
@@ -234,7 +227,6 @@ defmodule Yog.Community.LocalCommunity do
        ) do
     s_without_node = MapSet.delete(s, removed_node)
 
-    # Scan neighbors of removed_node
     successors =
       case Map.fetch(out_edges, removed_node) do
         {:ok, edges} -> Map.to_list(edges)
@@ -253,7 +245,6 @@ defmodule Yog.Community.LocalCommunity do
         end
       end)
 
-    # Add removed_node to frontier if it has neighbors in S
     successors2 =
       case Map.fetch(out_edges, removed_node) do
         {:ok, edges} -> Map.to_list(edges)
@@ -270,7 +261,6 @@ defmodule Yog.Community.LocalCommunity do
         new_frontier
       end
 
-    # Remove internal weights for removed_node
     final_weights = Map.delete(new_internal_weights, removed_node)
 
     {final_frontier, final_weights}
@@ -326,7 +316,6 @@ defmodule Yog.Community.LocalCommunity do
        ) do
     current_f = fitness(k_in, k_out, opts.alpha)
 
-    # Find the best ADD operation from frontier
     {best_add_op, best_add_f, cache_after_add} =
       Enum.reduce(frontier, {nil, current_f, cache}, fn node, {best_op, best_f, current_cache} ->
         {d, next_cache} = total_degree(graph, node, current_cache, weight_fn)
@@ -344,10 +333,8 @@ defmodule Yog.Community.LocalCommunity do
         end
       end)
 
-    # Find the best REMOVE operation from current community
     {best_op, _best_f, final_cache} =
       if MapSet.size(s) <= 1 do
-        # Don't remove if it's the last node
         {best_add_op, best_add_f, cache_after_add}
       else
         Enum.reduce(
@@ -375,7 +362,6 @@ defmodule Yog.Community.LocalCommunity do
 
     case best_op do
       nil ->
-        # Local maximum reached
         s
 
       {:add, node, nk_in, nk_out} ->

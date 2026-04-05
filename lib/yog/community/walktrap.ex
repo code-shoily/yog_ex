@@ -153,10 +153,8 @@ defmodule Yog.Community.Walktrap do
       ) do
     node_list = Map.keys(nodes)
 
-    # 1. Compute transition probabilities P^t
     p_t = compute_pt(graph, node_list, walk_length)
 
-    # 2. Compute weighted degrees for normalization
     degrees =
       Map.new(node_list, fn u ->
         d =
@@ -168,11 +166,9 @@ defmodule Yog.Community.Walktrap do
               0.0
           end
 
-        # Use 1.0 as floor to avoid division by zero in distance calculation
         {u, max(d, 1.0)}
       end)
 
-    # 3. Initial communities: each node in its own community
     initial_assignments = Map.new(Enum.with_index(node_list), fn {node, i} -> {node, i} end)
     initial_communities = Result.new(initial_assignments)
 
@@ -181,7 +177,6 @@ defmodule Yog.Community.Walktrap do
         {node, Map.get(p_t, node, %{})}
       end)
 
-    # 4. Hierarchical merging with priority queue
     do_walktrap_merge([initial_communities], p_t, degrees, node_list, initial_pt_cache)
   end
 
@@ -210,27 +205,22 @@ defmodule Yog.Community.Walktrap do
         {u, row}
       end)
 
-    # Compute P^t via repeated sparse multiplication
     Enum.reduce(1..(t - 1), p1, fn _, p_acc ->
       multiply_sparse_matrices(p_acc, p1)
     end)
   end
 
   defp multiply_sparse_matrices(a, b) do
-    # For each row i in a
     Map.new(a, fn {i, row_a} ->
-      # For each non-zero entry (k, a_ik) in row_a
       new_row =
         Enum.reduce(row_a, %{}, fn {k, aik}, acc ->
           row_b_k = Map.get(b, k, %{})
 
-          # Add aik * b_kj for each non-zero b_kj
           Enum.reduce(row_b_k, acc, fn {j, bkj}, inner_acc ->
             val = aik * bkj
             Map.update(inner_acc, j, val, &(&1 + val))
           end)
         end)
-        # Filter out near-zero values for sparsity
         |> Enum.filter(fn {_, v} -> v > 1.0e-12 end)
         |> Map.new()
 
@@ -257,7 +247,6 @@ defmodule Yog.Community.Walktrap do
           Dendrogram.new(Enum.reverse(levels), [])
 
         {c1, c2} ->
-          # Convert to map for merge, then back to Result
           map_level = Result.to_map(current_level)
           merged_map = Community.merge(map_level, source: c2, target: c1)
           next_level = Result.from_map(merged_map)
@@ -266,7 +255,6 @@ defmodule Yog.Community.Walktrap do
           p_c2 = Map.get(pt_cache, c2) || %{}
           merged_pt = merge_community_pt(p_c1, p_c2)
 
-          # Remove c2, update c1 with merged vector
           next_pt_cache =
             pt_cache
             |> Map.delete(c2)
@@ -289,8 +277,6 @@ defmodule Yog.Community.Walktrap do
         nil
 
       _multiple ->
-        # Build priority queue with all pairwise distances
-        # Store as {distance, {c1, c2}} with custom comparator
         pq =
           Enum.reduce(ids, PriorityQueue.new(fn {d1, _}, {d2, _} -> d1 <= d2 end), fn c1, acc ->
             Enum.reduce(ids, acc, fn c2, inner_acc ->
@@ -303,7 +289,6 @@ defmodule Yog.Community.Walktrap do
             end)
           end)
 
-        # Extract minimum
         case PriorityQueue.pop(pq) do
           {:ok, {_dist, pair}, _new_pq} -> pair
           :error -> nil
@@ -312,11 +297,9 @@ defmodule Yog.Community.Walktrap do
   end
 
   defp calculate_cached_distance(c1, c2, pt_cache, degrees) do
-    # Handle missing cache entries gracefully
     p_c1 = Map.get(pt_cache, c1) || %{}
     p_c2 = Map.get(pt_cache, c2) || %{}
 
-    # Union of all target nodes
     all_nodes =
       Map.keys(p_c1)
       |> MapSet.new()
@@ -336,7 +319,6 @@ defmodule Yog.Community.Walktrap do
   defp merge_community_pt(p_c1, nil), do: p_c1
 
   defp merge_community_pt(p_c1, p_c2) do
-    # Assume equal weight for now (can be enhanced with actual community sizes)
     all_keys =
       Map.keys(p_c1)
       |> MapSet.new()
@@ -345,7 +327,6 @@ defmodule Yog.Community.Walktrap do
     Enum.reduce(all_keys, %{}, fn k, acc ->
       v1 = Map.get(p_c1, k, 0.0)
       v2 = Map.get(p_c2, k, 0.0)
-      # Average (assumes equal-sized communities)
       avg = (v1 + v2) / 2.0
 
       if avg > 0.0 do
