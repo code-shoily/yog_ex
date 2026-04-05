@@ -10,7 +10,6 @@ defmodule Yog.Connectivity.Reachability do
   counting with O(V) memory.
   """
 
-  alias Yog.Model
   import Bitwise, only: [band: 2, bsr: 2, bsl: 2]
 
   @typedoc "Direction for reachability counting"
@@ -60,7 +59,6 @@ defmodule Yog.Connectivity.Reachability do
   """
   @spec counts(Yog.graph(), direction()) :: %{Yog.node_id() => integer()}
   def counts(graph, direction) do
-    # Check if the graph is a DAG to use the faster DP approach directly
     case Yog.Traversal.topological_sort(graph) do
       {:ok, sorted} ->
         solve_acyclic_counts(graph, sorted, direction)
@@ -75,23 +73,21 @@ defmodule Yog.Connectivity.Reachability do
   # ============================================================
 
   defp solve_acyclic_counts(graph, sorted, direction) do
-    # Determine processing order (reverse for descendants, forward for ancestors)
     nodes_to_process =
       case direction do
         :descendants -> Enum.reverse(sorted)
         :ancestors -> sorted
       end
 
-    get_related = build_related_fn(graph, direction)
+    get_related = build_get_related_fn(graph, direction)
 
-    # DP: Map of node -> Set of all reachable nodes
     reachability_sets =
-      Enum.reduce(nodes_to_process, %{}, fn node, acc ->
+      List.foldl(nodes_to_process, %{}, fn node, acc ->
         related = get_related.(node)
         related_set = MapSet.new(related)
 
         all_reachable =
-          Enum.reduce(related, related_set, fn neighbor, set_acc ->
+          List.foldl(related, related_set, fn neighbor, set_acc ->
             neighbor_set = Map.get(acc, neighbor, MapSet.new())
             MapSet.union(set_acc, neighbor_set)
           end)
@@ -103,17 +99,10 @@ defmodule Yog.Connectivity.Reachability do
   end
 
   defp solve_cyclic_counts(graph, direction) do
-    # 1. Component analysis
     sccs = Yog.Connectivity.strongly_connected_components(graph)
     node_to_scc = build_node_to_scc_map(sccs)
 
-    # 2. Build condensation graph
-    # (Each node in the condensation graph represents an SCC)
-    # We store the size of the SCC to count nodes correctly later
     condensation = build_condensation_graph(graph, sccs, node_to_scc)
-
-    # 3. Solve on the condensation DAG
-    # Since it's a DAG, topological sort is guaranteed to succeed
     {:ok, sorted_sccs} = Yog.Traversal.topological_sort(condensation)
 
     scc_direction = if direction == :descendants, do: :descendants, else: :ancestors
@@ -121,21 +110,19 @@ defmodule Yog.Connectivity.Reachability do
     scc_reachability_sets =
       solve_acyclic_reachability_sets(condensation, sorted_sccs, scc_direction)
 
-    # 4. Map results back to original nodes
-    Map.new(Yog.all_nodes(graph), fn node_id ->
-      scc_id = Map.get(node_to_scc, node_id)
-      # Total reachable = (nodes in all reachable SCCs) + (other nodes in my own SCC)
-      # Note: set contains SCC IDs including successors
+    cond_nodes = condensation.nodes
+
+    Map.new(Map.keys(graph.nodes), fn node_id ->
+      scc_id = Map.fetch!(node_to_scc, node_id)
       reachable_scc_ids = Map.get(scc_reachability_sets, scc_id, MapSet.new())
 
       node_count =
-        Enum.reduce(reachable_scc_ids, 0, fn id, acc ->
-          scc_data = Model.node(condensation, id)
+        List.foldl(MapSet.to_list(reachable_scc_ids), 0, fn id, acc ->
+          scc_data = Map.fetch!(cond_nodes, id)
           acc + scc_data.size
         end)
 
-      # Plus nodes in my own SCC minus myself
-      my_scc_data = Model.node(condensation, scc_id)
+      my_scc_data = Map.fetch!(cond_nodes, scc_id)
       my_scc_size = my_scc_data.size
       {node_id, node_count + (my_scc_size - 1)}
     end)
@@ -178,7 +165,6 @@ defmodule Yog.Connectivity.Reachability do
   end
 
   # HyperLogLog-based counting for acyclic graphs
-  # Each node's HLL contains actual node IDs (not SCC IDs)
   defp solve_acyclic_hll(graph, sorted, direction) do
     nodes_to_process =
       case direction do
@@ -186,19 +172,15 @@ defmodule Yog.Connectivity.Reachability do
         :ancestors -> sorted
       end
 
-    get_related = build_related_fn(graph, direction)
+    get_related = build_get_related_fn(graph, direction)
 
-    # DP: Map of node -> HLL registers
     hll_registers =
-      Enum.reduce(nodes_to_process, %{}, fn node, acc ->
+      List.foldl(nodes_to_process, %{}, fn node, acc ->
         related = get_related.(node)
+        base_hll = List.foldl(related, init_hll(), &hll_add(&2, &1))
 
-        # Start with HLL containing related nodes
-        base_hll = Enum.reduce(related, init_hll(), &hll_add(&2, &1))
-
-        # Merge HLL registers from all related nodes
         merged =
-          Enum.reduce(related, base_hll, fn neighbor, hll_acc ->
+          List.foldl(related, base_hll, fn neighbor, hll_acc ->
             neighbor_hll = Map.get(acc, neighbor, init_hll())
             hll_union(hll_acc, neighbor_hll)
           end)
@@ -210,41 +192,54 @@ defmodule Yog.Connectivity.Reachability do
   end
 
   # HyperLogLog-based counting for cyclic graphs (via condensation)
-  # Critical: HLLs contain actual node IDs, not SCC IDs
   defp solve_cyclic_hll(graph, direction) do
     sccs = Yog.Connectivity.strongly_connected_components(graph)
     node_to_scc = build_node_to_scc_map(sccs)
     condensation = build_condensation_graph(graph, sccs, node_to_scc)
     {:ok, sorted_sccs} = Yog.Traversal.topological_sort(condensation)
 
-    # Step 1: Create base HLL for each SCC containing its actual node IDs
     scc_base_hlls =
-      Enum.with_index(sccs)
-      |> Enum.reduce(%{}, fn {nodes, scc_id}, acc ->
-        hll = Enum.reduce(nodes, init_hll(), &hll_add(&2, &1))
+      List.foldl(Enum.with_index(sccs), %{}, fn {nodes, scc_id}, acc ->
+        hll = List.foldl(nodes, init_hll(), &hll_add(&2, &1))
         Map.put(acc, scc_id, hll)
       end)
 
-    # Step 2: Propagate HLLs up the condensation DAG
-    # Process in reverse topological order for descendants, or forward for ancestors
     sccs_to_process =
       case direction do
         :descendants -> Enum.reverse(sorted_sccs)
         :ancestors -> sorted_sccs
       end
 
-    get_scc_related = build_related_fn(condensation, direction)
+    cond_edges = condensation.out_edges
+    cond_in_edges = condensation.in_edges
+
+    get_scc_related =
+      case direction do
+        :descendants ->
+          fn scc_id ->
+            case Map.fetch(cond_edges, scc_id) do
+              {:ok, nbrs} -> Map.keys(nbrs)
+              :error -> []
+            end
+          end
+
+        :ancestors ->
+          fn scc_id ->
+            case Map.fetch(cond_in_edges, scc_id) do
+              {:ok, nbrs} -> Map.keys(nbrs)
+              :error -> []
+            end
+          end
+      end
 
     scc_final_hlls =
-      Enum.reduce(sccs_to_process, %{}, fn scc_id, acc ->
-        # Start with this SCC's own nodes
-        my_base = Map.get(scc_base_hlls, scc_id)
+      List.foldl(sccs_to_process, %{}, fn scc_id, acc ->
+        my_base = Map.fetch!(scc_base_hlls, scc_id)
 
-        # Union with the final HLLs of all reachable child SCCs
         children = get_scc_related.(scc_id)
 
         merged_children =
-          Enum.reduce(children, my_base, fn child_id, hll_acc ->
+          List.foldl(children, my_base, fn child_id, hll_acc ->
             child_hll = Map.get(acc, child_id, init_hll())
             hll_union(hll_acc, child_hll)
           end)
@@ -252,12 +247,11 @@ defmodule Yog.Connectivity.Reachability do
         Map.put(acc, scc_id, merged_children)
       end)
 
-    # Step 3: Map results back to original nodes
-    # Subtract 1 to exclude the node itself
-    Map.new(Yog.all_nodes(graph), fn node_id ->
-      scc_id = Map.get(node_to_scc, node_id)
+    all_nodes = Map.keys(graph.nodes)
+
+    Map.new(all_nodes, fn node_id ->
+      scc_id = Map.fetch!(node_to_scc, node_id)
       total_count = hll_count(Map.get(scc_final_hlls, scc_id, init_hll()))
-      # Subtract 1 for the node itself
       {node_id, max(0, total_count - 1)}
     end)
   end
@@ -266,23 +260,14 @@ defmodule Yog.Connectivity.Reachability do
   # HyperLogLog Implementation (Binary-based for efficiency)
   # ============================================================
 
-  # Use a binary for HLL registers - 1024 bytes, much faster than maps
-  # Each byte stores the max run of leading zeros for that register
   defp init_hll, do: :binary.copy(<<0>>, @hll_num_registers)
 
   defp hll_add(hll_bin, value) when is_binary(hll_bin) do
-    # Use native hash (faster than custom hash for this use case)
     hash = :erlang.phash2(value, 2_147_483_647)
-
-    # First @hll_precision bits determine the register
     index = band(hash, @hll_num_registers - 1)
-
-    # Remaining bits for leading zero count
     remaining = bsr(hash, @hll_precision)
     zeros = count_leading_zeros(remaining, 32 - @hll_precision)
     val = zeros + 1
-
-    # Update binary only if new value is higher (O(1) access)
     current = :binary.at(hll_bin, index)
 
     if val > current do
@@ -307,7 +292,6 @@ defmodule Yog.Connectivity.Reachability do
   defp hll_count(<<>>), do: 0
 
   defp hll_count(hll_bin) when is_binary(hll_bin) do
-    # Harmonic mean of register values
     sum_inverse =
       Enum.reduce(0..(@hll_num_registers - 1), 0.0, fn i, acc ->
         max_zeros = :binary.at(hll_bin, i)
@@ -316,9 +300,7 @@ defmodule Yog.Connectivity.Reachability do
 
     raw_estimate = @hll_alpha * @hll_num_registers * @hll_num_registers / sum_inverse
 
-    # Small range correction
     if raw_estimate <= 2.5 * @hll_num_registers do
-      # Count non-empty registers by counting zeros in binary
       v = count_empty_registers(hll_bin)
 
       if v != 0 do
@@ -341,7 +323,6 @@ defmodule Yog.Connectivity.Reachability do
   defp do_count_empty(<<0::8, rest::binary>>, count), do: do_count_empty(rest, count + 1)
   defp do_count_empty(<<_::8, rest::binary>>, count), do: do_count_empty(rest, count)
 
-  # Count leading zeros using bit-shifting
   defp count_leading_zeros(0, bits), do: bits
 
   defp count_leading_zeros(value, _bits) when value > 0 do
@@ -351,7 +332,6 @@ defmodule Yog.Connectivity.Reachability do
   defp do_clz(0, _bits, count), do: count
 
   defp do_clz(value, bits, count) when value > 0 do
-    # Check top bit
     if band(value, bsl(1, bits - 1)) == 0 do
       do_clz(value, bits - 1, count + 1)
     else
@@ -363,36 +343,64 @@ defmodule Yog.Connectivity.Reachability do
   # Helpers
   # ============================================================
 
-  defp build_related_fn(graph, :descendants), do: fn node -> Model.successor_ids(graph, node) end
-  defp build_related_fn(graph, :ancestors), do: fn node -> Model.predecessor_ids(graph, node) end
+  defp build_get_related_fn(graph, :descendants) do
+    out = graph.out_edges
+
+    fn node ->
+      case Map.fetch(out, node) do
+        {:ok, nbrs} -> Map.keys(nbrs)
+        :error -> []
+      end
+    end
+  end
+
+  defp build_get_related_fn(graph, :ancestors) do
+    in_edges = graph.in_edges
+
+    fn node ->
+      case Map.fetch(in_edges, node) do
+        {:ok, nbrs} -> Map.keys(nbrs)
+        :error -> []
+      end
+    end
+  end
 
   defp build_node_to_scc_map(sccs) do
-    Enum.with_index(sccs)
-    |> Enum.reduce(%{}, fn {nodes, id}, acc ->
-      Enum.reduce(nodes, acc, fn node, inner_acc -> Map.put(inner_acc, node, id) end)
+    List.foldl(Enum.with_index(sccs), %{}, fn {nodes, id}, acc ->
+      List.foldl(nodes, acc, fn node, inner_acc ->
+        Map.put(inner_acc, node, id)
+      end)
     end)
   end
 
   defp build_condensation_graph(graph, sccs, node_to_scc) do
     init = Yog.directed()
+    out_edges = graph.out_edges
 
-    # Add SCC nodes with their size as metadata
     graph_with_nodes =
-      Enum.with_index(sccs)
-      |> Enum.reduce(init, fn {nodes, id}, g ->
-        Model.add_node(g, id, %{size: length(nodes)})
+      List.foldl(Enum.with_index(sccs), init, fn {nodes, id}, g ->
+        Yog.add_node(g, id, %{size: length(nodes)})
       end)
 
-    # Add edges between SCCs
-    Enum.reduce(Yog.all_nodes(graph), graph_with_nodes, fn src, g ->
-      src_scc = Map.get(node_to_scc, src)
+    all_nodes = Map.keys(graph.nodes)
 
-      Enum.reduce(Model.successor_ids(graph, src), g, fn dst, acc_g ->
-        dst_scc = Map.get(node_to_scc, dst)
+    List.foldl(all_nodes, graph_with_nodes, fn src, g ->
+      src_scc = Map.fetch!(node_to_scc, src)
+
+      successors =
+        case Map.fetch(out_edges, src) do
+          {:ok, nbrs} -> Map.keys(nbrs)
+          :error -> []
+        end
+
+      List.foldl(successors, g, fn dst, acc_g ->
+        dst_scc = Map.fetch!(node_to_scc, dst)
 
         if src_scc != dst_scc do
-          # Add edge between components if not already present
-          Model.add_edge_ensure(acc_g, src_scc, dst_scc, 1, nil)
+          case Yog.add_edge(acc_g, src_scc, dst_scc, 1) do
+            {:ok, new_g} -> new_g
+            {:error, _} -> acc_g
+          end
         else
           acc_g
         end
@@ -407,14 +415,14 @@ defmodule Yog.Connectivity.Reachability do
         :ancestors -> sorted
       end
 
-    get_related = build_related_fn(dag, direction)
+    get_related = build_get_related_fn(dag, direction)
 
-    Enum.reduce(nodes_to_process, %{}, fn node, acc ->
+    List.foldl(nodes_to_process, %{}, fn node, acc ->
       related = get_related.(node)
       related_set = MapSet.new(related)
 
       all_reachable =
-        Enum.reduce(related, related_set, fn neighbor, set_acc ->
+        List.foldl(related, related_set, fn neighbor, set_acc ->
           neighbor_set = Map.get(acc, neighbor, MapSet.new())
           MapSet.union(set_acc, neighbor_set)
         end)

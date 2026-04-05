@@ -35,6 +35,7 @@ defmodule ComprehensiveBenchmark do
     bench_strongly_connected_components(yog_small, libgraph_small, digraph_small, yog_medium, libgraph_medium, digraph_medium)
     bench_shortest_path(yog_small, libgraph_small, digraph_small, yog_medium, libgraph_medium, digraph_medium)
     bench_graph_creation(100, 150, 500, 1000)
+    bench_k_core(yog_small, libgraph_small, yog_medium, libgraph_medium)
     bench_memory_usage(yog_large, libgraph_large, digraph_large)
 
     # Cleanup
@@ -251,6 +252,39 @@ defmodule ComprehensiveBenchmark do
     print_comparison("libgraph", lib_stats)
     print_comparison(":digraph", dg_stats)
     print_winner([{"Yog", yog_stats.avg}, {"libgraph", lib_stats.avg}, {":digraph", dg_stats.avg}])
+  end
+
+  # =============================================================================
+  # K-Core Benchmark (degeneracy)
+  # =============================================================================
+  defp bench_k_core(yog_s, lib_s, yog_m, lib_m) do
+    IO.puts("\n======================================================================")
+    IO.puts("K-CORE DEGENERACY")
+    IO.puts("======================================================================")
+
+    # Convert to undirected for k-core (k-core is typically for undirected graphs)
+    yog_s_u = to_undirected_yog(yog_s)
+    lib_s_u = to_undirected_libgraph(lib_s)
+    yog_m_u = to_undirected_yog(yog_m)
+    lib_m_u = to_undirected_libgraph(lib_m)
+
+    IO.puts("\nSmall Graph (100 nodes, ~150 edges, undirected):")
+    
+    yog_stats = benchmark(fn -> Yog.Connectivity.KCore.degeneracy(yog_s_u) end)
+    lib_stats = benchmark(fn -> Graph.degeneracy(lib_s_u) end)
+    
+    print_comparison("Yog (bucket-based)", yog_stats)
+    print_comparison("libgraph", lib_stats)
+    print_winner([{"Yog", yog_stats.avg}, {"libgraph", lib_stats.avg}])
+
+    IO.puts("\nMedium Graph (500 nodes, ~1000 edges, undirected):")
+    
+    yog_stats = benchmark(fn -> Yog.Connectivity.KCore.degeneracy(yog_m_u) end)
+    lib_stats = benchmark(fn -> Graph.degeneracy(lib_m_u) end)
+    
+    print_comparison("Yog (bucket-based)", yog_stats)
+    print_comparison("libgraph", lib_stats)
+    print_winner([{"Yog", yog_stats.avg}, {"libgraph", lib_stats.avg}])
   end
 
   # =============================================================================

@@ -48,8 +48,6 @@ defmodule Yog.Connectivity.KCore do
       0
   """
 
-  alias Yog.Model
-
   @doc """
   Detects the k-core of a graph.
   Returns the maximal subgraph where every node has at least degree `k`.
@@ -68,44 +66,55 @@ defmodule Yog.Connectivity.KCore do
   """
   @spec detect(Yog.graph(), integer()) :: Yog.graph()
   def detect(graph, k) when k >= 0 do
-    nodes = Model.all_nodes(graph)
+    out_edges = graph.out_edges
+    nodes = Map.keys(graph.nodes)
 
-    # Calculate initial degrees
     degrees =
-      Enum.reduce(nodes, %{}, fn u, acc ->
-        Map.put(acc, u, length(Model.neighbor_ids(graph, u)))
+      List.foldl(nodes, %{}, fn u, acc ->
+        deg =
+          case Map.fetch(out_edges, u) do
+            {:ok, neighbors} -> map_size(neighbors)
+            :error -> 0
+          end
+
+        Map.put(acc, u, deg)
       end)
 
-    # Initial queue of nodes to prune
-    to_prune = Enum.filter(nodes, fn u -> Map.get(degrees, u) < k end)
+    to_prune =
+      List.foldl(nodes, [], fn u, acc ->
+        if Map.fetch!(degrees, u) < k, do: [u | acc], else: acc
+      end)
+
     queue_set = MapSet.new(to_prune)
 
-    # Run pruning
-    pruned_nodes = do_prune(graph, to_prune, queue_set, degrees, k, MapSet.new())
+    pruned_nodes = do_prune(out_edges, to_prune, queue_set, degrees, k, MapSet.new())
 
-    # Keep only nodes NOT in the pruned set
     remaining = MapSet.difference(MapSet.new(nodes), pruned_nodes)
     Yog.subgraph(graph, MapSet.to_list(remaining))
   end
 
   defp do_prune(_, [], _, _, _, pruned), do: pruned
 
-  defp do_prune(graph, [u | rest], queue_set, degrees, k, pruned) do
+  defp do_prune(out_edges, [u | rest], queue_set, degrees, k, pruned) do
     queue_set = MapSet.delete(queue_set, u)
 
     if MapSet.member?(pruned, u) do
-      do_prune(graph, rest, queue_set, degrees, k, pruned)
+      do_prune(out_edges, rest, queue_set, degrees, k, pruned)
     else
       new_pruned = MapSet.put(pruned, u)
-      neighbors = Model.neighbor_ids(graph, u)
 
-      # Update neighbors degrees
+      neighbors =
+        case Map.fetch(out_edges, u) do
+          {:ok, nbrs} -> Map.keys(nbrs)
+          :error -> []
+        end
+
       {new_rest, new_queue_set, new_degrees} =
-        Enum.reduce(neighbors, {rest, queue_set, degrees}, fn v, {acc_rest, acc_qs, acc_deg} ->
+        List.foldl(neighbors, {rest, queue_set, degrees}, fn v, {acc_rest, acc_qs, acc_deg} ->
           if MapSet.member?(new_pruned, v) do
             {acc_rest, acc_qs, acc_deg}
           else
-            new_deg = Map.get(acc_deg, v) - 1
+            new_deg = Map.fetch!(acc_deg, v) - 1
             acc_deg = Map.put(acc_deg, v, new_deg)
 
             if new_deg < k and not MapSet.member?(acc_qs, v) do
@@ -116,7 +125,7 @@ defmodule Yog.Connectivity.KCore do
           end
         end)
 
-      do_prune(graph, new_rest, new_queue_set, new_degrees, k, new_pruned)
+      do_prune(out_edges, new_rest, new_queue_set, new_degrees, k, new_pruned)
     end
   end
 
@@ -132,70 +141,75 @@ defmodule Yog.Connectivity.KCore do
   """
   @spec core_numbers(Yog.graph()) :: %{Yog.node_id() => integer()}
   def core_numbers(graph) do
-    # O(V + E) variant of core number algorithm
-    nodes = Model.all_nodes(graph)
-    degrees = Map.new(nodes, fn u -> {u, length(Model.neighbor_ids(graph, u))} end)
+    out_edges = graph.out_edges
+    nodes = Map.keys(graph.nodes)
 
-    # Group nodes by degree for buckets
-    max_deg = if(degrees == %{}, do: 0, else: Map.values(degrees) |> Enum.max())
+    degrees =
+      List.foldl(nodes, %{}, fn u, acc ->
+        deg =
+          case Map.fetch(out_edges, u) do
+            {:ok, nbrs} -> map_size(nbrs)
+            :error -> 0
+          end
 
-    # We'll use a simple approach for now, reflecting the same pruning logic
-    do_calculate_core_numbers(graph, nodes, degrees, max_deg)
+        Map.put(acc, u, deg)
+      end)
+
+    max_deg =
+      if degrees == %{} do
+        0
+      else
+        degrees |> Map.values() |> Enum.max()
+      end
+
+    do_calculate_core_numbers(out_edges, nodes, degrees, max_deg)
   end
 
-  defp do_calculate_core_numbers(graph, nodes, degrees, max_deg) do
-    # This is slightly more complex for true O(V+E) (requires bucket sort + position map)
-    # Let's use a simpler iterative pruning if necessary, but try to stay O(V+E)
-
-    # Bucket nodes by degree
+  defp do_calculate_core_numbers(out_edges, nodes, degrees, max_deg) do
     buckets =
-      Enum.reduce(nodes, %{}, fn u, acc ->
-        deg = Map.get(degrees, u)
+      List.foldl(nodes, %{}, fn u, acc ->
+        deg = Map.fetch!(degrees, u)
         Map.update(acc, deg, [u], &[u | &1])
       end)
 
-    # State: {degrees, core_numbers, buckets, processed}
     initial_state = {degrees, %{}, buckets, MapSet.new()}
 
     {_, cores, _, _} =
       Enum.reduce(0..max_deg, initial_state, fn i, acc_state ->
-        process_bucket(graph, i, acc_state)
+        process_bucket(out_edges, i, acc_state)
       end)
 
     cores
   end
 
-  defp process_bucket(graph, i, {degs, cores, buckets, processed} = state) do
+  defp process_bucket(out_edges, i, {degs, cores, buckets, processed} = state) do
     case Map.get(buckets, i, []) do
       [] ->
         state
 
       [u | rest] ->
         if MapSet.member?(processed, u) do
-          # Lazy skip: node was already processed at a lower k
-          process_bucket(graph, i, {degs, cores, Map.put(buckets, i, rest), processed})
+          process_bucket(out_edges, i, {degs, cores, Map.put(buckets, i, rest), processed})
         else
-          # Mark u as processed with core number i
           cores = Map.put(cores, u, i)
           processed = MapSet.put(processed, u)
 
-          # Reduce neighbor degrees
-          neighbors = Model.neighbor_ids(graph, u)
+          neighbors =
+            case Map.fetch(out_edges, u) do
+              {:ok, nbrs} -> Map.keys(nbrs)
+              :error -> []
+            end
 
-          # Seed the reduction with the current buckets state (putting 'rest' back into bucket 'i')
-          # to ensure newly reduced neighbors are merged correctly without overwriting.
           {new_degs, new_buckets} =
-            Enum.reduce(neighbors, {degs, Map.put(buckets, i, rest)}, fn v, {d_acc, b_acc} ->
+            List.foldl(neighbors, {degs, Map.put(buckets, i, rest)}, fn v, {d_acc, b_acc} ->
               if MapSet.member?(processed, v) do
                 {d_acc, b_acc}
               else
-                old_v_deg = Map.get(d_acc, v)
+                old_v_deg = Map.fetch!(d_acc, v)
                 new_v_deg = old_v_deg - 1
 
-                # Update degree
                 d_acc = Map.put(d_acc, v, new_v_deg)
 
-                # Move v to a lower bucket (lazy deletion)
                 target_bucket = max(new_v_deg, i)
                 b_acc = Map.update(b_acc, target_bucket, [v], &[v | &1])
 
@@ -203,7 +217,7 @@ defmodule Yog.Connectivity.KCore do
               end
             end)
 
-          process_bucket(graph, i, {new_degs, cores, new_buckets, processed})
+          process_bucket(out_edges, i, {new_degs, cores, new_buckets, processed})
         end
     end
   end
