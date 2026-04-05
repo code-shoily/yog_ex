@@ -82,13 +82,27 @@ defmodule Yog.Property.Structure do
         n = Model.node_count(graph)
 
         if n > 0 and Model.edge_count(graph) == n - 1 do
-          nodes = Model.all_nodes(graph)
-          roots = Enum.filter(nodes, fn node -> Model.in_degree(graph, node) == 0 end)
+          roots =
+            :maps.fold(
+              fn node, _, acc ->
+                if Model.in_degree(graph, node) == 0, do: [node | acc], else: acc
+              end,
+              [],
+              graph.nodes
+            )
 
           case roots do
             [root] ->
-              Enum.all?(nodes, fn u -> u == root or Model.in_degree(graph, u) == 1 end) and
-                reachable_count(graph, root) == n
+              all_balanced =
+                :maps.fold(
+                  fn node, _, acc ->
+                    acc and (node == root or Model.in_degree(graph, node) == 1)
+                  end,
+                  true,
+                  graph.nodes
+                )
+
+              all_balanced and reachable_count(graph, root) == n
 
             _ ->
               false
@@ -108,13 +122,13 @@ defmodule Yog.Property.Structure do
   @spec arborescence_root(Yog.graph()) :: Yog.node_id() | nil
   def arborescence_root(graph) do
     if arborescence?(graph) do
-      graph
-      |> Model.all_nodes()
-      |> Enum.find(fn node ->
-        graph
-        |> Model.predecessors(node)
-        |> Enum.empty?()
-      end)
+      :maps.fold(
+        fn node, _, acc ->
+          if acc == nil and Model.in_degree(graph, node) == 0, do: node, else: acc
+        end,
+        nil,
+        graph.nodes
+      )
     else
       nil
     end
@@ -147,19 +161,27 @@ defmodule Yog.Property.Structure do
   """
   @spec regular?(Yog.graph(), integer()) :: boolean()
   def regular?(graph, k) do
-    nodes = Model.all_nodes(graph)
-
-    if nodes == [] do
+    if map_size(graph.nodes) == 0 do
       true
     else
       case Model.type(graph) do
         :undirected ->
-          Enum.all?(nodes, fn u -> Model.degree(graph, u) == k end)
+          :maps.fold(
+            fn node, _, acc ->
+              acc and Model.degree(graph, node) == k
+            end,
+            true,
+            graph.nodes
+          )
 
         :directed ->
-          Enum.all?(nodes, fn u ->
-            Model.out_degree(graph, u) == k and Model.in_degree(graph, u) == k
-          end)
+          :maps.fold(
+            fn node, _, acc ->
+              acc and Model.out_degree(graph, node) == k and Model.in_degree(graph, node) == k
+            end,
+            true,
+            graph.nodes
+          )
       end
     end
   end
@@ -265,12 +287,12 @@ defmodule Yog.Property.Structure do
   # =============================================================================
 
   defp mcs_ordering(graph) do
-    nodes = Model.all_nodes(graph)
-    n = length(nodes)
+    n = map_size(graph.nodes)
 
     if n == 0 do
       []
     else
+      nodes = Map.keys(graph.nodes)
       buckets = %{0 => MapSet.new(nodes)}
       weights = Map.new(nodes, fn id -> {id, 0} end)
 
@@ -287,44 +309,55 @@ defmodule Yog.Property.Structure do
     {v, new_buckets, new_max_weight} =
       pop_max_weight_node(buckets, max_weight)
 
-    neighbors = Model.neighbor_ids(graph, v)
+    case Map.fetch(graph.out_edges, v) do
+      {:ok, neighbors} ->
+        {new_weights, new_buckets2, updated_max_weight} =
+          :maps.fold(
+            fn u, _, {w_acc, b_acc, max_w_acc} ->
+              if MapSet.member?(remaining, u) do
+                old_weight = Map.get(w_acc, u)
+                new_weight = old_weight + 1
 
-    {new_weights, new_buckets2, updated_max_weight} =
-      Enum.reduce(
-        neighbors,
-        {weights, new_buckets, new_max_weight},
-        fn u, {w_acc, b_acc, max_w_acc} ->
-          if MapSet.member?(remaining, u) do
-            old_weight = Map.get(w_acc, u)
-            new_weight = old_weight + 1
+                w_acc2 = Map.put(w_acc, u, new_weight)
 
-            w_acc2 = Map.put(w_acc, u, new_weight)
+                old_bucket = Map.get(b_acc, old_weight)
+                new_bucket = Map.get(b_acc, new_weight) || MapSet.new()
 
-            old_bucket = Map.get(b_acc, old_weight)
-            new_bucket = Map.get(b_acc, new_weight) || MapSet.new()
+                b_acc2 =
+                  b_acc
+                  |> Map.put(old_weight, MapSet.delete(old_bucket, u))
+                  |> Map.put(new_weight, MapSet.put(new_bucket, u))
 
-            b_acc2 =
-              b_acc
-              |> Map.put(old_weight, MapSet.delete(old_bucket, u))
-              |> Map.put(new_weight, MapSet.put(new_bucket, u))
+                max_w_acc2 = max(max_w_acc, new_weight)
 
-            max_w_acc2 = max(max_w_acc, new_weight)
+                {w_acc2, b_acc2, max_w_acc2}
+              else
+                {w_acc, b_acc, max_w_acc}
+              end
+            end,
+            {weights, new_buckets, new_max_weight},
+            neighbors
+          )
 
-            {w_acc2, b_acc2, max_w_acc2}
-          else
-            {w_acc, b_acc, max_w_acc}
-          end
-        end
-      )
+        do_mcs(
+          graph,
+          new_weights,
+          [v | order],
+          MapSet.delete(remaining, v),
+          new_buckets2,
+          updated_max_weight
+        )
 
-    do_mcs(
-      graph,
-      new_weights,
-      [v | order],
-      MapSet.delete(remaining, v),
-      new_buckets2,
-      updated_max_weight
-    )
+      :error ->
+        do_mcs(
+          graph,
+          weights,
+          [v | order],
+          MapSet.delete(remaining, v),
+          new_buckets,
+          new_max_weight
+        )
+    end
   end
 
   defp pop_max_weight_node(_buckets, max_weight) when max_weight < 0 do
@@ -378,8 +411,12 @@ defmodule Yog.Property.Structure do
   end
 
   defp no_self_loops?(graph) do
-    graph
-    |> Model.all_nodes()
-    |> Enum.all?(fn u -> not Model.has_edge?(graph, u, u) end)
+    :maps.fold(
+      fn u, _, acc ->
+        acc and not Model.has_edge?(graph, u, u)
+      end,
+      true,
+      graph.nodes
+    )
   end
 end

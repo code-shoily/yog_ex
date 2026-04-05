@@ -1,0 +1,41 @@
+
+╔════════════════════════════════════════════════════════════════════╗
+║             YOG ANALYTICS & COMMUNITY BENCHMARK                   ║
+║           Centrality measures and Clustering algorithms           ║
+╚════════════════════════════════════════════════════════════════════╝
+
+Generating test graphs...
+Done!
+
+======================================================================
+STRESS-TESTING CENTRALITY MEASURES
+======================================================================
+
+Degree Centrality (2,000 nodes):
+  Yog (Degree)              avg: 142μs | min: 71μs | max: 359μs | p99: 99μs | 7k ops/s
+
+PageRank (10 iterations):
+  Small (500 node SBM)      avg: 2.97ms | min: 2.88ms | max: 3.05ms | p99: 3.03ms | 336 ops/s
+  Medium (2000 node SBM)    avg: 6.93ms | min: 6.15ms | max: 8.2ms | p99: 7.06ms | 144 ops/s
+
+Closeness Centrality (Small SBM):
+  Yog (Closeness)           avg: 116.93ms | min: 97.87ms | max: 133.74ms | p99: 125.15ms | 9 ops/s
+
+======================================================================
+COMMUNITY DETECTION PERFORMANCE (Louvain vs Leiden vs Label Prop)
+======================================================================
+
+Small SBM Graph (500 nodes):
+  Label Propagation         avg: 4.24ms | min: 4.16ms | max: 4.38ms | p99: 4.25ms | 236 ops/s
+  Leiden Detection          avg: 61.2ms | min: 60.91ms | max: 61.57ms | p99: 61.48ms | 16 ops/s
+  Louvain Detection         avg: 5.72s | min: 5.63s | max: 5.79s | p99: 5.76s | 0 ops/s
+
+Medium SBM Graph (2,000 nodes):
+  Label Propagation         avg: 7.13ms | min: 7.04ms | max: 7.22ms | p99: 7.21ms | 140 ops/s
+  Louvain Detection         avg: 12.45s | min: 12.45s | max: 12.45s | p99: 12.45s | 0 ops/s
+  Leiden Detection          avg: 138.22ms | min: 137.11ms | max: 140.0ms | p99: 138.16ms | 7 ops/s
+
+╔════════════════════════════════════════════════════════════════════╗
+║                      BENCHMARK COMPLETE                           ║
+╚════════════════════════════════════════════════════════════════════╝
+

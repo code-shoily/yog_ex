@@ -116,20 +116,19 @@ defmodule Yog.Generator.Random do
           Yog.add_node(g, i, nil)
         end)
 
-      # Generate all possible edges and filter by probability
-      all_pairs =
+      # Add edges directly using nested Enum.reduce calls
+      Enum.reduce(0..(n - 1), graph, fn i, g_i ->
         case graph_type do
           :undirected ->
-            for i <- 0..(n - 1), j <- (i + 1)..(n - 1)//1, i < j, do: {i, j}
+            Enum.reduce((i + 1)..(n - 1)//1, g_i, fn j, g_j ->
+              if :rand.uniform() <= p, do: Yog.add_edge!(g_j, i, j, 1), else: g_j
+            end)
 
           :directed ->
-            for i <- 0..(n - 1), j <- 0..(n - 1)//1, i != j, do: {i, j}
+            Enum.reduce(0..(n - 1), g_i, fn j, g_j ->
+              if i != j && :rand.uniform() <= p, do: Yog.add_edge!(g_j, i, j, 1), else: g_j
+            end)
         end
-
-      edges = Enum.filter(all_pairs, fn _ -> :rand.uniform() <= p end)
-
-      Enum.reduce(edges, graph, fn {from, to}, g ->
-        Yog.add_edge!(g, from, to, 1)
       end)
     end)
   end
@@ -183,29 +182,34 @@ defmodule Yog.Generator.Random do
           Yog.add_node(g, i, nil)
         end)
 
-      # Generate all possible edges
-      all_pairs =
+      # For large dense graphs, shuffle all pairs. For sparse/medium, use selection.
+      # Rejection sampling approach to avoid O(V^2) list allocation for sparse graphs.
+      total_possible =
         case graph_type do
-          :undirected ->
-            for i <- 0..(n - 1), j <- (i + 1)..(n - 1)//1, i < j, do: {i, j}
-
-          :directed ->
-            for i <- 0..(n - 1), j <- 0..(n - 1)//1, i != j, do: {i, j}
+          :undirected -> div(n * (n - 1), 2)
+          :directed -> n * (n - 1)
         end
 
-      # Clamp m to max possible edges
-      max_edges = length(all_pairs)
-      actual_m = min(m, max_edges)
+      actual_m = min(m, total_possible)
 
-      # Shuffle and take first m
-      selected_edges =
-        all_pairs
-        |> Enum.shuffle()
-        |> Enum.take(actual_m)
+      # Very sparse: pick unique pairs randomly. Very dense: shuffle is fine.
+      # Threshold: if m < total_possible / 4, use rejection sampling.
+      if actual_m < div(total_possible, 4) do
+        add_m_random_edges(graph, actual_m, n, graph_type)
+      else
+        # For dense graphs, we fallback to the list approach but more memory-efficient logic
+        all_pairs =
+          case graph_type do
+            :undirected -> for i <- 0..(n - 1), j <- (i + 1)..(n - 1)//1, i < j, do: {i, j}
+            :directed -> for i <- 0..(n - 1), j <- 0..(n - 1)//1, i != j, do: {i, j}
+          end
 
-      Enum.reduce(selected_edges, graph, fn {from, to}, g ->
-        Yog.add_edge!(g, from, to, 1)
-      end)
+        selected = all_pairs |> Enum.shuffle() |> Enum.take(actual_m)
+
+        Enum.reduce(selected, graph, fn {from, to}, g ->
+          Yog.add_edge!(g, from, to, 1)
+        end)
+      end
     end)
   end
 
@@ -279,11 +283,16 @@ defmodule Yog.Generator.Random do
         if Enum.empty?(existing_nodes) do
           g
         else
-          # Calculate degrees (for undirected, count all connections)
+          # Calculate degrees (direct map size lookups to avoid O(deg) list creation)
           degrees =
             Enum.map(existing_nodes, fn node ->
-              neighbors = length(Yog.neighbors(g, node))
-              {node, max(neighbors, 1)}
+              deg =
+                case Map.fetch(g.out_edges, node) do
+                  {:ok, inner} -> map_size(inner)
+                  :error -> 0
+                end
+
+              {node, max(deg, 1)}
             end)
 
           total_degree = Enum.sum(Enum.map(degrees, &elem(&1, 1)))
@@ -768,30 +777,24 @@ defmodule Yog.Generator.Random do
 
         communities = build_communities(community_sizes)
 
-        edges =
-          case graph_type do
-            :undirected ->
-              for u <- 0..(n - 1),
-                  v <- (u + 1)..(n - 1)//1,
-                  p = if(communities[u] == communities[v], do: p_in, else: p_out),
-                  :rand.uniform() <= p,
-                  do: {u, v}
+        # Add edges directly with nested Enum.reduce to avoid O(V^2) list
+        Enum.reduce(0..(n - 1), graph, fn u, g_i ->
+          range =
+            case graph_type do
+              :undirected -> (u + 1)..(n - 1)//1
+              :directed -> 0..(n - 1)
+            end
 
-            :directed ->
-              for u <- 0..(n - 1),
-                  v <- 0..(n - 1)//1,
-                  u != v,
-                  p = if(communities[u] == communities[v], do: p_in, else: p_out),
-                  :rand.uniform() <= p,
-                  do: {u, v}
-          end
-
-        final_graph =
-          Enum.reduce(edges, graph, fn {from, to}, g ->
-            Yog.add_edge!(g, from, to, 1)
+          Enum.reduce(range, g_i, fn v, g_j ->
+            if u != v do
+              p = if(communities[u] == communities[v], do: p_in, else: p_out)
+              if :rand.uniform() <= p, do: Yog.add_edge!(g_j, u, v, 1), else: g_j
+            else
+              g_j
+            end
           end)
-
-        {final_graph, communities}
+        end)
+        |> then(fn final_graph -> {final_graph, communities} end)
       else
         {Yog.new(:undirected), %{}}
       end
@@ -998,5 +1001,28 @@ defmodule Yog.Generator.Random do
     Enum.find(1..(length(powers) - 1), length(powers) - 1, fn l ->
       div(bu, Enum.at(powers, l)) == div(bv, Enum.at(powers, l))
     end)
+  end
+
+  defp add_m_random_edges(graph, m, n, graph_type) do
+    do_add_m_random_edges(graph, m, n, graph_type, 0)
+  end
+
+  defp do_add_m_random_edges(graph, m, _n, _graph_type, m), do: graph
+
+  defp do_add_m_random_edges(graph, m, n, graph_type, count) do
+    u = :rand.uniform(n) - 1
+    v = :rand.uniform(n) - 1
+
+    cond do
+      u == v ->
+        do_add_m_random_edges(graph, m, n, graph_type, count)
+
+      Yog.has_edge?(graph, u, v) ->
+        do_add_m_random_edges(graph, m, n, graph_type, count)
+
+      true ->
+        new_graph = Yog.add_edge!(graph, u, v, 1)
+        do_add_m_random_edges(new_graph, m, n, graph_type, count + 1)
+    end
   end
 end

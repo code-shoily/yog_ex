@@ -160,40 +160,45 @@ defmodule Yog.Flow.SuccessiveShortestPath do
           (any() -> integer())
         ) :: {:ok, min_cost_flow_result()} | {:error, min_cost_flow_error()}
   def min_cost_flow(graph, get_demand, get_capacity, get_cost) do
-    nodes = Model.all_nodes(graph)
-
     # Compute demands for all nodes
-    demands =
-      Map.new(nodes, fn node ->
-        data = Model.node(graph, node)
-        {node, get_demand.(data)}
-      end)
-
-    # Check if demands are balanced
-    total_demand = Enum.sum(Map.values(demands))
+    {demands, total_demand, total_supply} =
+      :maps.fold(
+        fn node, data, {dem_acc, total_dem, total_sup} ->
+          demand = get_demand.(data)
+          new_total_dem = total_dem + demand
+          new_total_sup = if demand < 0, do: total_sup - demand, else: total_sup
+          {Map.put(dem_acc, node, demand), new_total_dem, new_total_sup}
+        end,
+        {%{}, 0, 0},
+        graph.nodes
+      )
 
     if total_demand != 0 do
       {:error, :unbalanced_demands}
     else
-      # Handle trivial case: no flow needed
-      total_supply = -Enum.sum(Enum.filter(Map.values(demands), &(&1 < 0)))
-
       if total_supply == 0 do
         {:ok, %{cost: 0, flow: []}}
       else
         # Build edge information
         edges =
-          Enum.flat_map(nodes, fn from ->
-            Model.successors(graph, from)
-            |> Enum.map(fn {to, data} ->
-              capacity = get_capacity.(data)
-              cost = get_cost.(data)
-              {from, to, capacity, cost}
-            end)
-          end)
+          :maps.fold(
+            fn from, successors, acc ->
+              :maps.fold(
+                fn to, data, inner_acc ->
+                  capacity = get_capacity.(data)
+                  cost = get_cost.(data)
+                  [{from, to, capacity, cost} | inner_acc]
+                end,
+                acc,
+                successors
+              )
+            end,
+            [],
+            graph.out_edges
+          )
 
         # Run successive shortest path algorithm
-        case solve_min_cost_flow(nodes, edges, demands) do
+        case solve_min_cost_flow(Map.keys(demands), edges, demands) do
           {:ok, flow, total_cost} ->
             {:ok, %{cost: total_cost, flow: flow}}
 
@@ -209,10 +214,21 @@ defmodule Yog.Flow.SuccessiveShortestPath do
     original_edges = MapSet.new(edges, fn {u, v, _, _} -> {u, v} end)
     {capacities, costs, adj} = build_residual_graph(nodes, edges)
 
-    supply_nodes = Enum.filter(nodes, fn n -> demands[n] < 0 end)
-    demand_nodes = Enum.filter(nodes, fn n -> demands[n] > 0 end)
+    supply_nodes =
+      :maps.fold(
+        fn n, d, acc -> if d < 0, do: [n | acc], else: acc end,
+        [],
+        demands
+      )
 
-    case initialize_potentials(adj, capacities, costs, nodes) do
+    demand_nodes =
+      :maps.fold(
+        fn n, d, acc -> if d > 0, do: [n | acc], else: acc end,
+        [],
+        demands
+      )
+
+    case initialize_potentials(adj, capacities, costs, Map.keys(demands)) do
       {:ok, potentials} ->
         do_ssp(
           supply_nodes,
@@ -234,9 +250,9 @@ defmodule Yog.Flow.SuccessiveShortestPath do
 
   defp build_residual_graph(nodes, edges) do
     # Initialize adjacency for all nodes
-    adj = Map.new(nodes, fn n -> {n, []} end)
+    adj = List.foldl(nodes, %{}, fn n, acc -> Map.put(acc, n, []) end)
 
-    Enum.reduce(edges, {%{}, %{}, adj}, fn {u, v, cap, cost}, {caps, costs, adj} ->
+    List.foldl(edges, {%{}, %{}, adj}, fn {u, v, cap, cost}, {caps, costs, adj} ->
       # Forward edge
       caps = Map.put(caps, {u, v}, cap)
       costs = Map.put(costs, {u, v}, cost)
@@ -273,22 +289,26 @@ defmodule Yog.Flow.SuccessiveShortestPath do
   end
 
   defp relax_all_edges(adj, capacities, costs, dist, prev) do
-    Enum.reduce(adj, {dist, prev}, fn {u, neighbors}, {_d, _p} = acc ->
-      Enum.reduce(neighbors, acc, fn v, {d2, p2} = acc2 ->
-        if capacities[{u, v}] > 0 do
-          edge_cost = costs[{u, v}]
-          new_dist = d2[u] + edge_cost
+    :maps.fold(
+      fn u, neighbors, acc ->
+        List.foldl(neighbors, acc, fn v, {d2, p2} = acc2 ->
+          if Map.get(capacities, {u, v}, 0) > 0 do
+            edge_cost = Map.get(costs, {u, v}, 0)
+            new_dist = Map.get(d2, u, 0) + edge_cost
 
-          if new_dist < d2[v] do
-            {Map.put(d2, v, new_dist), Map.put(p2, v, u)}
+            if new_dist < Map.get(d2, v, :infinity) do
+              {Map.put(d2, v, new_dist), Map.put(p2, v, u)}
+            else
+              acc2
+            end
           else
             acc2
           end
-        else
-          acc2
-        end
-      end)
-    end)
+        end)
+      end,
+      {dist, prev},
+      adj
+    )
   end
 
   defp any_relaxation?(dist1, dist2) do
@@ -393,9 +413,11 @@ defmodule Yog.Flow.SuccessiveShortestPath do
             neighbors = Map.get(adj, u, [])
 
             {next_pq, next_dist, next_prev} =
-              Enum.reduce(neighbors, {new_pq, dist, prev}, fn v, {pq_acc, dist_acc, prev_acc} ->
-                if caps[{u, v}] > 0 do
-                  reduced_cost = costs[{u, v}] + pots[u] - pots[v]
+              List.foldl(neighbors, {new_pq, dist, prev}, fn v, {pq_acc, dist_acc, prev_acc} ->
+                if Map.get(caps, {u, v}, 0) > 0 do
+                  reduced_cost =
+                    Map.get(costs, {u, v}, 0) + Map.get(pots, u, 0) - Map.get(pots, v, 0)
+
                   new_dist = d + reduced_cost
                   old_dist = Map.get(dist_acc, v)
 

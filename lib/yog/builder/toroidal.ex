@@ -116,47 +116,49 @@ defmodule Yog.Builder.Toroidal do
         [] -> 0
       end
 
-    # Flatten grid into list of cells with coordinates
-    cells =
-      grid_data
-      |> Enum.with_index()
-      |> Enum.flat_map(fn {row, row_idx} ->
-        row
-        |> Enum.with_index()
-        |> Enum.map(fn {cell, col_idx} ->
-          {row_idx, col_idx, cell}
-        end)
+    # Build graph in a single pass to avoid intermediate 'cells' list allocation
+    {graph_with_nodes, _} =
+      List.foldl(grid_data, {Model.new(graph_type), 0}, fn row_data, {g_acc, r_idx} ->
+        {new_g, _} =
+          List.foldl(row_data, {g_acc, 0}, fn cell_data, {inner_g, c_idx} ->
+            id = coord_to_id(r_idx, c_idx, cols)
+            {Model.add_node(inner_g, id, cell_data), c_idx + 1}
+          end)
+
+        {new_g, r_idx + 1}
       end)
 
-    # Add all nodes
-    graph_with_nodes =
-      Enum.reduce(cells, Model.new(graph_type), fn {row, col, data}, g ->
-        id = coord_to_id(row, col, cols)
-        Model.add_node(g, id, data)
-      end)
+    # Add edges with wrapping in a second pass
+    {graph_with_edges, _} =
+      List.foldl(grid_data, {graph_with_nodes, 0}, fn row_data, {g_acc, r_idx} ->
+        {new_g, _} =
+          List.foldl(row_data, {g_acc, 0}, fn from_data, {inner_g, c_idx} ->
+            from_id = coord_to_id(r_idx, c_idx, cols)
 
-    # Add edges with wrapping
-    graph_with_edges =
-      Enum.reduce(cells, graph_with_nodes, fn {row, col, from_data}, g ->
-        from_id = coord_to_id(row, col, cols)
+            edge_g =
+              List.foldl(topology, inner_g, fn {d_row, d_col}, acc_g ->
+                # Wrap coordinates using modulo logic
+                n_row = wrap_coordinate(r_idx + d_row, rows)
+                n_col = wrap_coordinate(c_idx + d_col, cols)
 
-        Enum.reduce(topology, g, fn {d_row, d_col}, acc_g ->
-          # Wrap coordinates using modulo
-          n_row = wrap_coordinate(row + d_row, rows)
-          n_col = wrap_coordinate(col + d_col, cols)
+                to_id = coord_to_id(n_row, n_col, cols)
+                # Direct node lookup for data
+                to_data = Map.get(acc_g.nodes, to_id)
 
-          to_id = coord_to_id(n_row, n_col, cols)
-          to_data = Model.node(acc_g, to_id)
+                if to_data != nil && can_move_fn.(from_data, to_data) do
+                  case Model.add_edge(acc_g, from_id, to_id, 1) do
+                    {:ok, new_g} -> new_g
+                    {:error, _} -> acc_g
+                  end
+                else
+                  acc_g
+                end
+              end)
 
-          if to_data != nil && can_move_fn.(from_data, to_data) do
-            case Model.add_edge(acc_g, from_id, to_id, 1) do
-              {:ok, new_g} -> new_g
-              {:error, _} -> acc_g
-            end
-          else
-            acc_g
-          end
-        end)
+            {edge_g, c_idx + 1}
+          end)
+
+        {new_g, r_idx + 1}
       end)
 
     ToroidalGraph.new(graph_with_edges, rows, cols, :rook)

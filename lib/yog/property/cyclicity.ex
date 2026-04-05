@@ -82,7 +82,6 @@ defmodule Yog.Property.Cyclicity do
   - [CP-Algorithms: Finding Cycles](https://cp-algorithms.com/graph/finding-cycle.html)
   """
 
-  alias Yog.Model
   alias Yog.Traversal.Sort
 
   @doc """
@@ -185,42 +184,46 @@ defmodule Yog.Property.Cyclicity do
   # =============================================================================
 
   defp has_undirected_cycle?(graph) do
-    nodes = Model.all_nodes(graph)
+    # Optimization: Use :maps.next/1 approach or simple :maps.fold to drive DFS
+    # To mimic reduce_while, we can use a recursive helper on the keys
+    node_list = Map.keys(graph.nodes)
+    do_has_undirected_cycle(graph, node_list, MapSet.new())
+  end
 
-    # Manual DFS to detect back-edges while ignoring the immediate parent
-    {has_cycle?, _visited} =
-      Enum.reduce_while(nodes, {false, MapSet.new()}, fn node, {_, visited} ->
-        if MapSet.member?(visited, node) do
-          {:cont, {false, visited}}
-        else
-          case dfs_check_cycle(graph, node, nil, visited) do
-            {true, new_visited} -> {:halt, {true, new_visited}}
-            {false, new_visited} -> {:cont, {false, new_visited}}
-          end
-        end
-      end)
+  defp do_has_undirected_cycle(_graph, [], _visited), do: false
 
-    has_cycle?
+  defp do_has_undirected_cycle(graph, [node | rest], visited) do
+    if MapSet.member?(visited, node) do
+      do_has_undirected_cycle(graph, rest, visited)
+    else
+      case dfs_check_cycle(graph, node, nil, visited) do
+        {true, _} -> true
+        {false, next_visited} -> do_has_undirected_cycle(graph, rest, next_visited)
+      end
+    end
   end
 
   defp dfs_check_cycle(graph, u, parent, visited) do
     visited = MapSet.put(visited, u)
-    neighbors = Model.neighbor_ids(graph, u)
 
-    Enum.reduce_while(neighbors, {false, visited}, fn v, {_, current_visited} ->
-      cond do
-        v == parent ->
-          {:cont, {false, current_visited}}
+    case Map.fetch(graph.out_edges, u) do
+      {:ok, edges} ->
+        # Use recursive folder to mimic reduce_while
+        :maps.fold(
+          fn v, _, {found?, v_acc} ->
+            cond do
+              found? -> {true, v_acc}
+              v == parent -> {false, v_acc}
+              MapSet.member?(v_acc, v) -> {true, v_acc}
+              true -> dfs_check_cycle(graph, v, u, v_acc)
+            end
+          end,
+          {false, visited},
+          edges
+        )
 
-        MapSet.member?(current_visited, v) ->
-          {:halt, {true, current_visited}}
-
-        true ->
-          case dfs_check_cycle(graph, v, u, current_visited) do
-            {true, next_visited} -> {:halt, {true, next_visited}}
-            {false, next_visited} -> {:cont, {false, next_visited}}
-          end
-      end
-    end)
+      :error ->
+        {false, visited}
+    end
   end
 end

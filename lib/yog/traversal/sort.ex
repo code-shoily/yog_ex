@@ -65,14 +65,11 @@ defmodule Yog.Traversal.Sort do
   def topological_sort(graph) do
     out_edges = graph.out_edges
     in_edges = graph.in_edges
-    nodes = Map.keys(graph.nodes)
-    total_count = length(nodes)
+    total_count = Yog.Model.order(graph)
 
     in_degrees =
-      List.foldl(
-        nodes,
-        %{},
-        fn id, acc ->
+      :maps.fold(
+        fn id, _, acc ->
           deg =
             case Map.fetch(in_edges, id) do
               {:ok, inner} -> map_size(inner)
@@ -80,16 +77,18 @@ defmodule Yog.Traversal.Sort do
             end
 
           Map.put(acc, id, deg)
-        end
+        end,
+        %{},
+        graph.nodes
       )
 
     initial_q =
-      List.foldl(
-        nodes,
-        [],
-        fn id, acc ->
+      :maps.fold(
+        fn id, _, acc ->
           if Map.fetch!(in_degrees, id) == 0, do: [id | acc], else: acc
-        end
+        end,
+        [],
+        graph.nodes
       )
 
     do_kahn(out_edges, initial_q, in_degrees, [], 0, total_count)
@@ -106,15 +105,12 @@ defmodule Yog.Traversal.Sort do
   def lexicographical_topological_sort(graph, compare_nodes) do
     out_edges = graph.out_edges
     in_edges = graph.in_edges
-    nodes = Map.keys(graph.nodes)
     node_map = graph.nodes
-    total_count = length(nodes)
+    total_count = Yog.Model.order(graph)
 
     in_degrees =
-      List.foldl(
-        nodes,
-        %{},
-        fn id, acc ->
+      :maps.fold(
+        fn id, _, acc ->
           deg =
             case Map.fetch(in_edges, id) do
               {:ok, inner} -> map_size(inner)
@@ -122,7 +118,9 @@ defmodule Yog.Traversal.Sort do
             end
 
           Map.put(acc, id, deg)
-        end
+        end,
+        %{},
+        node_map
       )
 
     pq =
@@ -132,17 +130,17 @@ defmodule Yog.Traversal.Sort do
       end)
 
     initial_pq =
-      List.foldl(
-        nodes,
-        pq,
-        fn id, acc_pq ->
+      :maps.fold(
+        fn id, _, acc_pq ->
           if Map.fetch!(in_degrees, id) == 0 do
             data = Map.fetch!(node_map, id)
             PQ.push(acc_pq, {data, id})
           else
             acc_pq
           end
-        end
+        end,
+        pq,
+        node_map
       )
 
     do_lex_kahn(out_edges, node_map, initial_pq, in_degrees, [], 0, total_count, compare_nodes)
@@ -158,10 +156,8 @@ defmodule Yog.Traversal.Sort do
 
     {next_q, next_degrees} =
       if neighbors && map_size(neighbors) > 0 do
-        List.foldl(
-          Map.to_list(neighbors),
-          {tail, degrees},
-          fn {nb, _}, {q_acc, deg_acc} ->
+        :maps.fold(
+          fn nb, _, {q_acc, deg_acc} ->
             new_deg = Map.fetch!(deg_acc, nb) - 1
             new_deg_acc = Map.put(deg_acc, nb, new_deg)
 
@@ -170,7 +166,9 @@ defmodule Yog.Traversal.Sort do
             else
               {q_acc, new_deg_acc}
             end
-          end
+          end,
+          {tail, degrees},
+          neighbors
         )
       else
         {tail, degrees}
@@ -203,24 +201,21 @@ defmodule Yog.Traversal.Sort do
 
       {next_pq, next_degrees} =
         if neighbors && map_size(neighbors) > 0 do
-          List.foldl(
-            Map.to_list(neighbors),
-            {rest_pq, degrees},
-            fn {nb, _}, {acc_pq, deg_acc} ->
+          :maps.fold(
+            fn nb, _, {acc_pq, deg_acc} ->
               current_degree = Map.fetch!(deg_acc, nb)
               new_degree = current_degree - 1
-              new_degrees = Map.put(deg_acc, nb, new_degree)
+              new_deg_acc = Map.put(deg_acc, nb, new_degree)
 
-              updated_pq =
-                if new_degree == 0 do
-                  neighbor_data = Map.fetch!(nodes, nb)
-                  PQ.push(acc_pq, {neighbor_data, nb})
-                else
-                  acc_pq
-                end
-
-              {updated_pq, new_degrees}
-            end
+              if new_degree == 0 do
+                neighbor_data = Map.fetch!(nodes, nb)
+                {PQ.push(acc_pq, {neighbor_data, nb}), new_deg_acc}
+              else
+                {acc_pq, new_deg_acc}
+              end
+            end,
+            {rest_pq, degrees},
+            neighbors
           )
         else
           {rest_pq, degrees}

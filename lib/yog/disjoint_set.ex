@@ -241,10 +241,14 @@ defmodule Yog.DisjointSet do
   @spec count_sets(t()) :: non_neg_integer()
   def count_sets(%__MODULE__{parents: parents} = dsu) do
     roots =
-      List.foldl(Map.keys(parents), %{}, fn element, acc ->
-        root = find_root_readonly(dsu, element)
-        Map.put(acc, root, true)
-      end)
+      :maps.fold(
+        fn element, _, acc ->
+          root = find_root_readonly(dsu, element)
+          Map.put(acc, root, true)
+        end,
+        %{},
+        parents
+      )
 
     map_size(roots)
   end
@@ -268,12 +272,16 @@ defmodule Yog.DisjointSet do
   @spec to_lists(t()) :: [[term()]]
   def to_lists(%__MODULE__{parents: parents} = dsu) do
     groups =
-      List.foldl(Map.keys(parents), %{}, fn element, acc ->
-        root = find_root_readonly(dsu, element)
-        Map.update(acc, root, [element], fn members -> [element | members] end)
-      end)
+      :maps.fold(
+        fn element, _, acc ->
+          root = find_root_readonly(dsu, element)
+          Map.update(acc, root, [element], fn members -> [element | members] end)
+        end,
+        %{},
+        parents
+      )
 
-    Map.values(groups)
+    :maps.fold(fn _, members, acc -> [members | acc] end, [], groups)
   end
 
   # =============================================================================

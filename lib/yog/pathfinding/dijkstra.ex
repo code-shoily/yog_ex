@@ -468,36 +468,30 @@ defmodule Yog.Pathfinding.Dijkstra do
           if node == to do
             extract_result(distances, predecessors, to, dist)
           else
-            # Direct edge access for performance
-            successors =
-              case Map.fetch(graph.out_edges, node) do
-                {:ok, edges} -> Map.to_list(edges)
-                :error -> []
-              end
-
             {new_queue, new_distances, new_predecessors} =
-              List.foldl(successors, {rest, distances, predecessors}, fn {neighbor, weight},
-                                                                         {q, d, p} ->
-                new_dist = add.(dist, weight)
+              case Map.fetch(graph.out_edges, node) do
+                {:ok, neighbors} ->
+                  :maps.fold(
+                    fn neighbor, weight, {q_acc, d_acc, p_acc} ->
+                      nb_dist = Map.get(d_acc, neighbor)
+                      new_dist = add.(dist, weight)
 
-                case Map.fetch(d, neighbor) do
-                  {:ok, current} ->
-                    if compare.(new_dist, current) == :lt do
-                      new_q = PQ.push(q, {new_dist, neighbor})
-                      new_d = Map.put(d, neighbor, new_dist)
-                      new_p = Map.put(p, neighbor, node)
-                      {new_q, new_d, new_p}
-                    else
-                      {q, d, p}
-                    end
+                      if nb_dist == nil or compare.(new_dist, nb_dist) == :lt do
+                        new_q = PQ.push(q_acc, {new_dist, neighbor})
+                        new_d = Map.put(d_acc, neighbor, new_dist)
+                        new_p = Map.put(p_acc, neighbor, node)
+                        {new_q, new_d, new_p}
+                      else
+                        {q_acc, d_acc, p_acc}
+                      end
+                    end,
+                    {rest, distances, predecessors},
+                    neighbors
+                  )
 
-                  :error ->
-                    new_q = PQ.push(q, {new_dist, neighbor})
-                    new_d = Map.put(d, neighbor, new_dist)
-                    new_p = Map.put(p, neighbor, node)
-                    {new_q, new_d, new_p}
-                end
-              end)
+                :error ->
+                  {rest, distances, predecessors}
+              end
 
             do_dijkstra_loop(graph, new_queue, to, add, compare, new_distances, new_predecessors)
           end

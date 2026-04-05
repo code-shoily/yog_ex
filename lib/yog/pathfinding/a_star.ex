@@ -430,67 +430,60 @@ defmodule Yog.Pathfinding.AStar do
         :error
 
       {:ok, {_f, g, node}, rest} ->
-        key = node
-
-        case Map.fetch(g_scores, key) do
-          {:ok, best_g} ->
-            if compare.(g, best_g) == :gt do
-              do_a_star(graph, rest, to, add, compare, heuristic, g_scores, predecessors)
+        case Map.fetch(g_scores, node) do
+          {:ok, best_g} when g == best_g ->
+            if node == to do
+              path = reconstruct_path(predecessors, to, [to])
+              {:ok, Path.new(path, g, :a_star)}
             else
-              if node == to do
-                path = reconstruct_path(predecessors, to, [to])
-                {:ok, Path.new(path, g, :a_star)}
-              else
-                # Direct edge access for performance
-                successors =
-                  case Map.fetch(graph.out_edges, node) do
-                    {:ok, edges} -> Map.to_list(edges)
-                    :error -> []
-                  end
+              {new_queue, new_g_scores, new_predecessors} =
+                case Map.fetch(graph.out_edges, node) do
+                  {:ok, edges} ->
+                    :maps.fold(
+                      fn neighbor, cost, {q, gs, preds} ->
+                        new_g = add.(g, cost)
 
-                {new_queue, new_g_scores, new_predecessors} =
-                  List.foldl(successors, {rest, g_scores, predecessors}, fn {neighbor, cost},
-                                                                            {q, gs, preds} ->
-                    new_g = add.(g, cost)
-                    neighbor_key = neighbor
+                        case Map.fetch(gs, neighbor) do
+                          {:ok, existing_g} ->
+                            if compare.(new_g, existing_g) == :lt do
+                              h = heuristic.(neighbor, to)
+                              f = add.(new_g, h)
 
-                    case Map.fetch(gs, neighbor_key) do
-                      {:ok, existing_g} ->
-                        if compare.(new_g, existing_g) == :lt do
-                          h = heuristic.(neighbor, to)
-                          f = add.(new_g, h)
-                          new_q = PQ.push(q, {f, new_g, neighbor})
-                          new_gs = Map.put(gs, neighbor_key, new_g)
-                          new_preds = Map.put(preds, neighbor, node)
-                          {new_q, new_gs, new_preds}
-                        else
-                          {q, gs, preds}
+                              {PQ.push(q, {f, new_g, neighbor}), Map.put(gs, neighbor, new_g),
+                               Map.put(preds, neighbor, node)}
+                            else
+                              {q, gs, preds}
+                            end
+
+                          :error ->
+                            h = heuristic.(neighbor, to)
+                            f = add.(new_g, h)
+
+                            {PQ.push(q, {f, new_g, neighbor}), Map.put(gs, neighbor, new_g),
+                             Map.put(preds, neighbor, node)}
                         end
+                      end,
+                      {rest, g_scores, predecessors},
+                      edges
+                    )
 
-                      :error ->
-                        h = heuristic.(neighbor, to)
-                        f = add.(new_g, h)
-                        new_q = PQ.push(q, {f, new_g, neighbor})
-                        new_gs = Map.put(gs, neighbor_key, new_g)
-                        new_preds = Map.put(preds, neighbor, node)
-                        {new_q, new_gs, new_preds}
-                    end
-                  end)
+                  :error ->
+                    {rest, g_scores, predecessors}
+                end
 
-                do_a_star(
-                  graph,
-                  new_queue,
-                  to,
-                  add,
-                  compare,
-                  heuristic,
-                  new_g_scores,
-                  new_predecessors
-                )
-              end
+              do_a_star(
+                graph,
+                new_queue,
+                to,
+                add,
+                compare,
+                heuristic,
+                new_g_scores,
+                new_predecessors
+              )
             end
 
-          :error ->
+          _ ->
             do_a_star(graph, rest, to, add, compare, heuristic, g_scores, predecessors)
         end
     end

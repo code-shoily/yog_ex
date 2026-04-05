@@ -110,18 +110,30 @@ defmodule Yog.Community.Louvain do
   def detect_with_stats(graph, opts) do
     options = Map.merge(default_options(), Map.new(opts))
 
-    nodes = Map.keys(graph.nodes)
     total_weight = calculate_total_weight(graph)
 
-    initial_assignments = Map.new(Enum.with_index(nodes), fn {node, i} -> {node, i} end)
+    initial_assignments =
+      :maps.fold(
+        fn node, _, {acc, i} ->
+          {Map.put(acc, node, i), i + 1}
+        end,
+        {%{}, 0},
+        graph.nodes
+      )
+      |> elem(0)
 
     node_weights = calculate_node_weights(graph)
+
+    inv_m = if total_weight > 0.0, do: 1.0 / total_weight, else: 0.0
+    inv_two_m_sq = if total_weight > 0.0, do: 1.0 / (2.0 * total_weight * total_weight), else: 0.0
 
     initial_state = %{
       assignments: initial_assignments,
       node_weights: node_weights,
       community_totals: calculate_community_totals(initial_assignments, node_weights),
-      total_weight: total_weight
+      total_weight: total_weight,
+      inv_m: inv_m,
+      inv_two_m_sq: inv_two_m_sq
     }
 
     do_louvain(graph, initial_state, [], 0, options)
@@ -142,17 +154,30 @@ defmodule Yog.Community.Louvain do
   def detect_hierarchical_with_options(graph, opts) do
     options = Map.merge(default_options(), Map.new(opts))
 
-    nodes = Map.keys(graph.nodes)
     total_weight = calculate_total_weight(graph)
 
-    initial_assignments = Map.new(Enum.with_index(nodes), fn {node, i} -> {node, i} end)
+    initial_assignments =
+      :maps.fold(
+        fn node, _, {acc, i} ->
+          {Map.put(acc, node, i), i + 1}
+        end,
+        {%{}, 0},
+        graph.nodes
+      )
+      |> elem(0)
+
     node_weights = calculate_node_weights(graph)
+
+    inv_m = if total_weight > 0.0, do: 1.0 / total_weight, else: 0.0
+    inv_two_m_sq = if total_weight > 0.0, do: 1.0 / (2.0 * total_weight * total_weight), else: 0.0
 
     initial_state = %{
       assignments: initial_assignments,
       node_weights: node_weights,
       community_totals: calculate_community_totals(initial_assignments, node_weights),
-      total_weight: total_weight
+      total_weight: total_weight,
+      inv_m: inv_m,
+      inv_two_m_sq: inv_two_m_sq
     }
 
     do_louvain_hierarchical(graph, initial_state, [], 0, options)
@@ -163,24 +188,43 @@ defmodule Yog.Community.Louvain do
   # ============================================================
 
   defp do_louvain(graph, state, mod_history, phase, options) do
-    {improved, new_state} = phase1_local_optimize(graph, state, options)
+    {improved, state_after_local} = phase1_local_optimize(graph, state, options)
 
-    normalized_assignments = normalize_assignments(new_state.assignments)
-    communities = Result.new(normalized_assignments)
-
-    q = Metrics.modularity(graph, Result.to_map(communities))
+    # Calculate current modularity for history
+    normalized = normalize_assignments(state_after_local.assignments)
+    q = Metrics.modularity(graph, %{assignments: normalized})
     new_history = [q | mod_history]
 
-    if not improved or phase >= options.max_iterations do
+    num_comms = count_unique_communities(state_after_local.assignments)
+
+    # Convergence criteria: no improvement or max iterations or single community
+    if not improved or phase >= options.max_iterations or num_comms <= 1 do
       stats = %{
         num_phases: phase + 1,
         final_modularity: q,
         iteration_modularity: Enum.reverse(new_history)
       }
 
-      {communities, stats}
+      {Result.new(normalized), stats}
     else
-      do_louvain(graph, new_state, new_history, phase + 1, options)
+      # Phase 2: Aggregation
+      aggregated = phase2_aggregate(graph, state_after_local.assignments)
+      aggregated_state = rebuild_state(aggregated)
+
+      # Recurse on aggregated graph
+      {next_result, stats} =
+        do_louvain(aggregated, aggregated_state, new_history, phase + 1, options)
+
+      # Map communities back to original nodes
+      # next_result contains assignments of communities (super-nodes) to higher-level communities
+      %{assignments: next_asgn} = Result.to_map(next_result)
+
+      final_assignments =
+        Map.new(state_after_local.assignments, fn {node, comm_id} ->
+          {node, Map.get(next_asgn, comm_id, comm_id)}
+        end)
+
+      {Result.new(normalize_assignments(final_assignments)), stats}
     end
   end
 
@@ -203,7 +247,13 @@ defmodule Yog.Community.Louvain do
   end
 
   defp phase1_local_optimize(graph, state, options) do
-    nodes = Map.keys(state.assignments)
+    nodes =
+      :maps.fold(
+        fn node, _, acc -> [node | acc] end,
+        [],
+        state.assignments
+      )
+
     do_phase1_iterations(graph, state, nodes, false, 0, options)
   end
 
@@ -230,29 +280,29 @@ defmodule Yog.Community.Louvain do
       node_weight = Map.get(current_state.node_weights, node, 0.0)
 
       neighbor_weights = calculate_neighbor_weights_by_comm(graph, current_state, node)
-      neighbor_comms = Map.keys(neighbor_weights)
 
       {best_comm, best_gain} =
-        Enum.reduce(neighbor_comms, {current_comm, 0.0}, fn neighbor_comm, {best_c, best_g} ->
-          ki_in_comm = Map.get(neighbor_weights, neighbor_comm, 0.0)
+        :maps.fold(
+          fn neighbor_comm, ki_in_comm, {best_c, best_g} ->
+            gain =
+              calculate_modularity_gain_fast(
+                node_weight,
+                ki_in_comm,
+                current_comm,
+                neighbor_comm,
+                current_state,
+                options.resolution
+              )
 
-          gain =
-            calculate_modularity_gain_fast(
-              node,
-              current_comm,
-              neighbor_comm,
-              node_weight,
-              ki_in_comm,
-              current_state,
-              options.resolution
-            )
-
-          if gain > best_g do
-            {neighbor_comm, gain}
-          else
-            {best_c, best_g}
-          end
-        end)
+            if gain > best_g do
+              {neighbor_comm, gain}
+            else
+              {best_c, best_g}
+            end
+          end,
+          {current_comm, 0.0},
+          neighbor_weights
+        )
 
       if best_gain > options.min_modularity_gain and best_comm != current_comm do
         new_state = move_node(current_state, node, current_comm, best_comm, node_weight)
@@ -266,25 +316,28 @@ defmodule Yog.Community.Louvain do
   # Pre-calculate total edge weight from node to each neighbor community
   # Returns %{community_id => total_weight} in O(degree) time
   defp calculate_neighbor_weights_by_comm(%Yog.Graph{out_edges: out_edges}, state, node) do
-    neighbors =
-      case Map.fetch(out_edges, node) do
-        {:ok, edges} -> Map.to_list(edges)
-        :error -> []
-      end
+    case Map.fetch(out_edges, node) do
+      {:ok, edges} ->
+        :maps.fold(
+          fn neighbor_id, weight, acc ->
+            comm = Map.get(state.assignments, neighbor_id, neighbor_id)
+            Map.update(acc, comm, weight, &(&1 + weight))
+          end,
+          %{},
+          edges
+        )
 
-    List.foldl(neighbors, %{}, fn {neighbor_id, weight}, acc ->
-      comm = Map.get(state.assignments, neighbor_id, neighbor_id)
-      Map.update(acc, comm, weight, &(&1 + weight))
-    end)
+      :error ->
+        %{}
+    end
   end
 
   # Fast modularity gain using pre-calculated ki_in_community
   defp calculate_modularity_gain_fast(
-         _node,
-         current_comm,
-         target_comm,
          _node_weight,
          _ki_in_target,
+         current_comm,
+         target_comm,
          _state,
          _gamma
        )
@@ -293,28 +346,20 @@ defmodule Yog.Community.Louvain do
   end
 
   defp calculate_modularity_gain_fast(
-         _node,
+         ki,
+         ki_in_target,
          current_comm,
          target_comm,
-         node_weight,
-         ki_in_target,
          state,
          gamma
        ) do
-    ki = node_weight
-    m = state.total_weight
+    sigma_tot_target = Map.get(state.community_totals, target_comm, 0.0)
+    sigma_tot_current = Map.get(state.community_totals, current_comm, 0.0)
 
-    if m == 0.0 do
-      0.0
-    else
-      two_m_sq = 2.0 * m * m
-
-      sigma_tot_target = Map.get(state.community_totals, target_comm, 0.0)
-      sigma_tot_current = Map.get(state.community_totals, current_comm, 0.0)
-
-      ki_in_target / m - gamma * sigma_tot_target * ki / two_m_sq -
-        gamma * (sigma_tot_current - ki) * ki / two_m_sq
-    end
+    # Optimization: Use pre-calculated inv_m and inv_two_m_sq to replace division with multiplication
+    ki_in_target * state.inv_m -
+      gamma * sigma_tot_target * ki * state.inv_two_m_sq -
+      gamma * (sigma_tot_current - ki) * ki * state.inv_two_m_sq
   end
 
   defp move_node(state, node, from_comm, to_comm, node_weight) do
@@ -332,22 +377,22 @@ defmodule Yog.Community.Louvain do
     }
   end
 
-  defp calculate_total_weight(%Yog.Graph{out_edges: out_edges, kind: kind, nodes: nodes}) do
-    node_list = Map.keys(nodes)
-
+  defp calculate_total_weight(%Yog.Graph{out_edges: out_edges, kind: kind}) do
     total =
-      List.foldl(node_list, 0.0, fn node, acc ->
-        weight_sum =
-          case Map.fetch(out_edges, node) do
-            {:ok, edges} ->
-              List.foldl(Map.to_list(edges), 0, fn {_, weight}, sum -> sum + weight end)
+      :maps.fold(
+        fn _node, inner, acc ->
+          weight_sum =
+            :maps.fold(
+              fn _dst, weight, sum -> sum + weight end,
+              0,
+              inner
+            )
 
-            :error ->
-              0
-          end
-
-        acc + weight_sum
-      end)
+          acc + weight_sum
+        end,
+        0.0,
+        out_edges
+      )
 
     case kind do
       :undirected -> total / 2.0
@@ -355,42 +400,51 @@ defmodule Yog.Community.Louvain do
     end
   end
 
-  defp calculate_node_weights(%Yog.Graph{out_edges: out_edges, nodes: nodes}) do
-    node_list = Map.keys(nodes)
+  defp calculate_node_weights(%Yog.Graph{out_edges: out_edges}) do
+    :maps.fold(
+      fn node, inner, acc ->
+        weight_sum =
+          :maps.fold(
+            fn _dst, weight, sum -> sum + weight end,
+            0,
+            inner
+          )
 
-    Map.new(node_list, fn node ->
-      weight_sum =
-        case Map.fetch(out_edges, node) do
-          {:ok, edges} ->
-            List.foldl(Map.to_list(edges), 0, fn {_, weight}, sum -> sum + weight end)
-
-          :error ->
-            0
-        end
-
-      {node, weight_sum * 1.0}
-    end)
+        Map.put(acc, node, weight_sum * 1.0)
+      end,
+      %{},
+      out_edges
+    )
   end
 
   defp calculate_community_totals(assignments, node_weights) do
-    List.foldl(Map.to_list(assignments), %{}, fn {node, comm}, acc ->
-      weight = Map.get(node_weights, node, 0.0)
-      Map.update(acc, comm, weight, fn v -> v + weight end)
-    end)
+    :maps.fold(
+      fn node, comm, acc ->
+        weight = Map.get(node_weights, node, 0.0)
+        Map.update(acc, comm, weight, fn v -> v + weight end)
+      end,
+      %{},
+      assignments
+    )
   end
 
   defp count_unique_communities(assignments) do
-    assignments
-    |> Map.values()
-    |> Enum.uniq()
-    |> length()
+    :maps.fold(
+      fn _, comm, acc -> MapSet.put(acc, comm) end,
+      MapSet.new(),
+      assignments
+    )
+    |> MapSet.size()
   end
 
   defp normalize_assignments(assignments) do
     unique_communities =
-      assignments
-      |> Map.values()
-      |> Enum.uniq()
+      :maps.fold(
+        fn _, comm, acc -> MapSet.put(acc, comm) end,
+        MapSet.new(),
+        assignments
+      )
+      |> MapSet.to_list()
       |> Enum.sort()
 
     id_mapping =
@@ -409,69 +463,94 @@ defmodule Yog.Community.Louvain do
     new_graph = Yog.undirected()
 
     new_graph_with_nodes =
-      Enum.reduce(communities, new_graph, fn {comm_id, _nodes}, g ->
-        Yog.add_node(g, comm_id, nil)
-      end)
+      :maps.fold(
+        fn comm_id, _, g ->
+          Yog.add_node(g, comm_id, nil)
+        end,
+        new_graph,
+        communities
+      )
 
     aggregate_edges(graph, new_graph_with_nodes, assignments)
   end
 
   defp get_community_nodes(assignments) do
-    List.foldl(Map.to_list(assignments), %{}, fn {node, comm}, acc ->
-      current_set = Map.get(acc, comm, MapSet.new())
-      Map.put(acc, comm, MapSet.put(current_set, node))
-    end)
+    :maps.fold(
+      fn node, comm, acc ->
+        current_set = Map.get(acc, comm, MapSet.new())
+        Map.put(acc, comm, MapSet.put(current_set, node))
+      end,
+      %{},
+      assignments
+    )
   end
 
   defp aggregate_edges(
-         %Yog.Graph{out_edges: out_edges, kind: kind} = original_graph,
+         %Yog.Graph{out_edges: out_edges, kind: kind},
          new_graph,
          assignments
        ) do
-    nodes = Map.keys(original_graph.nodes)
-
     edge_weights =
-      List.foldl(nodes, %{}, fn u, acc ->
-        comm_u = Map.get(assignments, u, u)
+      :maps.fold(
+        fn u, inner, acc ->
+          comm_u = Map.get(assignments, u, u)
 
-        successors =
-          case Map.fetch(out_edges, u) do
-            {:ok, edges} -> Map.to_list(edges)
-            :error -> []
-          end
+          :maps.fold(
+            fn v, weight, inner_acc ->
+              comm_v = Map.get(assignments, v, v)
 
-        List.foldl(successors, acc, fn {v, weight}, inner_acc ->
-          comm_v = Map.get(assignments, v, v)
+              edge_key =
+                if kind == :undirected and comm_u > comm_v do
+                  {comm_v, comm_u}
+                else
+                  {comm_u, comm_v}
+                end
 
-          edge_key =
-            if kind == :undirected and comm_u > comm_v do
-              {comm_v, comm_u}
-            else
-              {comm_u, comm_v}
-            end
+              Map.update(inner_acc, edge_key, weight, &(&1 + weight))
+            end,
+            acc,
+            inner
+          )
+        end,
+        %{},
+        out_edges
+      )
 
-          Map.update(inner_acc, edge_key, weight, &(&1 + weight))
-        end)
-      end)
-
-    List.foldl(Map.to_list(edge_weights), new_graph, fn {{u, v}, weight}, g ->
-      {:ok, new_g} = Yog.add_edge(g, u, v, weight)
-      new_g
-    end)
+    :maps.fold(
+      fn {u, v}, weight, g ->
+        {:ok, new_g} = Yog.add_edge(g, u, v, weight)
+        new_g
+      end,
+      new_graph,
+      edge_weights
+    )
   end
 
   defp rebuild_state(aggregated_graph) do
-    nodes = Map.keys(aggregated_graph.nodes)
     total_weight = calculate_total_weight(aggregated_graph)
 
-    new_assignments = Map.new(Enum.with_index(nodes), fn {node, i} -> {node, i} end)
+    new_assignments =
+      :maps.fold(
+        fn node, _, {acc, i} ->
+          {Map.put(acc, node, i), i + 1}
+        end,
+        {%{}, 0},
+        aggregated_graph.nodes
+      )
+      |> elem(0)
+
     node_weights = calculate_node_weights(aggregated_graph)
+
+    inv_m = if total_weight > 0.0, do: 1.0 / total_weight, else: 0.0
+    inv_two_m_sq = if total_weight > 0.0, do: 1.0 / (2.0 * total_weight * total_weight), else: 0.0
 
     %{
       assignments: new_assignments,
       node_weights: node_weights,
       community_totals: calculate_community_totals(new_assignments, node_weights),
-      total_weight: total_weight
+      total_weight: total_weight,
+      inv_m: inv_m,
+      inv_two_m_sq: inv_two_m_sq
     }
   end
 end

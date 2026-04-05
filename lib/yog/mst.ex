@@ -234,13 +234,11 @@ defmodule Yog.MST do
   end
 
   def prim(graph, compare, nil) do
-    node_ids = Map.keys(graph.nodes)
-
-    case node_ids do
-      [] ->
+    case :maps.next(:maps.iterator(graph.nodes)) do
+      :none ->
         {:ok, Result.new([], :prim, 0)}
 
-      [start | _] ->
+      {start, _, _} ->
         do_prim(graph, start, compare)
     end
   end
@@ -265,15 +263,23 @@ defmodule Yog.MST do
   # Extracts all edges from a graph.
   # For undirected graphs, only includes each edge once (when from_id <= to_id).
   defp extract_edges(%Yog.Graph{kind: kind, out_edges: out_edges}) do
-    List.foldl(Map.to_list(out_edges), [], fn {from_id, targets}, acc ->
-      List.foldl(Map.to_list(targets), acc, fn {to_id, weight}, inner_acc ->
-        if kind == :undirected && from_id > to_id do
-          inner_acc
-        else
-          [%{from: from_id, to: to_id, weight: weight} | inner_acc]
-        end
-      end)
-    end)
+    :maps.fold(
+      fn from_id, targets, acc ->
+        :maps.fold(
+          fn to_id, weight, inner_acc ->
+            if kind == :undirected && from_id > to_id do
+              inner_acc
+            else
+              [%{from: from_id, to: to_id, weight: weight} | inner_acc]
+            end
+          end,
+          acc,
+          targets
+        )
+      end,
+      [],
+      out_edges
+    )
   end
 
   # Main Kruskal loop - processes edges in order, adding them if they don't form cycles.
@@ -359,9 +365,13 @@ defmodule Yog.MST do
   defp get_all_edges_from_node(graph, from_id) do
     case Map.fetch(graph.out_edges, from_id) do
       {:ok, edges} ->
-        List.foldl(Map.to_list(edges), [], fn {to_id, weight}, acc ->
-          [%{from: from_id, to: to_id, weight: weight} | acc]
-        end)
+        :maps.fold(
+          fn to_id, weight, acc ->
+            [%{from: from_id, to: to_id, weight: weight} | acc]
+          end,
+          [],
+          edges
+        )
 
       :error ->
         []

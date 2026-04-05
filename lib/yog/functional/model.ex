@@ -126,15 +126,18 @@ defmodule Yog.Functional.Model do
   @spec from_adjacency_graph(Graph.t()) :: t()
   def from_adjacency_graph(%Graph{} = graph) do
     nodes =
-      Enum.into(graph.nodes, %{}, fn {id, data} ->
-        {id,
-         %Context{
-           id: id,
-           label: data,
-           in_edges: Map.get(graph.in_edges, id, %{}),
-           out_edges: Map.get(graph.out_edges, id, %{})
-         }}
-      end)
+      :maps.fold(
+        fn id, data, g_acc ->
+          Map.put(g_acc, id, %Context{
+            id: id,
+            label: data,
+            in_edges: Map.get(graph.in_edges, id, %{}),
+            out_edges: Map.get(graph.out_edges, id, %{})
+          })
+        end,
+        %{},
+        graph.nodes
+      )
 
     %__MODULE__{nodes: nodes, direction: graph.kind}
   end
@@ -154,13 +157,37 @@ defmodule Yog.Functional.Model do
   def to_adjacency_graph(%__MODULE__{} = graph) do
     # Ensure every node has an entry in edge maps for Graph consistency
     {nodes, out_edges, in_edges} =
-      Enum.reduce(graph.nodes, {%{}, %{}, %{}}, fn {id, ctx}, {n, o, i} ->
-        {
-          Map.put(n, id, ctx.label),
-          Map.put(o, id, ctx.out_edges),
-          Map.put(i, id, ctx.in_edges)
-        }
-      end)
+      :maps.fold(
+        fn id, ctx, {n, o, i} ->
+          new_n = Map.put(n, id, ctx.label)
+
+          new_o =
+            :maps.fold(
+              fn nb, label, acc_inner ->
+                Map.update(acc_inner, id, %{nb => label}, fn inner ->
+                  Map.put(inner, nb, label)
+                end)
+              end,
+              o,
+              ctx.out_edges
+            )
+
+          new_i =
+            :maps.fold(
+              fn nb, label, acc_inner ->
+                Map.update(acc_inner, id, %{nb => label}, fn inner ->
+                  Map.put(inner, nb, label)
+                end)
+              end,
+              i,
+              ctx.in_edges
+            )
+
+          {new_n, new_o, new_i}
+        end,
+        {%{}, %{}, %{}},
+        graph.nodes
+      )
 
     %Graph{
       kind: graph.direction,

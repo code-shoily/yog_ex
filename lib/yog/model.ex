@@ -114,23 +114,46 @@ defmodule Yog.Model do
   """
   @spec remove_node(graph(), node_id()) :: graph()
   def remove_node(%Graph{} = graph, id) do
-    target_ids = successor_ids(graph, id)
-    source_ids = predecessor_ids(graph, id)
-
     new_nodes = Map.delete(graph.nodes, id)
     new_out = Map.delete(graph.out_edges, id)
 
     new_in_cleaned =
-      Enum.reduce(target_ids, graph.in_edges, fn target_id, acc_in ->
-        Map.replace_lazy(acc_in, target_id, &Map.delete(&1, id))
-      end)
+      case Map.fetch(graph.out_edges, id) do
+        {:ok, targets} ->
+          :maps.fold(
+            fn target_id, _, acc_in ->
+              case Map.fetch(acc_in, target_id) do
+                {:ok, inner} -> Map.put(acc_in, target_id, Map.delete(inner, id))
+                :error -> acc_in
+              end
+            end,
+            graph.in_edges,
+            targets
+          )
+
+        :error ->
+          graph.in_edges
+      end
 
     new_in = Map.delete(new_in_cleaned, id)
 
     new_out_cleaned =
-      Enum.reduce(source_ids, new_out, fn source_id, acc_out ->
-        Map.replace_lazy(acc_out, source_id, &Map.delete(&1, id))
-      end)
+      case Map.fetch(graph.in_edges, id) do
+        {:ok, sources} ->
+          :maps.fold(
+            fn source_id, _, acc_out ->
+              case Map.fetch(acc_out, source_id) do
+                {:ok, inner} -> Map.put(acc_out, source_id, Map.delete(inner, id))
+                :error -> acc_out
+              end
+            end,
+            new_out,
+            sources
+          )
+
+        :error ->
+          new_out
+      end
 
     %{graph | nodes: new_nodes, out_edges: new_out_cleaned, in_edges: new_in}
   end
@@ -692,18 +715,25 @@ defmodule Yog.Model do
   """
   @spec edge_count(graph()) :: integer()
   def edge_count(%Graph{kind: :directed, out_edges: out_edges}) do
-    Enum.reduce(out_edges, 0, fn {_src, targets}, acc ->
-      acc + map_size(targets)
-    end)
+    :maps.fold(
+      fn _src, targets, acc ->
+        acc + map_size(targets)
+      end,
+      0,
+      out_edges
+    )
   end
 
   def edge_count(%Graph{kind: :undirected, out_edges: out_edges}) do
     {total, self_loops} =
-      Enum.reduce(out_edges, {0, 0}, fn {src, targets}, {acc_total, acc_self} ->
-        new_total = acc_total + map_size(targets)
-        new_self = if Map.has_key?(targets, src), do: acc_self + 1, else: acc_self
-        {new_total, new_self}
-      end)
+      :maps.fold(
+        fn src, targets, {acc_total, acc_self} ->
+          self_edge = if Map.has_key?(targets, src), do: 1, else: 0
+          {acc_total + map_size(targets), acc_self + self_edge}
+        end,
+        {0, 0},
+        out_edges
+      )
 
     div(total - self_loops, 2) + self_loops
   end

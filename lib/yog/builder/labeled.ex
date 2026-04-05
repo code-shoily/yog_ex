@@ -319,7 +319,10 @@ defmodule Yog.Builder.Labeled do
       ["A", "B"]
   """
   @spec all_labels(t()) :: [label()]
-  def all_labels(%__MODULE__{label_to_id: label_to_id}), do: Map.keys(label_to_id)
+  def all_labels(%__MODULE__{label_to_id: label_to_id}) do
+    :maps.fold(fn label, _, acc -> [label | acc] end, [], label_to_id)
+    |> Enum.sort()
+  end
 
   @doc """
   Gets the next available node ID.
@@ -359,9 +362,25 @@ defmodule Yog.Builder.Labeled do
   defp do_successors(graph, label_to_id, label) do
     case Map.fetch(label_to_id, label) do
       {:ok, id} ->
-        successor_edges = Model.successors(graph, id)
-        labeled_edges = map_ids_to_labels(successor_edges, graph)
-        {:ok, labeled_edges}
+        case Map.fetch(graph.out_edges, id) do
+          {:ok, inner} ->
+            labeled_edges =
+              :maps.fold(
+                fn node_id, edge_data, acc ->
+                  case Map.fetch(graph.nodes, node_id) do
+                    {:ok, label} -> [{label, edge_data} | acc]
+                    :error -> acc
+                  end
+                end,
+                [],
+                inner
+              )
+
+            {:ok, labeled_edges}
+
+          :error ->
+            {:ok, []}
+        end
 
       :error ->
         {:error, nil}
@@ -389,9 +408,25 @@ defmodule Yog.Builder.Labeled do
   defp do_predecessors(graph, label_to_id, label) do
     case Map.fetch(label_to_id, label) do
       {:ok, id} ->
-        predecessor_edges = Model.predecessors(graph, id)
-        labeled_edges = map_ids_to_labels(predecessor_edges, graph)
-        {:ok, labeled_edges}
+        case Map.fetch(graph.in_edges, id) do
+          {:ok, inner} ->
+            labeled_edges =
+              :maps.fold(
+                fn node_id, edge_data, acc ->
+                  case Map.fetch(graph.nodes, node_id) do
+                    {:ok, label} -> [{label, edge_data} | acc]
+                    :error -> acc
+                  end
+                end,
+                [],
+                inner
+              )
+
+            {:ok, labeled_edges}
+
+          :error ->
+            {:ok, []}
+        end
 
       :error ->
         {:error, nil}
@@ -399,13 +434,4 @@ defmodule Yog.Builder.Labeled do
   end
 
   # ============= Private Helpers =============
-
-  defp map_ids_to_labels(edges, graph) do
-    Enum.flat_map(edges, fn {node_id, edge_data} ->
-      case Model.node(graph, node_id) do
-        nil -> []
-        label -> [{label, edge_data}]
-      end
-    end)
-  end
 end

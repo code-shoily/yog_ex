@@ -160,19 +160,31 @@ defmodule Yog.Flow.MaxFlow do
     if source == sink do
       # Build a copy of the original graph as the residual
       return_graph =
-        List.foldl(Map.keys(graph.nodes), Model.new(graph.kind), fn node, acc ->
-          Model.add_node(acc, node, Map.get(graph.nodes, node))
-        end)
+        :maps.fold(
+          fn node, data, acc ->
+            Model.add_node(acc, node, data)
+          end,
+          Model.new(graph.kind),
+          graph.nodes
+        )
 
       return_graph =
-        List.foldl(Map.to_list(graph.out_edges), return_graph, fn {src, inner}, acc ->
-          List.foldl(Map.to_list(inner), acc, fn {dst, weight}, inner_acc ->
-            case Model.add_edge(inner_acc, src, dst, weight) do
-              {:ok, g} -> g
-              {:error, _} -> inner_acc
-            end
-          end)
-        end)
+        :maps.fold(
+          fn src, inner, acc ->
+            :maps.fold(
+              fn dst, weight, inner_acc ->
+                case Model.add_edge(inner_acc, src, dst, weight) do
+                  {:ok, g} -> g
+                  {:error, _} -> inner_acc
+                end
+              end,
+              acc,
+              inner
+            )
+          end,
+          return_graph,
+          graph.out_edges
+        )
 
       MaxFlowResult.new(zero, return_graph, source, sink)
     else
@@ -189,52 +201,54 @@ defmodule Yog.Flow.MaxFlow do
   # Extract all edges and their capacities from the graph
   # Uses direct out_edges access for performance
   defp build_residual_graph(graph, _zero) do
-    nodes = Map.keys(graph.nodes)
     out_edges = graph.out_edges
 
-    List.foldl(nodes, %{}, fn from, acc ->
-      case Map.fetch(out_edges, from) do
-        {:ok, successors} when map_size(successors) > 0 ->
-          node_edges =
-            List.foldl(Map.to_list(successors), %{}, fn {to, capacity}, acc2 ->
-              Map.put(acc2, to, capacity)
-            end)
-
-          if map_size(node_edges) > 0 do
-            Map.put(acc, from, node_edges)
-          else
-            acc
-          end
-
-        _ ->
+    :maps.fold(
+      fn from, successors, acc ->
+        if map_size(successors) > 0 do
+          Map.put(acc, from, successors)
+        else
           acc
-      end
-    end)
+        end
+      end,
+      %{},
+      out_edges
+    )
   end
 
   # Convert internal residual map back to a Yog.Graph structure
   defp residual_to_graph(original_graph, residual_map) do
-    nodes = Map.keys(original_graph.nodes)
     original_nodes = original_graph.nodes
 
     graph =
-      List.foldl(nodes, Model.new(:directed), fn node, acc ->
-        data = Map.get(original_nodes, node)
-        Model.add_node(acc, node, data)
-      end)
+      :maps.fold(
+        fn node, data, acc ->
+          Model.add_node(acc, node, data)
+        end,
+        Model.new(:directed),
+        original_nodes
+      )
 
-    List.foldl(Map.to_list(residual_map), graph, fn {u, edges}, acc ->
-      List.foldl(Map.to_list(edges), acc, fn {v, cap}, inner_acc ->
-        if cap != 0 do
-          case Model.add_edge(inner_acc, u, v, cap) do
-            {:ok, new_graph} -> new_graph
-            {:error, _} -> inner_acc
-          end
-        else
-          inner_acc
-        end
-      end)
-    end)
+    :maps.fold(
+      fn u, edges, acc ->
+        :maps.fold(
+          fn v, cap, inner_acc ->
+            if cap != 0 do
+              case Model.add_edge(inner_acc, u, v, cap) do
+                {:ok, new_graph} -> new_graph
+                {:error, _} -> inner_acc
+              end
+            else
+              inner_acc
+            end
+          end,
+          acc,
+          edges
+        )
+      end,
+      graph,
+      residual_map
+    )
   end
 
   # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity
@@ -313,28 +327,31 @@ defmodule Yog.Flow.MaxFlow do
           current_bot = Map.get(state.bottlenecks, current)
 
           {next_q, next_state} =
-            List.foldl(Map.to_list(neighbors), {rest_q, state}, fn {to, cap},
-                                                                   {q_acc, s_acc} = acc ->
-              if MapSet.member?(s_acc.visited, to) or compare.(cap, zero) == :eq do
-                acc
-              else
-                path_bottleneck =
-                  if current_bot == :infinity,
-                    do: cap,
-                    else: min_fn.(current_bot, cap)
+            :maps.fold(
+              fn to, cap, {q_acc, s_acc} ->
+                if MapSet.member?(s_acc.visited, to) or compare.(cap, zero) == :eq do
+                  {q_acc, s_acc}
+                else
+                  path_bottleneck =
+                    if current_bot == :infinity,
+                      do: cap,
+                      else: min_fn.(current_bot, cap)
 
-                new_q = :queue.in(to, q_acc)
+                  new_q = :queue.in(to, q_acc)
 
-                new_s = %{
-                  s_acc
-                  | parents: Map.put(s_acc.parents, to, current),
-                    bottlenecks: Map.put(s_acc.bottlenecks, to, path_bottleneck),
-                    visited: MapSet.put(s_acc.visited, to)
-                }
+                  new_s = %{
+                    s_acc
+                    | parents: Map.put(s_acc.parents, to, current),
+                      bottlenecks: Map.put(s_acc.bottlenecks, to, path_bottleneck),
+                      visited: MapSet.put(s_acc.visited, to)
+                  }
 
-                {new_q, new_s}
-              end
-            end)
+                  {new_q, new_s}
+                end
+              end,
+              {rest_q, state},
+              neighbors
+            )
 
           do_bfs(next_q, residual, sink, zero, compare, min_fn, next_state)
         end
@@ -377,9 +394,15 @@ defmodule Yog.Flow.MaxFlow do
         source: source,
         max_flow: max_flow
       }) do
-    nodes = Map.keys(residual.nodes) |> MapSet.new()
-    source_side = bfs_reachable_with_compare(residual, source, nodes, 0, &Yog.Utils.compare/2)
-    sink_side = MapSet.difference(nodes, source_side)
+    nodes_set =
+      :maps.fold(
+        fn node, _, acc -> MapSet.put(acc, node) end,
+        MapSet.new(),
+        residual.nodes
+      )
+
+    source_side = bfs_reachable_with_compare(residual, source, nodes_set, 0, &Yog.Utils.compare/2)
+    sink_side = MapSet.difference(nodes_set, source_side)
 
     %Yog.Flow.MinCutResult{
       cut_value: max_flow,
@@ -419,9 +442,15 @@ defmodule Yog.Flow.MaxFlow do
         zero \\ 0,
         compare \\ &Yog.Utils.compare/2
       ) do
-    nodes = Map.keys(residual.nodes) |> MapSet.new()
-    source_side = bfs_reachable_with_compare(residual, source, nodes, zero, compare)
-    sink_side = MapSet.difference(nodes, source_side)
+    nodes_set =
+      :maps.fold(
+        fn node, _, acc -> MapSet.put(acc, node) end,
+        MapSet.new(),
+        residual.nodes
+      )
+
+    source_side = bfs_reachable_with_compare(residual, source, nodes_set, zero, compare)
+    sink_side = MapSet.difference(nodes_set, source_side)
 
     %Yog.Flow.MinCutResult{
       cut_value: max_flow,
@@ -447,28 +476,26 @@ defmodule Yog.Flow.MaxFlow do
         visited
 
       {{:value, current}, rest_q} ->
-        neighbors =
-          case Map.fetch(out_edges, current) do
-            {:ok, edges} ->
-              edges
-              |> Map.to_list()
-              |> Enum.filter(fn {_to, cap} -> compare.(cap, zero) != :eq end)
-              |> Enum.map(fn {to, _} -> to end)
+        case Map.fetch(out_edges, current) do
+          {:ok, edges} ->
+            {next_q, next_visited} =
+              :maps.fold(
+                fn neighbor, cap, {q_acc, v_acc} ->
+                  if !MapSet.member?(v_acc, neighbor) and compare.(cap, zero) != :eq do
+                    {:queue.in(neighbor, q_acc), MapSet.put(v_acc, neighbor)}
+                  else
+                    {q_acc, v_acc}
+                  end
+                end,
+                {rest_q, visited},
+                edges
+              )
 
-            :error ->
-              []
-          end
+            do_reachable_bfs(next_q, out_edges, zero, compare, next_visited)
 
-        {next_q, next_visited} =
-          List.foldl(neighbors, {rest_q, visited}, fn neighbor, {q_acc, visited_acc} ->
-            if MapSet.member?(visited_acc, neighbor) do
-              {q_acc, visited_acc}
-            else
-              {:queue.in(neighbor, q_acc), MapSet.put(visited_acc, neighbor)}
-            end
-          end)
-
-        do_reachable_bfs(next_q, out_edges, zero, compare, next_visited)
+          :error ->
+            do_reachable_bfs(rest_q, out_edges, zero, compare, visited)
+        end
     end
   end
 end

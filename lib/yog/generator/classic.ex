@@ -115,28 +115,23 @@ defmodule Yog.Generator.Classic do
 
     # Add all nodes
     graph =
-      Enum.reduce(0..(n - 1), base, fn i, g ->
+      Enum.reduce(0..(n - 1)//1, base, fn i, g ->
         Yog.add_node(g, i, nil)
       end)
 
-    # Add all edges (each pair connects both ways for undirected)
-    edges = for i <- 0..(n - 1)//1, j <- 0..(n - 1)//1, i != j, do: {i, j, 1}
-
-    edges
-    |> maybe_filter_undirected(graph_type)
-    |> Enum.reduce(graph, fn {from, to, weight}, g ->
-      Yog.add_edge!(g, from, to, weight)
+    # Add all edges directly without intermediate list allocation
+    Enum.reduce(0..(n - 1), graph, fn i, g_i ->
+      Enum.reduce(0..(n - 1), g_i, fn j, g_j ->
+        if i != j && (graph_type == :directed || i < j) do
+          Yog.add_edge!(g_j, i, j, 1)
+        else
+          g_j
+        end
+      end)
     end)
   end
 
   def complete_with_type(_n, _graph_type), do: Yog.new(:undirected)
-
-  defp maybe_filter_undirected(edges, :undirected) do
-    # For undirected graphs, only keep edges where from < to
-    Enum.filter(edges, fn {from, to, _} -> from < to end)
-  end
-
-  defp maybe_filter_undirected(edges, :directed), do: edges
 
   # ============= Cycle Graph =============
 
@@ -178,14 +173,12 @@ defmodule Yog.Generator.Classic do
     base = Yog.new(graph_type)
 
     graph =
-      Enum.reduce(0..(n - 1), base, fn i, g ->
+      Enum.reduce(0..(n - 1)//1, base, fn i, g ->
         Yog.add_node(g, i, nil)
       end)
 
-    edges = for i <- 0..(n - 1)//1, do: {i, rem(i + 1, n), 1}
-
-    Enum.reduce(edges, graph, fn {from, to, weight}, g ->
-      Yog.add_edge!(g, from, to, weight)
+    Enum.reduce(0..(n - 1)//1, graph, fn i, g ->
+      Yog.add_edge!(g, i, rem(i + 1, n), 1)
     end)
   end
 
@@ -231,15 +224,17 @@ defmodule Yog.Generator.Classic do
     base = Yog.new(graph_type)
 
     graph =
-      Enum.reduce(0..(n - 1), base, fn i, g ->
+      Enum.reduce(0..(n - 1)//1, base, fn i, g ->
         Yog.add_node(g, i, nil)
       end)
 
-    edges = if n >= 2, do: for(i <- 0..(n - 2)//1, do: {i, i + 1, 1}), else: []
-
-    Enum.reduce(edges, graph, fn {from, to, weight}, g ->
-      Yog.add_edge!(g, from, to, weight)
-    end)
+    if n >= 2 do
+      Enum.reduce(0..(n - 2)//1, graph, fn i, g ->
+        Yog.add_edge!(g, i, i + 1, 1)
+      end)
+    else
+      graph
+    end
   end
 
   # ============= Star Graph =============
@@ -284,15 +279,17 @@ defmodule Yog.Generator.Classic do
     base = Yog.new(graph_type)
 
     graph =
-      Enum.reduce(0..(n - 1), base, fn i, g ->
+      Enum.reduce(0..(n - 1)//1, base, fn i, g ->
         Yog.add_node(g, i, nil)
       end)
 
-    edges = if n >= 2, do: for(i <- 1..(n - 1)//1, do: {0, i, 1}), else: []
-
-    Enum.reduce(edges, graph, fn {from, to, weight}, g ->
-      Yog.add_edge!(g, from, to, weight)
-    end)
+    if n >= 2 do
+      Enum.reduce(1..(n - 1)//1, graph, fn i, g ->
+        Yog.add_edge!(g, 0, i, 1)
+      end)
+    else
+      graph
+    end
   end
 
   # ============= Wheel Graph =============
@@ -337,22 +334,20 @@ defmodule Yog.Generator.Classic do
 
     # Add all nodes: 0 is center, 1..(n-1) are rim
     graph =
-      Enum.reduce(0..(n - 1), base, fn i, g ->
+      Enum.reduce(0..(n - 1)//1, base, fn i, g ->
         Yog.add_node(g, i, nil)
       end)
 
     # Spokes: center (0) to each rim node
-    spokes = for i <- 1..(n - 1), do: {0, i, 1}
+    graph_with_spokes =
+      Enum.reduce(1..(n - 1)//1, graph, fn i, g ->
+        Yog.add_edge!(g, 0, i, 1)
+      end)
 
     # Rim cycle: edges between consecutive rim nodes
-    rim =
-      for i <- 1..(n - 1)//1 do
-        next = if(i == n - 1, do: 1, else: i + 1)
-        {i, next, 1}
-      end
-
-    Enum.reduce(spokes ++ rim, graph, fn {from, to, weight}, g ->
-      Yog.add_edge!(g, from, to, weight)
+    Enum.reduce(1..(n - 1)//1, graph_with_spokes, fn i, g ->
+      next = if(i == n - 1, do: 1, else: i + 1)
+      Yog.add_edge!(g, i, next, 1)
     end)
   end
 
@@ -409,10 +404,10 @@ defmodule Yog.Generator.Classic do
       end
 
     # All edges from first partition to second
-    edges = for i <- 0..(m - 1)//1, j <- m..(total - 1)//1, do: {i, j, 1}
-
-    Enum.reduce(edges, graph, fn {from, to, weight}, g ->
-      Yog.add_edge!(g, from, to, weight)
+    Enum.reduce(0..(m - 1)//1, graph, fn i, g_i ->
+      Enum.reduce(m..(total - 1)//1, g_i, fn j, g_j ->
+        Yog.add_edge!(g_j, i, j, 1)
+      end)
     end)
   end
 
@@ -462,14 +457,13 @@ defmodule Yog.Generator.Classic do
 
     # For each non-leaf node, add edges to its children
     # Node i has children at 2i+1 and 2i+2
-    edges =
-      for i <- 0..(Integer.pow(2, depth) - 2)//1,
-          left = 2 * i + 1,
-          right = 2 * i + 2,
-          do: [{i, left, 1}, {i, right, 1}]
+    Enum.reduce(0..(Integer.pow(2, depth) - 2), graph, fn i, g ->
+      left = 2 * i + 1
+      right = 2 * i + 2
 
-    Enum.reduce(List.flatten(edges), graph, fn {from, to, weight}, g ->
-      Yog.add_edge!(g, from, to, weight)
+      g
+      |> Yog.add_edge!(i, left, 1)
+      |> Yog.add_edge!(i, right, 1)
     end)
   end
 
@@ -520,29 +514,28 @@ defmodule Yog.Generator.Classic do
         Yog.add_node(g, i, nil)
       end)
 
-    # Generate edges between adjacent cells
-    # Node at (r, c) has index r * cols + c
-    horizontal_edges =
+    # Generate horizontal edges
+    graph_h =
       if cols >= 2 do
-        for r <- 0..(rows - 1)//1,
-            c <- 0..(cols - 2)//1,
-            do: {r * cols + c, r * cols + c + 1, 1}
+        Enum.reduce(0..(rows - 1)//1, graph, fn r, g_r ->
+          Enum.reduce(0..(cols - 2)//1, g_r, fn c, g_c ->
+            Yog.add_edge!(g_c, r * cols + c, r * cols + c + 1, 1)
+          end)
+        end)
       else
-        []
+        graph
       end
 
-    vertical_edges =
-      if rows >= 2 do
-        for r <- 0..(rows - 2)//1,
-            c <- 0..(cols - 1)//1,
-            do: {r * cols + c, (r + 1) * cols + c, 1}
-      else
-        []
-      end
-
-    Enum.reduce(horizontal_edges ++ vertical_edges, graph, fn {from, to, weight}, g ->
-      Yog.add_edge!(g, from, to, weight)
-    end)
+    # Generate vertical edges
+    if rows >= 2 do
+      Enum.reduce(0..(rows - 2)//1, graph_h, fn r, g_r ->
+        Enum.reduce(0..(cols - 1)//1, g_r, fn c, g_c ->
+          Yog.add_edge!(g_c, r * cols + c, (r + 1) * cols + c, 1)
+        end)
+      end)
+    else
+      graph_h
+    end
   end
 
   # ============= Special Graphs =============
@@ -593,17 +586,24 @@ defmodule Yog.Generator.Classic do
       end)
 
     # Outer pentagon edges (0-1-2-3-4-0)
-    outer_edges = [{0, 1, 1}, {1, 2, 1}, {2, 3, 1}, {3, 4, 1}, {4, 0, 1}]
-
     # Inner star edges (5-7-9-6-8-5) - note this is a 5-pointed star
-    inner_edges = [{5, 7, 1}, {7, 9, 1}, {9, 6, 1}, {6, 8, 1}, {8, 5, 1}]
-
     # Spokes connecting outer to inner (0-5, 1-6, 2-7, 3-8, 4-9)
-    spokes = [{0, 5, 1}, {1, 6, 1}, {2, 7, 1}, {3, 8, 1}, {4, 9, 1}]
-
-    Enum.reduce(outer_edges ++ inner_edges ++ spokes, graph, fn {from, to, weight}, g ->
-      Yog.add_edge!(g, from, to, weight)
-    end)
+    graph
+    |> Yog.add_edge!(0, 1, 1)
+    |> Yog.add_edge!(1, 2, 1)
+    |> Yog.add_edge!(2, 3, 1)
+    |> Yog.add_edge!(3, 4, 1)
+    |> Yog.add_edge!(4, 0, 1)
+    |> Yog.add_edge!(5, 7, 1)
+    |> Yog.add_edge!(7, 9, 1)
+    |> Yog.add_edge!(9, 6, 1)
+    |> Yog.add_edge!(6, 8, 1)
+    |> Yog.add_edge!(8, 5, 1)
+    |> Yog.add_edge!(0, 5, 1)
+    |> Yog.add_edge!(1, 6, 1)
+    |> Yog.add_edge!(2, 7, 1)
+    |> Yog.add_edge!(3, 8, 1)
+    |> Yog.add_edge!(4, 9, 1)
   end
 
   # ============= Empty Graph =============
@@ -705,16 +705,16 @@ defmodule Yog.Generator.Classic do
       end)
 
     # Add edges: connect nodes that differ by exactly one bit
-    edges =
-      for i <- 0..(num_nodes - 1),
-          bit <- 0..(n - 1),
-          j = Bitwise.bxor(i, Bitwise.bsl(1, bit)),
-          # Avoid duplicates for undirected
-          i < j,
-          do: {i, j, 1}
+    Enum.reduce(0..(num_nodes - 1)//1, graph, fn i, g_i ->
+      Enum.reduce(0..(n - 1)//1, g_i, fn bit, g_j ->
+        j = Bitwise.bxor(i, Bitwise.bsl(1, bit))
 
-    Enum.reduce(edges, graph, fn {from, to, weight}, g ->
-      Yog.add_edge!(g, from, to, weight)
+        if i < j do
+          Yog.add_edge!(g_j, i, j, 1)
+        else
+          g_j
+        end
+      end)
     end)
   end
 
@@ -776,16 +776,28 @@ defmodule Yog.Generator.Classic do
       end)
 
     # Bottom rail edges: (i, i+1) for i in 0..n-2
-    bottom_edges = if n >= 2, do: for(i <- 0..(n - 2), do: {i, i + 1, 1}), else: []
+    graph_bottom =
+      if n >= 2 do
+        Enum.reduce(0..(n - 2)//1, graph, fn i, g ->
+          Yog.add_edge!(g, i, i + 1, 1)
+        end)
+      else
+        graph
+      end
 
     # Top rail edges: (i, i+1) for i in n..2n-2
-    top_edges = if n >= 2, do: for(i <- n..(2 * n - 2), do: {i, i + 1, 1}), else: []
+    graph_top =
+      if n >= 2 do
+        Enum.reduce(n..(2 * n - 2)//1, graph_bottom, fn i, g ->
+          Yog.add_edge!(g, i, i + 1, 1)
+        end)
+      else
+        graph_bottom
+      end
 
     # Rung edges: (i, i+n) for i in 0..n-1
-    rung_edges = for(i <- 0..(n - 1), do: {i, i + n, 1})
-
-    Enum.reduce(bottom_edges ++ top_edges ++ rung_edges, graph, fn {from, to, weight}, g ->
-      Yog.add_edge!(g, from, to, weight)
+    Enum.reduce(0..(n - 1)//1, graph_top, fn i, g ->
+      Yog.add_edge!(g, i, i + n, 1)
     end)
   end
 
@@ -851,7 +863,7 @@ defmodule Yog.Generator.Classic do
 
     # Add all nodes
     graph =
-      Enum.reduce(0..(n - 1), base, fn i, g ->
+      Enum.reduce(0..(n - 1)//1, base, fn i, g ->
         Yog.add_node(g, i, nil)
       end)
 

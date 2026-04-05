@@ -70,34 +70,36 @@ defmodule Yog.Centrality do
   @spec degree(Yog.graph(), degree_mode()) :: centrality_scores()
   def degree(graph, mode \\ :total_degree) do
     n = map_size(graph.nodes)
-    nodes = Map.keys(graph.nodes)
-
     factor = if n > 1, do: (n - 1) * 1.0, else: 1.0
 
-    %Yog.Graph{kind: kind, out_edges: out_edges, in_edges: in_edges} = graph
+    %Yog.Graph{kind: kind, out_edges: out_edges, in_edges: in_edges, nodes: nodes_map} = graph
 
-    List.foldl(nodes, %{}, fn id, acc ->
-      count =
-        case kind do
-          :undirected ->
-            Map.get(out_edges, id, %{}) |> map_size()
+    :maps.fold(
+      fn id, _, acc ->
+        count =
+          case kind do
+            :undirected ->
+              Map.get(out_edges, id, %{}) |> map_size()
 
-          :directed ->
-            case mode do
-              :in_degree ->
-                Map.get(in_edges, id, %{}) |> map_size()
+            :directed ->
+              case mode do
+                :in_degree ->
+                  Map.get(in_edges, id, %{}) |> map_size()
 
-              :out_degree ->
-                Map.get(out_edges, id, %{}) |> map_size()
+                :out_degree ->
+                  Map.get(out_edges, id, %{}) |> map_size()
 
-              :total_degree ->
-                (Map.get(out_edges, id, %{}) |> map_size()) +
-                  (Map.get(in_edges, id, %{}) |> map_size())
-            end
-        end
+                :total_degree ->
+                  (Map.get(out_edges, id, %{}) |> map_size()) +
+                    (Map.get(in_edges, id, %{}) |> map_size())
+              end
+          end
 
-      Map.put(acc, id, count / factor)
-    end)
+        Map.put(acc, id, count / factor)
+      end,
+      %{},
+      nodes_map
+    )
   end
 
   @doc """
@@ -148,14 +150,17 @@ defmodule Yog.Centrality do
     compare = opts[:compare] || (&Yog.Utils.compare/2)
     to_float = opts[:to_float] || fn x -> x * 1.0 end
 
-    nodes = Map.keys(graph.nodes)
     n = map_size(graph.nodes)
 
     if n <= 1 do
-      List.foldl(nodes, %{}, fn id, acc ->
-        Map.put(acc, id, 0.0)
-      end)
+      :maps.fold(
+        fn id, _, acc -> Map.put(acc, id, 0.0) end,
+        %{},
+        graph.nodes
+      )
     else
+      nodes = Map.keys(graph.nodes)
+
       # Set parallelism options
       parallel_opts = [
         max_concurrency: System.schedulers_online(),
@@ -171,9 +176,13 @@ defmodule Yog.Centrality do
             {source, 0.0}
           else
             total_distance =
-              List.foldl(Map.to_list(distances), zero, fn {_node, dist}, sum ->
-                add.(sum, dist)
-              end)
+              :maps.fold(
+                fn _node, dist, sum ->
+                  add.(sum, dist)
+                end,
+                zero,
+                distances
+              )
 
             centrality_score = (n - 1) / to_float.(total_distance)
             {source, centrality_score}
@@ -232,15 +241,17 @@ defmodule Yog.Centrality do
     compare = opts[:compare] || (&Yog.Utils.compare/2)
     to_float = opts[:to_float] || fn x -> x * 1.0 end
 
-    nodes = Map.keys(graph.nodes)
     n = map_size(graph.nodes)
 
     if n <= 1 do
-      List.foldl(nodes, %{}, fn id, acc ->
-        Map.put(acc, id, 0.0)
-      end)
+      :maps.fold(
+        fn id, _, acc -> Map.put(acc, id, 0.0) end,
+        %{},
+        graph.nodes
+      )
     else
       denominator = (n - 1) * 1.0
+      nodes = Map.keys(graph.nodes)
 
       parallel_opts = [
         max_concurrency: System.schedulers_online(),
@@ -253,19 +264,23 @@ defmodule Yog.Centrality do
           distances = dijkstra_single_source(graph, source, zero, add, compare)
 
           sum_of_reciprocals =
-            List.foldl(Map.to_list(distances), 0.0, fn {node, dist}, sum ->
-              if node == source do
-                sum
-              else
-                d = to_float.(dist)
-
-                if d > 0.0 do
-                  sum + 1.0 / d
-                else
+            :maps.fold(
+              fn node, dist, sum ->
+                if node == source do
                   sum
+                else
+                  d = to_float.(dist)
+
+                  if d > 0.0 do
+                    sum + 1.0 / d
+                  else
+                    sum
+                  end
                 end
-              end
-            end)
+              end,
+              0.0,
+              distances
+            )
 
           {source, sum_of_reciprocals / denominator}
         end,
@@ -319,12 +334,14 @@ defmodule Yog.Centrality do
     compare = opts[:compare] || (&Yog.Utils.compare/2)
     _to_float = opts[:to_float] || fn x -> x * 1.0 end
 
-    nodes = Map.keys(graph.nodes)
-
     initial =
-      List.foldl(nodes, %{}, fn id, acc ->
-        Map.put(acc, id, 0.0)
-      end)
+      :maps.fold(
+        fn id, _, acc -> Map.put(acc, id, 0.0) end,
+        %{},
+        graph.nodes
+      )
+
+    nodes = Map.keys(graph.nodes)
 
     parallel_opts = [
       max_concurrency: System.schedulers_online(),
@@ -409,24 +426,42 @@ defmodule Yog.Centrality do
     %Yog.Graph{kind: kind, out_edges: out_edges, in_edges: in_edges} = graph
 
     in_neighbors_map =
-      List.foldl(nodes, %{}, fn id, acc ->
-        Map.put(acc, id, get_in_neighbor_ids_fast(kind, out_edges, in_edges, id))
-      end)
+      :maps.fold(
+        fn id, _, acc ->
+          Map.put(acc, id, get_in_neighbor_ids_fast(kind, out_edges, in_edges, id))
+        end,
+        %{},
+        graph.nodes
+      )
 
     out_degrees_map =
-      List.foldl(nodes, %{}, fn id, acc ->
-        Map.put(acc, id, get_out_degree_fast(kind, out_edges, id))
-      end)
+      :maps.fold(
+        fn id, _, acc ->
+          Map.put(acc, id, get_out_degree_fast(kind, out_edges, id))
+        end,
+        %{},
+        graph.nodes
+      )
 
     sinks =
-      Enum.filter(nodes, fn id -> out_degrees_map[id] == 0 end)
+      :maps.fold(
+        fn id, _, acc ->
+          if Map.get(out_degrees_map, id) == 0, do: [id | acc], else: acc
+        end,
+        [],
+        graph.nodes
+      )
 
     initial_rank = 1.0 / n
 
     ranks =
-      List.foldl(nodes, %{}, fn id, acc ->
-        Map.put(acc, id, initial_rank)
-      end)
+      :maps.fold(
+        fn id, _, acc ->
+          Map.put(acc, id, initial_rank)
+        end,
+        %{},
+        graph.nodes
+      )
 
     iterate_pagerank(
       ranks,

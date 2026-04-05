@@ -267,9 +267,13 @@ defmodule Yog.Multi.Model do
   @spec to_simple_graph(t(), (any(), any() -> any())) :: Yog.graph()
   def to_simple_graph(graph, combine_fn) do
     base =
-      Enum.reduce(graph.nodes, %{}, fn {id, data}, g ->
-        Map.put(g, id, data)
-      end)
+      :maps.fold(
+        fn id, data, g_acc ->
+          Map.put(g_acc, id, data)
+        end,
+        %{},
+        graph.nodes
+      )
 
     edges =
       Enum.reduce(graph.edges, %{}, fn {_eid, {src, dst, data}}, acc ->

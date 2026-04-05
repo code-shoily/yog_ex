@@ -97,9 +97,9 @@ defmodule Yog.Flow.MinCut do
   """
   @spec global_min_cut(Yog.graph()) :: MinCutResult.t()
   def global_min_cut(graph) do
-    nodes = Map.keys(graph.nodes)
+    order = Yog.Model.order(graph)
 
-    case length(nodes) do
+    case order do
       n when n <= 1 ->
         MinCutResult.new(0, 0, 0)
 
@@ -141,30 +141,40 @@ defmodule Yog.Flow.MinCut do
   # - t: last node added
   # - cut_weight: accumulated weight in the MAS weights dict for t
   defp maximum_adjacency_search(graph) do
-    nodes = Map.keys(graph.nodes)
-    [start | rest] = nodes
+    # Pick first node without allocating entire keys list
+    {start, _} = Enum.at(graph.nodes, 0)
 
     # Direct edge access for performance
     out_edges = graph.out_edges
 
     initial_dists =
       case Map.fetch(out_edges, start) do
-        {:ok, neighbors} ->
-          List.foldl(Map.to_list(neighbors), %{}, fn {neighbor, weight}, acc ->
-            Map.put(acc, neighbor, weight)
-          end)
-
-        :error ->
-          %{}
+        {:ok, neighbors} -> neighbors
+        :error -> %{}
       end
 
     pq =
-      List.foldl(rest, PriorityQueue.new(fn a, b -> a >= b end), fn node, acc ->
-        dist = Map.get(initial_dists, node, 0)
-        PriorityQueue.push(acc, {dist, node})
-      end)
+      :maps.fold(
+        fn node, _, acc ->
+          if node == start do
+            acc
+          else
+            dist = Map.get(initial_dists, node, 0)
+            PriorityQueue.push(acc, {dist, node})
+          end
+        end,
+        PriorityQueue.new(fn a, b -> a >= b end),
+        graph.nodes
+      )
 
-    remaining = MapSet.new(rest)
+    remaining =
+      :maps.fold(
+        fn node, _, acc ->
+          if node == start, do: acc, else: MapSet.put(acc, node)
+        end,
+        MapSet.new(),
+        graph.nodes
+      )
 
     {final_order, final_weights} =
       build_mas_order(
@@ -194,20 +204,23 @@ defmodule Yog.Flow.MinCut do
       {new_weights, updated_queue} =
         case Map.fetch(out_edges, node) do
           {:ok, neighbors} ->
-            List.foldl(Map.to_list(neighbors), {weights, new_queue}, fn {neighbor, weight},
-                                                                        {weights_acc, queue_acc} ->
-              if MapSet.member?(new_remaining, neighbor) do
-                existing_w = Map.get(weights_acc, neighbor, 0)
-                new_w = existing_w + weight
+            :maps.fold(
+              fn neighbor, weight, {weights_acc, queue_acc} ->
+                if MapSet.member?(new_remaining, neighbor) do
+                  existing_w = Map.get(weights_acc, neighbor, 0)
+                  new_w = existing_w + weight
 
-                new_weights_acc = Map.put(weights_acc, neighbor, new_w)
-                new_queue_acc = PriorityQueue.push(queue_acc, {new_w, neighbor})
+                  new_weights_acc = Map.put(weights_acc, neighbor, new_w)
+                  new_queue_acc = PriorityQueue.push(queue_acc, {new_w, neighbor})
 
-                {new_weights_acc, new_queue_acc}
-              else
-                {weights_acc, queue_acc}
-              end
-            end)
+                  {new_weights_acc, new_queue_acc}
+                else
+                  {weights_acc, queue_acc}
+                end
+              end,
+              {weights, new_queue},
+              neighbors
+            )
 
           :error ->
             {weights, new_queue}

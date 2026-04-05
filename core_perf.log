@@ -1,0 +1,11 @@
+
+Generating test graph (5000 nodes, 20000 edges)...
+Done!
+
+Running Core Benchmarks...
+  Yog.all_nodes/1 (List Allocation):    avg: 89.66μs | min: 72.0μs | max: 1.07ms
+  Direct Map Iteration (Manual):        avg: 77.74μs | min: 74.0μs | max: 93.0μs
+  Yog.successors/2 (Map.to_list):       avg: 5.8μs | min: 5.0μs | max: 7.0μs
+  Direct Edge Map Access (fetch):       avg: 4.1μs | min: 4.0μs | max: 6.0μs
+  Yog.Transform.to_undirected/1:        avg: 7.43ms | min: 5.65ms | max: 10.31ms
+  Yog.Operation.intersection/2:         avg: 15.03ms | min: 13.02ms | max: 18.28ms

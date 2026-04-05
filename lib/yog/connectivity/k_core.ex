@@ -69,21 +69,33 @@ defmodule Yog.Connectivity.KCore do
     out_edges = graph.out_edges
     nodes = Map.keys(graph.nodes)
 
-    degrees =
-      List.foldl(nodes, %{}, fn u, acc ->
-        deg =
-          case Map.fetch(out_edges, u) do
-            {:ok, neighbors} -> map_size(neighbors)
-            :error -> 0
-          end
+    degrees_ =
+      :maps.fold(
+        fn u, inner, acc ->
+          Map.put(acc, u, map_size(inner))
+        end,
+        %{},
+        out_edges
+      )
 
-        Map.put(acc, u, deg)
-      end)
+    # Ensure all nodes have degree entries
+    degrees =
+      :maps.fold(
+        fn u, _, acc ->
+          Map.put_new(acc, u, 0)
+        end,
+        degrees_,
+        graph.nodes
+      )
 
     to_prune =
-      List.foldl(nodes, [], fn u, acc ->
-        if Map.fetch!(degrees, u) < k, do: [u | acc], else: acc
-      end)
+      :maps.fold(
+        fn u, deg, acc ->
+          if deg < k, do: [u | acc], else: acc
+        end,
+        [],
+        degrees
+      )
 
     queue_set = MapSet.new(to_prune)
 
@@ -103,29 +115,33 @@ defmodule Yog.Connectivity.KCore do
     else
       new_pruned = MapSet.put(pruned, u)
 
-      neighbors =
-        case Map.fetch(out_edges, u) do
-          {:ok, nbrs} -> Map.keys(nbrs)
-          :error -> []
-        end
+      case Map.fetch(out_edges, u) do
+        {:ok, neighbors} ->
+          {new_rest, new_queue_set, new_degrees} =
+            :maps.fold(
+              fn v, _, {acc_rest, acc_qs, acc_deg} ->
+                if MapSet.member?(new_pruned, v) do
+                  {acc_rest, acc_qs, acc_deg}
+                else
+                  new_deg = Map.fetch!(acc_deg, v) - 1
+                  acc_deg = Map.put(acc_deg, v, new_deg)
 
-      {new_rest, new_queue_set, new_degrees} =
-        List.foldl(neighbors, {rest, queue_set, degrees}, fn v, {acc_rest, acc_qs, acc_deg} ->
-          if MapSet.member?(new_pruned, v) do
-            {acc_rest, acc_qs, acc_deg}
-          else
-            new_deg = Map.fetch!(acc_deg, v) - 1
-            acc_deg = Map.put(acc_deg, v, new_deg)
+                  if new_deg < k and not MapSet.member?(acc_qs, v) do
+                    {[v | acc_rest], MapSet.put(acc_qs, v), acc_deg}
+                  else
+                    {acc_rest, acc_qs, acc_deg}
+                  end
+                end
+              end,
+              {rest, queue_set, degrees},
+              neighbors
+            )
 
-            if new_deg < k and not MapSet.member?(acc_qs, v) do
-              {[v | acc_rest], MapSet.put(acc_qs, v), acc_deg}
-            else
-              {acc_rest, acc_qs, acc_deg}
-            end
-          end
-        end)
+          do_prune(out_edges, new_rest, new_queue_set, new_degrees, k, new_pruned)
 
-      do_prune(out_edges, new_rest, new_queue_set, new_degrees, k, new_pruned)
+        :error ->
+          do_prune(out_edges, rest, queue_set, degrees, k, new_pruned)
+      end
     end
   end
 
@@ -142,18 +158,25 @@ defmodule Yog.Connectivity.KCore do
   @spec core_numbers(Yog.graph()) :: %{Yog.node_id() => integer()}
   def core_numbers(graph) do
     out_edges = graph.out_edges
-    nodes = Map.keys(graph.nodes)
 
+    degrees_ =
+      :maps.fold(
+        fn u, inner, acc ->
+          Map.put(acc, u, map_size(inner))
+        end,
+        %{},
+        out_edges
+      )
+
+    # Ensure all nodes are present
     degrees =
-      List.foldl(nodes, %{}, fn u, acc ->
-        deg =
-          case Map.fetch(out_edges, u) do
-            {:ok, nbrs} -> map_size(nbrs)
-            :error -> 0
-          end
-
-        Map.put(acc, u, deg)
-      end)
+      :maps.fold(
+        fn u, _, acc ->
+          Map.put_new(acc, u, 0)
+        end,
+        degrees_,
+        graph.nodes
+      )
 
     max_deg =
       if degrees == %{} do
@@ -162,15 +185,18 @@ defmodule Yog.Connectivity.KCore do
         degrees |> Map.values() |> Enum.max()
       end
 
-    do_calculate_core_numbers(out_edges, nodes, degrees, max_deg)
+    do_calculate_core_numbers(out_edges, degrees, max_deg)
   end
 
-  defp do_calculate_core_numbers(out_edges, nodes, degrees, max_deg) do
+  defp do_calculate_core_numbers(out_edges, degrees, max_deg) do
     buckets =
-      List.foldl(nodes, %{}, fn u, acc ->
-        deg = Map.fetch!(degrees, u)
-        Map.update(acc, deg, [u], &[u | &1])
-      end)
+      :maps.fold(
+        fn u, deg, acc ->
+          Map.update(acc, deg, [u], &[u | &1])
+        end,
+        %{},
+        degrees
+      )
 
     initial_state = {degrees, %{}, buckets, MapSet.new()}
 
@@ -194,28 +220,32 @@ defmodule Yog.Connectivity.KCore do
           cores = Map.put(cores, u, i)
           processed = MapSet.put(processed, u)
 
-          neighbors =
-            case Map.fetch(out_edges, u) do
-              {:ok, nbrs} -> Map.keys(nbrs)
-              :error -> []
-            end
-
           {new_degs, new_buckets} =
-            List.foldl(neighbors, {degs, Map.put(buckets, i, rest)}, fn v, {d_acc, b_acc} ->
-              if MapSet.member?(processed, v) do
-                {d_acc, b_acc}
-              else
-                old_v_deg = Map.fetch!(d_acc, v)
-                new_v_deg = old_v_deg - 1
+            case Map.fetch(out_edges, u) do
+              {:ok, neighbors} ->
+                :maps.fold(
+                  fn v, _, {d_acc, b_acc} ->
+                    if MapSet.member?(processed, v) do
+                      {d_acc, b_acc}
+                    else
+                      old_v_deg = Map.fetch!(d_acc, v)
+                      new_v_deg = old_v_deg - 1
 
-                d_acc = Map.put(d_acc, v, new_v_deg)
+                      d_acc = Map.put(d_acc, v, new_v_deg)
 
-                target_bucket = max(new_v_deg, i)
-                b_acc = Map.update(b_acc, target_bucket, [v], &[v | &1])
+                      target_bucket = max(new_v_deg, i)
+                      b_acc = Map.update(b_acc, target_bucket, [v], &[v | &1])
 
-                {d_acc, b_acc}
-              end
-            end)
+                      {d_acc, b_acc}
+                    end
+                  end,
+                  {degs, Map.put(buckets, i, rest)},
+                  neighbors
+                )
+
+              :error ->
+                {degs, Map.put(buckets, i, rest)}
+            end
 
           process_bucket(out_edges, i, {new_degs, cores, new_buckets, processed})
         end

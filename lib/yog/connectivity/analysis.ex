@@ -3,8 +3,6 @@ defmodule Yog.Connectivity.Analysis do
   Algorithms for analyzing graph connectivity (bridges, articulation points).
   """
 
-  alias Yog.Model
-
   @type bridge :: {Yog.node_id(), Yog.node_id()}
   @type connectivity_results :: %{
           bridges: [bridge()],
@@ -27,8 +25,6 @@ defmodule Yog.Connectivity.Analysis do
   end
 
   defp do_analyze(graph) do
-    all_nodes = Model.all_nodes(graph)
-
     initial_state = %{
       disc: %{},
       low: %{},
@@ -39,13 +35,17 @@ defmodule Yog.Connectivity.Analysis do
     }
 
     final_state =
-      Enum.reduce(all_nodes, initial_state, fn node, state ->
-        if Map.has_key?(state.disc, node) do
-          state
-        else
-          analyze_dfs(graph, node, state)
-        end
-      end)
+      :maps.fold(
+        fn node, _, state ->
+          if Map.has_key?(state.disc, node) do
+            state
+          else
+            analyze_dfs(graph, node, state)
+          end
+        end,
+        initial_state,
+        graph.nodes
+      )
 
     %{
       bridges: Enum.sort(final_state.bridges),
@@ -59,52 +59,63 @@ defmodule Yog.Connectivity.Analysis do
       |> Map.update!(:low, &Map.put(&1, node, state.time))
       |> Map.update!(:time, &(&1 + 1))
 
-    neighbors = Model.successor_ids(graph, node)
-
-    # Use a tuple {state, children_count} to track state and counter functionally
     {state_after_neighbors, children_count} =
-      Enum.reduce(neighbors, {state, 0}, fn neighbor, {acc_state, count} ->
-        case Map.fetch(acc_state.disc, neighbor) do
-          :error ->
-            new_count = count + 1
+      case Map.fetch(graph.out_edges, node) do
+        {:ok, edges} ->
+          :maps.fold(
+            fn neighbor, _, {acc_state, count} ->
+              case Map.fetch(acc_state.disc, neighbor) do
+                :error ->
+                  new_count = count + 1
 
-            new_state =
-              Map.update!(acc_state, :parent, &Map.put(&1, neighbor, node))
-              |> then(&analyze_dfs(graph, neighbor, &1))
+                  new_state =
+                    Map.update!(acc_state, :parent, &Map.put(&1, neighbor, node))
+                    |> then(&analyze_dfs(graph, neighbor, &1))
 
-            new_low = min(Map.fetch!(new_state.low, node), Map.fetch!(new_state.low, neighbor))
-            new_state = Map.update!(new_state, :low, &Map.put(&1, node, new_low))
+                  new_low =
+                    min(Map.fetch!(new_state.low, node), Map.fetch!(new_state.low, neighbor))
 
-            parent = Map.get(new_state.parent, node)
+                  new_state = Map.update!(new_state, :low, &Map.put(&1, node, new_low))
 
-            new_state =
-              if parent != nil and
-                   Map.fetch!(new_state.low, neighbor) >= Map.fetch!(new_state.disc, node) do
-                Map.update!(new_state, :articulation_points, &MapSet.put(&1, node))
-              else
-                new_state
+                  parent = Map.get(new_state.parent, node)
+
+                  new_state =
+                    if parent != nil and
+                         Map.fetch!(new_state.low, neighbor) >= Map.fetch!(new_state.disc, node) do
+                      Map.update!(new_state, :articulation_points, &MapSet.put(&1, node))
+                    else
+                      new_state
+                    end
+
+                  new_state =
+                    if Map.fetch!(new_state.low, neighbor) > Map.fetch!(new_state.disc, node) do
+                      bridge = if node < neighbor, do: {node, neighbor}, else: {neighbor, node}
+                      Map.update!(new_state, :bridges, &[bridge | &1])
+                    else
+                      new_state
+                    end
+
+                  {new_state, new_count}
+
+                {:ok, _} ->
+                  if Map.get(acc_state.parent, node) != neighbor do
+                    new_low =
+                      min(Map.fetch!(acc_state.low, node), Map.fetch!(acc_state.disc, neighbor))
+
+                    new_state = Map.update!(acc_state, :low, &Map.put(&1, node, new_low))
+                    {new_state, count}
+                  else
+                    {acc_state, count}
+                  end
               end
+            end,
+            {state, 0},
+            edges
+          )
 
-            new_state =
-              if Map.fetch!(new_state.low, neighbor) > Map.fetch!(new_state.disc, node) do
-                bridge = if node < neighbor, do: {node, neighbor}, else: {neighbor, node}
-                Map.update!(new_state, :bridges, &[bridge | &1])
-              else
-                new_state
-              end
-
-            {new_state, new_count}
-
-          {:ok, _} ->
-            if Map.get(acc_state.parent, node) != neighbor do
-              new_low = min(Map.fetch!(acc_state.low, node), Map.fetch!(acc_state.disc, neighbor))
-              new_state = Map.update!(acc_state, :low, &Map.put(&1, node, new_low))
-              {new_state, count}
-            else
-              {acc_state, count}
-            end
-        end
-      end)
+        :error ->
+          {state, 0}
+      end
 
     if Map.get(state_after_neighbors.parent, node) == nil and children_count > 1 do
       Map.update!(state_after_neighbors, :articulation_points, &MapSet.put(&1, node))

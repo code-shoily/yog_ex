@@ -253,19 +253,13 @@ defmodule Yog.Traversal.Walk do
   defp do_random_walk(_out_edges, _current, 0, acc), do: Enum.reverse(acc)
 
   defp do_random_walk(out_edges, current, steps, acc) do
-    successors =
-      case Map.fetch(out_edges, current) do
-        {:ok, edges} -> Map.keys(edges)
-        :error -> []
-      end
-
-    case successors do
-      [] ->
-        Enum.reverse(acc)
-
-      nodes ->
-        next = Enum.random(nodes)
+    case Map.fetch(out_edges, current) do
+      {:ok, edges} when map_size(edges) > 0 ->
+        {next, _} = Enum.random(edges)
         do_random_walk(out_edges, next, steps - 1, [next | acc])
+
+      _ ->
+        Enum.reverse(acc)
     end
   end
 
@@ -299,21 +293,25 @@ defmodule Yog.Traversal.Walk do
               do_fold_walk_bfs(out_edges, rest, new_visited, new_acc, folder)
 
             :continue ->
-              next_nodes =
-                case Map.fetch(out_edges, node_id) do
-                  {:ok, edges} -> Map.keys(edges)
-                  :error -> []
-                end
-
               next_queue =
-                List.foldl(next_nodes, rest, fn next_id, current_queue ->
-                  next_meta = %{
-                    depth: metadata.depth + 1,
-                    parent: node_id
-                  }
+                case Map.fetch(out_edges, node_id) do
+                  {:ok, edges} ->
+                    :maps.fold(
+                      fn next_id, _weight, current_queue ->
+                        next_meta = %{
+                          depth: metadata.depth + 1,
+                          parent: node_id
+                        }
 
-                  :queue.in({next_id, next_meta}, current_queue)
-                end)
+                        :queue.in({next_id, next_meta}, current_queue)
+                      end,
+                      rest,
+                      edges
+                    )
+
+                  :error ->
+                    rest
+                end
 
               do_fold_walk_bfs(out_edges, next_queue, new_visited, new_acc, folder)
           end
@@ -343,21 +341,25 @@ defmodule Yog.Traversal.Walk do
               do_fold_walk_dfs(out_edges, tail, new_visited, new_acc, folder)
 
             :continue ->
-              next_nodes =
-                case Map.fetch(out_edges, node_id) do
-                  {:ok, edges} -> Map.keys(edges)
-                  :error -> []
-                end
-
               next_stack =
-                List.foldl(Enum.reverse(next_nodes), tail, fn next_id, current_stack ->
-                  next_meta = %{
-                    depth: metadata.depth + 1,
-                    parent: node_id
-                  }
+                case Map.fetch(out_edges, node_id) do
+                  {:ok, edges} ->
+                    :maps.fold(
+                      fn next_id, _weight, current_stack ->
+                        next_meta = %{
+                          depth: metadata.depth + 1,
+                          parent: node_id
+                        }
 
-                  [{next_id, next_meta} | current_stack]
-                end)
+                        [{next_id, next_meta} | current_stack]
+                      end,
+                      tail,
+                      edges
+                    )
+
+                  :error ->
+                    tail
+                end
 
               do_fold_walk_dfs(out_edges, next_stack, new_visited, new_acc, folder)
           end
@@ -394,22 +396,26 @@ defmodule Yog.Traversal.Walk do
               )
 
             :continue ->
-              next_nodes =
-                case Map.fetch(out_edges, node_id) do
-                  {:ok, edges} -> Map.to_list(edges)
-                  :error -> []
-                end
-
               next_pq =
-                List.foldl(next_nodes, rest_pq, fn {next_id, weight}, current_pq ->
-                  next_meta = %{
-                    depth: metadata.depth + 1,
-                    parent: node_id
-                  }
+                case Map.fetch(out_edges, node_id) do
+                  {:ok, edges} ->
+                    :maps.fold(
+                      fn next_id, weight, current_pq ->
+                        next_meta = %{
+                          depth: metadata.depth + 1,
+                          parent: node_id
+                        }
 
-                  p = priority_fn.(next_id, weight, next_meta)
-                  Yog.PriorityQueue.push(current_pq, {p, {next_id, next_meta}})
-                end)
+                        p = priority_fn.(next_id, weight, next_meta)
+                        Yog.PriorityQueue.push(current_pq, {p, {next_id, next_meta}})
+                      end,
+                      rest_pq,
+                      edges
+                    )
+
+                  :error ->
+                    rest_pq
+                end
 
               do_fold_walk_best_first(
                 out_edges,

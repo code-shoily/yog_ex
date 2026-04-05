@@ -126,13 +126,39 @@ defmodule Yog.Pathfinding.FloydWarshall do
     final_dist =
       List.foldl(nodes, initial_dist, fn k, acc_dist ->
         List.foldl(nodes, acc_dist, fn i, acc_dist_i ->
-          List.foldl(nodes, acc_dist_i, fn j, acc_dist_j ->
-            relax_via_intermediate(i, j, k, acc_dist_j, add, compare)
-          end)
+          # Only proceed if there's a path from i to k
+          case Map.fetch(acc_dist_i, {i, k}) do
+            {:ok, dist_ik} ->
+              List.foldl(nodes, acc_dist_i, fn j, acc_dist_j ->
+                # Try to relax distance from i to j via intermediate k
+                case Map.fetch(acc_dist_j, {k, j}) do
+                  {:ok, dist_kj} ->
+                    new_dist = add.(dist_ik, dist_kj)
+
+                    case Map.fetch(acc_dist_j, {i, j}) do
+                      {:ok, current} ->
+                        if compare.(new_dist, current) == :lt do
+                          Map.put(acc_dist_j, {i, j}, new_dist)
+                        else
+                          acc_dist_j
+                        end
+
+                      :error ->
+                        Map.put(acc_dist_j, {i, j}, new_dist)
+                    end
+
+                  :error ->
+                    acc_dist_j
+                end
+              end)
+
+            :error ->
+              acc_dist_i
+          end
         end)
       end)
 
-    if has_negative_cycle?(nodes, final_dist, compare) do
+    if has_negative_cycle?(nodes, final_dist, compare, zero) do
       {:error, :negative_cycle}
     else
       {:ok, final_dist}
@@ -205,25 +231,29 @@ defmodule Yog.Pathfinding.FloydWarshall do
       end)
 
     List.foldl(nodes, initial, fn i, acc ->
-      successors =
-        case Map.fetch(out_edges, i) do
-          {:ok, edges} -> Map.to_list(edges)
-          :error -> []
-        end
+      case Map.fetch(out_edges, i) do
+        {:ok, edges} ->
+          :maps.fold(
+            fn j, weight, acc_inner ->
+              case Map.fetch(acc_inner, {i, j}) do
+                {:ok, existing} ->
+                  if Yog.Utils.compare(weight, existing) == :lt do
+                    Map.put(acc_inner, {i, j}, weight)
+                  else
+                    acc_inner
+                  end
 
-      List.foldl(successors, acc, fn {j, weight}, acc_inner ->
-        case Map.fetch(acc_inner, {i, j}) do
-          {:ok, existing} ->
-            if compare_weights(weight, existing, &Yog.Utils.compare/2) == :lt do
-              Map.put(acc_inner, {i, j}, weight)
-            else
-              acc_inner
-            end
+                :error ->
+                  Map.put(acc_inner, {i, j}, weight)
+              end
+            end,
+            acc,
+            edges
+          )
 
-          :error ->
-            Map.put(acc_inner, {i, j}, weight)
-        end
-      end)
+        :error ->
+          acc
+      end
     end)
   end
 
@@ -250,13 +280,13 @@ defmodule Yog.Pathfinding.FloydWarshall do
   end
 
   # Check if any node has negative distance to itself
-  defp has_negative_cycle?(nodes, dist, compare) do
+  defp has_negative_cycle?(nodes, dist, compare, zero) do
     List.foldl(nodes, false, fn i, found? ->
       if found? do
         true
       else
         case Map.fetch(dist, {i, i}) do
-          {:ok, d} -> compare_weights(d, 0, compare) == :lt
+          {:ok, d} -> compare.(d, zero) == :lt
           :error -> false
         end
       end

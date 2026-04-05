@@ -118,17 +118,19 @@ defmodule Yog.Property.Clique do
   """
   @spec max_clique(Yog.graph()) :: MapSet.t(Yog.node_id())
   def max_clique(graph) do
-    nodes = Model.all_nodes(graph)
-
-    if nodes == [] do
+    if map_size(graph.nodes) == 0 do
       MapSet.new()
     else
       all_cliques = all_maximal_cliques(graph)
 
-      if all_cliques == [] do
-        MapSet.new()
-      else
-        Enum.max_by(all_cliques, &MapSet.size/1)
+      case all_cliques do
+        [] ->
+          MapSet.new()
+
+        [first | rest] ->
+          Enum.reduce(rest, first, fn c, best ->
+            if MapSet.size(c) > MapSet.size(best), do: c, else: best
+          end)
       end
     end
   end
@@ -171,18 +173,30 @@ defmodule Yog.Property.Clique do
   """
   @spec all_maximal_cliques(Yog.graph()) :: [MapSet.t(Yog.node_id())]
   def all_maximal_cliques(graph) do
-    nodes = Model.all_nodes(graph)
-
-    if nodes == [] do
+    if map_size(graph.nodes) == 0 do
       []
     else
       adj =
-        Map.new(nodes, fn u ->
-          neighbors = Model.neighbor_ids(graph, u) |> MapSet.new()
-          {u, neighbors}
-        end)
+        :maps.fold(
+          fn u, inner, acc ->
+            neighbors = Map.keys(inner) |> MapSet.new()
+            Map.put(acc, u, neighbors)
+          end,
+          %{},
+          graph.out_edges
+        )
 
-      p = MapSet.new(nodes)
+      # Ensure all nodes are in adj even if they have no edges
+      adj =
+        :maps.fold(
+          fn u, _, acc ->
+            Map.put_new(acc, u, MapSet.new())
+          end,
+          adj,
+          graph.nodes
+        )
+
+      p = Map.keys(graph.nodes) |> MapSet.new()
       r = MapSet.new()
       x = MapSet.new()
 
@@ -244,7 +258,8 @@ defmodule Yog.Property.Clique do
     pivot_x
   end
 
-  defp find_max_degree_to_p(search_set, p, adj, {_current_best, _current_max} = acc) do
+  defp find_max_degree_to_p(search_set, p, adj, acc) do
+    # search_set is a MapSet, so we use Enum.reduce
     Enum.reduce(search_set, acc, fn u, {_best_u, max_deg} = inner_acc ->
       neighbors = Map.get(adj, u, MapSet.new())
       # Degree to P
@@ -294,13 +309,27 @@ defmodule Yog.Property.Clique do
   def k_cliques(graph, 1), do: Model.all_nodes(graph) |> Enum.map(&MapSet.new([&1]))
 
   def k_cliques(graph, k) do
-    nodes = Model.all_nodes(graph) |> Enum.sort()
+    nodes = Map.keys(graph.nodes) |> Enum.sort()
 
+    adj_ =
+      :maps.fold(
+        fn u, inner, acc ->
+          neighbors = Map.keys(inner) |> MapSet.new()
+          Map.put(acc, u, neighbors)
+        end,
+        %{},
+        graph.out_edges
+      )
+
+    # Ensure all nodes are in adj
     adj =
-      Map.new(nodes, fn u ->
-        neighbors = Model.neighbor_ids(graph, u) |> MapSet.new()
-        {u, neighbors}
-      end)
+      :maps.fold(
+        fn u, _, acc ->
+          Map.put_new(acc, u, MapSet.new())
+        end,
+        adj_,
+        graph.nodes
+      )
 
     find_k_cliques_recursive(nodes, k, [], adj, [])
   end

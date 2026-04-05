@@ -83,46 +83,44 @@ defmodule Yog.Connectivity.Components do
   @spec connected_components(Yog.graph()) :: [component()]
   def connected_components(graph) do
     out_edges = graph.out_edges
-    nodes = Map.keys(graph.nodes)
 
     {_, components} =
-      do_components_all(nodes, out_edges, %{}, [])
+      :maps.fold(
+        fn node, _, {visited_acc, comps} ->
+          if is_map_key(visited_acc, node) do
+            {visited_acc, comps}
+          else
+            {new_visited, comp} = dfs_component(out_edges, node, visited_acc, [])
+            {new_visited, [comp | comps]}
+          end
+        end,
+        {%{}, []},
+        graph.nodes
+      )
 
     components
   end
 
-  defp do_components_all([], _, _, comps), do: {%{}, comps}
-
-  defp do_components_all([node | rest], out, visited, comps) do
-    if is_map_key(visited, node) do
-      do_components_all(rest, out, visited, comps)
-    else
-      {new_visited, comp} = dfs_component(out, node, visited, [])
-      do_components_all(rest, out, new_visited, [comp | comps])
-    end
-  end
-
   defp dfs_component(out, node, visited, comp) do
-    visited = Map.put(visited, node, true)
-
-    case Map.fetch(out, node) do
-      {:ok, neighbors} when map_size(neighbors) > 0 ->
-        neighbor_list = Map.to_list(neighbors)
-        dfs_component_neighbors(neighbor_list, out, visited, [node | comp])
-
-      _ ->
-        {visited, [node | comp]}
-    end
-  end
-
-  defp dfs_component_neighbors([], _, visited, comp), do: {visited, comp}
-
-  defp dfs_component_neighbors([{nb, _} | rest], out, visited, comp) do
-    if is_map_key(visited, nb) do
-      dfs_component_neighbors(rest, out, visited, comp)
+    if Map.has_key?(visited, node) do
+      {visited, comp}
     else
-      {new_visited, new_comp} = dfs_component(out, nb, visited, comp)
-      dfs_component_neighbors(rest, out, new_visited, new_comp)
+      visited = Map.put(visited, node, true)
+      comp = [node | comp]
+
+      case Map.fetch(out, node) do
+        {:ok, neighbors} ->
+          :maps.fold(
+            fn nb, _, {v_acc, c_acc} ->
+              dfs_component(out, nb, v_acc, c_acc)
+            end,
+            {visited, comp},
+            neighbors
+          )
+
+        :error ->
+          {visited, comp}
+      end
     end
   end
 
@@ -161,56 +159,61 @@ defmodule Yog.Connectivity.Components do
   def weakly_connected_components(graph) do
     out_edges = graph.out_edges
     in_edges = graph.in_edges
-    nodes = Map.keys(graph.nodes)
 
     {_, components} =
-      do_wcc_all(nodes, out_edges, in_edges, %{}, [])
+      :maps.fold(
+        fn node, _, {visited_acc, comps} ->
+          if is_map_key(visited_acc, node) do
+            {visited_acc, comps}
+          else
+            {new_visited, comp} = dfs_wcc(out_edges, in_edges, node, visited_acc, [])
+            {new_visited, [comp | comps]}
+          end
+        end,
+        {%{}, []},
+        graph.nodes
+      )
 
     components
   end
 
-  defp do_wcc_all([], _, _, _, comps), do: {%{}, comps}
-
-  defp do_wcc_all([node | rest], out, in_e, visited, comps) do
-    if is_map_key(visited, node) do
-      do_wcc_all(rest, out, in_e, visited, comps)
-    else
-      {new_visited, comp} = dfs_wcc(out, in_e, node, visited, [])
-      do_wcc_all(rest, out, in_e, new_visited, [comp | comps])
-    end
-  end
-
   defp dfs_wcc(out, in_e, node, visited, comp) do
-    visited = Map.put(visited, node, true)
-
-    {v1, c1} =
-      case Map.fetch(out, node) do
-        {:ok, succs} when map_size(succs) > 0 ->
-          succ_list = Map.to_list(succs)
-          dfs_wcc_neighbors(succ_list, out, in_e, visited, [node | comp])
-
-        _ ->
-          {visited, [node | comp]}
-      end
-
-    case Map.fetch(in_e, node) do
-      {:ok, preds} when map_size(preds) > 0 ->
-        pred_list = Map.to_list(preds)
-        dfs_wcc_neighbors(pred_list, out, in_e, v1, c1)
-
-      _ ->
-        {v1, c1}
-    end
-  end
-
-  defp dfs_wcc_neighbors([], _, _, visited, comp), do: {visited, comp}
-
-  defp dfs_wcc_neighbors([{nb, _} | rest], out, in_e, visited, comp) do
-    if is_map_key(visited, nb) do
-      dfs_wcc_neighbors(rest, out, in_e, visited, comp)
+    if Map.has_key?(visited, node) do
+      {visited, comp}
     else
-      {new_visited, new_comp} = dfs_wcc(out, in_e, nb, visited, comp)
-      dfs_wcc_neighbors(rest, out, in_e, new_visited, new_comp)
+      visited = Map.put(visited, node, true)
+      comp = [node | comp]
+
+      # Explore outgoing edges
+      {v1, c1} =
+        case Map.fetch(out, node) do
+          {:ok, succs} ->
+            :maps.fold(
+              fn nb, _, {v_acc, c_acc} ->
+                dfs_wcc(out, in_e, nb, v_acc, c_acc)
+              end,
+              {visited, comp},
+              succs
+            )
+
+          :error ->
+            {visited, comp}
+        end
+
+      # Explore incoming edges
+      case Map.fetch(in_e, node) do
+        {:ok, preds} ->
+          :maps.fold(
+            fn nb, _, {v_acc, c_acc} ->
+              dfs_wcc(out, in_e, nb, v_acc, c_acc)
+            end,
+            {v1, c1},
+            preds
+          )
+
+        :error ->
+          {v1, c1}
+      end
     end
   end
 end

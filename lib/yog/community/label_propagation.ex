@@ -90,19 +90,39 @@ defmodule Yog.Community.LabelPropagation do
       Result.new(%{})
     else
       # Initialize each node with its own unique label
-      initial_labels = Map.new(nodes, fn node -> {node, node} end)
+      initial_labels =
+        :maps.fold(
+          fn node, _, acc -> Map.put(acc, node, node) end,
+          %{},
+          graph.nodes
+        )
 
       # Run label propagation
       final_labels = propagate_labels(graph, nodes, initial_labels, max_iterations, seed)
 
       # Renumber communities to be 0, 1, 2, ...
-      unique_labels = final_labels |> Map.values() |> Enum.uniq() |> Enum.sort()
+      unique_labels =
+        :maps.fold(
+          fn _, label, acc -> MapSet.put(acc, label) end,
+          MapSet.new(),
+          final_labels
+        )
+        |> MapSet.to_list()
+        |> Enum.sort()
 
       label_to_community =
-        Map.new(Enum.with_index(unique_labels), fn {label, idx} -> {label, idx} end)
+        unique_labels
+        |> Enum.with_index()
+        |> Map.new(fn {label, idx} -> {label, idx} end)
 
       assignments =
-        Map.new(final_labels, fn {node, label} -> {node, label_to_community[label]} end)
+        :maps.fold(
+          fn node, label, acc ->
+            Map.put(acc, node, Map.get(label_to_community, label))
+          end,
+          %{},
+          final_labels
+        )
 
       Result.new(assignments)
     end
@@ -119,16 +139,13 @@ defmodule Yog.Community.LabelPropagation do
 
     {new_labels, changed} =
       List.foldl(shuffled_nodes, {labels, false}, fn node, {acc_labels, has_changed} ->
-        neighbors = get_neighbors(graph, node)
+        neighbor_freqs = calculate_neighbor_freqs(graph, node, acc_labels)
 
-        if neighbors == [] do
+        if map_size(neighbor_freqs) == 0 do
           {acc_labels, has_changed}
         else
-          neighbor_labels = Enum.map(neighbors, fn n -> acc_labels[n] end)
-
           current_label = acc_labels[node]
-
-          most_frequent = most_frequent_label(neighbor_labels, current_label, seed)
+          most_frequent = most_frequent_label_fast(neighbor_freqs, current_label, seed)
 
           if most_frequent != current_label do
             {Map.put(acc_labels, node, most_frequent), true}
@@ -145,39 +162,66 @@ defmodule Yog.Community.LabelPropagation do
     end
   end
 
-  defp get_neighbors(%Yog.Graph{out_edges: out_edges, kind: kind, in_edges: in_edges}, node) do
-    out =
+  defp calculate_neighbor_freqs(
+         %Yog.Graph{out_edges: out_edges, kind: kind, in_edges: in_edges},
+         node,
+         labels
+       ) do
+    # Optimization: count frequencies directly from edge maps
+    out_freqs =
       case Map.fetch(out_edges, node) do
-        {:ok, edges} -> Map.keys(edges)
-        :error -> []
+        {:ok, edges} ->
+          :maps.fold(
+            fn neighbor, _, acc ->
+              label = Map.get(labels, neighbor)
+              Map.update(acc, label, 1, &(&1 + 1))
+            end,
+            %{},
+            edges
+          )
+
+        :error ->
+          %{}
       end
 
     case kind do
       :undirected ->
-        out
+        out_freqs
 
       :directed ->
-        in_neighbors =
-          case Map.fetch(in_edges, node) do
-            {:ok, edges} -> Map.keys(edges)
-            :error -> []
-          end
+        case Map.fetch(in_edges, node) do
+          {:ok, edges} ->
+            :maps.fold(
+              fn neighbor, _, acc ->
+                label = Map.get(labels, neighbor)
+                Map.update(acc, label, 1, &(&1 + 1))
+              end,
+              out_freqs,
+              edges
+            )
 
-        Enum.uniq(out ++ in_neighbors)
+          :error ->
+            out_freqs
+        end
     end
   end
 
-  defp most_frequent_label(neighbor_labels, current_label, seed) do
-    {freqs, max_count} =
-      List.foldl(neighbor_labels, {%{}, 0}, fn label, {acc, max_so_far} ->
-        new_count = Map.get(acc, label, 0) + 1
-        new_max = max(max_so_far, new_count)
-        {Map.put(acc, label, new_count), new_max}
-      end)
+  defp most_frequent_label_fast(freqs, current_label, seed) do
+    max_count =
+      :maps.fold(
+        fn _, count, acc -> max(acc, count) end,
+        0,
+        freqs
+      )
 
     candidates =
-      Enum.filter(freqs, fn {_, count} -> count == max_count end)
-      |> Enum.map(fn {label, _} -> label end)
+      :maps.fold(
+        fn label, count, acc ->
+          if count == max_count, do: [label | acc], else: acc
+        end,
+        [],
+        freqs
+      )
 
     if current_label in candidates do
       current_label

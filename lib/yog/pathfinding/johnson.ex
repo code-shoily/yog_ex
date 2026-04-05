@@ -140,11 +140,11 @@ defmodule Yog.Pathfinding.Johnson do
         subtract \\ &Kernel.-/2,
         compare \\ &Yog.Utils.compare/2
       ) do
-    nodes = Map.keys(graph.nodes)
+    node_count = Yog.Model.order(graph)
 
-    case compute_potentials(graph, nodes, zero, add, compare) do
+    case compute_potentials(graph, node_count, zero, add, compare) do
       {:ok, potentials} ->
-        distances = run_dijkstra_from_all(graph, nodes, potentials, zero, add, subtract, compare)
+        distances = run_dijkstra_from_all(graph, potentials, zero, add, subtract, compare)
         {:ok, distances}
 
       {:error, :negative_cycle} ->
@@ -156,14 +156,12 @@ defmodule Yog.Pathfinding.Johnson do
   # Helper functions
   # ============================================================
 
-  defp compute_potentials(graph, nodes, zero, add, compare) do
+  defp compute_potentials(graph, original_node_count, zero, add, compare) do
     temp_source = make_ref()
-
     initial_distances = %{temp_source => zero}
 
-    edges = get_all_edges_with_temp_source(graph.out_edges, nodes, temp_source, zero)
-
-    node_count = length(nodes) + 1
+    edges = get_all_edges_with_temp_source(graph, temp_source, zero)
+    node_count = original_node_count + 1
 
     distances =
       List.foldl(Enum.to_list(1..node_count), initial_distances, fn iteration, dist ->
@@ -186,21 +184,22 @@ defmodule Yog.Pathfinding.Johnson do
     end
   end
 
-  defp get_all_edges_with_temp_source(out_edges, nodes, temp_source, zero) do
-    temp_edges = List.foldl(nodes, [], fn node, acc -> [{temp_source, node, zero} | acc] end)
+  defp get_all_edges_with_temp_source(graph, temp_source, zero) do
+    :maps.fold(
+      fn u, successors, acc ->
+        # Add temp_source edge to u
+        acc_with_temp = [{temp_source, u, zero} | acc]
 
-    regular_edges =
-      List.foldl(nodes, [], fn u, acc ->
-        successors =
-          case Map.fetch(out_edges, u) do
-            {:ok, edges} -> Map.to_list(edges)
-            :error -> []
-          end
-
-        List.foldl(successors, acc, fn {v, weight}, inner_acc -> [{u, v, weight} | inner_acc] end)
-      end)
-
-    temp_edges ++ regular_edges
+        # Add all regular edges from u
+        :maps.fold(
+          fn v, weight, inner_acc -> [{u, v, weight} | inner_acc] end,
+          acc_with_temp,
+          successors
+        )
+      end,
+      [],
+      graph.out_edges
+    )
   end
 
   # Relax all edges once
@@ -230,20 +229,24 @@ defmodule Yog.Pathfinding.Johnson do
 
   # Check if distances changed (for negative cycle detection)
   defp distances_changed?(old_dist, new_dist, compare) do
-    List.foldl(Map.to_list(new_dist), false, fn {node, new_val}, changed? ->
-      if changed? do
-        true
-      else
-        case Map.fetch(old_dist, node) do
-          {:ok, old_val} -> compare.(new_val, old_val) == :lt
-          :error -> true
+    :maps.fold(
+      fn node, new_val, changed? ->
+        if changed? do
+          true
+        else
+          case Map.fetch(old_dist, node) do
+            {:ok, old_val} -> compare.(new_val, old_val) == :lt
+            :error -> true
+          end
         end
-      end
-    end)
+      end,
+      false,
+      new_dist
+    )
   end
 
   # Run Dijkstra from each node with reweighted edges
-  defp run_dijkstra_from_all(graph, nodes, potentials, zero, add, subtract, compare) do
+  defp run_dijkstra_from_all(graph, potentials, zero, add, subtract, compare) do
     reweighted_graph =
       Transform.map_edges_indexed(graph, fn u, v, w ->
         h_u = Map.get(potentials, u, zero)
@@ -256,7 +259,7 @@ defmodule Yog.Pathfinding.Johnson do
       timeout: :infinity
     ]
 
-    nodes
+    Map.keys(graph.nodes)
     |> Task.async_stream(
       fn source ->
         reweighted_distances =
@@ -264,12 +267,16 @@ defmodule Yog.Pathfinding.Johnson do
 
         h_source = Map.get(potentials, source, zero)
 
-        List.foldl(Map.to_list(reweighted_distances), %{}, fn {dest, dist_prime}, inner_acc ->
-          h_dest = Map.get(potentials, dest, zero)
-          # dist = dist' - h(u) + h(v)
-          adjusted_dist = add.(subtract.(dist_prime, h_source), h_dest)
-          Map.put(inner_acc, {source, dest}, adjusted_dist)
-        end)
+        :maps.fold(
+          fn dest, dist_prime, inner_acc ->
+            h_dest = Map.get(potentials, dest, zero)
+            # dist = dist' - h(u) + h(v)
+            adjusted_dist = add.(subtract.(dist_prime, h_source), h_dest)
+            Map.put(inner_acc, {source, dest}, adjusted_dist)
+          end,
+          %{},
+          reweighted_distances
+        )
       end,
       parallel_opts
     )

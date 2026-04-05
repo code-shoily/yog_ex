@@ -73,22 +73,34 @@ defmodule Yog.Utils do
   def norm_diff(m1, m2, type) do
     case type do
       :l1 ->
-        Enum.reduce(m1, 0.0, fn {k, v1}, acc ->
-          acc + abs(v1 - Map.get(m2, k, 0.0))
-        end)
+        :maps.fold(
+          fn k, v1, acc ->
+            acc + abs(v1 - Map.get(m2, k, 0.0))
+          end,
+          0.0,
+          m1
+        )
 
       :l2 ->
         sum_sq =
-          Enum.reduce(m1, 0.0, fn {k, v1}, acc ->
-            acc + :math.pow(v1 - Map.get(m2, k, 0.0), 2)
-          end)
+          :maps.fold(
+            fn k, v1, acc ->
+              acc + :math.pow(v1 - Map.get(m2, k, 0.0), 2)
+            end,
+            0.0,
+            m1
+          )
 
         :math.sqrt(sum_sq)
 
       :max ->
-        Enum.reduce(m1, 0.0, fn {k, v1}, acc ->
-          max(acc, abs(v1 - Map.get(m2, k, 0.0)))
-        end)
+        :maps.fold(
+          fn k, v1, acc ->
+            max(acc, abs(v1 - Map.get(m2, k, 0.0)))
+          end,
+          0.0,
+          m1
+        )
     end
   end
 

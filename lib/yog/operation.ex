@@ -131,14 +131,23 @@ defmodule Yog.Operation do
   """
   @spec intersection(Graph.t(), Graph.t()) :: Graph.t()
   def intersection(first, second) do
-    common_nodes =
-      MapSet.intersection(
-        MapSet.new(Map.keys(first.nodes)),
-        MapSet.new(Map.keys(second.nodes))
+    # Optimization: iterate on the smaller graph and use direct Map performance
+    {smaller, larger} =
+      if map_size(first.nodes) <= map_size(second.nodes),
+        do: {first, second},
+        else: {second, first}
+
+    common_node_ids =
+      :maps.fold(
+        fn id, _, acc ->
+          if Map.has_key?(larger.nodes, id), do: [id | acc], else: acc
+        end,
+        [],
+        smaller.nodes
       )
 
-    first
-    |> Yog.Transform.subgraph(MapSet.to_list(common_nodes))
+    smaller
+    |> Yog.Transform.subgraph(common_node_ids)
     # Direct edge check using second's out_edges
     |> Yog.Transform.filter_edges(fn u, v, _w ->
       case Map.fetch(second.out_edges, u) do
@@ -174,11 +183,15 @@ defmodule Yog.Operation do
   """
   @spec difference(Graph.t(), Graph.t()) :: Graph.t()
   def difference(first, second) do
-    second_node_set = MapSet.new(Map.keys(second.nodes))
-
+    # Optimization: avoid MapSet creation, use direct Map membership
     nodes_v1_minus_v2 =
-      Map.keys(first.nodes)
-      |> Enum.reject(&MapSet.member?(second_node_set, &1))
+      :maps.fold(
+        fn id, _, acc ->
+          if Map.has_key?(second.nodes, id), do: acc, else: [id | acc]
+        end,
+        [],
+        first.nodes
+      )
 
     first
     |> Yog.Transform.subgraph(nodes_v1_minus_v2)
@@ -289,77 +302,112 @@ defmodule Yog.Operation do
   """
   @spec cartesian_product(Graph.t(), Graph.t(), any(), any()) :: Graph.t()
   def cartesian_product(first, second, default_first, default_second) do
-    first_nodes = Map.keys(first.nodes)
-    second_nodes = Map.keys(second.nodes)
     second_order = map_size(second.nodes)
 
     # Rank nodes to create stable integer re-indexing
-    u_map = Enum.with_index(first_nodes) |> Enum.into(%{})
-    v_map = Enum.with_index(second_nodes) |> Enum.into(%{})
+    # Note: Map.keys(nodes) is still used here for rank map creation
+    u_map = Enum.with_index(Map.keys(first.nodes)) |> Enum.into(%{})
+    v_map = Enum.with_index(Map.keys(second.nodes)) |> Enum.into(%{})
 
     # Create empty graph with same kind
     init_graph = Yog.Graph.new(first.kind)
 
     # Add nodes: new_id = rank(u) * second_order + rank(v)
     graph_with_nodes =
-      Enum.reduce(first_nodes, init_graph, fn u, g_acc ->
-        u_data = Map.get(first.nodes, u)
-        u_idx = Map.fetch!(u_map, u)
+      :maps.fold(
+        fn u, u_data, g_acc ->
+          u_idx = Map.fetch!(u_map, u)
 
-        List.foldl(second_nodes, g_acc, fn v, g ->
-          v_idx = Map.fetch!(v_map, v)
-          new_id = u_idx * second_order + v_idx
-          v_data = Map.get(second.nodes, v)
-          Yog.add_node(g, new_id, {u_data, v_data})
-        end)
-      end)
+          :maps.fold(
+            fn v, v_data, inner_g ->
+              v_idx = Map.fetch!(v_map, v)
+              new_id = u_idx * second_order + v_idx
+              Yog.add_node(inner_g, new_id, {u_data, v_data})
+            end,
+            g_acc,
+            second.nodes
+          )
+        end,
+        init_graph,
+        first.nodes
+      )
+
+    first_out = first.out_edges
+    second_out = second.out_edges
 
     # Add edges from second graph (vertical)
     graph_with_second_edges =
-      Enum.reduce(first_nodes, graph_with_nodes, fn u, g_acc ->
-        u_idx = Map.fetch!(u_map, u)
+      :maps.fold(
+        fn u, _, outer_g_acc ->
+          u_idx = Map.fetch!(u_map, u)
 
-        List.foldl(second_nodes, g_acc, fn v, g ->
-          v_idx = Map.fetch!(v_map, v)
+          :maps.fold(
+            fn v, _, inner_g_acc ->
+              v_idx = Map.fetch!(v_map, v)
 
-          successors =
-            case Map.fetch(second.out_edges, v) do
-              {:ok, edges} -> Map.to_list(edges)
-              :error -> []
-            end
+              case Map.fetch(second_out, v) do
+                {:ok, edges} ->
+                  :maps.fold(
+                    fn v_succ, weight, g_final ->
+                      v_succ_idx = Map.fetch!(v_map, v_succ)
+                      src_id = u_idx * second_order + v_idx
+                      dst_id = u_idx * second_order + v_succ_idx
 
-          List.foldl(successors, g, fn {v_succ, weight}, g_inner ->
-            v_succ_idx = Map.fetch!(v_map, v_succ)
-            src_id = u_idx * second_order + v_idx
-            dst_id = u_idx * second_order + v_succ_idx
-            {:ok, new_g} = Yog.add_edge(g_inner, src_id, dst_id, {default_second, weight})
-            new_g
-          end)
-        end)
-      end)
+                      {:ok, new_g} =
+                        Yog.add_edge(g_final, src_id, dst_id, {default_second, weight})
+
+                      new_g
+                    end,
+                    inner_g_acc,
+                    edges
+                  )
+
+                :error ->
+                  inner_g_acc
+              end
+            end,
+            outer_g_acc,
+            second.nodes
+          )
+        end,
+        graph_with_nodes,
+        first.nodes
+      )
 
     # Add edges from first graph (horizontal)
-    List.foldl(second_nodes, graph_with_second_edges, fn v, g_acc ->
-      v_idx = Map.fetch!(v_map, v)
+    :maps.fold(
+      fn v, _, outer_g_acc ->
+        v_idx = Map.fetch!(v_map, v)
 
-      List.foldl(first_nodes, g_acc, fn u, g ->
-        u_idx = Map.fetch!(u_map, u)
+        :maps.fold(
+          fn u, _, inner_g_acc ->
+            u_idx = Map.fetch!(u_map, u)
 
-        successors =
-          case Map.fetch(first.out_edges, u) do
-            {:ok, edges} -> Map.to_list(edges)
-            :error -> []
-          end
+            case Map.fetch(first_out, u) do
+              {:ok, edges} ->
+                :maps.fold(
+                  fn u_succ, weight, g_final ->
+                    u_succ_idx = Map.fetch!(u_map, u_succ)
+                    src_id = u_idx * second_order + v_idx
+                    dst_id = u_succ_idx * second_order + v_idx
+                    {:ok, new_g} = Yog.add_edge(g_final, src_id, dst_id, {weight, default_first})
+                    new_g
+                  end,
+                  inner_g_acc,
+                  edges
+                )
 
-        List.foldl(successors, g, fn {u_succ, weight}, g_inner ->
-          u_succ_idx = Map.fetch!(u_map, u_succ)
-          src_id = u_idx * second_order + v_idx
-          dst_id = u_succ_idx * second_order + v_idx
-          {:ok, new_g} = Yog.add_edge(g_inner, src_id, dst_id, {weight, default_first})
-          new_g
-        end)
-      end)
-    end)
+              :error ->
+                inner_g_acc
+            end
+          end,
+          outer_g_acc,
+          first.nodes
+        )
+      end,
+      graph_with_second_edges,
+      second.nodes
+    )
   end
 
   @doc """
@@ -433,11 +481,19 @@ defmodule Yog.Operation do
   def line_graph(%Graph{kind: kind} = graph, default_weight \\ 1) do
     # Get all edges from out_edges directly, with deduping for undirected graphs
     edges_i =
-      List.foldl(Map.to_list(graph.out_edges), [], fn {u, inner}, acc ->
-        List.foldl(Map.to_list(inner), acc, fn {v, w}, inner_acc ->
-          [{u, v, w} | inner_acc]
-        end)
-      end)
+      :maps.fold(
+        fn u, inner, acc ->
+          :maps.fold(
+            fn v, w, inner_acc ->
+              [{u, v, w} | inner_acc]
+            end,
+            acc,
+            inner
+          )
+        end,
+        [],
+        graph.out_edges
+      )
 
     edges =
       case kind do
@@ -519,33 +575,35 @@ defmodule Yog.Operation do
     if k <= 1 do
       graph
     else
-      nodes = Map.keys(graph.nodes)
+      :maps.fold(
+        fn src, _, acc_graph ->
+          reachable = nodes_within_distance(acc_graph, src, k)
 
-      List.foldl(nodes, graph, fn src, acc_graph ->
-        reachable = nodes_within_distance(acc_graph, src, k)
-
-        List.foldl(reachable, acc_graph, fn dst, g ->
-          if src == dst do
-            g
-          else
-            # Check if edge already exists
-            already_has_edge =
-              case Map.fetch(g.out_edges, src) do
-                {:ok, inner} -> Map.has_key?(inner, dst)
-                :error -> false
-              end
-
-            if already_has_edge do
+          List.foldl(reachable, acc_graph, fn dst, g ->
+            if src == dst do
               g
             else
-              case Yog.add_edge(g, src, dst, default_weight) do
-                {:ok, new_g} -> new_g
-                {:error, _} -> g
+              # Check if edge already exists
+              already_has_edge =
+                case Map.fetch(g.out_edges, src) do
+                  {:ok, inner} -> Map.has_key?(inner, dst)
+                  :error -> false
+                end
+
+              if already_has_edge do
+                g
+              else
+                case Yog.add_edge(g, src, dst, default_weight) do
+                  {:ok, new_g} -> new_g
+                  {:error, _} -> g
+                end
               end
             end
-          end
-        end)
-      end)
+          end)
+        end,
+        graph,
+        graph.nodes
+      )
     end
   end
 
@@ -696,17 +754,29 @@ defmodule Yog.Operation do
   # Reindex edges with a tag to avoid ID collisions
   defp add_tagged_component(target_graph, source_graph, tag) do
     target_graph =
-      List.foldl(Map.to_list(source_graph.nodes), target_graph, fn {node_id, data}, acc ->
-        Yog.add_node(acc, {tag, node_id}, data)
-      end)
+      :maps.fold(
+        fn node_id, data, acc ->
+          Yog.add_node(acc, {tag, node_id}, data)
+        end,
+        target_graph,
+        source_graph.nodes
+      )
 
     # Get edges directly from out_edges
     edges =
-      List.foldl(Map.to_list(source_graph.out_edges), [], fn {u, inner}, acc ->
-        List.foldl(Map.to_list(inner), acc, fn {v, data}, inner_acc ->
-          [{u, v, data} | inner_acc]
-        end)
-      end)
+      :maps.fold(
+        fn u, inner, acc ->
+          :maps.fold(
+            fn v, data, inner_acc ->
+              [{u, v, data} | inner_acc]
+            end,
+            acc,
+            inner
+          )
+        end,
+        [],
+        source_graph.out_edges
+      )
 
     List.foldl(edges, target_graph, fn {u, v, data}, acc ->
       {:ok, new_g} = Yog.add_edge(acc, {tag, u}, {tag, v}, data)
@@ -733,25 +803,28 @@ defmodule Yog.Operation do
 
   # Computes the degree sequence of a graph as {in_degree, out_degree} pairs
   defp degree_sequence(graph) do
-    nodes = Map.keys(graph.nodes)
     out_edges = graph.out_edges
     in_edges = graph.in_edges
 
-    List.foldl(nodes, [], fn node, acc ->
-      out_deg =
-        case Map.fetch(out_edges, node) do
-          {:ok, inner} -> map_size(inner)
-          :error -> 0
-        end
+    :maps.fold(
+      fn node, _, acc ->
+        out_deg =
+          case Map.fetch(out_edges, node) do
+            {:ok, inner} -> map_size(inner)
+            :error -> 0
+          end
 
-      in_deg =
-        case Map.fetch(in_edges, node) do
-          {:ok, inner} -> map_size(inner)
-          :error -> 0
-        end
+        in_deg =
+          case Map.fetch(in_edges, node) do
+            {:ok, inner} -> map_size(inner)
+            :error -> 0
+          end
 
-      [{in_deg, out_deg} | acc]
-    end)
+        [{in_deg, out_deg} | acc]
+      end,
+      [],
+      graph.nodes
+    )
   end
 
   # Attempts to find an isomorphism between two graphs using backtracking

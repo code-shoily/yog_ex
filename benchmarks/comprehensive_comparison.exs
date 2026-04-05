@@ -37,6 +37,7 @@ defmodule ComprehensiveBenchmark do
     bench_connected_components(yog_small, libgraph_small, digraph_small, yog_medium, libgraph_medium, digraph_medium)
     bench_strongly_connected_components(yog_small, libgraph_small, digraph_small, yog_medium, libgraph_medium, digraph_medium)
     bench_shortest_path(yog_small, libgraph_small, digraph_small, yog_medium, libgraph_medium, digraph_medium)
+    bench_bellman_ford(yog_small, libgraph_small, yog_medium, libgraph_medium)
     bench_graph_creation(100, 150, 500, 1000)
     bench_k_core(yog_small, libgraph_small, yog_medium, libgraph_medium)
     bench_mst(yog_small, libgraph_small, yog_medium, libgraph_medium)
@@ -189,11 +190,20 @@ defmodule ComprehensiveBenchmark do
         :digraph.get_short_path(dg_s, source, target)
       end
     end)
+
+    lib_dijkstra_stats = benchmark(fn -> 
+      for i <- 1..50 do
+        source = rem(i, 100) + 1
+        target = rem(i * 7, 100) + 1
+        Graph.Pathfinding.dijkstra(lib_s, source, target)
+      end
+    end)
     
     print_comparison("Yog (Dijkstra)", yog_stats)
     print_comparison("libgraph (BFS)", lib_stats)
+    print_comparison("libgraph (Dijkstra)", lib_dijkstra_stats)
     print_comparison(":digraph (BFS)", dg_stats)
-    print_winner([{"Yog", yog_stats.avg}, {"libgraph", lib_stats.avg}, {":digraph", dg_stats.avg}])
+    print_winner([{"Yog", yog_stats.avg}, {"libgraph BFS", lib_stats.avg}, {"libgraph Dijkstra", lib_dijkstra_stats.avg}, {":digraph", dg_stats.avg}])
 
     IO.puts("\nMedium Graph (500 nodes, ~1000 edges):")
     
@@ -220,11 +230,49 @@ defmodule ComprehensiveBenchmark do
         :digraph.get_short_path(dg_m, source, target)
       end
     end)
+
+    lib_dijkstra_stats = benchmark(fn -> 
+      for i <- 1..50 do
+        source = rem(i, 500) + 1
+        target = rem(i * 7, 500) + 1
+        Graph.Pathfinding.dijkstra(lib_m, source, target)
+      end
+    end)
     
     print_comparison("Yog (Dijkstra)", yog_stats)
     print_comparison("libgraph (BFS)", lib_stats)
+    print_comparison("libgraph (Dijkstra)", lib_dijkstra_stats)
     print_comparison(":digraph (BFS)", dg_stats)
-    print_winner([{"Yog", yog_stats.avg}, {"libgraph", lib_stats.avg}, {":digraph", dg_stats.avg}])
+    print_winner([{"Yog", yog_stats.avg}, {"libgraph BFS", lib_stats.avg}, {"libgraph Dijkstra", lib_dijkstra_stats.avg}, {":digraph", dg_stats.avg}])
+  end
+
+  # =============================================================================
+  # Bellman-Ford Benchmark
+  # =============================================================================
+  defp bench_bellman_ford(yog_s, lib_s, yog_m, lib_m) do
+    IO.puts("\n======================================================================")
+    IO.puts("BELLMAN-FORD (Single-source all-paths)")
+    IO.puts("======================================================================")
+
+    IO.puts("\nSmall Graph (100 nodes, ~150 edges):")
+    
+    source = 1
+    yog_stats = benchmark(fn -> Yog.Pathfinding.BellmanFord.relaxation_passes(yog_s, source) end)
+    lib_stats = benchmark(fn -> Graph.Pathfinding.bellman_ford(lib_s, source) end)
+    
+    print_comparison("Yog", yog_stats)
+    print_comparison("libgraph", lib_stats)
+    print_winner([{"Yog", yog_stats.avg}, {"libgraph", lib_stats.avg}])
+
+    IO.puts("\nMedium Graph (500 nodes, ~1000 edges):")
+    
+    source = 1
+    yog_stats = benchmark(fn -> Yog.Pathfinding.BellmanFord.relaxation_passes(yog_m, source) end)
+    lib_stats = benchmark(fn -> Graph.Pathfinding.bellman_ford(lib_m, source) end)
+    
+    print_comparison("Yog", yog_stats)
+    print_comparison("libgraph", lib_stats)
+    print_winner([{"Yog", yog_stats.avg}, {"libgraph", lib_stats.avg}])
   end
 
   # =============================================================================

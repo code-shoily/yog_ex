@@ -51,41 +51,51 @@ defmodule Yog.Community.Metrics do
       gamma = Keyword.get(opts, :resolution, 1.0)
 
       community_nodes =
-        List.foldl(Map.to_list(communities.assignments), %{}, fn {node, comm}, acc ->
-          Map.update(acc, comm, [node], &[node | &1])
-        end)
+        :maps.fold(
+          fn node, comm, acc ->
+            Map.update(acc, comm, [node], &[node | &1])
+          end,
+          %{},
+          communities.assignments
+        )
 
-      List.foldl(Map.to_list(community_nodes), 0.0, fn {_, nodes_in_comm}, acc ->
-        node_set = MapSet.new(nodes_in_comm)
+      :maps.fold(
+        fn _, nodes_in_comm, acc ->
+          node_set = MapSet.new(nodes_in_comm)
 
-        {internal_edges, degree_sum} =
-          List.foldl(nodes_in_comm, {0, 0}, fn node, {int_acc, deg_acc} ->
-            successors =
+          {internal_edges, degree_sum} =
+            List.foldl(nodes_in_comm, {0, 0}, fn node, {int_acc, deg_acc} ->
+              # Optimization: Check directly for edge existence
               case Map.fetch(out_edges, node) do
-                {:ok, edges} -> Map.to_list(edges)
-                :error -> []
+                {:ok, edges} ->
+                  {internal, degree} =
+                    :maps.fold(
+                      fn neighbor, weight, {int, deg} ->
+                        new_int =
+                          if MapSet.member?(node_set, neighbor), do: int + weight, else: int
+
+                        {new_int, deg + weight}
+                      end,
+                      {0, 0},
+                      edges
+                    )
+
+                  {int_acc + internal, deg_acc + degree}
+
+                :error ->
+                  {int_acc, deg_acc}
               end
+            end)
 
-            degree = List.foldl(successors, 0, fn {_, w}, sum -> sum + w end)
+          internal_edges = internal_edges / 2.0
 
-            internal =
-              List.foldl(successors, 0, fn {neighbor, weight}, sum ->
-                if MapSet.member?(node_set, neighbor) do
-                  sum + weight
-                else
-                  sum
-                end
-              end)
-
-            {int_acc + internal, deg_acc + degree}
-          end)
-
-        internal_edges = internal_edges / 2.0
-
-        term1 = internal_edges / m
-        term2 = gamma * :math.pow(degree_sum / m2, 2)
-        acc + (term1 - term2)
-      end)
+          term1 = internal_edges / m
+          term2 = gamma * :math.pow(degree_sum / m2, 2)
+          acc + (term1 - term2)
+        end,
+        0.0,
+        community_nodes
+      )
     end
   end
 

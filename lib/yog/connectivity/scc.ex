@@ -84,26 +84,21 @@ defmodule Yog.Connectivity.SCC do
   @spec strongly_connected_components(Yog.graph()) :: [[Yog.node_id()]]
   def strongly_connected_components(graph) do
     out_edges = graph.out_edges
-    nodes = Map.keys(graph.nodes)
 
     {_, _, _, _, _, final_sccs} =
-      do_tarjan_all(nodes, out_edges, 0, %{}, %{}, [], %{}, [])
+      :maps.fold(
+        fn node, _, {idx, ids, lows, st, os, sccs} ->
+          if is_map_key(ids, node) do
+            {idx, ids, lows, st, os, sccs}
+          else
+            tarjan_dfs(out_edges, node, idx, ids, lows, st, os, sccs)
+          end
+        end,
+        {0, %{}, %{}, [], %{}, []},
+        graph.nodes
+      )
 
     final_sccs
-  end
-
-  defp do_tarjan_all([], _, idx, ids, lows, st, os, sccs),
-    do: {idx, ids, lows, st, os, sccs}
-
-  defp do_tarjan_all([node | rest], out, idx, ids, lows, st, os, sccs) do
-    if is_map_key(ids, node) do
-      do_tarjan_all(rest, out, idx, ids, lows, st, os, sccs)
-    else
-      {idx2, ids2, lows2, st2, os2, sccs2} =
-        tarjan_dfs(out, node, idx, ids, lows, st, os, sccs)
-
-      do_tarjan_all(rest, out, idx2, ids2, lows2, st2, os2, sccs2)
-    end
   end
 
   defp tarjan_dfs(out, node, index, indices, lowlinks, stack, on_stack, sccs) do
@@ -136,12 +131,8 @@ defmodule Yog.Connectivity.SCC do
 
   # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity
   defp process_neighbors(neighbors, out, node, idx, ids, lows, st, os, sccs) do
-    neighbor_list = Map.to_list(neighbors)
-
-    List.foldl(
-      neighbor_list,
-      {idx, ids, lows, st, os, sccs},
-      fn {neighbor, _}, {i, ids_acc, lows_acc, st_acc, os_acc, sccs_acc} ->
+    :maps.fold(
+      fn neighbor, _, {i, ids_acc, lows_acc, st_acc, os_acc, sccs_acc} ->
         case Map.get(ids_acc, neighbor) do
           nil ->
             # Unvisited - recursive DFS
@@ -158,7 +149,7 @@ defmodule Yog.Connectivity.SCC do
           neighbor_index ->
             # Visited - check for back edge
             new_lows =
-              if is_map_key(os_acc, neighbor) do
+              if Map.has_key?(os_acc, neighbor) do
                 node_low = Map.fetch!(lows_acc, node)
 
                 if neighbor_index < node_low do
@@ -172,7 +163,9 @@ defmodule Yog.Connectivity.SCC do
 
             {i, ids_acc, new_lows, st_acc, os_acc, sccs_acc}
         end
-      end
+      end,
+      {idx, ids, lows, st, os, sccs},
+      neighbors
     )
   end
 
@@ -221,9 +214,19 @@ defmodule Yog.Connectivity.SCC do
   def kosaraju(graph) do
     out_edges = graph.out_edges
     in_edges = graph.in_edges
-    nodes = Map.keys(graph.nodes)
 
-    {finish_order, _} = kosaraju_first_pass(nodes, out_edges, [], %{})
+    {finish_order, _} =
+      :maps.fold(
+        fn node, _, {order, visited} ->
+          if is_map_key(visited, node) do
+            {order, visited}
+          else
+            kosaraju_finish(out_edges, node, order, visited)
+          end
+        end,
+        {[], %{}},
+        graph.nodes
+      )
 
     {_, sccs} =
       List.foldl(
@@ -242,30 +245,24 @@ defmodule Yog.Connectivity.SCC do
     sccs
   end
 
-  defp kosaraju_first_pass([], _, order, visited), do: {order, visited}
-
-  defp kosaraju_first_pass([node | rest], out, order, visited) do
-    if is_map_key(visited, node) do
-      kosaraju_first_pass(rest, out, order, visited)
-    else
-      {new_order, new_visited} = kosaraju_finish(out, node, order, visited)
-      kosaraju_first_pass(rest, out, new_order, new_visited)
-    end
-  end
-
   defp kosaraju_finish(out, node, order, visited) do
-    if is_map_key(visited, node) do
+    if Map.has_key?(visited, node) do
       {order, visited}
     else
       visited = Map.put(visited, node, true)
 
       {new_order, new_visited} =
         case Map.fetch(out, node) do
-          {:ok, neighbors} when map_size(neighbors) > 0 ->
-            neighbor_list = Map.to_list(neighbors)
-            kosaraju_finish_neighbors(neighbor_list, out, order, visited)
+          {:ok, neighbors} ->
+            :maps.fold(
+              fn nb, _, {o_acc, v_acc} ->
+                kosaraju_finish(out, nb, o_acc, v_acc)
+              end,
+              {order, visited},
+              neighbors
+            )
 
-          _ ->
+          :error ->
             {order, visited}
         end
 
@@ -273,37 +270,26 @@ defmodule Yog.Connectivity.SCC do
     end
   end
 
-  defp kosaraju_finish_neighbors([], _, order, visited), do: {order, visited}
-
-  defp kosaraju_finish_neighbors([{nb, _} | rest], out, order, visited) do
-    {new_order, new_visited} = kosaraju_finish(out, nb, order, visited)
-    kosaraju_finish_neighbors(rest, out, new_order, new_visited)
-  end
-
-  defp kosaraju_collect(in_edges, node, visited, acc) do
-    if is_map_key(visited, node) do
+  defp kosaraju_collect(edges, node, visited, acc) do
+    if Map.has_key?(visited, node) do
       {visited, acc}
     else
       visited = Map.put(visited, node, true)
+      acc = [node | acc]
 
-      {new_visited, new_acc} =
-        case Map.fetch(in_edges, node) do
-          {:ok, neighbors} when map_size(neighbors) > 0 ->
-            neighbor_list = Map.to_list(neighbors)
-            kosaraju_collect_neighbors(neighbor_list, in_edges, visited, [node | acc])
+      case Map.fetch(edges, node) do
+        {:ok, neighbors} ->
+          :maps.fold(
+            fn nb, _, {v_acc, c_acc} ->
+              kosaraju_collect(edges, nb, v_acc, c_acc)
+            end,
+            {visited, acc},
+            neighbors
+          )
 
-          _ ->
-            {visited, [node | acc]}
-        end
-
-      {new_visited, new_acc}
+        :error ->
+          {visited, acc}
+      end
     end
-  end
-
-  defp kosaraju_collect_neighbors([], _, visited, acc), do: {visited, acc}
-
-  defp kosaraju_collect_neighbors([{nb, _} | rest], in_edges, visited, acc) do
-    {new_visited, new_acc} = kosaraju_collect(in_edges, nb, visited, acc)
-    kosaraju_collect_neighbors(rest, in_edges, new_visited, new_acc)
   end
 end

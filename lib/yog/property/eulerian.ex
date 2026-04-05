@@ -134,34 +134,40 @@ defmodule Yog.Property.Eulerian do
   """
   @spec has_eulerian_circuit?(Yog.graph()) :: boolean()
   def has_eulerian_circuit?(graph) do
-    nodes = Model.all_nodes(graph)
-
-    if nodes == [] do
+    if map_size(graph.nodes) == 0 do
       false
     else
       case Model.type(graph) do
-        :undirected -> has_eulerian_circuit_undirected?(graph, nodes)
-        :directed -> has_eulerian_circuit_directed?(graph, nodes)
+        :undirected -> has_eulerian_circuit_undirected?(graph, [])
+        :directed -> has_eulerian_circuit_directed?(graph, [])
       end
     end
   end
 
-  defp has_eulerian_circuit_undirected?(graph, nodes) do
+  defp has_eulerian_circuit_undirected?(graph, _nodes) do
     all_even =
-      Enum.all?(nodes, fn node ->
-        rem(Model.degree(graph, node), 2) == 0
-      end)
+      :maps.fold(
+        fn node, _, acc ->
+          acc and rem(Model.degree(graph, node), 2) == 0
+        end,
+        true,
+        graph.nodes
+      )
 
-    all_even and connected?(graph, nodes)
+    all_even and connected?(graph)
   end
 
-  defp has_eulerian_circuit_directed?(graph, nodes) do
+  defp has_eulerian_circuit_directed?(graph, _nodes) do
     all_balanced =
-      Enum.all?(nodes, fn node ->
-        Model.in_degree(graph, node) == Model.out_degree(graph, node)
-      end)
+      :maps.fold(
+        fn node, _, acc ->
+          acc and Model.in_degree(graph, node) == Model.out_degree(graph, node)
+        end,
+        true,
+        graph.nodes
+      )
 
-    all_balanced and connected?(graph, nodes)
+    all_balanced and connected?(graph)
   end
 
   @doc """
@@ -207,43 +213,49 @@ defmodule Yog.Property.Eulerian do
   """
   @spec has_eulerian_path?(Yog.graph()) :: boolean()
   def has_eulerian_path?(graph) do
-    nodes = Model.all_nodes(graph)
-
-    if nodes == [] do
+    if map_size(graph.nodes) == 0 do
       false
     else
       case Model.type(graph) do
-        :undirected -> has_eulerian_path_undirected?(graph, nodes)
-        :directed -> has_eulerian_path_directed?(graph, nodes)
+        :undirected -> has_eulerian_path_undirected?(graph)
+        :directed -> has_eulerian_path_directed?(graph)
       end
     end
   end
 
-  defp has_eulerian_path_undirected?(graph, nodes) do
+  defp has_eulerian_path_undirected?(graph) do
     odd_count =
-      Enum.count(nodes, fn node ->
-        rem(Model.degree(graph, node), 2) == 1
-      end)
+      :maps.fold(
+        fn node, _, acc ->
+          if rem(Model.degree(graph, node), 2) == 1, do: acc + 1, else: acc
+        end,
+        0,
+        graph.nodes
+      )
 
-    (odd_count == 0 or odd_count == 2) and connected?(graph, nodes)
+    (odd_count == 0 or odd_count == 2) and connected?(graph)
   end
 
-  defp has_eulerian_path_directed?(graph, nodes) do
+  defp has_eulerian_path_directed?(graph) do
     stats =
-      Enum.reduce(nodes, {0, 0, true}, fn node, {starts, ends, valid} ->
-        diff = Model.out_degree(graph, node) - Model.in_degree(graph, node)
+      :maps.fold(
+        fn node, _, {starts, ends, valid} ->
+          diff = Model.out_degree(graph, node) - Model.in_degree(graph, node)
 
-        cond do
-          diff == 1 -> {starts + 1, ends, valid and starts < 1}
-          diff == -1 -> {starts, ends + 1, valid and ends < 1}
-          diff == 0 -> {starts, ends, valid}
-          true -> {starts, ends, false}
-        end
-      end)
+          cond do
+            diff == 1 -> {starts + 1, ends, valid and starts < 1}
+            diff == -1 -> {starts, ends + 1, valid and ends < 1}
+            diff == 0 -> {starts, ends, valid}
+            true -> {starts, ends, false}
+          end
+        end,
+        {0, 0, true},
+        graph.nodes
+      )
 
     case stats do
       {s, e, true} when (s == 0 and e == 0) or (s == 1 and e == 1) ->
-        connected?(graph, nodes)
+        connected?(graph)
 
       _ ->
         false
@@ -251,18 +263,14 @@ defmodule Yog.Property.Eulerian do
   end
 
   # Check if all nodes with degree > 0 are in the same weakly connected component
-  defp connected?(graph, _nodes) do
-    # Get all weakly connected components
+  defp connected?(graph) do
     components = Components.weakly_connected_components(graph)
 
-    # Filter for components that contain at least one edge (non-isolated)
-    # A component has an edge if any node in it has degree > 0
     non_isolated_components =
       Enum.filter(components, fn component ->
         Enum.any?(component, fn node -> Model.degree(graph, node) > 0 end)
       end)
 
-    # An Eulerian graph must have at most one such component
     length(non_isolated_components) <= 1
   end
 
@@ -393,20 +401,27 @@ defmodule Yog.Property.Eulerian do
   end
 
   defp build_hierholzer_data(graph) do
-    nodes = Model.all_nodes(graph)
+    :maps.fold(
+      fn u, inner, {adj_acc, count_acc} ->
+        # Optimization: Use inner (out_edges) map keys directly
+        successors = Map.keys(inner)
 
-    Enum.reduce(nodes, {%{}, %{}}, fn u, {adj_acc, count_acc} ->
-      successors = Model.successor_ids(graph, u)
+        new_adj = Map.put(adj_acc, u, successors)
 
-      new_adj = Map.put(adj_acc, u, successors)
+        new_counts =
+          :maps.fold(
+            fn v, _, acc ->
+              Map.update(acc, {u, v}, 1, &(&1 + 1))
+            end,
+            count_acc,
+            inner
+          )
 
-      new_counts =
-        Enum.reduce(successors, count_acc, fn v, acc ->
-          Map.update(acc, {u, v}, 1, &(&1 + 1))
-        end)
-
-      {new_adj, new_counts}
-    end)
+        {new_adj, new_counts}
+      end,
+      {%{}, %{}},
+      graph.out_edges
+    )
   end
 
   defp do_hierholzer(graph, current, adj_stacks, edge_counts, path) do

@@ -80,8 +80,6 @@ defmodule Yog.Property.Bipartite do
   - [CP-Algorithms: Bipartite Check](https://cp-algorithms.com/graph/bipartite-check.html)
   """
 
-  alias Yog.Model
-
   @typedoc """
   A partition of a bipartite graph into two independent sets.
   In a bipartite graph, all edges connect vertices from `left` to `right`,
@@ -171,18 +169,20 @@ defmodule Yog.Property.Bipartite do
   def partition(graph), do: do_partition(graph)
 
   defp do_partition(graph) do
-    nodes = Model.all_nodes(graph)
-
-    if nodes == [] do
+    if map_size(graph.nodes) == 0 do
       {:ok, %{left: MapSet.new(), right: MapSet.new()}}
     else
-      case bfs_color_all(graph, nodes, %{}) do
+      # Optimization: drive node loop with :maps.fold to avoid large list of keys
+      case bfs_color_all(graph) do
         {:ok, colors} ->
           {left, right} =
-            Enum.reduce(colors, {[], []}, fn
-              {id, 1}, {l, r} -> {[id | l], r}
-              {id, 2}, {l, r} -> {l, [id | r]}
-            end)
+            :maps.fold(
+              fn id, color, {l, r} ->
+                if color == 1, do: {[id | l], r}, else: {l, [id | r]}
+              end,
+              {[], []},
+              colors
+            )
 
           {:ok, %{left: MapSet.new(left), right: MapSet.new(right)}}
 
@@ -192,17 +192,24 @@ defmodule Yog.Property.Bipartite do
     end
   end
 
-  defp bfs_color_all(graph, nodes, colors) do
-    Enum.reduce_while(nodes, {:ok, colors}, fn node, {:ok, acc_colors} ->
-      if Map.has_key?(acc_colors, node) do
-        {:cont, {:ok, acc_colors}}
-      else
-        case bfs_color_component(graph, node, acc_colors) do
-          {:ok, new_colors} -> {:cont, {:ok, new_colors}}
-          {:error, reason} -> {:halt, {:error, reason}}
+  defp bfs_color_all(graph) do
+    :maps.fold(
+      fn node, _, acc ->
+        case acc do
+          {:error, _} ->
+            acc
+
+          {:ok, acc_colors} ->
+            if Map.has_key?(acc_colors, node) do
+              acc
+            else
+              bfs_color_component(graph, node, acc_colors)
+            end
         end
-      end
-    end)
+      end,
+      {:ok, %{}},
+      graph.nodes
+    )
   end
 
   defp bfs_color_component(graph, source, colors) do
@@ -217,28 +224,43 @@ defmodule Yog.Property.Bipartite do
       {{:value, u}, rest_q} ->
         current_color = Map.get(colors, u)
         next_color = if(current_color == 1, do: 2, else: 1)
-        neighbors = Model.neighbor_ids(graph, u)
 
-        case process_neighbors(neighbors, current_color, next_color, colors, rest_q) do
-          {:ok, new_colors, new_q} -> do_bfs_coloring(graph, new_q, new_colors)
-          {:error, reason} -> {:error, reason}
+        case Map.fetch(graph.out_edges, u) do
+          {:ok, neighbors} ->
+            case process_neighbors_native(neighbors, current_color, next_color, colors, rest_q) do
+              {:ok, new_colors, new_q} -> do_bfs_coloring(graph, new_q, new_colors)
+              {:error, reason} -> {:error, reason}
+            end
+
+          :error ->
+            do_bfs_coloring(graph, rest_q, colors)
         end
     end
   end
 
-  defp process_neighbors([], _curr, _next, colors, queue), do: {:ok, colors, queue}
+  defp process_neighbors_native(neighbors, curr, next, colors, queue) do
+    :maps.fold(
+      fn v, _, acc ->
+        case acc do
+          {:error, _} ->
+            acc
 
-  defp process_neighbors([v | tail], curr, next, colors, queue) do
-    case Map.get(colors, v) do
-      nil ->
-        process_neighbors(tail, curr, next, Map.put(colors, v, next), :queue.in(v, queue))
+          {:ok, acc_colors, acc_q} ->
+            case Map.get(acc_colors, v) do
+              nil ->
+                {:ok, Map.put(acc_colors, v, next), :queue.in(v, acc_q)}
 
-      ^curr ->
-        {:error, :not_bipartite}
+              ^curr ->
+                {:error, :not_bipartite}
 
-      _ ->
-        process_neighbors(tail, curr, next, colors, queue)
-    end
+              _ ->
+                acc
+            end
+        end
+      end,
+      {:ok, colors, queue},
+      neighbors
+    )
   end
 
   @doc """
@@ -319,59 +341,89 @@ defmodule Yog.Property.Bipartite do
           right: MapSet.t(Yog.node_id())
         }) :: [{Yog.node_id(), Yog.node_id()}]
   def maximum_matching(graph, partition_map) do
-    left = MapSet.to_list(partition_map.left)
-    _right = MapSet.to_list(partition_map.right)
-
+    # Optimized adj built with only valid edges to right partition
     adj =
-      Map.new(left, fn u ->
-        neighbors = Model.neighbor_ids(graph, u)
-        valid = Enum.filter(neighbors, fn v -> MapSet.member?(partition_map.right, v) end)
-        {u, valid}
-      end)
+      :maps.fold(
+        fn u, inner, acc ->
+          if MapSet.member?(partition_map.left, u) do
+            # Filter neighbors that are in the right partition
+            valid_successors =
+              :maps.fold(
+                fn v, _, v_acc ->
+                  if MapSet.member?(partition_map.right, v) do
+                    [v | v_acc]
+                  else
+                    v_acc
+                  end
+                end,
+                [],
+                inner
+              )
+
+            Map.put(acc, u, valid_successors)
+          else
+            acc
+          end
+        end,
+        %{},
+        graph.out_edges
+      )
 
     match_r = %{}
 
+    # Iterate over left partition to find augmenting paths
     {matching, _} =
-      Enum.reduce(left, {[], match_r}, fn u, {matches, match_right} ->
-        visited = MapSet.new()
+      :maps.fold(
+        fn u, _, {matches, match_right} ->
+          if MapSet.member?(partition_map.left, u) do
+            visited = MapSet.new()
 
-        case find_augmenting_path(u, adj, match_right, visited) do
-          {:ok, v, new_match_right} ->
-            {[{u, v} | matches], new_match_right}
+            case find_augmenting_path(u, adj, match_right, visited) do
+              {:ok, v, new_match_right} ->
+                {[{u, v} | matches], new_match_right}
 
-          :none ->
+              :none ->
+                {matches, match_right}
+            end
+          else
             {matches, match_right}
-        end
-      end)
+          end
+        end,
+        {[], match_r},
+        graph.nodes
+      )
 
     Enum.reverse(matching)
   end
 
-  # Find augmenting path using DFS
+  # Find augmenting path using DFS on the pre-built adj list
   defp find_augmenting_path(u, adj, match_r, visited) do
     neighbors = Map.get(adj, u, [])
+    do_find_augmenting_path(u, neighbors, adj, match_r, visited)
+  end
 
-    Enum.reduce_while(neighbors, :none, fn v, _acc ->
-      if MapSet.member?(visited, v) do
-        {:cont, :none}
-      else
-        new_visited = MapSet.put(visited, v)
+  defp do_find_augmenting_path(_u, [], _adj, _match_r, _visited), do: :none
 
-        case Map.get(match_r, v) do
-          nil ->
-            {:halt, {:ok, v, Map.put(match_r, v, u)}}
+  defp do_find_augmenting_path(u, [v | rest], adj, match_r, visited) do
+    if MapSet.member?(visited, v) do
+      do_find_augmenting_path(u, rest, adj, match_r, visited)
+    else
+      new_visited = MapSet.put(visited, v)
 
-          u2 ->
-            case find_augmenting_path(u2, adj, match_r, new_visited) do
-              {:ok, v2, new_match} ->
-                {:halt, {:ok, v2, Map.put(new_match, v, u)}}
+      case Map.get(match_r, v) do
+        nil ->
+          {:ok, v, Map.put(match_r, v, u)}
 
-              :none ->
-                {:cont, :none}
-            end
-        end
+        u2 ->
+          case find_augmenting_path(u2, adj, match_r, new_visited) do
+            {:ok, v2, new_match} ->
+              {:ok, v2, Map.put(new_match, v, u)}
+
+            :none ->
+              do_find_augmenting_path(u, rest, adj, match_r, new_visited)
+          end
       end
-    end)
+    end
   end
 
   @doc """

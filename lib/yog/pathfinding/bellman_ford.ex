@@ -214,8 +214,7 @@ defmodule Yog.Pathfinding.BellmanFord do
         add \\ &Kernel.+/2,
         compare \\ &Yog.Utils.compare/2
       ) do
-    nodes = Map.keys(graph.nodes)
-    node_count = length(nodes)
+    node_count = Yog.Model.order(graph)
 
     initial_distances = %{from => zero}
     initial_predecessors = %{}
@@ -236,7 +235,7 @@ defmodule Yog.Pathfinding.BellmanFord do
     {final_distances, _} =
       relax_all_edges_from_graph(graph, distances, predecessors, add, compare)
 
-    if negative_cycle_detected?(nodes, distances, final_distances, compare) do
+    if negative_cycle_detected?(graph.nodes, distances, final_distances, compare) do
       {:error, :negative_cycle}
     else
       case Map.fetch(distances, to) do
@@ -269,8 +268,7 @@ defmodule Yog.Pathfinding.BellmanFord do
         add \\ &Kernel.+/2,
         compare \\ &Yog.Utils.compare/2
       ) do
-    nodes = Map.keys(graph.nodes)
-    node_count = length(nodes)
+    node_count = Yog.Model.order(graph)
 
     initial_distances = %{from => zero}
     initial_predecessors = %{}
@@ -304,8 +302,7 @@ defmodule Yog.Pathfinding.BellmanFord do
         add \\ &Kernel.+/2,
         compare \\ &Yog.Utils.compare/2
       ) do
-    nodes = Map.keys(graph.nodes)
-    node_count = length(nodes)
+    node_count = Yog.Model.order(graph)
 
     initial_distances = %{from => zero}
 
@@ -316,7 +313,7 @@ defmodule Yog.Pathfinding.BellmanFord do
 
     final_distances = relax_all_edges_from_graph_no_pred(graph, distances, add, compare)
 
-    negative_cycle_detected?(nodes, distances, final_distances, compare)
+    negative_cycle_detected?(graph.nodes, distances, final_distances, compare)
   end
 
   @doc """
@@ -453,90 +450,95 @@ defmodule Yog.Pathfinding.BellmanFord do
 
   defp relax_all_edges_from_graph(graph, distances, predecessors, add, compare) do
     out_edges = graph.out_edges
-    nodes = Map.keys(graph.nodes)
 
-    List.foldl(nodes, {distances, predecessors}, fn u, {dist, pred} ->
-      case Map.fetch(dist, u) do
-        {:ok, dist_u} ->
-          successors =
-            case Map.fetch(out_edges, u) do
-              {:ok, edges} -> Map.to_list(edges)
-              :error -> []
-            end
+    :maps.fold(
+      fn u, dist_u, {dist, pred} ->
+        case Map.fetch(out_edges, u) do
+          {:ok, edges} ->
+            :maps.fold(
+              fn v, weight, {d, p} ->
+                new_dist_v = add.(dist_u, weight)
 
-          List.foldl(successors, {dist, pred}, fn {v, weight}, {d, p} ->
-            new_dist_v = add.(dist_u, weight)
+                case Map.fetch(d, v) do
+                  {:ok, current_dist_v} ->
+                    if compare.(new_dist_v, current_dist_v) == :lt do
+                      {Map.put(d, v, new_dist_v), Map.put(p, v, u)}
+                    else
+                      {d, p}
+                    end
 
-            case Map.fetch(d, v) do
-              {:ok, current_dist_v} ->
-                if compare.(new_dist_v, current_dist_v) == :lt do
-                  {Map.put(d, v, new_dist_v), Map.put(p, v, u)}
-                else
-                  {d, p}
+                  :error ->
+                    {Map.put(d, v, new_dist_v), Map.put(p, v, u)}
                 end
+              end,
+              {dist, pred},
+              edges
+            )
 
-              :error ->
-                {Map.put(d, v, new_dist_v), Map.put(p, v, u)}
-            end
-          end)
-
-        :error ->
-          {dist, pred}
-      end
-    end)
+          :error ->
+            {dist, pred}
+        end
+      end,
+      {distances, predecessors},
+      distances
+    )
   end
 
   # Relax all edges without tracking predecessors (protocol-compatible)
   defp relax_all_edges_from_graph_no_pred(graph, distances, add, compare) do
     out_edges = graph.out_edges
-    nodes = Map.keys(graph.nodes)
 
-    List.foldl(nodes, distances, fn u, dist ->
-      case Map.fetch(dist, u) do
-        {:ok, dist_u} ->
-          successors =
-            case Map.fetch(out_edges, u) do
-              {:ok, edges} -> Map.to_list(edges)
-              :error -> []
-            end
+    :maps.fold(
+      fn u, dist_u, dist ->
+        case Map.fetch(out_edges, u) do
+          {:ok, edges} ->
+            :maps.fold(
+              fn v, weight, d ->
+                new_dist_v = add.(dist_u, weight)
 
-          List.foldl(successors, dist, fn {v, weight}, d ->
-            new_dist_v = add.(dist_u, weight)
+                case Map.fetch(d, v) do
+                  {:ok, current_dist_v} ->
+                    if compare.(new_dist_v, current_dist_v) == :lt do
+                      Map.put(d, v, new_dist_v)
+                    else
+                      d
+                    end
 
-            case Map.fetch(d, v) do
-              {:ok, current_dist_v} ->
-                if compare.(new_dist_v, current_dist_v) == :lt do
-                  Map.put(d, v, new_dist_v)
-                else
-                  d
+                  :error ->
+                    Map.put(d, v, new_dist_v)
                 end
+              end,
+              dist,
+              edges
+            )
 
-              :error ->
-                Map.put(d, v, new_dist_v)
-            end
-          end)
-
-        :error ->
-          dist
-      end
-    end)
+          :error ->
+            dist
+        end
+      end,
+      distances,
+      distances
+    )
   end
 
-  defp negative_cycle_detected?(nodes, old_distances, new_distances, compare) do
-    List.foldl(nodes, false, fn node, found? ->
-      if found? do
-        true
-      else
-        old_val = Map.get(old_distances, node)
-        new_val = Map.get(new_distances, node)
-
-        if old_val == nil or new_val == nil do
-          false
+  defp negative_cycle_detected?(_nodes, old_distances, new_distances, compare) do
+    :maps.fold(
+      fn node, old_val, found? ->
+        if found? do
+          true
         else
-          compare.(new_val, old_val) == :lt
+          new_val = Map.get(new_distances, node)
+
+          if new_val == nil do
+            false
+          else
+            compare.(new_val, old_val) == :lt
+          end
         end
-      end
-    end)
+      end,
+      false,
+      old_distances
+    )
   end
 
   defp reconstruct_path_from_predecessors(predecessors, from, to) do
@@ -573,35 +575,33 @@ defmodule Yog.Pathfinding.BellmanFord do
         # Too many iterations, likely a negative cycle
         {:error, :negative_cycle}
       else
-        # Build a list of all state-distance pairs to process
-        state_dist_pairs =
-          List.foldl(Map.to_list(distances), [], fn {_, {state, dist}}, acc ->
-            [{state, dist} | acc]
-          end)
-
+        # Relax all edges from all current states
         # Relax all edges from all current states
         {next_distances, any_change} =
-          List.foldl(state_dist_pairs, {distances, false}, fn {state, state_dist},
-                                                              {dists, changed} ->
-            next_states = successors.(state)
+          :maps.fold(
+            fn _, {state, state_dist}, {dists, changed} ->
+              next_states = successors.(state)
 
-            List.foldl(next_states, {dists, changed}, fn {next_state, cost}, {acc, ch} ->
-              key = key_fn.(next_state)
-              new_dist = add.(state_dist, cost)
+              List.foldl(next_states, {dists, changed}, fn {next_state, cost}, {acc, ch} ->
+                key = key_fn.(next_state)
+                new_dist = add.(state_dist, cost)
 
-              case Map.fetch(acc, key) do
-                {:ok, {_, current_dist}} ->
-                  if compare.(new_dist, current_dist) == :lt do
+                case Map.fetch(acc, key) do
+                  {:ok, {_, current_dist}} ->
+                    if compare.(new_dist, current_dist) == :lt do
+                      {Map.put(acc, key, {next_state, new_dist}), true}
+                    else
+                      {acc, ch}
+                    end
+
+                  :error ->
                     {Map.put(acc, key, {next_state, new_dist}), true}
-                  else
-                    {acc, ch}
-                  end
-
-                :error ->
-                  {Map.put(acc, key, {next_state, new_dist}), true}
-              end
-            end)
-          end)
+                end
+              end)
+            end,
+            {distances, false},
+            distances
+          )
 
         if any_change do
           do_implicit_bellman_ford(

@@ -168,19 +168,27 @@ defmodule Yog.Transform do
     out_edges = graph.out_edges
 
     symmetric_out =
-      List.foldl(Map.to_list(out_edges), out_edges, fn {src, inner}, acc_outer ->
-        List.foldl(Map.to_list(inner), acc_outer, fn {dst, weight}, acc ->
-          dst_inner = Map.get(acc, dst, %{})
+      :maps.fold(
+        fn src, inner, acc_outer ->
+          :maps.fold(
+            fn dst, weight, acc ->
+              dst_inner = Map.get(acc, dst, %{})
 
-          updated_inner =
-            case Map.fetch(dst_inner, src) do
-              {:ok, existing} -> Map.put(dst_inner, src, resolve.(existing, weight))
-              :error -> Map.put(dst_inner, src, weight)
-            end
+              updated_inner =
+                case Map.fetch(dst_inner, src) do
+                  {:ok, existing} -> Map.put(dst_inner, src, resolve.(existing, weight))
+                  :error -> Map.put(dst_inner, src, weight)
+                end
 
-          Map.put(acc, dst, updated_inner)
-        end)
-      end)
+              Map.put(acc, dst, updated_inner)
+            end,
+            acc_outer,
+            inner
+          )
+        end,
+        out_edges,
+        out_edges
+      )
 
     %{graph | kind: :undirected, out_edges: symmetric_out, in_edges: symmetric_out}
   end
@@ -510,19 +518,18 @@ defmodule Yog.Transform do
 
     stream_opts = Keyword.merge(default_opts, opts)
 
-    # Flatten edges and chunk them to avoid data skew on high-degree nodes
-    # Process chunks in parallel for better load balancing
+    # Optimization: Use lazy streams to avoid building a massive list of all edges in memory
     all_out_edges =
-      for {src, inner} <- graph.out_edges,
-          {dst, weight} <- inner,
-          do: {:out, src, dst, weight}
+      Stream.flat_map(graph.out_edges, fn {src, inner} ->
+        Stream.map(inner, fn {dst, weight} -> {:out, src, dst, weight} end)
+      end)
 
     all_in_edges =
-      for {dst, inner} <- graph.in_edges,
-          {src, weight} <- inner,
-          do: {:in, dst, src, weight}
+      Stream.flat_map(graph.in_edges, fn {dst, inner} ->
+        Stream.map(inner, fn {src, weight} -> {:in, dst, src, weight} end)
+      end)
 
-    all_edges = all_out_edges ++ all_in_edges
+    all_edges = Stream.concat(all_out_edges, all_in_edges)
 
     # Process edges in parallel and collect results
     processed_edges =

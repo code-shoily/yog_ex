@@ -99,12 +99,12 @@ defmodule Yog.Health do
         do: Transform.map_edges(graph, weight_fn),
         else: graph
 
-    nodes = Map.keys(reweighted_graph.nodes)
+    node_map = reweighted_graph.nodes
 
-    if nodes == [] do
+    if map_size(node_map) == 0 do
       nil
     else
-      n = length(nodes)
+      n = map_size(node_map)
 
       parallel_opts = [
         max_concurrency: System.schedulers_online(),
@@ -112,7 +112,7 @@ defmodule Yog.Health do
       ]
 
       eccentricities =
-        nodes
+        Map.keys(node_map)
         |> Task.async_stream(
           fn node ->
             eccentricity(reweighted_graph, node,
@@ -190,12 +190,12 @@ defmodule Yog.Health do
         do: Transform.map_edges(graph, weight_fn),
         else: graph
 
-    nodes = Map.keys(reweighted_graph.nodes)
+    node_map = reweighted_graph.nodes
 
-    if nodes == [] do
+    if map_size(node_map) == 0 do
       nil
     else
-      n = length(nodes)
+      n = map_size(node_map)
 
       parallel_opts = [
         max_concurrency: System.schedulers_online(),
@@ -203,7 +203,7 @@ defmodule Yog.Health do
       ]
 
       eccentricities =
-        nodes
+        Map.keys(node_map)
         |> Task.async_stream(
           fn node ->
             eccentricity(reweighted_graph, node,
@@ -287,8 +287,7 @@ defmodule Yog.Health do
         do: Transform.map_edges(graph, weight_fn),
         else: graph
 
-    all_nodes = Map.keys(reweighted_graph.nodes)
-    num_nodes = length(all_nodes)
+    num_nodes = map_size(reweighted_graph.nodes)
 
     if num_nodes <= 1 do
       zero
@@ -298,11 +297,13 @@ defmodule Yog.Health do
       if map_size(distances) < num_nodes do
         nil
       else
-        distances
-        |> Map.values()
-        |> Enum.reduce(fn dist, max_dist ->
-          if compare.(dist, max_dist) == :gt, do: dist, else: max_dist
-        end)
+        :maps.fold(
+          fn _, dist, max_dist ->
+            if compare.(dist, max_dist) == :gt, do: dist, else: max_dist
+          end,
+          zero,
+          distances
+        )
       end
     end
   end
@@ -348,32 +349,43 @@ defmodule Yog.Health do
   """
   @spec assortativity(Yog.graph()) :: float()
   def assortativity(graph) do
-    nodes = Map.keys(graph.nodes)
     out_edges = graph.out_edges
 
     degrees =
-      List.foldl(nodes, %{}, fn node, acc ->
-        deg =
-          case Map.fetch(out_edges, node) do
-            {:ok, inner} -> map_size(inner)
-            :error -> 0
-          end
+      :maps.fold(
+        fn node, _, acc ->
+          deg =
+            case Map.fetch(out_edges, node) do
+              {:ok, inner} -> map_size(inner)
+              :error -> 0
+            end
 
-        Map.put(acc, node, deg)
-      end)
+          Map.put(acc, node, deg)
+        end,
+        %{},
+        graph.nodes
+      )
 
     edges_data =
-      List.foldl(nodes, [], fn u, acc ->
-        successors =
+      :maps.fold(
+        fn u, _, acc ->
           case Map.fetch(out_edges, u) do
-            {:ok, inner} -> Map.to_list(inner)
-            :error -> []
-          end
+            {:ok, inner} ->
+              :maps.fold(
+                fn v, _weight, inner_acc ->
+                  [{Map.get(degrees, u, 0), Map.get(degrees, v, 0)} | inner_acc]
+                end,
+                acc,
+                inner
+              )
 
-        List.foldl(successors, acc, fn {v, _weight}, inner_acc ->
-          [{Map.get(degrees, u, 0), Map.get(degrees, v, 0)} | inner_acc]
-        end)
-      end)
+            :error ->
+              acc
+          end
+        end,
+        [],
+        graph.nodes
+      )
 
     m = length(edges_data) * 1.0
 
@@ -460,8 +472,8 @@ defmodule Yog.Health do
         do: Transform.map_edges(graph, weight_fn),
         else: graph
 
-    nodes = Map.keys(reweighted_graph.nodes)
-    num_nodes = length(nodes)
+    node_map = reweighted_graph.nodes
+    num_nodes = map_size(node_map)
 
     if num_nodes <= 1 do
       nil
@@ -472,7 +484,7 @@ defmodule Yog.Health do
       ]
 
       all_distances =
-        nodes
+        Map.keys(node_map)
         |> Task.async_stream(
           fn source ->
             Dijkstra.single_source_distances(reweighted_graph, source, zero, add, compare)
@@ -490,9 +502,13 @@ defmodule Yog.Health do
         total =
           List.foldl(all_distances, 0.0, fn distances, acc ->
             sum =
-              List.foldl(Map.to_list(distances), 0.0, fn {_node, dist}, sum ->
-                sum + to_float.(dist)
-              end)
+              :maps.fold(
+                fn _node, dist, sum ->
+                  sum + to_float.(dist)
+                end,
+                0.0,
+                distances
+              )
 
             acc + sum
           end)

@@ -79,23 +79,32 @@ defmodule Yog.Connectivity.Reachability do
         :ancestors -> sorted
       end
 
-    get_related = build_get_related_fn(graph, direction)
-
     reachability_sets =
       List.foldl(nodes_to_process, %{}, fn node, acc ->
-        related = get_related.(node)
-        related_set = MapSet.new(related)
+        neighbors =
+          case direction do
+            :descendants -> Map.get(graph.out_edges, node, %{})
+            :ancestors -> Map.get(graph.in_edges, node, %{})
+          end
 
         all_reachable =
-          List.foldl(related, related_set, fn neighbor, set_acc ->
-            neighbor_set = Map.get(acc, neighbor, MapSet.new())
-            MapSet.union(set_acc, neighbor_set)
-          end)
+          :maps.fold(
+            fn neighbor, _, set_acc ->
+              neighbor_set = Map.get(acc, neighbor, MapSet.new())
+              MapSet.union(MapSet.put(set_acc, neighbor), neighbor_set)
+            end,
+            MapSet.new(),
+            neighbors
+          )
 
         Map.put(acc, node, all_reachable)
       end)
 
-    Map.new(reachability_sets, fn {node, set} -> {node, MapSet.size(set)} end)
+    :maps.fold(
+      fn node, set, acc -> Map.put(acc, node, MapSet.size(set)) end,
+      %{},
+      reachability_sets
+    )
   end
 
   defp solve_cyclic_counts(graph, direction) do
@@ -112,20 +121,25 @@ defmodule Yog.Connectivity.Reachability do
 
     cond_nodes = condensation.nodes
 
-    Map.new(Map.keys(graph.nodes), fn node_id ->
-      scc_id = Map.fetch!(node_to_scc, node_id)
-      reachable_scc_ids = Map.get(scc_reachability_sets, scc_id, MapSet.new())
+    :maps.fold(
+      fn node_id, _, acc ->
+        scc_id = Map.fetch!(node_to_scc, node_id)
+        reachable_scc_ids = Map.get(scc_reachability_sets, scc_id, MapSet.new())
 
-      node_count =
-        List.foldl(MapSet.to_list(reachable_scc_ids), 0, fn id, acc ->
-          scc_data = Map.fetch!(cond_nodes, id)
-          acc + scc_data.size
-        end)
+        # Sum sizes of reachable SCCs
+        node_count =
+          Enum.reduce(reachable_scc_ids, 0, fn id, inner_acc ->
+            scc_data = Map.fetch!(cond_nodes, id)
+            inner_acc + scc_data.size
+          end)
 
-      my_scc_data = Map.fetch!(cond_nodes, scc_id)
-      my_scc_size = my_scc_data.size
-      {node_id, node_count + (my_scc_size - 1)}
-    end)
+        my_scc_data = Map.fetch!(cond_nodes, scc_id)
+        my_scc_size = my_scc_data.size
+        Map.put(acc, node_id, node_count + (my_scc_size - 1))
+      end,
+      %{},
+      graph.nodes
+    )
   end
 
   @doc """
@@ -172,23 +186,32 @@ defmodule Yog.Connectivity.Reachability do
         :ancestors -> sorted
       end
 
-    get_related = build_get_related_fn(graph, direction)
-
     hll_registers =
       List.foldl(nodes_to_process, %{}, fn node, acc ->
-        related = get_related.(node)
-        base_hll = List.foldl(related, init_hll(), &hll_add(&2, &1))
+        neighbors =
+          case direction do
+            :descendants -> Map.get(graph.out_edges, node, %{})
+            :ancestors -> Map.get(graph.in_edges, node, %{})
+          end
 
         merged =
-          List.foldl(related, base_hll, fn neighbor, hll_acc ->
-            neighbor_hll = Map.get(acc, neighbor, init_hll())
-            hll_union(hll_acc, neighbor_hll)
-          end)
+          :maps.fold(
+            fn neighbor, _, hll_acc ->
+              neighbor_hll = Map.get(acc, neighbor, init_hll())
+              hll_union(hll_add(hll_acc, neighbor), neighbor_hll)
+            end,
+            init_hll(),
+            neighbors
+          )
 
         Map.put(acc, node, merged)
       end)
 
-    Map.new(hll_registers, fn {node, hll} -> {node, hll_count(hll)} end)
+    :maps.fold(
+      fn node, hll, acc -> Map.put(acc, node, hll_count(hll)) end,
+      %{},
+      hll_registers
+    )
   end
 
   # HyperLogLog-based counting for cyclic graphs (via condensation)
@@ -213,47 +236,38 @@ defmodule Yog.Connectivity.Reachability do
     cond_edges = condensation.out_edges
     cond_in_edges = condensation.in_edges
 
-    get_scc_related =
-      case direction do
-        :descendants ->
-          fn scc_id ->
-            case Map.fetch(cond_edges, scc_id) do
-              {:ok, nbrs} -> Map.keys(nbrs)
-              :error -> []
-            end
-          end
-
-        :ancestors ->
-          fn scc_id ->
-            case Map.fetch(cond_in_edges, scc_id) do
-              {:ok, nbrs} -> Map.keys(nbrs)
-              :error -> []
-            end
-          end
-      end
-
     scc_final_hlls =
       List.foldl(sccs_to_process, %{}, fn scc_id, acc ->
         my_base = Map.fetch!(scc_base_hlls, scc_id)
 
-        children = get_scc_related.(scc_id)
+        neighbors =
+          case direction do
+            :descendants -> Map.get(cond_edges, scc_id, %{})
+            :ancestors -> Map.get(cond_in_edges, scc_id, %{})
+          end
 
         merged_children =
-          List.foldl(children, my_base, fn child_id, hll_acc ->
-            child_hll = Map.get(acc, child_id, init_hll())
-            hll_union(hll_acc, child_hll)
-          end)
+          :maps.fold(
+            fn child_id, _, hll_acc ->
+              child_hll = Map.get(acc, child_id, init_hll())
+              hll_union(hll_acc, child_hll)
+            end,
+            my_base,
+            neighbors
+          )
 
         Map.put(acc, scc_id, merged_children)
       end)
 
-    all_nodes = Map.keys(graph.nodes)
-
-    Map.new(all_nodes, fn node_id ->
-      scc_id = Map.fetch!(node_to_scc, node_id)
-      total_count = hll_count(Map.get(scc_final_hlls, scc_id, init_hll()))
-      {node_id, max(0, total_count - 1)}
-    end)
+    :maps.fold(
+      fn node_id, _, acc ->
+        scc_id = Map.fetch!(node_to_scc, node_id)
+        total_count = hll_count(Map.get(scc_final_hlls, scc_id, init_hll()))
+        Map.put(acc, node_id, max(0, total_count - 1))
+      end,
+      %{},
+      graph.nodes
+    )
   end
 
   # ============================================================
@@ -343,28 +357,6 @@ defmodule Yog.Connectivity.Reachability do
   # Helpers
   # ============================================================
 
-  defp build_get_related_fn(graph, :descendants) do
-    out = graph.out_edges
-
-    fn node ->
-      case Map.fetch(out, node) do
-        {:ok, nbrs} -> Map.keys(nbrs)
-        :error -> []
-      end
-    end
-  end
-
-  defp build_get_related_fn(graph, :ancestors) do
-    in_edges = graph.in_edges
-
-    fn node ->
-      case Map.fetch(in_edges, node) do
-        {:ok, nbrs} -> Map.keys(nbrs)
-        :error -> []
-      end
-    end
-  end
-
   defp build_node_to_scc_map(sccs) do
     List.foldl(Enum.with_index(sccs), %{}, fn {nodes, id}, acc ->
       List.foldl(nodes, acc, fn node, inner_acc ->
@@ -415,17 +407,22 @@ defmodule Yog.Connectivity.Reachability do
         :ancestors -> sorted
       end
 
-    get_related = build_get_related_fn(dag, direction)
-
     List.foldl(nodes_to_process, %{}, fn node, acc ->
-      related = get_related.(node)
-      related_set = MapSet.new(related)
+      neighbors =
+        case direction do
+          :descendants -> Map.get(dag.out_edges, node, %{})
+          :ancestors -> Map.get(dag.in_edges, node, %{})
+        end
 
       all_reachable =
-        List.foldl(related, related_set, fn neighbor, set_acc ->
-          neighbor_set = Map.get(acc, neighbor, MapSet.new())
-          MapSet.union(set_acc, neighbor_set)
-        end)
+        :maps.fold(
+          fn neighbor, _, set_acc ->
+            neighbor_set = Map.get(acc, neighbor, MapSet.new())
+            MapSet.union(MapSet.put(set_acc, neighbor), neighbor_set)
+          end,
+          MapSet.new(),
+          neighbors
+        )
 
       Map.put(acc, node, all_reachable)
     end)
