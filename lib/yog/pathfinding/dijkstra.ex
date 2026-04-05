@@ -38,7 +38,7 @@ defmodule Yog.Pathfinding.Dijkstra do
       #=> %{:a => 0, :b => 4, :c => 5}
   """
 
-  alias Yog.BalancedTree, as: PQ
+  alias Yog.PairingHeap, as: PQ
   alias Yog.Pathfinding.Path
 
   @typedoc "Result type for shortest path queries"
