@@ -110,7 +110,7 @@ defmodule Yog.Community do
   """
   @spec to_dict(communities()) :: %{community_id() => MapSet.t(Yog.node_id())}
   def to_dict(%Result{} = communities) do
-    Enum.reduce(communities.assignments, %{}, fn {node, community}, acc ->
+    List.foldl(Map.to_list(communities.assignments), %{}, fn {node, community}, acc ->
       current_set = Map.get(acc, community, MapSet.new())
       Map.put(acc, community, MapSet.put(current_set, node))
     end)
@@ -135,7 +135,8 @@ defmodule Yog.Community do
   @spec largest(communities()) :: {:ok, community_id()} | :error
   def largest(%Result{} = communities) do
     communities.assignments
-    |> Enum.reduce({%{}, {nil, 0}}, fn {_node, comm}, {counts, {max_c, max_s}} ->
+    |> Map.to_list()
+    |> List.foldl({%{}, {nil, 0}}, fn {_node, comm}, {counts, {max_c, max_s}} ->
       new_count = Map.get(counts, comm, 0) + 1
       new_counts = Map.put(counts, comm, new_count)
 
@@ -167,7 +168,9 @@ defmodule Yog.Community do
   """
   @spec sizes(communities()) :: %{community_id() => integer()}
   def sizes(%Result{} = communities) do
-    Enum.reduce(communities.assignments, %{}, fn {_node, community}, acc ->
+    communities.assignments
+    |> Map.to_list()
+    |> List.foldl(%{}, fn {_node, community}, acc ->
       current_size = Map.get(acc, community, 0)
       Map.put(acc, community, current_size + 1)
     end)
@@ -198,10 +201,12 @@ defmodule Yog.Community do
           communities() | map()
   def merge(%Result{} = communities, source: source, target: target) do
     source_exists =
-      Enum.any?(communities.assignments, fn {_node, comm} -> comm == source end)
+      Enum.any?(Map.values(communities.assignments), fn comm -> comm == source end)
 
     new_assignments =
-      Enum.reduce(communities.assignments, communities.assignments, fn
+      communities.assignments
+      |> Map.to_list()
+      |> List.foldl(communities.assignments, fn
         {node, ^source}, acc ->
           Map.put(acc, node, target)
 
@@ -231,10 +236,12 @@ defmodule Yog.Community do
   # Legacy map support
   def merge(%{assignments: _, num_communities: _} = communities, source: source, target: target) do
     source_exists =
-      Enum.any?(communities.assignments, fn {_node, comm} -> comm == source end)
+      Enum.any?(Map.values(communities.assignments), fn comm -> comm == source end)
 
     new_assignments =
-      Enum.reduce(communities.assignments, communities.assignments, fn
+      communities.assignments
+      |> Map.to_list()
+      |> List.foldl(communities.assignments, fn
         {node, ^source}, acc ->
           Map.put(acc, node, target)
 
@@ -277,9 +284,11 @@ defmodule Yog.Community do
   @spec nodes_in(communities(), community_id()) :: MapSet.t(Yog.node_id())
   def nodes_in(%Result{} = communities, community_id) do
     communities.assignments
-    |> Enum.filter(fn {_, c} -> c == community_id end)
-    |> Enum.map(fn {node, _} -> node end)
-    |> MapSet.new()
+    |> Map.to_list()
+    |> List.foldl(MapSet.new(), fn
+      {node, ^community_id}, acc -> MapSet.put(acc, node)
+      _, acc -> acc
+    end)
   end
 
   @doc """

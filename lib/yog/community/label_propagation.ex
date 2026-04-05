@@ -84,7 +84,7 @@ defmodule Yog.Community.LabelPropagation do
     max_iterations = Keyword.get(opts, :max_iterations, 100)
     seed = Keyword.get(opts, :seed, 0)
 
-    nodes = Yog.all_nodes(graph)
+    nodes = Map.keys(graph.nodes)
 
     if nodes == [] do
       Result.new(%{})
@@ -120,7 +120,7 @@ defmodule Yog.Community.LabelPropagation do
 
     # Update labels
     {new_labels, changed} =
-      Enum.reduce(shuffled_nodes, {labels, false}, fn node, {acc_labels, has_changed} ->
+      List.foldl(shuffled_nodes, {labels, false}, fn node, {acc_labels, has_changed} ->
         neighbors = get_neighbors(graph, node)
 
         if neighbors == [] do
@@ -152,8 +152,26 @@ defmodule Yog.Community.LabelPropagation do
     end
   end
 
-  defp get_neighbors(graph, node) do
-    Yog.Model.neighbor_ids(graph, node)
+  defp get_neighbors(%Yog.Graph{out_edges: out_edges, kind: kind, in_edges: in_edges}, node) do
+    out =
+      case Map.fetch(out_edges, node) do
+        {:ok, edges} -> Map.keys(edges)
+        :error -> []
+      end
+
+    case kind do
+      :undirected ->
+        out
+
+      :directed ->
+        in_neighbors =
+          case Map.fetch(in_edges, node) do
+            {:ok, edges} -> Map.keys(edges)
+            :error -> []
+          end
+
+        Enum.uniq(out ++ in_neighbors)
+    end
   end
 
   # Single-pass frequency count with current label preference and randomized tie-break
@@ -161,7 +179,7 @@ defmodule Yog.Community.LabelPropagation do
   defp most_frequent_label(neighbor_labels, current_label, seed) do
     # Single-pass: count frequencies while tracking max
     {freqs, max_count} =
-      Enum.reduce(neighbor_labels, {%{}, 0}, fn label, {acc, max_so_far} ->
+      List.foldl(neighbor_labels, {%{}, 0}, fn label, {acc, max_so_far} ->
         new_count = Map.get(acc, label, 0) + 1
         new_max = max(max_so_far, new_count)
         {Map.put(acc, label, new_count), new_max}

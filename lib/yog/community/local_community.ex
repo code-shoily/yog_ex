@@ -45,8 +45,6 @@ defmodule Yog.Community.LocalCommunity do
   - Clauset, A. (2005). Finding local community structure in networks.
   """
 
-  alias Yog.Model
-
   @typedoc "Options for local community detection"
   @type local_options :: %{
           alpha: float(),
@@ -146,10 +144,15 @@ defmodule Yog.Community.LocalCommunity do
   # Private Functions
   # ============================================================
 
-  defp compute_k_out_in(graph, s, weight_fn) do
-    Enum.reduce(s, {0.0, 0.0}, fn node, {k_in_acc, k_out_acc} ->
-      Model.successors(graph, node)
-      |> Enum.reduce({k_in_acc, k_out_acc}, fn {neighbor_id, w}, {kin, kout} ->
+  defp compute_k_out_in(%Yog.Graph{out_edges: out_edges}, s, weight_fn) do
+    List.foldl(MapSet.to_list(s), {0.0, 0.0}, fn node, {k_in_acc, k_out_acc} ->
+      successors =
+        case Map.fetch(out_edges, node) do
+          {:ok, edges} -> Map.to_list(edges)
+          :error -> []
+        end
+
+      List.foldl(successors, {k_in_acc, k_out_acc}, fn {neighbor_id, w}, {kin, kout} ->
         w_float = weight_fn.(w)
 
         if MapSet.member?(s, neighbor_id) do
@@ -161,10 +164,15 @@ defmodule Yog.Community.LocalCommunity do
     end)
   end
 
-  defp initialize_frontier_and_weights(graph, s, weight_fn) do
-    Enum.reduce(s, {MapSet.new(), %{}}, fn node, {frontier_acc, weights_acc} ->
-      Model.successors(graph, node)
-      |> Enum.reduce({frontier_acc, weights_acc}, fn {neighbor_id, w}, {front, wacc} ->
+  defp initialize_frontier_and_weights(%Yog.Graph{out_edges: out_edges}, s, weight_fn) do
+    List.foldl(MapSet.to_list(s), {MapSet.new(), %{}}, fn node, {frontier_acc, weights_acc} ->
+      successors =
+        case Map.fetch(out_edges, node) do
+          {:ok, edges} -> Map.to_list(edges)
+          :error -> []
+        end
+
+      List.foldl(successors, {frontier_acc, weights_acc}, fn {neighbor_id, w}, {front, wacc} ->
         w_float = weight_fn.(w)
 
         if MapSet.member?(s, neighbor_id) do
@@ -182,13 +190,25 @@ defmodule Yog.Community.LocalCommunity do
     end)
   end
 
-  defp update_frontier_on_add(graph, frontier, internal_weights, s, new_node, weight_fn) do
+  defp update_frontier_on_add(
+         %Yog.Graph{out_edges: out_edges},
+         frontier,
+         internal_weights,
+         s,
+         new_node,
+         weight_fn
+       ) do
     # Remove added node from frontier
     frontier = MapSet.delete(frontier, new_node)
 
     # Scan neighbors of new_node
-    Model.successors(graph, new_node)
-    |> Enum.reduce({frontier, internal_weights}, fn {neighbor_id, w}, {front, wacc} ->
+    successors =
+      case Map.fetch(out_edges, new_node) do
+        {:ok, edges} -> Map.to_list(edges)
+        :error -> []
+      end
+
+    List.foldl(successors, {frontier, internal_weights}, fn {neighbor_id, w}, {front, wacc} ->
       w_float = weight_fn.(w)
 
       if MapSet.member?(s, neighbor_id) do
@@ -204,13 +224,25 @@ defmodule Yog.Community.LocalCommunity do
     end)
   end
 
-  defp update_frontier_on_remove(graph, frontier, internal_weights, s, removed_node, weight_fn) do
+  defp update_frontier_on_remove(
+         %Yog.Graph{out_edges: out_edges},
+         frontier,
+         internal_weights,
+         s,
+         removed_node,
+         weight_fn
+       ) do
     s_without_node = MapSet.delete(s, removed_node)
 
     # Scan neighbors of removed_node
+    successors =
+      case Map.fetch(out_edges, removed_node) do
+        {:ok, edges} -> Map.to_list(edges)
+        :error -> []
+      end
+
     {new_frontier, new_internal_weights} =
-      Model.successors(graph, removed_node)
-      |> Enum.reduce({frontier, internal_weights}, fn {neighbor_id, w}, {front, wacc} ->
+      List.foldl(successors, {frontier, internal_weights}, fn {neighbor_id, w}, {front, wacc} ->
         w_float = weight_fn.(w)
 
         if neighbor_id != removed_node and MapSet.member?(s_without_node, neighbor_id) do
@@ -222,9 +254,14 @@ defmodule Yog.Community.LocalCommunity do
       end)
 
     # Add removed_node to frontier if it has neighbors in S
+    successors2 =
+      case Map.fetch(out_edges, removed_node) do
+        {:ok, edges} -> Map.to_list(edges)
+        :error -> []
+      end
+
     has_internal_neighbor =
-      Model.successors(graph, removed_node)
-      |> Enum.any?(fn {nid, _} -> MapSet.member?(s_without_node, nid) end)
+      Enum.any?(successors2, fn {nid, _} -> MapSet.member?(s_without_node, nid) end)
 
     final_frontier =
       if has_internal_neighbor do
@@ -239,12 +276,17 @@ defmodule Yog.Community.LocalCommunity do
     {final_frontier, final_weights}
   end
 
-  defp total_degree(graph, node, cache, weight_fn) do
+  defp total_degree(%Yog.Graph{out_edges: out_edges}, node, cache, weight_fn) do
     case Map.get(cache, node) do
       nil ->
+        successors =
+          case Map.fetch(out_edges, node) do
+            {:ok, edges} -> Map.to_list(edges)
+            :error -> []
+          end
+
         d =
-          Model.successors(graph, node)
-          |> Enum.reduce(0.0, fn {_, w}, acc -> acc + weight_fn.(w) end)
+          List.foldl(successors, 0.0, fn {_, w}, acc -> acc + weight_fn.(w) end)
 
         {d, Map.put(cache, node, d)}
 

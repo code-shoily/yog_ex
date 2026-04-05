@@ -50,7 +50,6 @@ defmodule Yog.Community.Walktrap do
 
   alias Yog.Community
   alias Yog.Community.{Dendrogram, Result}
-  alias Yog.Model
   alias Yog.PriorityQueue
 
   @typedoc "Options for Walktrap algorithm"
@@ -107,7 +106,7 @@ defmodule Yog.Community.Walktrap do
 
   def detect_with_options(graph, opts) when is_map(opts) do
     options = Map.merge(default_options(), opts)
-    nodes = Yog.all_nodes(graph)
+    nodes = Map.keys(graph.nodes)
 
     case length(nodes) do
       0 ->
@@ -148,45 +147,58 @@ defmodule Yog.Community.Walktrap do
       IO.inspect(length(dendrogram.levels))
   """
   @spec detect_hierarchical(Yog.graph(), integer()) :: Dendrogram.t()
-  def detect_hierarchical(graph, walk_length \\ 4) do
-    nodes = Yog.all_nodes(graph)
+  def detect_hierarchical(
+        %Yog.Graph{out_edges: out_edges, nodes: nodes} = graph,
+        walk_length \\ 4
+      ) do
+    node_list = Map.keys(nodes)
 
     # 1. Compute transition probabilities P^t
-    p_t = compute_pt(graph, nodes, walk_length)
+    p_t = compute_pt(graph, node_list, walk_length)
 
     # 2. Compute weighted degrees for normalization
     degrees =
-      Map.new(nodes, fn u ->
+      Map.new(node_list, fn u ->
         d =
-          Model.successors(graph, u)
-          |> Enum.reduce(0.0, fn {_, w}, acc -> acc + w end)
+          case Map.fetch(out_edges, u) do
+            {:ok, edges} ->
+              List.foldl(Map.to_list(edges), 0.0, fn {_, w}, acc -> acc + w end)
+
+            :error ->
+              0.0
+          end
 
         # Use 1.0 as floor to avoid division by zero in distance calculation
         {u, max(d, 1.0)}
       end)
 
     # 3. Initial communities: each node in its own community
-    initial_assignments = Map.new(Enum.with_index(nodes), fn {node, i} -> {node, i} end)
+    initial_assignments = Map.new(Enum.with_index(node_list), fn {node, i} -> {node, i} end)
     initial_communities = Result.new(initial_assignments)
 
     initial_pt_cache =
-      Map.new(nodes, fn node ->
+      Map.new(node_list, fn node ->
         {node, Map.get(p_t, node, %{})}
       end)
 
     # 4. Hierarchical merging with priority queue
-    do_walktrap_merge([initial_communities], p_t, degrees, nodes, initial_pt_cache)
+    do_walktrap_merge([initial_communities], p_t, degrees, node_list, initial_pt_cache)
   end
 
   # =============================================================================
   # RANDOM WALK COMPUTATION
   # =============================================================================
 
-  defp compute_pt(graph, nodes, t) do
+  defp compute_pt(%Yog.Graph{out_edges: out_edges}, nodes, t) do
     p1 =
       Map.new(nodes, fn u ->
-        neighbors = Model.successors(graph, u)
-        total_weight = Enum.reduce(neighbors, 0.0, fn {_, w}, acc -> acc + w end)
+        neighbors =
+          case Map.fetch(out_edges, u) do
+            {:ok, edges} -> Map.to_list(edges)
+            :error -> []
+          end
+
+        total_weight = List.foldl(neighbors, 0.0, fn {_, w}, acc -> acc + w end)
 
         row =
           if total_weight > 0 do

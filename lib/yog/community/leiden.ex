@@ -62,7 +62,6 @@ defmodule Yog.Community.Leiden do
   """
 
   alias Yog.Community.{Dendrogram, Result}
-  alias Yog.Model
 
   @typedoc "Options for the Leiden algorithm"
   @type leiden_options :: %{
@@ -387,14 +386,19 @@ defmodule Yog.Community.Leiden do
 
   # Memory-efficient connectivity check without building subgraph
   # Returns adjacency map for nodes within the community
-  defp build_community_adjacency(original, nodes) do
+  defp build_community_adjacency(%Yog.Graph{out_edges: out_edges}, nodes) do
     node_list = MapSet.to_list(nodes)
 
-    Enum.reduce(node_list, %{}, fn u, adj ->
+    List.foldl(node_list, %{}, fn u, adj ->
       # Get neighbors that are also in the community
+      successors =
+        case Map.fetch(out_edges, u) do
+          {:ok, edges} -> Map.to_list(edges)
+          :error -> []
+        end
+
       neighbors_in_comm =
-        original
-        |> Model.successors(u)
+        successors
         |> Enum.filter(fn {v, _weight} -> MapSet.member?(nodes, v) end)
         |> Enum.map(fn {v, _weight} -> v end)
 
@@ -499,8 +503,12 @@ defmodule Yog.Community.Leiden do
   # HELPER FUNCTIONS (shared with Louvain)
   # =============================================================================
 
-  defp get_neighbor_communities(graph, state, node) do
-    neighbors = Model.successors(graph, node)
+  defp get_neighbor_communities(%Yog.Graph{out_edges: out_edges}, state, node) do
+    neighbors =
+      case Map.fetch(out_edges, node) do
+        {:ok, edges} -> Map.to_list(edges)
+        :error -> []
+      end
 
     Enum.reduce(neighbors, MapSet.new(), fn {neighbor_id, _}, acc ->
       comm = Map.get(state.assignments, neighbor_id, neighbor_id)
@@ -554,10 +562,14 @@ defmodule Yog.Community.Leiden do
     end
   end
 
-  defp calculate_ki_in(graph, state, node, target_comm) do
-    successors = Model.successors(graph, node)
+  defp calculate_ki_in(%Yog.Graph{out_edges: out_edges}, state, node, target_comm) do
+    successors =
+      case Map.fetch(out_edges, node) do
+        {:ok, edges} -> Map.to_list(edges)
+        :error -> []
+      end
 
-    Enum.reduce(successors, 0.0, fn {neighbor, weight}, acc ->
+    List.foldl(successors, 0.0, fn {neighbor, weight}, acc ->
       neighbor_comm = Map.get(state.assignments, neighbor, neighbor)
 
       if neighbor_comm == target_comm do
@@ -583,39 +595,49 @@ defmodule Yog.Community.Leiden do
     }
   end
 
-  defp calculate_total_weight(graph) do
-    nodes = Yog.all_nodes(graph)
+  defp calculate_total_weight(%Yog.Graph{out_edges: out_edges, kind: kind, nodes: nodes}) do
+    node_list = Map.keys(nodes)
 
     total =
-      Enum.reduce(nodes, 0.0, fn node, acc ->
+      List.foldl(node_list, 0.0, fn node, acc ->
         weight_sum =
-          Model.successors(graph, node)
-          |> Enum.reduce(0, fn {_, weight}, sum -> sum + weight end)
+          case Map.fetch(out_edges, node) do
+            {:ok, edges} ->
+              List.foldl(Map.to_list(edges), 0, fn {_, weight}, sum -> sum + weight end)
+
+            :error ->
+              0
+          end
 
         acc + weight_sum
       end)
 
     # Only divide by 2 for undirected graphs (each edge counted twice)
-    case Model.type(graph) do
+    case kind do
       :undirected -> total / 2.0
       :directed -> total
     end
   end
 
-  defp calculate_node_weights(graph) do
-    nodes = Yog.all_nodes(graph)
+  defp calculate_node_weights(%Yog.Graph{out_edges: out_edges, nodes: nodes}) do
+    node_list = Map.keys(nodes)
 
-    Map.new(nodes, fn node ->
+    Map.new(node_list, fn node ->
       weight_sum =
-        Model.successors(graph, node)
-        |> Enum.reduce(0, fn {_, weight}, sum -> sum + weight end)
+        case Map.fetch(out_edges, node) do
+          {:ok, edges} ->
+            List.foldl(Map.to_list(edges), 0, fn {_, weight}, sum -> sum + weight end)
+
+          :error ->
+            0
+        end
 
       {node, weight_sum / 1.0}
     end)
   end
 
   defp calculate_community_totals(assignments, node_weights) do
-    Enum.reduce(assignments, %{}, fn {node, comm}, acc ->
+    List.foldl(Map.to_list(assignments), %{}, fn {node, comm}, acc ->
       weight = Map.get(node_weights, node, 0.0)
       Map.update(acc, comm, weight, fn v -> v + weight end)
     end)
@@ -665,28 +687,38 @@ defmodule Yog.Community.Leiden do
   end
 
   defp get_community_nodes(assignments) do
-    Enum.reduce(assignments, %{}, fn {node, comm}, acc ->
+    List.foldl(Map.to_list(assignments), %{}, fn {node, comm}, acc ->
       current_set = Map.get(acc, comm, MapSet.new())
       Map.put(acc, comm, MapSet.put(current_set, node))
     end)
   end
 
-  defp aggregate_edges(original_graph, new_graph, assignments) do
-    nodes = Yog.all_nodes(original_graph)
+  defp aggregate_edges(
+         %Yog.Graph{out_edges: out_edges, kind: kind} = original_graph,
+         new_graph,
+         assignments
+       ) do
+    nodes = Map.keys(original_graph.nodes)
 
     # Step 1: Accumulate weights in a Map %{{u_comm, v_comm} => weight}
     # This avoids O(degree) search for each edge - uses O(1) Map operations instead
     edge_weights =
-      Enum.reduce(nodes, %{}, fn u, acc ->
+      List.foldl(nodes, %{}, fn u, acc ->
         comm_u = Map.get(assignments, u, u)
 
-        Enum.reduce(Model.successors(original_graph, u), acc, fn {v, weight}, inner_acc ->
+        successors =
+          case Map.fetch(out_edges, u) do
+            {:ok, edges} -> Map.to_list(edges)
+            :error -> []
+          end
+
+        List.foldl(successors, acc, fn {v, weight}, inner_acc ->
           comm_v = Map.get(assignments, v, v)
 
           # For undirected graphs, use stable key {min, max} to avoid double-counting
           # Self-loops naturally handled (comm_u == comm_v)
           edge_key =
-            if Model.type(original_graph) == :undirected and comm_u > comm_v do
+            if kind == :undirected and comm_u > comm_v do
               {comm_v, comm_u}
             else
               {comm_u, comm_v}
@@ -697,13 +729,14 @@ defmodule Yog.Community.Leiden do
       end)
 
     # Step 2: Bulk add all accumulated edges to the new graph
-    Enum.reduce(edge_weights, new_graph, fn {{u, v}, weight}, g ->
-      Model.add_edge_ensure(g, u, v, weight, default: nil)
+    List.foldl(Map.to_list(edge_weights), new_graph, fn {{u, v}, weight}, g ->
+      {:ok, new_g} = Yog.add_edge(g, u, v, weight)
+      new_g
     end)
   end
 
   defp rebuild_state(aggregated_graph) do
-    nodes = Yog.all_nodes(aggregated_graph)
+    nodes = Map.keys(aggregated_graph.nodes)
     total_weight = calculate_total_weight(aggregated_graph)
 
     new_assignments = Map.new(Enum.with_index(nodes), fn {node, i} -> {node, i} end)

@@ -53,7 +53,6 @@ defmodule Yog.Community.FluidCommunities do
   """
 
   alias Yog.Community.Result
-  alias Yog.Model
 
   @typedoc "Options for Fluid Communities algorithm"
   @type fluid_options :: %{
@@ -113,7 +112,7 @@ defmodule Yog.Community.FluidCommunities do
 
   def detect_with_options(graph, opts) when is_map(opts) do
     options = Map.merge(default_options(), opts)
-    all_nodes = Yog.all_nodes(graph)
+    all_nodes = Map.keys(graph.nodes)
     k = min(options.target_communities, length(all_nodes))
 
     case k do
@@ -131,9 +130,7 @@ defmodule Yog.Community.FluidCommunities do
 
         # Initialize assignments and sizes
         {assignments, sizes} =
-          initial_nodes
-          |> Enum.with_index()
-          |> Enum.reduce({%{}, %{}}, fn {node, i}, {asgn, sz} ->
+          List.foldl(Enum.with_index(initial_nodes), {%{}, %{}}, fn {node, i}, {asgn, sz} ->
             {Map.put(asgn, node, i), Map.put(sz, i, 1)}
           end)
 
@@ -243,10 +240,22 @@ defmodule Yog.Community.FluidCommunities do
 
   # Single-pass reduction to find max density community without intermediate Map
   # Returns {best_community, new_seed, found?}
-  defp find_max_density_community(graph, node, assignments, sizes, seed) do
-    Model.successors(graph, node)
-    |> Enum.reduce({nil, -1.0, nil, seed}, fn {neighbor_id, weight},
-                                              {best_c, max_d, tie_candidates, current_seed} ->
+  defp find_max_density_community(
+         %Yog.Graph{out_edges: out_edges},
+         node,
+         assignments,
+         sizes,
+         seed
+       ) do
+    successors =
+      case Map.fetch(out_edges, node) do
+        {:ok, edges} -> Map.to_list(edges)
+        :error -> []
+      end
+
+    List.foldl(successors, {nil, -1.0, nil, seed}, fn {neighbor_id, weight},
+                                                      {best_c, max_d, tie_candidates,
+                                                       current_seed} ->
       case Map.get(assignments, neighbor_id) do
         nil ->
           {best_c, max_d, tie_candidates, current_seed}

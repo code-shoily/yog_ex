@@ -66,7 +66,6 @@ defmodule Yog.Community.Infomap do
   """
 
   alias Yog.Community.Result
-  alias Yog.Model
 
   @typedoc "Options for Infomap algorithm"
   @type options :: %{
@@ -127,7 +126,7 @@ defmodule Yog.Community.Infomap do
 
   def detect_with_options(graph, opts) when is_map(opts) do
     options = Map.merge(default_options(), opts)
-    nodes = Model.all_nodes(graph)
+    nodes = Map.keys(graph.nodes)
     n = length(nodes)
 
     case n do
@@ -178,23 +177,28 @@ defmodule Yog.Community.Infomap do
 
   defp do_pagerank(_graph, _nodes, pr, _alpha, 0), do: pr
 
-  defp do_pagerank(graph, nodes, pr, alpha, remaining_iters) do
+  defp do_pagerank(%Yog.Graph{out_edges: out_edges} = graph, nodes, pr, alpha, remaining_iters) do
     n_float = length(nodes) / 1.0
     teleport = alpha / n_float
 
     node_weights =
       nodes
-      |> Enum.reduce(%{}, fn u, acc ->
+      |> List.foldl(%{}, fn u, acc ->
         total =
-          Model.successors(graph, u)
-          |> Enum.reduce(0.0, fn {_, w}, sum -> sum + w end)
+          case Map.fetch(out_edges, u) do
+            {:ok, edges} ->
+              List.foldl(Map.to_list(edges), 0.0, fn {_, w}, sum -> sum + w end)
+
+            :error ->
+              0.0
+          end
 
         Map.put(acc, u, max(total, 1.0e-10))
       end)
 
     # Calculate total PageRank from dangling nodes (nodes with no outgoing edges)
     dangling_pr =
-      Enum.reduce(nodes, 0.0, fn u, sum ->
+      List.foldl(nodes, 0.0, fn u, sum ->
         total_weight = Map.get(node_weights, u, 0.0)
 
         if total_weight < 1.0e-10 do
@@ -206,8 +210,13 @@ defmodule Yog.Community.Infomap do
 
     # Calculate flow from each node to its neighbors using weighted transitions
     next_pr =
-      Enum.reduce(nodes, %{}, fn u, acc ->
-        neighbors = Model.successors(graph, u)
+      List.foldl(nodes, %{}, fn u, acc ->
+        neighbors =
+          case Map.fetch(out_edges, u) do
+            {:ok, edges} -> Map.to_list(edges)
+            :error -> []
+          end
+
         total_weight = Map.get(node_weights, u, 0.0)
         u_pr = Map.get(pr, u, 0.0)
 
@@ -220,7 +229,7 @@ defmodule Yog.Community.Infomap do
           if is_number(ratio) and ratio < 1.0e200 do
             contribution_per_weight = min(ratio * (1.0 - alpha), 1.0e200)
 
-            Enum.reduce(neighbors, acc, fn {v, weight}, inner_acc ->
+            List.foldl(neighbors, acc, fn {v, weight}, inner_acc ->
               # Guard against overflow from extreme weight values
               # Also guard against contribution_per_weight being infinity/NaN
               if is_number(contribution_per_weight) and contribution_per_weight < 1.0e200 do
@@ -275,11 +284,21 @@ defmodule Yog.Community.Infomap do
   # MAP EQUATION OPTIMIZATION (Entropy-based)
   # =============================================================================
 
-  defp optimize_map_equation(graph, pagerank, assignments, nodes) do
+  defp optimize_map_equation(
+         %Yog.Graph{out_edges: out_edges} = graph,
+         pagerank,
+         assignments,
+         nodes
+       ) do
     # Greedy optimization: try moving each node to maximize internal flow
     Enum.reduce(nodes, assignments, fn u, current_assignments ->
       current_comm = Map.get(current_assignments, u)
-      neighbors = Model.successors(graph, u)
+
+      neighbors =
+        case Map.fetch(out_edges, u) do
+          {:ok, edges} -> Map.to_list(edges)
+          :error -> []
+        end
 
       neighbor_comms =
         neighbors
@@ -344,10 +363,15 @@ defmodule Yog.Community.Infomap do
   #   end)
   # end
 
-  defp calculate_flow_to_comm(graph, u, comm_id, assignments, pagerank) do
-    neighbors = Model.successors(graph, u)
+  defp calculate_flow_to_comm(%Yog.Graph{out_edges: out_edges}, u, comm_id, assignments, pagerank) do
+    neighbors =
+      case Map.fetch(out_edges, u) do
+        {:ok, edges} -> Map.to_list(edges)
+        :error -> []
+      end
+
     u_pr = Map.get(pagerank, u, 0.0)
-    total_weight = Enum.reduce(neighbors, 0.0, fn {_, w}, sum -> sum + w end)
+    total_weight = List.foldl(neighbors, 0.0, fn {_, w}, sum -> sum + w end)
 
     if total_weight == 0 do
       0.0
@@ -355,7 +379,7 @@ defmodule Yog.Community.Infomap do
       # Clamp u_pr to avoid overflow with extreme values
       safe_u_pr = min(u_pr, 1.0e200)
 
-      Enum.reduce(neighbors, 0.0, fn {v, weight}, acc ->
+      List.foldl(neighbors, 0.0, fn {v, weight}, acc ->
         v_comm = Map.get(assignments, v, -1)
 
         if v_comm == comm_id do

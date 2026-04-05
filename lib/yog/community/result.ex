@@ -39,7 +39,11 @@ defmodule Yog.Community.Result do
   """
   @spec new(%{node_id() => community_id()}) :: t()
   def new(assignments) when is_map(assignments) do
-    num = assignments |> Map.values() |> Enum.uniq() |> length()
+    num =
+      assignments
+      |> Map.values()
+      |> Enum.uniq()
+      |> length()
 
     %__MODULE__{assignments: assignments, num_communities: num}
   end
@@ -61,8 +65,14 @@ defmodule Yog.Community.Result do
   def new(assignments, metadata, opts \\ []) when is_map(assignments) and is_map(metadata) do
     num =
       case Keyword.get(opts, :num_communities) do
-        nil -> assignments |> Map.values() |> Enum.uniq() |> length()
-        n -> n
+        nil ->
+          assignments
+          |> Map.values()
+          |> Enum.uniq()
+          |> length()
+
+        n ->
+          n
       end
 
     %__MODULE__{assignments: assignments, num_communities: num, metadata: metadata}

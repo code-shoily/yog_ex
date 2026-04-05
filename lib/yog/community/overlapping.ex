@@ -102,8 +102,8 @@ defmodule Yog.Community.Overlapping do
   end
 
   defp build_community_index(memberships) do
-    Enum.reduce(memberships, %{}, fn {node, comms}, acc ->
-      Enum.reduce(comms, acc, fn comm, inner_acc ->
+    List.foldl(Map.to_list(memberships), %{}, fn {node, comms}, acc ->
+      List.foldl(comms, acc, fn comm, inner_acc ->
         Map.update(inner_acc, comm, MapSet.new([node]), &MapSet.put(&1, node))
       end)
     end)

@@ -51,7 +51,6 @@ defmodule Yog.Community.GirvanNewman do
   """
 
   alias Yog.Community.{Dendrogram, Result}
-  alias Yog.Model
   alias Yog.PriorityQueue, as: PQ
 
   @typedoc "Options for Girvan-Newman algorithm"
@@ -80,16 +79,16 @@ defmodule Yog.Community.GirvanNewman do
       IO.inspect(betweenness)
   """
   @spec edge_betweenness(Yog.graph()) :: %{{Yog.node_id(), Yog.node_id()} => float()}
-  def edge_betweenness(graph) do
-    nodes = Yog.all_nodes(graph)
+  def edge_betweenness(%Yog.Graph{nodes: nodes} = graph) do
+    node_list = Map.keys(nodes)
 
     edge_scores =
-      Enum.reduce(nodes, %{}, fn s, acc ->
+      List.foldl(node_list, %{}, fn s, acc ->
         discovery = run_discovery(graph, s)
         edge_dependencies = accumulate_edge_dependencies(discovery)
 
-        # Merge edge_dependencies into acc using Enum.reduce with Map.update
-        Enum.reduce(edge_dependencies, acc, fn {edge, score}, inner_acc ->
+        # Merge edge_dependencies into acc using List.foldl with Map.update
+        List.foldl(Map.to_list(edge_dependencies), acc, fn {edge, score}, inner_acc ->
           Map.update(inner_acc, edge, score, &(&1 + score))
         end)
       end)
@@ -197,7 +196,14 @@ defmodule Yog.Community.GirvanNewman do
     do_brandes_dijkstra(graph, queue, dists, sigmas, preds, stack)
   end
 
-  defp do_brandes_dijkstra(graph, queue, dists, sigmas, preds, stack) do
+  defp do_brandes_dijkstra(
+         %Yog.Graph{out_edges: out_edges} = graph,
+         queue,
+         dists,
+         sigmas,
+         preds,
+         stack
+       ) do
     case PQ.pop(queue) do
       :error ->
         {stack, preds, sigmas}
@@ -210,9 +216,15 @@ defmodule Yog.Community.GirvanNewman do
         else
           new_stack = [v | stack]
 
+          successors =
+            case Map.fetch(out_edges, v) do
+              {:ok, edges} -> Map.to_list(edges)
+              :error -> []
+            end
+
           {next_q, next_dists, next_sigmas, next_preds} =
-            Model.successors(graph, v)
-            |> Enum.reduce({rest_q, dists, sigmas, preds}, fn {w, weight}, {q, ds, ss, ps} ->
+            List.foldl(successors, {rest_q, dists, sigmas, preds}, fn {w, weight},
+                                                                      {q, ds, ss, ps} ->
               weight_float = if is_nil(weight), do: 1.0, else: weight
               new_dist = d_v + weight_float
 
@@ -258,12 +270,12 @@ defmodule Yog.Community.GirvanNewman do
     edge_deltas = %{}
 
     {_node_deltas, final_edge_deltas} =
-      Enum.reduce(stack, {node_deltas, edge_deltas}, fn v, {nd, ed} ->
+      List.foldl(stack, {node_deltas, edge_deltas}, fn v, {nd, ed} ->
         sigma_v = get_sigma(sigmas, v) * 1.0
         delta_v = Map.get(nd, v, 0.0)
         v_preds = Map.get(preds, v, [])
 
-        Enum.reduce(v_preds, {nd, ed}, fn u, {inner_nd, inner_ed} ->
+        List.foldl(v_preds, {nd, ed}, fn u, {inner_nd, inner_ed} ->
           sigma_u = get_sigma(sigmas, u) * 1.0
 
           c = sigma_u / sigma_v * (1.0 + delta_v)
@@ -321,8 +333,8 @@ defmodule Yog.Community.GirvanNewman do
 
         # Remove all edges with max betweenness
         new_graph =
-          Enum.reduce(edges_to_remove, graph, fn {u, v}, g ->
-            Model.remove_edge(g, u, v)
+          List.foldl(edges_to_remove, graph, fn {u, v}, g ->
+            Yog.remove_edge(g, u, v)
           end)
 
         do_gn_split(new_graph, new_levels, current_num_comms)
@@ -330,20 +342,22 @@ defmodule Yog.Community.GirvanNewman do
     end
   end
 
-  defp count_edges(graph) do
-    nodes = Yog.all_nodes(graph)
+  defp count_edges(%Yog.Graph{out_edges: out_edges, nodes: nodes}) do
+    node_list = Map.keys(nodes)
 
-    Enum.reduce(nodes, 0, fn node, acc ->
-      successors = Model.successors(graph, node)
-      acc + length(successors)
+    List.foldl(node_list, 0, fn node, acc ->
+      case Map.fetch(out_edges, node) do
+        {:ok, edges} -> acc + map_size(edges)
+        :error -> acc
+      end
     end)
   end
 
-  defp find_connected_components(graph) do
-    nodes = Yog.all_nodes(graph)
+  defp find_connected_components(%Yog.Graph{nodes: nodes} = graph) do
+    node_list = Map.keys(nodes)
 
     {_visited, assignments, _count} =
-      Enum.reduce(nodes, {MapSet.new(), %{}, 0}, fn u, {visited, assignments, count} ->
+      List.foldl(node_list, {MapSet.new(), %{}, 0}, fn u, {visited, assignments, count} ->
         if MapSet.member?(visited, u) do
           {visited, assignments, count}
         else
