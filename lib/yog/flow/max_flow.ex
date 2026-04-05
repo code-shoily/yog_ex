@@ -156,13 +156,34 @@ defmodule Yog.Flow.MaxFlow do
         compare \\ &Yog.Utils.compare/2,
         min_fn \\ &min/2
       ) do
-    residual = build_residual_graph(graph, zero)
+    # Edge case: source equals sink - return 0 flow immediately
+    if source == sink do
+      # Build a copy of the original graph as the residual
+      return_graph =
+        List.foldl(Map.keys(graph.nodes), Model.new(graph.kind), fn node, acc ->
+          Model.add_node(acc, node, Map.get(graph.nodes, node))
+        end)
 
-    {max_flow, final_residual} =
-      do_edmonds_karp(residual, source, sink, zero, add, subtract, compare, min_fn, zero)
+      return_graph =
+        List.foldl(Map.to_list(graph.out_edges), return_graph, fn {src, inner}, acc ->
+          List.foldl(Map.to_list(inner), acc, fn {dst, weight}, inner_acc ->
+            case Model.add_edge(inner_acc, src, dst, weight) do
+              {:ok, g} -> g
+              {:error, _} -> inner_acc
+            end
+          end)
+        end)
 
-    final_residual_graph = residual_to_graph(graph, final_residual)
-    MaxFlowResult.new(max_flow, final_residual_graph, source, sink)
+      MaxFlowResult.new(zero, return_graph, source, sink)
+    else
+      residual = build_residual_graph(graph, zero)
+
+      {max_flow, final_residual} =
+        do_edmonds_karp(residual, source, sink, zero, add, subtract, compare, min_fn, zero)
+
+      final_residual_graph = residual_to_graph(graph, final_residual)
+      MaxFlowResult.new(max_flow, final_residual_graph, source, sink)
+    end
   end
 
   # Extract all edges and their capacities from the graph
