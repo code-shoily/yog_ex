@@ -65,7 +65,7 @@ Add YogEx to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:yog_ex, "~> 0.80.0"}
+    {:yog_ex, "~> 0.95.0"}
   ]
 end
 ```
@@ -82,7 +82,7 @@ For livebook, add the following:
 
 ```elixir
 Mix.install(
-  {:yog_ex, "~> 0.80.0"}
+  {:yog_ex, "~> 0.95.0"}
 )
 ```
 

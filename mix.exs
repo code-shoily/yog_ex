@@ -1,7 +1,7 @@
 defmodule YogEx.MixProject do
   use Mix.Project
 
-  @version "0.90.0"
+  @version "0.95.0"
   @source_url "https://github.com/code-shoily/yog_ex"
 
   def project do
