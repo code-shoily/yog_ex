@@ -103,10 +103,11 @@ defmodule Yog.PriorityQueue do
       {:ok, 3}
   """
   @spec push(t(), any()) :: t()
-  def push(%Empty{compare_fn: cmp}, value), do: make_node(value, [], cmp)
+  def push(%Empty{compare_fn: cmp}, value),
+    do: %Node{value: value, children: [], compare_fn: cmp, size: 1}
 
   def push(%Node{compare_fn: cmp} = heap, value) do
-    merge(heap, make_node(value, [], cmp), cmp)
+    merge(heap, %Node{value: value, children: [], compare_fn: cmp, size: 1}, cmp)
   end
 
   @doc """
@@ -169,7 +170,7 @@ defmodule Yog.PriorityQueue do
 
   @spec from_list([any()], compare_fn()) :: t()
   def from_list(list, compare_fn) do
-    Enum.reduce(list, new(compare_fn), fn x, acc -> push(acc, x) end)
+    List.foldl(list, new(compare_fn), fn x, acc -> push(acc, x) end)
   end
 
   @doc """
@@ -215,23 +216,20 @@ defmodule Yog.PriorityQueue do
   # Private Helper Functions
   # =============================================================================
 
-  defp make_node(value, children, compare_fn) do
-    total_size = 1 + Enum.reduce(children, 0, fn %Node{size: s}, acc -> acc + s end)
-    %Node{value: value, children: children, compare_fn: compare_fn, size: total_size}
-  end
-
   defp merge(h, %Empty{}, _cmp), do: h
   defp merge(%Empty{}, h, _cmp), do: h
 
   defp merge(
-         %Node{value: v1, children: c1, compare_fn: cmp} = h1,
-         %Node{value: v2, children: c2} = h2,
+         %Node{value: v1, children: c1, compare_fn: cmp, size: s1} = h1,
+         %Node{value: v2, children: c2, size: s2} = h2,
          cmp
        ) do
     if cmp.(v1, v2) do
-      make_node(v1, [h2 | c1], cmp)
+      # v1 is new root, h2 becomes a child
+      %Node{value: v1, children: [h2 | c1], compare_fn: cmp, size: s1 + s2}
     else
-      make_node(v2, [h1 | c2], cmp)
+      # v2 is new root, h1 becomes a child
+      %Node{value: v2, children: [h1 | c2], compare_fn: cmp, size: s1 + s2}
     end
   end
 
