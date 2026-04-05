@@ -59,6 +59,7 @@ defmodule YogEx.MixProject do
     [
       {:saxy, "~> 1.5"},
       {:jason, "~> 1.4"},
+      {:libgraph, "~> 0.16", optional: true},
       {:ex_doc, "~> 0.40", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.18", only: :test},
