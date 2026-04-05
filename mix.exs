@@ -90,7 +90,6 @@ defmodule YogEx.MixProject do
         "examples/README.md",
         "lib/yog/functional/README.md",
         "GLEAM_ELIXIR_COMPARISON.md",
-        "benchmarks/README.md",
         "CHANGELOG.md",
         "PROPERTIES.md"
       ],
