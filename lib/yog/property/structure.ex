@@ -49,7 +49,6 @@ defmodule Yog.Property.Structure do
   alias Yog.Connectivity.SCC
   alias Yog.Model
   alias Yog.Property.Bipartite
-  alias Yog.Traversal
   alias Yog.Utils
 
   @doc """
@@ -74,6 +73,14 @@ defmodule Yog.Property.Structure do
 
   @doc """
   Checks if the graph is an arborescence (directed tree with a single root).
+
+  A directed graph is an arborescence iff:
+  - It has n nodes and n-1 edges
+  - Exactly one node has in-degree 0 (the root)
+  - All other nodes have in-degree >= 1
+
+  When edges = n-1 and there's exactly one root, reachability is guaranteed
+  (no need for explicit BFS check).
   """
   @spec arborescence?(Yog.graph()) :: boolean()
   def arborescence?(graph) do
@@ -82,17 +89,18 @@ defmodule Yog.Property.Structure do
         n = Model.node_count(graph)
 
         if n > 0 and Model.edge_count(graph) == n - 1 do
-          nodes = Model.all_nodes(graph)
-          roots = Enum.filter(nodes, fn node -> Model.in_degree(graph, node) == 0 end)
+          {roots, non_roots_with_valid_degree} =
+            graph
+            |> Model.all_nodes()
+            |> Enum.reduce({[], 0}, fn node, {roots, valid} ->
+              case Model.in_degree(graph, node) do
+                0 -> {[node | roots], valid}
+                1 -> {roots, valid + 1}
+                _ -> {roots, valid}
+              end
+            end)
 
-          case roots do
-            [root] ->
-              Enum.all?(nodes, fn u -> u == root or Model.in_degree(graph, u) == 1 end) and
-                reachable_count(graph, root) == n
-
-            _ ->
-              false
-          end
+          match?([_], roots) and non_roots_with_valid_degree == n - 1
         else
           false
         end
@@ -369,12 +377,6 @@ defmodule Yog.Property.Structure do
         _ -> true
       end
     end)
-  end
-
-  defp reachable_count(graph, start) do
-    graph
-    |> Traversal.walk(start, :breadth_first)
-    |> length()
   end
 
   defp no_self_loops?(graph) do

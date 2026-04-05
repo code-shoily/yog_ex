@@ -20,8 +20,8 @@ defmodule Yog.Centrality do
 
   """
 
+  alias Yog.PairingHeap, as: PQ
   alias Yog.Pathfinding.Dijkstra
-  alias Yog.PriorityQueue, as: PQ
 
   @typedoc """
   A mapping of Node IDs to their calculated centrality scores.

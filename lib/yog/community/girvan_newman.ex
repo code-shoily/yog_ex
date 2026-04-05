@@ -51,7 +51,7 @@ defmodule Yog.Community.GirvanNewman do
   """
 
   alias Yog.Community.{Dendrogram, Result}
-  alias Yog.PriorityQueue, as: PQ
+  alias Yog.PairingHeap, as: PQ
 
   @typedoc "Options for Girvan-Newman algorithm"
   @type girvan_newman_options :: %{target_communities: integer() | nil}

@@ -146,8 +146,8 @@ defmodule Yog.Traversal.Walk do
 
         do_fold_walk_best_first(
           out_edges,
-          Yog.PriorityQueue.new(fn {p1, _}, {p2, _} -> p1 <= p2 end)
-          |> Yog.PriorityQueue.push({0, {from, start_metadata}}),
+          Yog.PairingHeap.new(fn {p1, _}, {p2, _} -> p1 <= p2 end)
+          |> Yog.PairingHeap.push({0, {from, start_metadata}}),
           MapSet.new(),
           initial,
           folder,
@@ -157,8 +157,8 @@ defmodule Yog.Traversal.Walk do
       :random ->
         do_fold_walk_best_first(
           out_edges,
-          Yog.PriorityQueue.new(fn {p1, _}, {p2, _} -> p1 <= p2 end)
-          |> Yog.PriorityQueue.push({0, {from, start_metadata}}),
+          Yog.PairingHeap.new(fn {p1, _}, {p2, _} -> p1 <= p2 end)
+          |> Yog.PairingHeap.push({0, {from, start_metadata}}),
           MapSet.new(),
           initial,
           folder,
@@ -368,7 +368,7 @@ defmodule Yog.Traversal.Walk do
   # Best-first with fold and metadata
   # Uses direct out_edges access for performance
   defp do_fold_walk_best_first(out_edges, pq, visited, acc, folder, priority_fn) do
-    case Yog.PriorityQueue.pop(pq) do
+    case Yog.PairingHeap.pop(pq) do
       :error ->
         acc
 
@@ -408,7 +408,7 @@ defmodule Yog.Traversal.Walk do
                   }
 
                   p = priority_fn.(next_id, weight, next_meta)
-                  Yog.PriorityQueue.push(current_pq, {p, {next_id, next_meta}})
+                  Yog.PairingHeap.push(current_pq, {p, {next_id, next_meta}})
                 end)
 
               do_fold_walk_best_first(

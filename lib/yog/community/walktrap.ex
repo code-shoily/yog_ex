@@ -50,7 +50,7 @@ defmodule Yog.Community.Walktrap do
 
   alias Yog.Community
   alias Yog.Community.{Dendrogram, Result}
-  alias Yog.PriorityQueue
+  alias Yog.PairingHeap
 
   @typedoc "Options for Walktrap algorithm"
   @type walktrap_options :: %{
@@ -278,18 +278,18 @@ defmodule Yog.Community.Walktrap do
 
       _multiple ->
         pq =
-          Enum.reduce(ids, PriorityQueue.new(fn {d1, _}, {d2, _} -> d1 <= d2 end), fn c1, acc ->
+          Enum.reduce(ids, PairingHeap.new(fn {d1, _}, {d2, _} -> d1 <= d2 end), fn c1, acc ->
             Enum.reduce(ids, acc, fn c2, inner_acc ->
               if c1 < c2 do
                 dist = calculate_cached_distance(c1, c2, pt_cache, degrees)
-                PriorityQueue.push(inner_acc, {dist, {c1, c2}})
+                PairingHeap.push(inner_acc, {dist, {c1, c2}})
               else
                 inner_acc
               end
             end)
           end)
 
-        case PriorityQueue.pop(pq) do
+        case PairingHeap.pop(pq) do
           {:ok, {_dist, pair}, _new_pq} -> pair
           :error -> nil
         end

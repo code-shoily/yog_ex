@@ -62,7 +62,7 @@ defmodule Yog.Flow.MinCut do
 
   alias Yog.Flow.MinCutResult
   alias Yog.Model
-  alias Yog.PriorityQueue
+  alias Yog.PairingHeap
   alias Yog.Transform
 
   @doc """
@@ -159,9 +159,9 @@ defmodule Yog.Flow.MinCut do
       end
 
     pq =
-      List.foldl(rest, PriorityQueue.new(fn a, b -> a >= b end), fn node, acc ->
+      List.foldl(rest, PairingHeap.new(fn a, b -> a >= b end), fn node, acc ->
         dist = Map.get(initial_dists, node, 0)
-        PriorityQueue.push(acc, {dist, node})
+        PairingHeap.push(acc, {dist, node})
       end)
 
     remaining = MapSet.new(rest)
@@ -201,7 +201,7 @@ defmodule Yog.Flow.MinCut do
                 new_w = existing_w + weight
 
                 new_weights_acc = Map.put(weights_acc, neighbor, new_w)
-                new_queue_acc = PriorityQueue.push(queue_acc, {new_w, neighbor})
+                new_queue_acc = PairingHeap.push(queue_acc, {new_w, neighbor})
 
                 {new_weights_acc, new_queue_acc}
               else
@@ -224,7 +224,7 @@ defmodule Yog.Flow.MinCut do
   end
 
   defp get_next_mas_node(queue, remaining, weights) do
-    case PriorityQueue.pop(queue) do
+    case PairingHeap.pop(queue) do
       {:ok, {w, node}, q_rest} ->
         if MapSet.member?(remaining, node) do
           current_weight = Map.get(weights, node, 0)

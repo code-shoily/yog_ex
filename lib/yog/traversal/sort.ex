@@ -54,7 +54,7 @@ defmodule Yog.Traversal.Sort do
       [2, 1, 3]
   """
 
-  alias Yog.PriorityQueue, as: PQ
+  alias Yog.PairingHeap, as: PQ
 
   @doc """
   Performs a topological sort on a directed graph using Kahn's algorithm.

@@ -4,7 +4,7 @@ defmodule Yog.Traversal.Implicit do
   successor functions rather than materialized data structures.
   """
 
-  alias Yog.PriorityQueue, as: PQ
+  alias Yog.PairingHeap, as: PQ
 
   @doc """
   Traverse implicit graphs using BFS, DFS, Best-First, or Random order

@@ -38,8 +38,8 @@ defmodule Yog.Pathfinding.Dijkstra do
       #=> %{:a => 0, :b => 4, :c => 5}
   """
 
+  alias Yog.BalancedTree, as: PQ
   alias Yog.Pathfinding.Path
-  alias Yog.PriorityQueue, as: PQ
 
   @typedoc "Result type for shortest path queries"
   @type path_result :: {:ok, Path.t()} | :error
@@ -406,7 +406,7 @@ defmodule Yog.Pathfinding.Dijkstra do
         compare \\ &Yog.Utils.compare/2
       ) do
     initial_queue =
-      PQ.new(fn {d1, _}, {d2, _} -> compare.(d1, d2) != :gt end)
+      PQ.new()
       |> PQ.push({zero, from})
 
     initial_visited = %{key_fn.(from) => zero}
@@ -432,7 +432,7 @@ defmodule Yog.Pathfinding.Dijkstra do
   defp do_dijkstra(graph, from, to, zero, add, compare, _return_path) do
     # Unified implementation using predecessor map for path reconstruction
     initial_queue =
-      PQ.new(fn {d1, _}, {d2, _} -> compare.(d1, d2) != :gt end)
+      PQ.new()
       |> PQ.push({zero, from})
 
     initial_distances = %{from => zero}

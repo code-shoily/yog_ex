@@ -1,6 +1,6 @@
-defmodule Yog.PriorityQueue do
+defmodule Yog.PairingHeap do
   @moduledoc """
-  A Priority Queue implementation based on [Pairing Heap](https://en.wikipedia.org/wiki/Pairing_heap).
+  A [Pairing Heap](https://en.wikipedia.org/wiki/Pairing_heap) implementation of a priority queue.
 
   This module provides a priority queue with support for custom comparison functions,
   making it suitable for various graph algorithms like Dijkstra's, Prim's, and A*.
@@ -19,25 +19,25 @@ defmodule Yog.PriorityQueue do
   ## Examples
 
       # Min-priority queue (default)
-      pq = Yog.PriorityQueue.new()
-      |> Yog.PriorityQueue.push(5)
-      |> Yog.PriorityQueue.push(3)
-      |> Yog.PriorityQueue.push(7)
+      pq = Yog.PairingHeap.new()
+      |> Yog.PairingHeap.push(5)
+      |> Yog.PairingHeap.push(3)
+      |> Yog.PairingHeap.push(7)
 
-      {:ok, 3, pq} = Yog.PriorityQueue.pop(pq)
+      {:ok, 3, pq} = Yog.PairingHeap.pop(pq)
 
       # Max-priority queue with custom comparator
-      pq = Yog.PriorityQueue.new(fn a, b -> a >= b end)
-      |> Yog.PriorityQueue.push({:node, 5})
-      |> Yog.PriorityQueue.push({:node, 10})
+      pq = Yog.PairingHeap.new(fn a, b -> a >= b end)
+      |> Yog.PairingHeap.push({:node, 5})
+      |> Yog.PairingHeap.push({:node, 10})
 
-      {:ok, {:node, 10}, _} = Yog.PriorityQueue.pop(pq)
+      {:ok, {:node, 10}, _} = Yog.PairingHeap.pop(pq)
 
       # Priority queue for Dijkstra's algorithm
-      pq = Yog.PriorityQueue.new(fn {dist1, _}, {dist2, _} -> dist1 <= dist2 end)
-      |> Yog.PriorityQueue.push({0, :start})
-      |> Yog.PriorityQueue.push({5, :a})
-      |> Yog.PriorityQueue.push({3, :b})
+      pq = Yog.PairingHeap.new(fn {dist1, _}, {dist2, _} -> dist1 <= dist2 end)
+      |> Yog.PairingHeap.push({0, :start})
+      |> Yog.PairingHeap.push({5, :a})
+      |> Yog.PairingHeap.push({3, :b})
   """
 
   defmodule Node do
@@ -60,12 +60,12 @@ defmodule Yog.PriorityQueue do
 
   ## Examples
 
-      iex> pq = Yog.PriorityQueue.new()
-      iex> Yog.PriorityQueue.empty?(pq)
+      iex> pq = Yog.PairingHeap.new()
+      iex> Yog.PairingHeap.empty?(pq)
       true
 
-      iex> pq = Yog.PriorityQueue.new(fn a, b -> a >= b end)  # max-heap
-      iex> Yog.PriorityQueue.empty?(pq)
+      iex> pq = Yog.PairingHeap.new(fn a, b -> a >= b end)  # max-heap
+      iex> Yog.PairingHeap.empty?(pq)
       true
   """
   @spec new() :: t()
@@ -79,11 +79,11 @@ defmodule Yog.PriorityQueue do
 
   ## Examples
 
-      iex> Yog.PriorityQueue.empty?(Yog.PriorityQueue.new())
+      iex> Yog.PairingHeap.empty?(Yog.PairingHeap.new())
       true
 
-      iex> Yog.PriorityQueue.empty?(Yog.PriorityQueue.new()
-      ...> |> Yog.PriorityQueue.push(1))
+      iex> Yog.PairingHeap.empty?(Yog.PairingHeap.new()
+      ...> |> Yog.PairingHeap.push(1))
       false
   """
   @spec empty?(t()) :: boolean()
@@ -96,10 +96,10 @@ defmodule Yog.PriorityQueue do
   ## Examples
 
       iex> pq =
-      ...>   Yog.PriorityQueue.new()
-      ...>   |> Yog.PriorityQueue.push(5)
-      ...>   |> Yog.PriorityQueue.push(3)
-      iex> Yog.PriorityQueue.peek(pq)
+      ...>   Yog.PairingHeap.new()
+      ...>   |> Yog.PairingHeap.push(5)
+      ...>   |> Yog.PairingHeap.push(3)
+      iex> Yog.PairingHeap.peek(pq)
       {:ok, 3}
   """
   @spec push(t(), any()) :: t()
@@ -117,11 +117,11 @@ defmodule Yog.PriorityQueue do
 
   ## Examples
 
-      iex> pq = Yog.PriorityQueue.new() |> Yog.PriorityQueue.push(5) |> Yog.PriorityQueue.push(3)
-      iex> Yog.PriorityQueue.peek(pq)
+      iex> pq = Yog.PairingHeap.new() |> Yog.PairingHeap.push(5) |> Yog.PairingHeap.push(3)
+      iex> Yog.PairingHeap.peek(pq)
       {:ok, 3}
 
-      iex> Yog.PriorityQueue.peek(Yog.PriorityQueue.new())
+      iex> Yog.PairingHeap.peek(Yog.PairingHeap.new())
       :error
   """
   @spec peek(t()) :: {:ok, any()} | :error
@@ -135,11 +135,11 @@ defmodule Yog.PriorityQueue do
 
   ## Examples
 
-      iex> pq = Yog.PriorityQueue.new() |> Yog.PriorityQueue.push(5) |> Yog.PriorityQueue.push(3) |> Yog.PriorityQueue.push(7)
-      iex> {:ok, min, pq} = Yog.PriorityQueue.pop(pq)
+      iex> pq = Yog.PairingHeap.new() |> Yog.PairingHeap.push(5) |> Yog.PairingHeap.push(3) |> Yog.PairingHeap.push(7)
+      iex> {:ok, min, pq} = Yog.PairingHeap.pop(pq)
       iex> min
       3
-      iex> {:ok, next_min, _} = Yog.PriorityQueue.pop(pq)
+      iex> {:ok, next_min, _} = Yog.PairingHeap.pop(pq)
       iex> next_min
       5
   """
@@ -155,13 +155,13 @@ defmodule Yog.PriorityQueue do
 
   ## Examples
 
-      iex> pq = Yog.PriorityQueue.from_list([3, 1, 4, 1, 5])
-      iex> {:ok, min, _} = Yog.PriorityQueue.pop(pq)
+      iex> pq = Yog.PairingHeap.from_list([3, 1, 4, 1, 5])
+      iex> {:ok, min, _} = Yog.PairingHeap.pop(pq)
       iex> min
       1
 
-      iex> pq = Yog.PriorityQueue.from_list([3, 1, 4, 1, 5], &Kernel.>=/2)
-      iex> {:ok, max, _} = Yog.PriorityQueue.pop(pq)
+      iex> pq = Yog.PairingHeap.from_list([3, 1, 4, 1, 5], &Kernel.>=/2)
+      iex> {:ok, max, _} = Yog.PairingHeap.pop(pq)
       iex> max
       5
   """
@@ -178,11 +178,11 @@ defmodule Yog.PriorityQueue do
 
   ## Examples
 
-      iex> Yog.PriorityQueue.new()
-      ...> |> Yog.PriorityQueue.push(3)
-      ...> |> Yog.PriorityQueue.push(1)
-      ...> |> Yog.PriorityQueue.push(2)
-      ...> |> Yog.PriorityQueue.to_list()
+      iex> Yog.PairingHeap.new()
+      ...> |> Yog.PairingHeap.push(3)
+      ...> |> Yog.PairingHeap.push(1)
+      ...> |> Yog.PairingHeap.push(2)
+      ...> |> Yog.PairingHeap.to_list()
       [1, 2, 3]
   """
   @spec to_list(t()) :: [any()]
@@ -202,10 +202,10 @@ defmodule Yog.PriorityQueue do
 
   ## Examples
 
-      iex> Yog.PriorityQueue.new()
-      ...> |> Yog.PriorityQueue.push(1)
-      ...> |> Yog.PriorityQueue.push(2)
-      ...> |> Yog.PriorityQueue.size()
+      iex> Yog.PairingHeap.new()
+      ...> |> Yog.PairingHeap.push(1)
+      ...> |> Yog.PairingHeap.push(2)
+      ...> |> Yog.PairingHeap.size()
       2
   """
   @spec size(t()) :: non_neg_integer()

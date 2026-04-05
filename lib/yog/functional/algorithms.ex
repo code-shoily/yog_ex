@@ -30,7 +30,7 @@ defmodule Yog.Functional.Algorithms do
   """
   alias Yog.Functional.Model
   alias Yog.Functional.{Transform, Traversal}
-  alias Yog.PriorityQueue, as: PQ
+  alias Yog.PairingHeap, as: PQ
 
   @doc """
   Performs a Topological Sort by repeatedly extracting nodes with 0 in-degree.

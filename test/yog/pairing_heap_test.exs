@@ -1,13 +1,13 @@
-defmodule Yog.PriorityQueueTest do
+defmodule Yog.PairingHeapTest do
   @moduledoc """
-  Tests for Yog.PriorityQueue module.
+  Tests for Yog.PairingHeap module.
 
   Priority Queue implementation based on Pairing Heap.
   """
 
   use ExUnit.Case
 
-  alias Yog.PriorityQueue, as: PQ
+  alias Yog.PairingHeap, as: PQ
 
   doctest PQ
 

@@ -15,7 +15,7 @@ defmodule Yog.Flow.SuccessiveShortestPath do
   The implementation uses the Successive Shortest Path algorithm with Dijkstra and
   node potentials (reduced costs). One initial Bellman-Ford pass computes valid
   potentials; every subsequent shortest-path query runs Dijkstra using
-  `Yog.PriorityQueue` on non-negative reduced costs.
+  `Yog.PairingHeap` on non-negative reduced costs.
 
   ## Key Concepts
 
@@ -359,7 +359,7 @@ defmodule Yog.Flow.SuccessiveShortestPath do
   # Dijkstra with node potentials on residual graph
   defp shortest_path(adj, capacities, costs, potentials, source, sink) do
     compare = fn {d1, _}, {d2, _} -> d1 <= d2 end
-    pq = Yog.PriorityQueue.new(compare) |> Yog.PriorityQueue.push({0, source})
+    pq = Yog.PairingHeap.new(compare) |> Yog.PairingHeap.push({0, source})
 
     dist = %{source => 0}
     prev = %{}
@@ -376,7 +376,7 @@ defmodule Yog.Flow.SuccessiveShortestPath do
 
   # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity
   defp do_dijkstra(adj, caps, costs, pots, source, sink, pq, dist, prev) do
-    case Yog.PriorityQueue.pop(pq) do
+    case Yog.PairingHeap.pop(pq) do
       :error ->
         nil
 
@@ -401,7 +401,7 @@ defmodule Yog.Flow.SuccessiveShortestPath do
 
                   if old_dist == nil or new_dist < old_dist do
                     {
-                      Yog.PriorityQueue.push(pq_acc, {new_dist, v}),
+                      Yog.PairingHeap.push(pq_acc, {new_dist, v}),
                       Map.put(dist_acc, v, new_dist),
                       Map.put(prev_acc, v, u)
                     }
