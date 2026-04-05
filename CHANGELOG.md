@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Generators**: Add `Yog.Generator.Random.sbm/5` and `Yog.Generator.Random.sbm_with_labels/5` to generate graphs using the Stochastic Block Model (SBM).
 - **MST Result Struct**: `Yog.MST.kruskal/2` and `Yog.MST.prim/2` now return `{:ok, %Yog.MST.Result{}}` instead of a raw edge list. The struct contains `edges`, `total_weight`, `node_count`, `edge_count`, and `algorithm` fields.
 - **Prim's `:from` option**: `Yog.MST.prim/1` now accepts a `:from` keyword to specify the starting node.
 - **Renamed `Yog.Flow.NetworkSimplex` to `Yog.Flow.SuccessiveShortestPath`** to accurately reflect the implemented algorithm (Successive Shortest Path, not Network Simplex).
