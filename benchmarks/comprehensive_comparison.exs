@@ -3,6 +3,9 @@ defmodule ComprehensiveBenchmark do
   Comprehensive benchmark comparing Yog, libgraph, and :digraph as separate libraries.
   
   Similar to Gleam's benchmark style with statistical metrics (min, max, p99, IPS).
+  
+  For a comparison between Yog's adjacency-list representation and functional 
+  inductive graphs (FGL), see `benchmarks/functional_comparison.exs`.
   """
 
   # Number of iterations for each benchmark

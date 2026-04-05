@@ -28,6 +28,8 @@
 Yog is a set of Graph and Network algorithms and data structures implemented in Elixir and packaged as a common API.
 
 It started off as a wrapper around the Gleam [Yog](https://hex.pm/packages/yog) library, but now YogEx is now fully implemented in Elixir and a superset of the original Gleam version.
+
+📊 See the [Gleam vs Elixir Comparison](GLEAM_ELIXIR_COMPARISON.md) for a detailed feature comparison between the two implementations.
  
 > [!WARNING]
 > **API Stability**: Until the version reaches `1.0.0`, there may be breaking changes. While I'll try my best to keep the API stable, there's no guarantee. The primary focus is on **performance**, **documentation**, and **bugfixes**.
@@ -74,6 +76,59 @@ Then run:
 
 ```bash
 mix deps.get
+```
+
+### Optional Dependencies
+
+YogEx includes several optional dependencies that enable additional I/O and interoperability features:
+
+| Dependency | Module | Purpose |
+|------------|--------|---------|
+| [`:saxy`](https://hex.pm/packages/saxy) | `Yog.IO.GraphML` | Fast streaming XML parser for GraphML files (3-4x faster than default `:xmerl`) |
+| [`:jason`](https://hex.pm/packages/jason) | `Yog.IO.JSON` | JSON serialization/deserialization for D3.js, Cytoscape, vis.js, NetworkX formats |
+| [`:libgraph`](https://hex.pm/packages/libgraph) | `Yog.IO.Libgraph` | Bidirectional conversion with libgraph library |
+
+To use these features, add the optional dependencies to your `mix.exs`:
+
+```elixir
+def deps do
+  [
+    {:yog_ex, "~> 0.95.0"},
+    {:saxy, "~> 1.5"},       # For fast GraphML/XML parsing
+    {:jason, "~> 1.4"},      # For JSON import/export
+    {:libgraph, "~> 0.16"}   # For libgraph interoperability
+  ]
+end
+```
+
+#### XML/GraphML with Saxy
+
+```elixir
+# Reading large GraphML files is significantly faster with saxy
+{:ok, graph} = Yog.IO.GraphML.read("large_network.graphml")
+
+# Writing GraphML
+Yog.IO.GraphML.write("output.graphml", graph)
+```
+
+#### JSON Serialization with Jason
+
+```elixir
+# Export to various JSON formats
+json = Yog.IO.JSON.to_json(graph, Yog.IO.JSON.export_options_for(:d3_force))
+
+# Import from JSON
+{:ok, graph} = Yog.IO.JSON.from_json(json_string)
+```
+
+#### Libgraph Interoperability
+
+```elixir
+# Convert Yog graph to libgraph
+libgraph = Yog.IO.Libgraph.to_libgraph(graph)
+
+# Convert libgraph back to Yog
+{:ok, yog_graph} = Yog.IO.Libgraph.from_libgraph(libgraph)
 ```
 
 ### Livebook

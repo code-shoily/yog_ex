@@ -57,8 +57,8 @@ defmodule YogEx.MixProject do
 
   defp deps do
     [
-      {:saxy, "~> 1.5"},
-      {:jason, "~> 1.4"},
+      {:saxy, "~> 1.5", optional: true},
+      {:jason, "~> 1.4", optional: true},
       {:libgraph, "~> 0.16", optional: true},
       {:ex_doc, "~> 0.40", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
