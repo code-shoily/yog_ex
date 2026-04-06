@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Classic Graph Generators
+- **Platonic Solids** (#102): Added all five Platonic solid generators in `Yog.Generator.Classic`:
+  - `tetrahedron/0` - Complete graph K₄ (4 vertices, 6 edges)
+  - `cube/0` - 3D hypercube Q₃ (8 vertices, 12 edges)
+  - `octahedron/0` - Dual of cube (6 vertices, 12 edges)
+  - `dodecahedron/0` - 20 vertices, 30 edges, golden ratio embedding
+  - `icosahedron/0` - Dual of dodecahedron (12 vertices, 30 edges)
+- **General Tree Generators** (#103): Added k-ary tree and related generators:
+  - `kary_tree/2` - Complete k-ary tree of given depth with configurable arity
+  - `complete_kary/2` - Complete m-ary tree with exactly n nodes
+  - `caterpillar/2` - Caterpillar tree with configurable spine length
+- **Circular and Möbius Ladders** (#104): Added ladder graph variants:
+  - `circular_ladder/1` - Prism graph CL_n = C_n × K_2 (Cartesian product)
+  - `mobius_ladder/1` - Möbius ladder ML_n with twist topology
+  - `prism/1` - Alias for `circular_ladder/1`
+- **Friendship and Windmill Graphs** (#105): Added friendship theorem graphs:
+  - `friendship/1` - Friendship graph F_n with n triangles sharing a common vertex
+  - `windmill/2` - Generalized windmill graph W_n^{(k)} with configurable clique size
+  - `book/1` - Book graph B_n with triangles sharing a common edge (spine)
+- **Crown Graph** (#106): Added `crown/1` - Crown graph S_n^0 = K_{n,n} minus perfect matching
+
+#### Random Graph Generators
+- **Configuration Model** (#110): Added configurable random graph generators:
+  - `configuration_model/2` - Stub matching with rejection sampling for simple graphs
+  - `randomize_degree_sequence/2` - Degree sequence randomization preserving distribution
+  - `power_law_graph/2` - Scale-free networks using power-law degree distribution
+- **Kronecker Graphs** (#109): Added recursive matrix-based generators:
+  - `kronecker/3` - Kronecker graph generator with initiator matrix
+  - `rmat/7` - R-MAT (Recursive Matrix) generator for realistic networks
+  - `kronecker_general/3` - Generalized Kronecker with arbitrary initiator
+- **Geometric Graphs** (#107): Added spatial network generators:
+  - `geometric/2` - 2D geometric random graph with distance threshold
+  - `geometric_nd/2` - N-dimensional geometric graph
+  - `waxman/2` - Waxman model with distance-probabilistic edge formation
+
+#### Other Changes
 - **Pathfinding**: Added `Johnson's algorithm` to Matrix auto-selection for non-negative weights on sparse graphs with many POIs. Previously Johnson's was only used with negative weights; now it's also selected for sparse graphs (E < V²/4) with many POIs (P > V/3) instead of Floyd-Warshall.
 
 ### Changed
