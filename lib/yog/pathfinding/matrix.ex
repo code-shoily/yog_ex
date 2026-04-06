@@ -21,7 +21,8 @@ defmodule Yog.Pathfinding.Matrix do
   | Algorithm | When Selected | Complexity |
   |-----------|---------------|------------|
   | [Dijkstra](https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm) × P | Few POIs (P ≤ V/3) | O(P × (V + E) log V) |
-  | [Floyd-Warshall](https://en.wikipedia.org/wiki/Floyd%E2%80%93Warshall_algorithm) | Many POIs (P > V/3) | O(V³) then filter |
+  | [Johnson's](https://en.wikipedia.org/wiki/Johnson%27s_algorithm) | Many POIs (P > V/3) on sparse graphs (E < V²/4) | O(V² log V + VE) |
+  | [Floyd-Warshall](https://en.wikipedia.org/wiki/Floyd%E2%80%93Warshall_algorithm) | Many POIs (P > V/3) on dense graphs | O(V³) then filter |
 
   ## Heuristics
 
@@ -31,7 +32,8 @@ defmodule Yog.Pathfinding.Matrix do
 
   **For non-negative weights only:**
   - Multiple Dijkstra runs when P ≤ V/3 (few POIs)
-  - Floyd-Warshall when P > V/3 (many POIs)
+  - Johnson's algorithm for many POIs on sparse graphs (E < V²/4)
+  - Floyd-Warshall when P > V/3 on dense graphs
 
   ## Use Cases
 
@@ -147,16 +149,6 @@ defmodule Yog.Pathfinding.Matrix do
     node_count = map_size(graph.nodes)
     edge_count = Yog.Graph.edge_count(graph)
 
-    # Check if any POI is not in the graph
-    all_nodes = Map.keys(graph.nodes)
-    all_node_set = MapSet.new(all_nodes)
-
-    _check_pois =
-      if not all_in_set?(poi_set, all_node_set) do
-        # Some POIs don't exist in graph - still compute for valid ones
-        :ok
-      end
-
     if subtract != nil do
       # Negative weight support needed: choose between Johnson's and Floyd-Warshall
       # Johnson's is better for sparse graphs (E < V²/4)
@@ -166,14 +158,24 @@ defmodule Yog.Pathfinding.Matrix do
         run_floyd_warshall(graph, points_of_interest, poi_set, zero, add, compare)
       end
     else
-      # Non-negative weights: choose between Dijkstra × P and Floyd-Warshall
-      # Dijkstra is better when few POIs (P ≤ V/3)
+      # Non-negative weights: choose between Dijkstra × P, Johnson's, and Floyd-Warshall
       poi_count = length(points_of_interest)
 
-      if poi_count <= div(node_count, 3) do
-        run_dijkstra_multi(graph, points_of_interest, poi_set, zero, add, compare)
-      else
-        run_floyd_warshall(graph, points_of_interest, poi_set, zero, add, compare)
+      cond do
+        # Few POIs: Dijkstra from each POI is most efficient
+        poi_count <= div(node_count, 3) ->
+          run_dijkstra_multi(graph, points_of_interest, poi_set, zero, add, compare)
+
+        # Many POIs but sparse graph: Johnson's is better than Floyd-Warshall
+        # Johnson's: O(V² log V + VE) vs Floyd-Warshall: O(V³)
+        edge_count < div(node_count * node_count, 4) ->
+          # For non-negative weights, we can use a dummy subtract (not used in reweighting)
+          # or run Johnson's with standard subtraction
+          run_johnson_nonneg(graph, points_of_interest, poi_set, zero, add, compare)
+
+        # Dense graph with many POIs: Floyd-Warshall
+        true ->
+          run_floyd_warshall(graph, points_of_interest, poi_set, zero, add, compare)
       end
     end
   end
@@ -191,6 +193,11 @@ defmodule Yog.Pathfinding.Matrix do
       {:error, :negative_cycle} ->
         {:error, :negative_cycle}
     end
+  end
+
+  # Run Johnson's for non-negative weights (uses standard subtraction for reweighting)
+  defp run_johnson_nonneg(graph, points_of_interest, poi_set, zero, add, compare) do
+    run_johnson(graph, points_of_interest, poi_set, zero, add, &Kernel.-/2, compare)
   end
 
   # Run Floyd-Warshall algorithm and filter to POIs
@@ -242,10 +249,5 @@ defmodule Yog.Pathfinding.Matrix do
         acc
       end
     end)
-  end
-
-  # Check if all elements of set1 are in set2
-  defp all_in_set?(set1, set2) do
-    MapSet.subset?(set1, set2)
   end
 end
