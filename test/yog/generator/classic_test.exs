@@ -635,4 +635,176 @@ defmodule Yog.Generator.ClassicTest do
       assert e == n - 1
     end
   end
+
+  # ============= Circular Ladder Tests =============
+
+  test "circular_ladder/1 creates correct structure" do
+    cl = Classic.circular_ladder(5)
+    # 2n vertices
+    assert Yog.Model.order(cl) == 10
+    # 3n edges
+    assert Yog.Model.edge_count(cl) == 15
+  end
+
+  test "circular_ladder/1 is 3-regular for n > 2" do
+    cl = Classic.circular_ladder(5)
+
+    for v <- 0..9 do
+      assert length(Yog.neighbors(cl, v)) == 3
+    end
+  end
+
+  test "circular_ladder/1 CL_4 is isomorphic to cube" do
+    # CL_4 and hypercube(3) both have 8 vertices and 12 edges
+    cl4 = Classic.circular_ladder(4)
+    cube = Classic.hypercube(3)
+    assert Yog.Model.order(cl4) == Yog.Model.order(cube)
+    assert Yog.Model.edge_count(cl4) == Yog.Model.edge_count(cube)
+    # Both are 3-regular
+    for v <- 0..7 do
+      assert length(Yog.neighbors(cl4, v)) == 3
+      assert length(Yog.neighbors(cube, v)) == 3
+    end
+  end
+
+  test "circular_ladder/1 is bipartite when n is even" do
+    # CL_4 should be bipartite
+    cl4 = Classic.circular_ladder(4)
+    assert Yog.Property.Bipartite.bipartite?(cl4) == true
+  end
+
+  test "circular_ladder/1 has two cycles of length n" do
+    cl = Classic.circular_ladder(5)
+    # Check inner cycle connections
+    for i <- 0..4 do
+      assert Yog.Model.has_edge?(cl, i, rem(i + 1, 5))
+    end
+
+    # Check outer cycle connections
+    for i <- 5..9 do
+      assert Yog.Model.has_edge?(cl, i, rem(i - 5 + 1, 5) + 5)
+    end
+  end
+
+  test "circular_ladder/1 has rungs connecting cycles" do
+    cl = Classic.circular_ladder(5)
+    # Each inner node i connects to outer node i+n
+    for i <- 0..4 do
+      assert Yog.Model.has_edge?(cl, i, i + 5)
+    end
+  end
+
+  test "circular_ladder/1 edge cases" do
+    # n < 3 returns empty graph
+    assert Yog.Model.order(Classic.circular_ladder(2)) == 0
+    assert Yog.Model.order(Classic.circular_ladder(0)) == 0
+    assert Yog.Model.order(Classic.circular_ladder(-1)) == 0
+  end
+
+  test "prism/1 is alias for circular_ladder/1" do
+    prism = Classic.prism(5)
+    cl = Classic.circular_ladder(5)
+    assert Yog.Model.order(prism) == Yog.Model.order(cl)
+    assert Yog.Model.edge_count(prism) == Yog.Model.edge_count(cl)
+  end
+
+  # ============= Möbius Ladder Tests =============
+
+  test "mobius_ladder/1 creates correct structure" do
+    ml = Classic.mobius_ladder(6)
+    # 2n vertices
+    assert Yog.Model.order(ml) == 12
+    # 3n edges
+    assert Yog.Model.edge_count(ml) == 18
+  end
+
+  test "mobius_ladder/1 is 3-regular" do
+    ml = Classic.mobius_ladder(5)
+
+    for v <- 0..9 do
+      assert length(Yog.neighbors(ml, v)) == 3
+    end
+  end
+
+  test "mobius_ladder/1 ML_4 has correct structure" do
+    # ML_4 has 8 vertices, 12 edges
+    ml4 = Classic.mobius_ladder(4)
+    assert Yog.Model.order(ml4) == 8
+    assert Yog.Model.edge_count(ml4) == 12
+    # 3-regular
+    for v <- 0..7 do
+      assert length(Yog.neighbors(ml4, v)) == 3
+    end
+
+    # ML_n is bipartite when n is odd; ML_4 (n=4, even) is NOT bipartite
+    assert Yog.Property.Bipartite.bipartite?(ml4) == false
+  end
+
+  test "mobius_ladder/1 ML_5 is bipartite" do
+    # ML_5 (n=5, odd) should be bipartite
+    ml5 = Classic.mobius_ladder(5)
+    assert Yog.Property.Bipartite.bipartite?(ml5) == true
+  end
+
+  test "mobius_ladder/1 has cycle of length 2n" do
+    ml = Classic.mobius_ladder(5)
+    # Check main cycle edges
+    for i <- 0..9 do
+      assert Yog.Model.has_edge?(ml, i, rem(i + 1, 10))
+    end
+  end
+
+  test "mobius_ladder/1 has twist edges" do
+    ml = Classic.mobius_ladder(5)
+    # Twist edges connect i to i+n (mod 2n)
+    for i <- 0..4 do
+      assert Yog.Model.has_edge?(ml, i, i + 5)
+    end
+  end
+
+  test "mobius_ladder/1 edge cases" do
+    # n < 2 returns empty graph
+    assert Yog.Model.order(Classic.mobius_ladder(1)) == 0
+    assert Yog.Model.order(Classic.mobius_ladder(0)) == 0
+    assert Yog.Model.order(Classic.mobius_ladder(-1)) == 0
+  end
+
+  test "mobius_ladder/1 ML_3 is 6-vertex utility graph" do
+    # ML_3 has 6 vertices, 9 edges
+    ml3 = Classic.mobius_ladder(3)
+    assert Yog.Model.order(ml3) == 6
+    assert Yog.Model.edge_count(ml3) == 9
+    # 3-regular
+    for v <- 0..5 do
+      assert length(Yog.neighbors(ml3, v)) == 3
+    end
+  end
+
+  # ============= Ladder Graph Comparison Tests =============
+
+  test "ladder vs circular_ladder comparison" do
+    # Regular ladder (n=5): 10 vertices, 13 edges (no wraparound)
+    ladder = Classic.ladder(5)
+    # Circular ladder (n=5): 10 vertices, 15 edges (wraparound cycles)
+    cl = Classic.circular_ladder(5)
+
+    assert Yog.Model.order(ladder) == Yog.Model.order(cl)
+    # Circular ladder has 2 more edges (the wraparound connections)
+    assert Yog.Model.edge_count(cl) - Yog.Model.edge_count(ladder) == 2
+  end
+
+  test "circular vs mobius ladder structural difference" do
+    # Both have 10 vertices, 15 edges for n=5
+    cl = Classic.circular_ladder(5)
+    ml = Classic.mobius_ladder(5)
+
+    assert Yog.Model.order(cl) == Yog.Model.order(ml)
+    assert Yog.Model.edge_count(cl) == Yog.Model.edge_count(ml)
+
+    # Both are 3-regular
+    for v <- 0..9 do
+      assert length(Yog.neighbors(cl, v)) == 3
+      assert length(Yog.neighbors(ml, v)) == 3
+    end
+  end
 end

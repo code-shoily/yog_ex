@@ -1031,6 +1031,155 @@ defmodule Yog.Generator.Classic do
     end)
   end
 
+  # ============= Circular and Möbius Ladder Graphs =============
+
+  @doc """
+  Generates a circular ladder graph (prism graph) with n rungs.
+
+  The circular ladder CL_n consists of two concentric n-cycles with
+  corresponding vertices connected by rungs. It's equivalent to the
+  Cartesian product C_n × K_2 (cycle × edge).
+
+  ## Examples
+
+      iex> cl = Yog.Generator.Classic.circular_ladder(5)
+      iex> Yog.Model.order(cl)
+      10
+
+      iex> # CL_4 is the cube graph (isomorphic to hypercube(3))
+      ...> cl4 = Yog.Generator.Classic.circular_ladder(4)
+      ...> Yog.Model.order(cl4)
+      8
+
+  ## Properties
+
+  - Vertices: 2n
+  - Edges: 3n (2n cycle edges + n rungs)
+  - 3-regular (cubic) for n > 2
+  - Planar (can be drawn on a cylinder)
+  - Hamiltonian
+  - Bipartite when n is even
+
+  ## Use Cases
+
+  - Prism graphs in chemistry (molecular structures)
+  - Network topologies with wraparound
+  - Topological graph theory (cylindrical embeddings)
+  """
+  @spec circular_ladder(integer()) :: Yog.graph()
+  def circular_ladder(n) when is_integer(n) and n >= 3 do
+    circular_ladder_with_type(n, :undirected)
+  end
+
+  def circular_ladder(_n), do: Yog.new(:undirected)
+
+  @doc """
+  Generates a circular ladder graph with specified graph type.
+  """
+  @spec circular_ladder_with_type(integer(), Yog.graph_type()) :: Yog.graph()
+  def circular_ladder_with_type(n, _graph_type) when not is_integer(n) or n < 3,
+    do: Yog.new(:undirected)
+
+  def circular_ladder_with_type(n, graph_type) do
+    base = Yog.new(graph_type)
+
+    # Nodes 0..n-1 are inner cycle, n..2n-1 are outer cycle
+    graph =
+      Enum.reduce(0..(2 * n - 1)//1, base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # Inner cycle edges: (i, (i+1) mod n) for i in 0..n-1
+    inner_edges = for i <- 0..(n - 1)//1, do: {i, rem(i + 1, n), 1}
+
+    # Outer cycle edges: (i+n, ((i+1) mod n)+n) for i in 0..n-1
+    outer_edges = for i <- 0..(n - 1)//1, do: {i + n, rem(i + 1, n) + n, 1}
+
+    # Rung edges: (i, i+n) for i in 0..n-1
+    rung_edges = for i <- 0..(n - 1)//1, do: {i, i + n, 1}
+
+    Enum.reduce(inner_edges ++ outer_edges ++ rung_edges, graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
+
+  @doc """
+  Alias for `circular_ladder/1`.
+
+  The n-sided prism graph is exactly the circular ladder CL_n.
+  """
+  @spec prism(integer()) :: Yog.graph()
+  def prism(n), do: circular_ladder(n)
+
+  @doc """
+  Generates a Möbius ladder graph with n rungs.
+
+  The Möbius ladder ML_n is formed from a circular ladder by giving it
+  a half-twist before connecting the ends, creating a Möbius strip topology.
+
+  ## Examples
+
+      iex> ml = Yog.Generator.Classic.mobius_ladder(6)
+      iex> Yog.Model.order(ml)
+      12
+
+      iex> # ML_4 is K_{3,3} (complete bipartite graph)
+      ...> ml4 = Yog.Generator.Classic.mobius_ladder(4)
+      ...> Yog.Model.order(ml4)
+      8
+
+  ## Properties
+
+  - Vertices: 2n
+  - Edges: 3n
+  - 3-regular (cubic)
+  - Non-planar for n ≥ 3
+  - ML_4 = K_{3,3} (canonical non-planar graph)
+  - ML_3 = 6-vertex utility graph (K_{3,3} minus an edge)
+  - Bipartite when n is odd
+
+  ## Use Cases
+
+  - Non-orientable embeddings in topological graph theory
+  - Planarity testing (contains K_{3,3} minor)
+  - Chemical graph theory (Möbius molecules)
+  - Network design with twisted topology
+  """
+  @spec mobius_ladder(integer()) :: Yog.graph()
+  def mobius_ladder(n) when is_integer(n) and n >= 2 do
+    mobius_ladder_with_type(n, :undirected)
+  end
+
+  def mobius_ladder(_n), do: Yog.new(:undirected)
+
+  @doc """
+  Generates a Möbius ladder graph with specified graph type.
+  """
+  @spec mobius_ladder_with_type(integer(), Yog.graph_type()) :: Yog.graph()
+  def mobius_ladder_with_type(n, _graph_type) when not is_integer(n) or n < 2,
+    do: Yog.new(:undirected)
+
+  def mobius_ladder_with_type(n, graph_type) do
+    base = Yog.new(graph_type)
+
+    # Nodes 0..2n-1 arranged in a cycle
+    graph =
+      Enum.reduce(0..(2 * n - 1)//1, base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # Cycle edges: (i, (i+1) mod 2n) for i in 0..2n-1
+    cycle_edges = for i <- 0..(2 * n - 1)//1, do: {i, rem(i + 1, 2 * n), 1}
+
+    # Twist edges (rungs with twist): (i, (i+n) mod 2n) for i in 0..n-1
+    # These connect opposite vertices in the cycle, creating the twist
+    twist_edges = for i <- 0..(n - 1)//1, do: {i, rem(i + n, 2 * n), 1}
+
+    Enum.reduce(cycle_edges ++ twist_edges, graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
+
   # ============= Turan Graph =============
 
   @doc """
