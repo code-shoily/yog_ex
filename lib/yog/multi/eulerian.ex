@@ -362,19 +362,23 @@ defmodule Yog.Multi.Eulerian do
   end
 
   defp find_undirected_path_start(graph) do
-    case Enum.find(Model.all_nodes(graph), fn n ->
+    nodes = Model.all_nodes(graph)
+
+    case Enum.find(nodes, fn n ->
            rem(Model.out_degree(graph, n), 2) == 1
          end) do
-      nil -> List.first(Model.all_nodes(graph))
+      nil -> List.first(nodes)
       node -> node
     end
   end
 
   defp find_directed_path_start(graph) do
-    case Enum.find(Model.all_nodes(graph), fn n ->
+    nodes = Model.all_nodes(graph)
+
+    case Enum.find(nodes, fn n ->
            Model.out_degree(graph, n) == Model.in_degree(graph, n) + 1
          end) do
-      nil -> List.first(Model.all_nodes(graph))
+      nil -> List.first(nodes)
       node -> node
     end
   end
