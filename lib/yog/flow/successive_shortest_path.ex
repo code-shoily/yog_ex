@@ -295,17 +295,14 @@ defmodule Yog.Flow.SuccessiveShortestPath do
     Enum.any?(dist1, fn {node, val} -> dist2[node] < val end)
   end
 
-  # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity
   defp do_ssp(_supply, [], _demands, _adj, _caps, _costs, _orig, flow, cost, _pots) do
     {:ok, flow_to_list(flow), cost}
   end
 
-  # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity
   defp do_ssp([], _demand, _demands, _adj, _caps, _costs, _orig, _flow, _cost, _pots) do
     :infeasible
   end
 
-  # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity
   defp do_ssp(
          supply_nodes,
          demand_nodes,
@@ -374,7 +371,6 @@ defmodule Yog.Flow.SuccessiveShortestPath do
     end
   end
 
-  # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity
   defp do_dijkstra(adj, caps, costs, pots, source, sink, pq, dist, prev) do
     case Yog.PairingHeap.pop(pq) do
       :error ->

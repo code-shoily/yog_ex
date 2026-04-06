@@ -130,11 +130,9 @@ defmodule Yog.Connectivity.SCC do
     end
   end
 
-  # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity
   defp process_neighbors(nil, _, _, idx, ids, lows, st, os, sccs),
     do: {idx, ids, lows, st, os, sccs}
 
-  # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity
   defp process_neighbors(neighbors, out, node, idx, ids, lows, st, os, sccs) do
     neighbor_list = Map.to_list(neighbors)
 

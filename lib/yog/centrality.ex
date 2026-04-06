@@ -732,7 +732,6 @@ defmodule Yog.Centrality do
     end
   end
 
-  # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity
   defp iterate_pagerank(
          ranks,
          _nodes,
@@ -749,7 +748,6 @@ defmodule Yog.Centrality do
     ranks
   end
 
-  # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity
   defp iterate_pagerank(
          ranks,
          nodes,

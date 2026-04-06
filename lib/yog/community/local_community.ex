@@ -300,7 +300,6 @@ defmodule Yog.Community.LocalCommunity do
     end
   end
 
-  # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity
   defp do_detect(
          graph,
          s,

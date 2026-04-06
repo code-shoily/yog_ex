@@ -237,7 +237,6 @@ defmodule Yog.Flow.MaxFlow do
     end)
   end
 
-  # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity
   defp do_edmonds_karp(residual, source, sink, zero, add, subtract, compare, min_fn, acc_flow) do
     case find_augmenting_path(residual, source, sink, zero, compare, min_fn) do
       nil ->
