@@ -101,10 +101,9 @@ defmodule Yog.Graph do
   def edge_count(%__MODULE__{} = graph) do
     case graph.kind do
       :directed ->
-        graph.out_edges
-        |> Map.values()
-        |> Enum.map(&map_size/1)
-        |> Enum.sum()
+        Enum.reduce(graph.out_edges, 0, fn {_src, targets}, acc ->
+          acc + map_size(targets)
+        end)
 
       :undirected ->
         {total, self_loops} =
