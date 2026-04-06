@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Pathfinding**: Added `Johnson's algorithm` to Matrix auto-selection for non-negative weights on sparse graphs with many POIs. Previously Johnson's was only used with negative weights; now it's also selected for sparse graphs (E < V²/4) with many POIs (P > V/3) instead of Floyd-Warshall.
+
+### Changed
+
+- **Dijkstra Implementation**: `Yog.Pathfinding.Dijkstra` now delegates `shortest_path/6`, `implicit_dijkstra/6`, and `implicit_dijkstra_by/7` to `Yog.Pathfinding.AStar` with a zero heuristic (`fn _, _ -> 0 end`). This reduces code duplication since Dijkstra's algorithm is mathematically equivalent to A* with zero heuristic. `single_source_distances/5` retains its native implementation as A* requires a goal node.
+- **Bellman-Ford Optimization**: Added early termination optimization. If no distances change during a relaxation pass, the algorithm stops early instead of completing all V-1 iterations.
+  - **Performance improvement**: 13-24x faster on typical graphs that converge quickly
+  - Small graphs (50 nodes): 64 μs → 5.5 μs
+  - Medium graphs (100 nodes): 471 μs → 35 μs
+- **Bidirectional BFS Optimization**: Fixed O(n) `length/1` queue size check by tracking sizes separately (O(1)). Replaced list-based queue with `:queue` module for proper O(1) enqueue/dequeue operations.
+- **Johnson's Algorithm Optimization**: Added early termination to the Bellman-Ford phase (same optimization as standalone Bellman-Ford module).
+- **Bidirectional Dijkstra**: Now uses a proper implementation with two priority queues (forward and backward search) instead of delegating to regular Dijkstra. Implementation includes meeting point detection and optimal path reconstruction.
+
+### Breaking
+
+- **Removed `Yog.Pathfinding.Utils` module**. Its functions have been merged into `Yog.Pathfinding.Path`:
+  - `Utils.path(nodes, weight)` → Use `Path.new(nodes, weight)`
+  - `Utils.nodes(path)` → Use `path.nodes` directly
+  - `Utils.total_weight(path)` → Use `path.weight` directly
+
 ## [0.95.0] - 2026-04-04
 
 ### Added
