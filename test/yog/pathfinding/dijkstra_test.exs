@@ -579,4 +579,189 @@ defmodule Yog.Pathfinding.DijkstraTest do
 
     assert {:ok, 4} = result
   end
+
+  # ============= Delegation to A* Tests =============
+
+  test "shortest_path_returns_dijkstra_algorithm_tag_test" do
+    # Verify that even though we delegate to A*, the algorithm field is :dijkstra
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+
+    {:ok, path} = Dijkstra.shortest_path(graph, 1, 2, 0, &add/2, &compare/2)
+
+    assert path.algorithm == :dijkstra
+  end
+
+  test "shortest_path_matches_a_star_with_zero_heuristic_test" do
+    # Verify Dijkstra and A* with zero heuristic return same results
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_node(4, "D")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 4, with: 20)
+      |> Yog.add_edge_ensure(from: 4, to: 3, with: 5)
+
+    {:ok, dij_path} = Dijkstra.shortest_path(graph, 1, 3, 0, &add/2, &compare/2)
+
+    zero_h = fn _, _ -> 0 end
+    {:ok, astar_path} = Yog.Pathfinding.AStar.a_star(graph, 1, 3, zero_h, 0, &add/2, &compare/2)
+
+    assert dij_path.weight == astar_path.weight
+    assert dij_path.nodes == astar_path.nodes
+    assert dij_path.algorithm == :dijkstra
+    assert astar_path.algorithm == :a_star
+  end
+
+  test "implicit_dijkstra_matches_implicit_a_star_with_zero_heuristic_test" do
+    successors = fn
+      1 -> [{2, 5}, {3, 15}]
+      2 -> [{3, 5}]
+      3 -> []
+    end
+
+    is_goal = fn n -> n == 3 end
+
+    {:ok, dij_cost} = Dijkstra.implicit_dijkstra(1, successors, is_goal, 0, &add/2, &compare/2)
+
+    zero_h = fn _ -> 0 end
+
+    {:ok, astar_cost} =
+      Yog.Pathfinding.AStar.implicit_a_star(1, successors, is_goal, zero_h, 0, &add/2, &compare/2)
+
+    assert dij_cost == astar_cost
+    # 1 -> 2 -> 3 = 5 + 5
+    assert dij_cost == 10
+  end
+
+  test "implicit_dijkstra_by_matches_implicit_a_star_by_with_zero_heuristic_test" do
+    successors = fn {x, y, _dir} ->
+      next = []
+      next = if x < 3, do: [{{x + 1, y, :east}, 1} | next], else: next
+      next = if y < 3, do: [{{x, y + 1, :south}, 1} | next], else: next
+      next
+    end
+
+    key_fn = fn {x, y, _} -> {x, y} end
+    goal_fn = fn {x, y, _} -> x == 3 and y == 3 end
+
+    {:ok, dij_cost} =
+      Dijkstra.implicit_dijkstra_by(
+        {0, 0, :start},
+        successors,
+        key_fn,
+        goal_fn,
+        0,
+        &add/2,
+        &compare/2
+      )
+
+    zero_h = fn _ -> 0 end
+
+    {:ok, astar_cost} =
+      Yog.Pathfinding.AStar.implicit_a_star_by(
+        {0, 0, :start},
+        successors,
+        key_fn,
+        goal_fn,
+        zero_h,
+        0,
+        &add/2,
+        &compare/2
+      )
+
+    assert dij_cost == astar_cost
+    # Manhattan distance from (0,0) to (3,3)
+    assert dij_cost == 6
+  end
+
+  test "shortest_path_error_propagation_from_a_star_test" do
+    # Verify that :error from A* is properly propagated
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+
+    # No edge between 1 and 2
+
+    result = Dijkstra.shortest_path(graph, 1, 2, 0, &add/2, &compare/2)
+
+    assert result == :error
+  end
+
+  test "implicit_dijkstra_error_propagation_from_a_star_test" do
+    successors = fn
+      1 -> [{2, 1}]
+      2 -> [{3, 1}]
+      _ -> []
+    end
+
+    # Unreachable goal
+    is_goal = fn n -> n == 99 end
+
+    result = Dijkstra.implicit_dijkstra(1, successors, is_goal, 0, &add/2, &compare/2)
+
+    assert result == :error
+  end
+
+  test "dijkstra_with_custom_numeric_types_delegates_correctly_test" do
+    # Test that custom zero, add, compare functions work through delegation
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: {0, 5})
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: {0, 10})
+
+    # Custom numeric type: {int_part, frac_part}
+    zero = {0, 0}
+    add = fn {i1, f1}, {i2, f2} -> {i1 + i2, f1 + f2} end
+
+    compare = fn {i1, f1}, {i2, f2} ->
+      cond do
+        i1 < i2 -> :lt
+        i1 > i2 -> :gt
+        f1 < f2 -> :lt
+        f1 > f2 -> :gt
+        true -> :eq
+      end
+    end
+
+    {:ok, path} = Dijkstra.shortest_path(graph, 1, 3, zero, add, compare)
+
+    assert path.weight == {0, 15}
+    assert path.algorithm == :dijkstra
+  end
+
+  test "single_source_distances_is_independent_of_a_star_test" do
+    # Verify single_source_distances uses native implementation, not A*
+    # (A* cannot compute distances to all nodes without a goal)
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 100)
+
+    distances = Dijkstra.single_source_distances(graph, 1, 0, &add/2, &compare/2)
+
+    # Should compute distances to ALL nodes, not just one target
+    assert distances[1] == 0
+    assert distances[2] == 5
+    # 1 -> 2 -> 3, not 1 -> 3 directly
+    assert distances[3] == 15
+
+    # Verify the result doesn't depend on which node we "ask" about
+    # (A* with any goal would only guarantee correctness to that goal)
+    assert map_size(distances) == 3
+  end
 end
