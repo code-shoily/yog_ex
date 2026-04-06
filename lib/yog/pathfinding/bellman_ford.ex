@@ -224,19 +224,21 @@ defmodule Yog.Pathfinding.BellmanFord do
       if node_count <= 1 do
         {initial_distances, initial_predecessors}
       else
-        List.foldl(
-          Enum.to_list(1..(node_count - 1)),
-          {initial_distances, initial_predecessors},
-          fn _, {dist, pred} ->
-            relax_all_edges_from_graph(graph, dist, pred, add, compare)
-          end
+        do_relaxation_passes(
+          graph,
+          nodes,
+          initial_distances,
+          initial_predecessors,
+          add,
+          compare,
+          node_count - 1
         )
       end
 
-    {final_distances, _} =
+    {_final_distances, _, changed?} =
       relax_all_edges_from_graph(graph, distances, predecessors, add, compare)
 
-    if negative_cycle_detected?(nodes, distances, final_distances, compare) do
+    if changed? do
       {:error, :negative_cycle}
     else
       case Map.fetch(distances, to) do
@@ -276,12 +278,14 @@ defmodule Yog.Pathfinding.BellmanFord do
     initial_predecessors = %{}
 
     {distances, _} =
-      List.foldl(
-        Enum.to_list(1..(node_count - 1)),
-        {initial_distances, initial_predecessors},
-        fn _, {dist, pred} ->
-          relax_all_edges_from_graph(graph, dist, pred, add, compare)
-        end
+      do_relaxation_passes(
+        graph,
+        nodes,
+        initial_distances,
+        initial_predecessors,
+        add,
+        compare,
+        node_count - 1
       )
 
     distances
@@ -310,13 +314,15 @@ defmodule Yog.Pathfinding.BellmanFord do
     initial_distances = %{from => zero}
 
     distances =
-      List.foldl(Enum.to_list(1..(node_count - 1)), initial_distances, fn _, dist ->
-        relax_all_edges_from_graph_no_pred(graph, dist, add, compare)
+      Enum.reduce(1..(node_count - 1), initial_distances, fn _, dist ->
+        {new_dist, _} = relax_all_edges_from_graph_no_pred(graph, dist, add, compare)
+        new_dist
       end)
 
-    final_distances = relax_all_edges_from_graph_no_pred(graph, distances, add, compare)
+    {final_distances, changed?} =
+      relax_all_edges_from_graph_no_pred(graph, distances, add, compare)
 
-    negative_cycle_detected?(nodes, distances, final_distances, compare)
+    changed? or negative_cycle_detected?(nodes, distances, final_distances, compare)
   end
 
   @doc """
@@ -451,11 +457,29 @@ defmodule Yog.Pathfinding.BellmanFord do
   # Helper functions
   # ============================================================
 
+  # Relax edges for V-1 iterations with early termination optimization
+  # If no distances change in an iteration, we can stop early
+  defp do_relaxation_passes(_graph, _nodes, distances, predecessors, _add, _compare, 0) do
+    {distances, predecessors}
+  end
+
+  defp do_relaxation_passes(graph, nodes, distances, predecessors, add, compare, iterations_left) do
+    {new_dist, new_pred, changed?} =
+      relax_all_edges_from_graph(graph, distances, predecessors, add, compare)
+
+    if changed? do
+      do_relaxation_passes(graph, nodes, new_dist, new_pred, add, compare, iterations_left - 1)
+    else
+      {new_dist, new_pred}
+    end
+  end
+
+  # Returns {distances, predecessors, changed?}
   defp relax_all_edges_from_graph(graph, distances, predecessors, add, compare) do
     out_edges = graph.out_edges
     nodes = Map.keys(graph.nodes)
 
-    List.foldl(nodes, {distances, predecessors}, fn u, {dist, pred} ->
+    List.foldl(nodes, {distances, predecessors, false}, fn u, {dist, pred, changed?} ->
       case Map.fetch(dist, u) do
         {:ok, dist_u} ->
           successors =
@@ -464,34 +488,35 @@ defmodule Yog.Pathfinding.BellmanFord do
               :error -> []
             end
 
-          List.foldl(successors, {dist, pred}, fn {v, weight}, {d, p} ->
+          List.foldl(successors, {dist, pred, changed?}, fn {v, weight}, {d, p, ch} ->
             new_dist_v = add.(dist_u, weight)
 
             case Map.fetch(d, v) do
               {:ok, current_dist_v} ->
                 if compare.(new_dist_v, current_dist_v) == :lt do
-                  {Map.put(d, v, new_dist_v), Map.put(p, v, u)}
+                  {Map.put(d, v, new_dist_v), Map.put(p, v, u), true}
                 else
-                  {d, p}
+                  {d, p, ch}
                 end
 
               :error ->
-                {Map.put(d, v, new_dist_v), Map.put(p, v, u)}
+                {Map.put(d, v, new_dist_v), Map.put(p, v, u), true}
             end
           end)
 
         :error ->
-          {dist, pred}
+          {dist, pred, changed?}
       end
     end)
   end
 
   # Relax all edges without tracking predecessors (protocol-compatible)
+  # Returns {distances, changed?}
   defp relax_all_edges_from_graph_no_pred(graph, distances, add, compare) do
     out_edges = graph.out_edges
     nodes = Map.keys(graph.nodes)
 
-    List.foldl(nodes, distances, fn u, dist ->
+    List.foldl(nodes, {distances, false}, fn u, {dist, changed?} ->
       case Map.fetch(dist, u) do
         {:ok, dist_u} ->
           successors =
@@ -500,24 +525,24 @@ defmodule Yog.Pathfinding.BellmanFord do
               :error -> []
             end
 
-          List.foldl(successors, dist, fn {v, weight}, d ->
+          List.foldl(successors, {dist, changed?}, fn {v, weight}, {d, ch} ->
             new_dist_v = add.(dist_u, weight)
 
             case Map.fetch(d, v) do
               {:ok, current_dist_v} ->
                 if compare.(new_dist_v, current_dist_v) == :lt do
-                  Map.put(d, v, new_dist_v)
+                  {Map.put(d, v, new_dist_v), true}
                 else
-                  d
+                  {d, ch}
                 end
 
               :error ->
-                Map.put(d, v, new_dist_v)
+                {Map.put(d, v, new_dist_v), true}
             end
           end)
 
         :error ->
-          dist
+          {dist, changed?}
       end
     end)
   end
@@ -550,13 +575,11 @@ defmodule Yog.Pathfinding.BellmanFord do
   defp reconstruct_path_recursive(predecessors, from, current, acc) do
     case Map.fetch(predecessors, current) do
       {:ok, prev} -> reconstruct_path_recursive(predecessors, from, prev, [prev | acc])
-      # No path exists
       :error -> []
     end
   end
 
   defp do_implicit_bellman_ford(successors, key_fn, is_goal, add, compare, distances, max_iter) do
-    # First, check if we've reached the goal
     goal_result =
       Enum.find_value(distances, fn {_, {state, dist}} ->
         if is_goal.(state) do
@@ -570,16 +593,13 @@ defmodule Yog.Pathfinding.BellmanFord do
       goal_result
     else
       if max_iter <= 0 do
-        # Too many iterations, likely a negative cycle
         {:error, :negative_cycle}
       else
-        # Build a list of all state-distance pairs to process
         state_dist_pairs =
           List.foldl(Map.to_list(distances), [], fn {_, {state, dist}}, acc ->
             [{state, dist} | acc]
           end)
 
-        # Relax all edges from all current states
         {next_distances, any_change} =
           List.foldl(state_dist_pairs, {distances, false}, fn {state, state_dist},
                                                               {dists, changed} ->
