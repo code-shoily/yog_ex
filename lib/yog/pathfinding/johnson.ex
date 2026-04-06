@@ -165,25 +165,40 @@ defmodule Yog.Pathfinding.Johnson do
 
     node_count = length(nodes) + 1
 
-    distances =
-      List.foldl(Enum.to_list(1..node_count), initial_distances, fn iteration, dist ->
-        new_dist = relax_all_edges(edges, dist, add, compare)
-
-        if iteration == node_count do
-          if distances_changed?(dist, new_dist, compare) do
-            :negative_cycle
-          else
-            new_dist
-          end
-        else
-          new_dist
-        end
-      end)
-
-    case distances do
+    # Run Bellman-Ford with early termination
+    case run_bellman_ford_with_early_stop(edges, initial_distances, node_count, add, compare) do
       :negative_cycle -> {:error, :negative_cycle}
       dists -> {:ok, Map.delete(dists, temp_source)}
     end
+  end
+
+  # Run Bellman-Ford with early termination optimization
+  defp run_bellman_ford_with_early_stop(_edges, distances, 0, _add, _compare) do
+    distances
+  end
+
+  defp run_bellman_ford_with_early_stop(edges, distances, iterations_left, add, compare) do
+    new_distances = relax_all_edges(edges, distances, add, compare)
+
+    if iterations_left == 1 do
+      if distances_changed?(distances, new_distances, compare) do
+        :negative_cycle
+      else
+        new_distances
+      end
+    else
+      # Early termination: if no changes, we can stop
+      if distances_equal?(distances, new_distances) do
+        new_distances
+      else
+        run_bellman_ford_with_early_stop(edges, new_distances, iterations_left - 1, add, compare)
+      end
+    end
+  end
+
+  # Quick check if distances are equal (no changes)
+  defp distances_equal?(old_dist, new_dist) do
+    old_dist == new_dist
   end
 
   defp get_all_edges_with_temp_source(out_edges, nodes, temp_source, zero) do
@@ -230,14 +245,10 @@ defmodule Yog.Pathfinding.Johnson do
 
   # Check if distances changed (for negative cycle detection)
   defp distances_changed?(old_dist, new_dist, compare) do
-    List.foldl(Map.to_list(new_dist), false, fn {node, new_val}, changed? ->
-      if changed? do
-        true
-      else
-        case Map.fetch(old_dist, node) do
-          {:ok, old_val} -> compare.(new_val, old_val) == :lt
-          :error -> true
-        end
+    Enum.any?(new_dist, fn {node, new_val} ->
+      case Map.fetch(old_dist, node) do
+        {:ok, old_val} -> compare.(new_val, old_val) == :lt
+        :error -> true
       end
     end)
   end
