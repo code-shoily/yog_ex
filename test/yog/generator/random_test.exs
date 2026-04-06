@@ -366,4 +366,117 @@ defmodule Yog.Generator.RandomTest do
     # 5^2 = 25 leaf blocks, but only 8 nodes -> base_leaf_size = 0
     assert Yog.Model.order(g) == 0
   end
+
+  # ============= Configuration Model Tests =============
+
+  test "configuration_model/2 creates graph with correct degree sequence" do
+    degrees = [3, 3, 2, 2, 2]
+    {:ok, g} = Random.configuration_model(degrees)
+    assert Yog.Model.order(g) == 5
+
+    # Check each node has the expected degree
+    for {expected_deg, node} <- Enum.with_index(degrees) do
+      actual_deg = Yog.Model.degree(g, node)
+
+      assert actual_deg == expected_deg,
+             "Node #{node} should have degree #{expected_deg}, got #{actual_deg}"
+    end
+  end
+
+  test "configuration_model/2 returns error for odd degree sum" do
+    # Use a sequence with odd sum: 3+2+2 = 7
+    result = Random.configuration_model([3, 2, 2])
+    assert result == {:error, :odd_degree_sum}
+  end
+
+  test "configuration_model/2 returns error for negative degrees" do
+    result = Random.configuration_model([3, -1, 2])
+    assert result == {:error, :negative_degrees}
+  end
+
+  test "configuration_model/2 returns error for empty sequence" do
+    result = Random.configuration_model([])
+    assert result == {:error, :empty_degree_sequence}
+  end
+
+  test "configuration_model/2 allows self-loops when configured" do
+    # Star graph: one center with degree 4, 4 leaves with degree 1
+    # Without allowing self-loops, this is easy
+    degrees = [4, 1, 1, 1, 1]
+    {:ok, g} = Random.configuration_model(degrees, allow_selfloops: true)
+    assert Yog.Model.order(g) == 5
+  end
+
+  test "configuration_model/2 is reproducible with seed" do
+    degrees = [3, 3, 2, 2, 2]
+    {:ok, g1} = Random.configuration_model(degrees, seed: 42)
+    {:ok, g2} = Random.configuration_model(degrees, seed: 42)
+    assert Yog.all_edges(g1) |> MapSet.new() == Yog.all_edges(g2) |> MapSet.new()
+  end
+
+  test "randomize_degree_sequence/2 preserves degrees" do
+    original = Yog.Generator.Classic.star(5)
+    {:ok, randomized} = Random.randomize_degree_sequence(original, seed: 42)
+
+    assert Yog.Model.order(randomized) == 5
+
+    # Check degrees are preserved
+    for node <- 0..4 do
+      orig_deg = Yog.Model.degree(original, node)
+      rand_deg = Yog.Model.degree(randomized, node)
+      assert orig_deg == rand_deg
+    end
+  end
+
+  test "randomize_degree_sequence/2 works with non-integer node IDs" do
+    # Create a graph with atom node IDs
+    original =
+      Yog.undirected()
+      |> Yog.add_node(:a, nil)
+      |> Yog.add_node(:b, nil)
+      |> Yog.add_node(:c, nil)
+      |> Yog.add_node(:d, nil)
+      |> Yog.add_edge!(:a, :b, 1)
+      |> Yog.add_edge!(:b, :c, 1)
+      |> Yog.add_edge!(:c, :d, 1)
+
+    {:ok, randomized} = Random.randomize_degree_sequence(original, seed: 42)
+
+    assert Yog.Model.order(randomized) == 4
+
+    # Check that node IDs are preserved
+    assert Yog.Model.has_node?(randomized, :a)
+    assert Yog.Model.has_node?(randomized, :b)
+    assert Yog.Model.has_node?(randomized, :c)
+    assert Yog.Model.has_node?(randomized, :d)
+
+    # Check degrees are preserved
+    assert Yog.Model.degree(randomized, :a) == Yog.Model.degree(original, :a)
+    assert Yog.Model.degree(randomized, :b) == Yog.Model.degree(original, :b)
+    assert Yog.Model.degree(randomized, :c) == Yog.Model.degree(original, :c)
+    assert Yog.Model.degree(randomized, :d) == Yog.Model.degree(original, :d)
+  end
+
+  test "power_law_graph/2 creates graph with n nodes" do
+    result = Random.power_law_graph(50, gamma: 2.5, seed: 42)
+    assert {:ok, g} = result
+    assert Yog.Model.order(g) == 50
+  end
+
+  test "power_law_graph/2 returns error for invalid gamma" do
+    result = Random.power_law_graph(50, gamma: 2.0)
+    assert result == {:error, :gamma_must_be_greater_than_2}
+
+    result = Random.power_law_graph(50, gamma: 1.5)
+    assert result == {:error, :gamma_must_be_greater_than_2}
+  end
+
+  test "power_law_graph/2 respects degree bounds" do
+    {:ok, g} = Random.power_law_graph(30, gamma: 2.5, k_min: 2, k_max: 5, seed: 42)
+
+    for node <- 0..29 do
+      deg = Yog.Model.degree(g, node)
+      assert deg >= 2 and deg <= 5
+    end
+  end
 end
