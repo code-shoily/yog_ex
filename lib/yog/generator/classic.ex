@@ -119,7 +119,6 @@ defmodule Yog.Generator.Classic do
         Yog.add_node(g, i, nil)
       end)
 
-    # Add all edges (each pair connects both ways for undirected)
     edges = for i <- 0..(n - 1)//1, j <- 0..(n - 1)//1, i != j, do: {i, j, 1}
 
     edges
@@ -132,7 +131,6 @@ defmodule Yog.Generator.Classic do
   def complete_with_type(_n, _graph_type), do: Yog.new(:undirected)
 
   defp maybe_filter_undirected(edges, :undirected) do
-    # For undirected graphs, only keep edges where from < to
     Enum.filter(edges, fn {from, to, _} -> from < to end)
   end
 
@@ -408,7 +406,6 @@ defmodule Yog.Generator.Classic do
         base
       end
 
-    # All edges from first partition to second
     edges = for i <- 0..(m - 1)//1, j <- m..(total - 1)//1, do: {i, j, 1}
 
     Enum.reduce(edges, graph, fn {from, to, weight}, g ->
@@ -859,19 +856,14 @@ defmodule Yog.Generator.Classic do
     # Handle case where n <= r: each node gets its own partition, complete graph
     partition_of = fn node ->
       if r >= n do
-        # Each node in its own partition
         node
       else
-        # r partitions, each of size either floor(n/r) or ceil(n/r)
         base_size = div(n, r)
         remainder = rem(n, r)
 
-        # First 'remainder' partitions have base_size + 1 nodes
-        # Remaining partitions have base_size nodes
         if node < remainder * (base_size + 1) do
           div(node, base_size + 1)
         else
-          # Handle case where base_size could be 0
           if base_size == 0 do
             remainder - 1
           else
@@ -881,7 +873,6 @@ defmodule Yog.Generator.Classic do
       end
     end
 
-    # Add edges between nodes in different partitions
     edges =
       for i <- 0..(n - 1),
           j <- (i + 1)..(n - 1)//1,

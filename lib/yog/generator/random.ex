@@ -116,7 +116,6 @@ defmodule Yog.Generator.Random do
           Yog.add_node(g, i, nil)
         end)
 
-      # Generate all possible edges and filter by probability
       all_pairs =
         case graph_type do
           :undirected ->
@@ -183,7 +182,6 @@ defmodule Yog.Generator.Random do
           Yog.add_node(g, i, nil)
         end)
 
-      # Generate all possible edges
       all_pairs =
         case graph_type do
           :undirected ->
@@ -193,11 +191,9 @@ defmodule Yog.Generator.Random do
             for i <- 0..(n - 1), j <- 0..(n - 1)//1, i != j, do: {i, j}
         end
 
-      # Clamp m to max possible edges
       max_edges = length(all_pairs)
       actual_m = min(m, max_edges)
 
-      # Shuffle and take first m
       selected_edges =
         all_pairs
         |> Enum.shuffle()
@@ -256,39 +252,33 @@ defmodule Yog.Generator.Random do
     with_seed(seed, fn ->
       base = Yog.new(graph_type)
 
-      # Start with a small complete graph of m nodes
       initial_nodes = min(m, n)
 
       graph =
         Enum.reduce(0..(initial_nodes - 1), base, fn i, g ->
           g = Yog.add_node(g, i, nil)
-          # Connect to all previous nodes
+
           Enum.reduce(0..(i - 1)//1, g, fn j, acc ->
             acc = Yog.add_edge!(acc, i, j, 1)
             if graph_type == :directed, do: Yog.add_edge!(acc, j, i, 1), else: acc
           end)
         end)
 
-      # Add remaining nodes with preferential attachment
       Enum.reduce(initial_nodes..(n - 1), graph, fn new_node, g ->
         g = Yog.add_node(g, new_node, nil)
 
-        # Get current nodes and their degrees
         existing_nodes = 0..(new_node - 1)
 
         if Enum.empty?(existing_nodes) do
           g
         else
-          # Calculate degrees (for undirected, count all connections)
           degrees =
             Enum.map(existing_nodes, fn node ->
-              neighbors = length(Yog.neighbors(g, node))
-              {node, max(neighbors, 1)}
+              deg = Yog.Model.degree(g, node)
+              {node, max(deg, 1)}
             end)
 
           total_degree = Enum.sum(Enum.map(degrees, &elem(&1, 1)))
-
-          # Preferential attachment: select m nodes
           targets = select_preferential(degrees, total_degree, m, [])
 
           Enum.reduce(targets, g, fn target, acc ->
@@ -301,7 +291,6 @@ defmodule Yog.Generator.Random do
   end
 
   def barabasi_albert_with_type(n, _m, _graph_type, _seed) when n >= 1 do
-    # m >= n case: just return n isolated nodes
     base = Yog.new(:undirected)
 
     Enum.reduce(0..(n - 1), base, fn i, g ->
@@ -329,7 +318,6 @@ defmodule Yog.Generator.Random do
         end
       end)
 
-    # Retry if we picked a duplicate (simple approach)
     if node in acc do
       select_preferential(degrees, total, remaining, acc)
     else
@@ -382,24 +370,18 @@ defmodule Yog.Generator.Random do
     with_seed(seed, fn ->
       base = Yog.new(graph_type)
 
-      # Add all nodes
       graph =
         Enum.reduce(0..(n - 1)//1, base, fn i, g ->
           Yog.add_node(g, i, nil)
         end)
 
-      # k must be even for the ring lattice construction
       k_half = div(k, 2)
 
-      # Build ring lattice: each node connects to k/2 neighbors on each side
-      # For undirected graphs, we create edges in both directions (each node connects forward)
-      # For directed graphs, we create edges in one direction only
       lattice_edges =
         for i <- 0..(n - 1)//1,
             offset <- 1..k_half//1,
             do: {i, rem(i + offset, n)}
 
-      # For undirected, also add the reverse edges to ensure each node has k neighbors
       all_lattice_edges =
         case graph_type do
           :undirected ->
@@ -410,7 +392,6 @@ defmodule Yog.Generator.Random do
             lattice_edges
         end
 
-      # Rewire edges with probability p
       {final_edges, _} =
         Enum.reduce(all_lattice_edges, {[], MapSet.new()}, fn {from, to}, {edges, used} ->
           edge_key =
