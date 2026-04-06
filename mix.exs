@@ -87,11 +87,12 @@ defmodule YogEx.MixProject do
       extras: [
         "README.md",
         "ALGORITHMS.md",
-        "examples/README.md",
-        "lib/yog/functional/README.md",
+        {"examples/README.md", [filename: "examples_readme", title: "Examples README"]},
+        {"lib/yog/functional/README.md",
+         [filename: "functional_readme", title: "Functional API README"]},
+        "PROPERTIES.md",
         "GLEAM_ELIXIR_COMPARISON.md",
-        "CHANGELOG.md",
-        "PROPERTIES.md"
+        "CHANGELOG.md"
       ],
       source_ref: "v#{@version}",
       source_url: @source_url
