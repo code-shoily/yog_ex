@@ -158,4 +158,49 @@ defmodule Yog.Utils do
     without_h = combinations(t, k)
     with_h ++ without_h
   end
+
+  @doc """
+  Folds over a map using the fast BIF `:maps.fold/3`.
+
+  This is a wrapper around `:maps.fold/3` with a more Elixir-friendly API:
+  - Data (map) comes first (like `Enum.reduce`)
+  - Followed by the initial accumulator
+  - Then the function with arity 3: `(key, value, acc) -> new_acc`
+
+  This avoids the overhead of `Enum.reduce` protocol dispatch and eliminates
+  the need for `Map.to_list` + `List.foldl` which creates intermediate lists.
+
+  ## Performance Comparison
+
+  | Approach | Speed | Notes |
+  |----------|-------|-------|
+  | `Yog.Utils.map_fold/3` | **Fastest** | Direct BIF call, no allocation |
+  | `:maps.fold/3` | **Fastest** | Same as above, but awkward argument order |
+  | `Enum.reduce(map, ...)` | Slower | Protocol dispatch overhead |
+  | `List.foldl(Map.to_list(map), ...)` | Slowest | Allocates intermediate list |
+
+  ## Examples
+
+      iex> map = %{a: 1, b: 2, c: 3}
+      iex> Yog.Utils.map_fold(map, 0, fn _k, v, acc -> acc + v end)
+      6
+
+      iex> map = %{x: 10, y: 20}
+      iex> Yog.Utils.map_fold(map, %{}, fn k, v, acc -> Map.put(acc, k, v * 2) end)
+      %{x: 20, y: 40}
+
+  ## When to Use
+
+  Use this function when:
+  - You need to iterate over a map's key-value pairs
+  - Performance matters (hot paths, large maps)
+  - You don't need the generic `Enumerable` protocol features
+
+  For lists, use `List.foldl/3` instead. For other enumerables, use `Enum.reduce/3`.
+  """
+  @spec map_fold(map(), acc, (key, value, acc -> acc)) :: acc
+        when key: any(), value: any(), acc: var
+  def map_fold(map, acc, fun) when is_map(map) and is_function(fun, 3) do
+    :maps.fold(fun, acc, map)
+  end
 end
