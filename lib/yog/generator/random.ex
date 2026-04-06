@@ -1306,4 +1306,351 @@ defmodule Yog.Generator.Random do
       List.replace_at(degrees, idx, new_value)
     end
   end
+
+  # ============= Kronecker Graphs =============
+
+  @doc """
+  Generates a Kronecker graph using recursive expansion.
+
+  Starting from a small initiator matrix, recursively expands using Kronecker
+  multiplication to create a graph with realistic properties like power-law
+  degree distributions, small diameter, and high clustering.
+
+  ## Parameters
+    - `k` - Number of recursive iterations (results in 2^k nodes)
+    - `initiator` - 2×2 probability matrix [[a, b], [c, d]]
+
+  ## Options
+    - `:n_edges` - Target number of edges (default: estimated from probabilities)
+    - `:seed` - Random seed
+    - `:directed` - Whether graph should be directed (default: true)
+
+  ## Examples
+
+      iex> # Standard Kronecker initiator
+      ...> initiator = [[0.9, 0.5], [0.5, 0.1]]
+      ...> kron = Yog.Generator.Random.kronecker(4, initiator)
+      iex> Yog.Model.order(kron)
+      16
+
+      iex> # Undirected version
+      ...> initiator = [[0.9, 0.5], [0.5, 0.1]]
+      ...> kron = Yog.Generator.Random.kronecker(3, initiator, directed: false)
+      iex> Yog.Model.order(kron)
+      8
+
+  ## References
+
+  - Leskovec et al., "Kronecker graphs: An approach to modeling networks", JMLR 2010
+  """
+  @spec kronecker(integer(), [[float()]], keyword()) :: Yog.graph()
+  def kronecker(k, initiator, opts \\ []) when k >= 0 do
+    opts = Keyword.merge([directed: true, seed: nil, n_edges: nil], opts)
+
+    with_seed(opts[:seed], fn ->
+      n = Integer.pow(2, k)
+
+      # Validate initiator
+      [[a, b], [c, d]] = initiator
+      total_prob = a + b + c + d
+
+      # Estimate edges if not provided
+      n_edges =
+        opts[:n_edges] ||
+          round(n * n * (a + b + c + d) / 4 * if(opts[:directed], do: 1, else: 0.5))
+
+      # Use R-MAT algorithm for efficient generation
+      params =
+        if opts[:directed] do
+          # For directed: a, b, c, d as given
+          normalize_params(a, b, c, d, total_prob)
+        else
+          # For undirected: symmetrize (b = c)
+          avg_bc = (b + c) / 2
+          normalize_params(a, avg_bc, avg_bc, d, a + 2 * avg_bc + d)
+        end
+
+      do_rmat(n, n_edges, params, opts[:directed])
+    end)
+  end
+
+  @doc """
+  Generates a Kronecker graph using the fast R-MAT (Recursive Matrix) algorithm.
+
+  The R-MAT algorithm generates Kronecker graphs in O(E × log V) time instead
+  of O(V²), making it scalable to billions of edges. Used in the Graph500 benchmark.
+
+  ## Parameters
+    - `n_nodes` - Number of nodes (must be power of 2)
+    - `n_edges` - Number of edges to generate
+    - `a, b, c, d` - Probabilities for the four quadrants (should sum to 1.0)
+
+  ## Options
+    - `:seed` - Random seed
+    - `:noise` - Add small noise to probabilities to avoid self-loops (default: true)
+    - `:undirected` - Make undirected by symmetrizing (default: false)
+
+  ## Examples
+
+      iex> # Standard R-MAT parameters (creates hub structure)
+      ...> rmat = Yog.Generator.Random.rmat(1024, 8192, 0.45, 0.15, 0.15, 0.25)
+      iex> Yog.Model.order(rmat)
+      1024
+
+      iex> # Undirected version
+      ...> undir = Yog.Generator.Random.rmat(512, 2048, 0.5, 0.2, 0.2, 0.1,
+      ...>   undirected: true)
+      iex> Yog.Model.order(undir)
+      512
+
+  ## References
+
+  - Chakrabarti et al., "R-MAT: A recursive model for graph mining", SDM 2004
+  - Graph500 benchmark: https://graph500.org/
+  """
+  @spec rmat(integer(), integer(), float(), float(), float(), float(), keyword()) ::
+          Yog.graph()
+  def rmat(n_nodes, n_edges, a, b, c, d, opts \\ [])
+      when n_nodes > 0 and n_edges >= 0 do
+    opts = Keyword.merge([seed: nil, noise: true, undirected: false], opts)
+
+    # Validate n_nodes is power of 2
+    unless power_of_two?(n_nodes) do
+      raise ArgumentError, "n_nodes must be a power of 2"
+    end
+
+    with_seed(opts[:seed], fn ->
+      # Normalize probabilities
+      _total = a + b + c + d
+
+      # Add small noise if requested (helps avoid self-loops)
+      {na, nb, nc, nd} =
+        if opts[:noise] do
+          add_noise(a, b, c, d)
+        else
+          {a, b, c, d}
+        end
+
+      params = normalize_params(na, nb, nc, nd, na + nb + nc + nd)
+      undirected = opts[:undirected]
+
+      do_rmat(n_nodes, n_edges, params, not undirected)
+    end)
+  end
+
+  @doc """
+  Generates a Kronecker graph with a larger initiator matrix.
+
+  Supports 3×3 or larger initiators for more complex community structure.
+
+  ## Parameters
+    - `k` - Number of iterations (results in n^k nodes where n is initiator size)
+    - `initiator` - n×n initiator matrix
+
+  ## Options
+    - `:seed` - Random seed
+    - `:directed` - Whether graph should be directed (default: true)
+
+  ## Examples
+
+      iex> # 3x3 initiator for 3-community structure (use k=1 for simplicity)
+      ...> init_3x3 = [[0.8, 0.3, 0.2], [0.3, 0.6, 0.2], [0.2, 0.2, 0.5]]
+      ...> kron3 = Yog.Generator.Random.kronecker_general(1, init_3x3)
+      iex> Yog.Model.order(kron3)
+      3
+
+  """
+  @spec kronecker_general(integer(), [[float()]], keyword()) :: Yog.graph()
+  def kronecker_general(k, initiator, opts \\ []) when k >= 0 do
+    opts = Keyword.merge([directed: true, seed: nil], opts)
+
+    with_seed(opts[:seed], fn ->
+      n = length(initiator)
+      num_nodes = Integer.pow(n, k)
+
+      # For k=0, return empty graph with 1 node
+      if k == 0 do
+        Yog.new(:undirected) |> Yog.add_node(0, nil)
+      else
+        # Flatten initiator and normalize
+        flat_init = List.flatten(initiator)
+        total = Enum.sum(flat_init)
+        probs = Enum.map(flat_init, &(&1 / total))
+
+        # Calculate cumulative distribution for sampling
+        cumprobs = cumsum(probs)
+
+        # Generate edges
+        directed = opts[:directed]
+        # Estimate edges: each node has expected degree based on initiator
+        n_edges = max(1, div(num_nodes * 2, 1))
+
+        base = if directed, do: Yog.directed(), else: Yog.undirected()
+
+        graph =
+          Enum.reduce(0..(num_nodes - 1), base, fn i, g ->
+            Yog.add_node(g, i, nil)
+          end)
+
+        # Generate edges using simultaneous quadrant selection
+        # At each level, we choose one of n^2 entries, determining both u and v
+        edges =
+          for _ <- 1..n_edges do
+            {u, v} = kronecker_general_choose_edge(k, n, cumprobs)
+            {u, v}
+          end
+
+        # Add edges (with deduplication for undirected)
+        edge_set =
+          if directed do
+            MapSet.new(edges)
+          else
+            MapSet.new(edges, fn {u, v} -> {min(u, v), max(u, v)} end)
+          end
+
+        Enum.reduce(MapSet.to_list(edge_set), graph, fn {from, to}, g ->
+          if from != to and from >= 0 and from < num_nodes and to >= 0 and
+               to < num_nodes do
+            Yog.add_edge!(g, from, to, 1)
+          else
+            g
+          end
+        end)
+      end
+    end)
+  end
+
+  # ============ R-MAT Implementation ============
+
+  defp do_rmat(n, m, {a, b, c, d}, directed) do
+    base = if directed, do: Yog.directed(), else: Yog.undirected()
+
+    # Add all nodes
+    graph =
+      Enum.reduce(0..(n - 1), base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # Generate m edges using recursive quadrant selection
+    # The key insight: at each level, we choose ONE quadrant (a,b,c,d)
+    # which determines the bits of BOTH u and v simultaneously
+    edges =
+      for _ <- 1..m do
+        {u, v} = rmat_choose_edge(n, a, b, c, d)
+        {u, v}
+      end
+
+    # Deduplicate and filter self-loops
+    edge_set =
+      if directed do
+        MapSet.new(edges)
+      else
+        MapSet.new(edges, fn {u, v} -> {min(u, v), max(u, v)} end)
+      end
+
+    # Add edges to graph
+    Enum.reduce(MapSet.to_list(edge_set), graph, fn {from, to}, g ->
+      if from != to do
+        Yog.add_edge!(g, from, to, 1)
+      else
+        g
+      end
+    end)
+  end
+
+  # Choose an edge (u, v) by recursively selecting quadrants
+  # At each level, one of a, b, c, d is chosen, determining bits of both u and v
+  defp rmat_choose_edge(n, a, b, c, d) do
+    rmat_choose_edge_recursive(0, n - 1, 0, n - 1, a, b, c, d)
+  end
+
+  defp rmat_choose_edge_recursive(u_lo, u_hi, v_lo, v_hi, _a, _b, _c, _d)
+       when u_lo == u_hi and v_lo == v_hi do
+    {u_lo, v_lo}
+  end
+
+  defp rmat_choose_edge_recursive(u_lo, u_hi, v_lo, v_hi, a, b, c, d) do
+    u_mid = div(u_lo + u_hi, 2)
+    v_mid = div(v_lo + v_hi, 2)
+
+    r = :rand.uniform()
+
+    cond do
+      # Quadrant a: u in first half, v in first half (top-left)
+      r < a ->
+        rmat_choose_edge_recursive(u_lo, u_mid, v_lo, v_mid, a, b, c, d)
+
+      # Quadrant b: u in first half, v in second half (top-right)
+      r < a + b ->
+        rmat_choose_edge_recursive(u_lo, u_mid, v_mid + 1, v_hi, a, b, c, d)
+
+      # Quadrant c: u in second half, v in first half (bottom-left)
+      r < a + b + c ->
+        rmat_choose_edge_recursive(u_mid + 1, u_hi, v_lo, v_mid, a, b, c, d)
+
+      # Quadrant d: u in second half, v in second half (bottom-right)
+      true ->
+        rmat_choose_edge_recursive(u_mid + 1, u_hi, v_mid + 1, v_hi, a, b, c, d)
+    end
+  end
+
+  # Choose an edge (u, v) for general n×n initiator
+  # At each level, choose one of n^2 entries, determining digits of both u and v
+  defp kronecker_general_choose_edge(k, n, cumprobs) do
+    kronecker_general_choose_edge_recursive(k, n, cumprobs, 0, 0)
+  end
+
+  defp kronecker_general_choose_edge_recursive(0, _n, _cumprobs, u, v) do
+    {u, v}
+  end
+
+  defp kronecker_general_choose_edge_recursive(level, n, cumprobs, u_acc, v_acc) do
+    r = :rand.uniform()
+    # Choose one of n^2 entries based on initiator probabilities
+    entry = find_quadrant(r, cumprobs)
+
+    # entry determines the "digit" for both u and v
+    # entry = u_digit * n + v_digit
+    u_digit = div(entry, n)
+    v_digit = rem(entry, n)
+
+    new_u = u_acc * n + u_digit
+    new_v = v_acc * n + v_digit
+
+    kronecker_general_choose_edge_recursive(level - 1, n, cumprobs, new_u, new_v)
+  end
+
+  defp find_quadrant(r, cumprobs) do
+    Enum.find_index(cumprobs, &(&1 >= r)) || length(cumprobs) - 1
+  end
+
+  # ============ Helper Functions ============
+
+  defp normalize_params(a, b, c, d, total) do
+    {a / total, b / total, c / total, d / total}
+  end
+
+  defp add_noise(a, b, c, d, epsilon \\ 0.01) do
+    # Add small random noise to probabilities
+    na = max(0, a + (:rand.uniform() - 0.5) * epsilon)
+    nb = max(0, b + (:rand.uniform() - 0.5) * epsilon)
+    nc = max(0, c + (:rand.uniform() - 0.5) * epsilon)
+    nd = max(0, d + (:rand.uniform() - 0.5) * epsilon)
+    {na, nb, nc, nd}
+  end
+
+  defp power_of_two?(n) when n <= 0, do: false
+  defp power_of_two?(n), do: Bitwise.band(n, n - 1) == 0
+
+  defp cumsum(list), do: cumsum(list, 0, [])
+  defp cumsum([], _acc, result), do: Enum.reverse(result)
+  defp cumsum([h | t], acc, result), do: cumsum(t, acc + h, [acc + h | result])
+
+  # Unused - kept for potential future use
+  # defp estimate_edges(num_nodes, total_initiator, init_size, _k, directed) do
+  #   # Rough estimate: average probability * possible edges
+  #   avg_prob = total_initiator / (init_size * init_size)
+  #   possible = if directed, do: num_nodes * num_nodes, else: num_nodes * (num_nodes - 1) / 2
+  #   round(possible * avg_prob * 0.1)  # Scale factor to avoid too many edges
+  # end
 end

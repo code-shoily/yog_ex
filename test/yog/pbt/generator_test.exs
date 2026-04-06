@@ -431,4 +431,119 @@ defmodule Yog.PBT.GeneratorTest do
       end
     end
   end
+
+  describe "Kronecker Graph Properties" do
+    property "kronecker/3 creates graph with 2^k nodes" do
+      check all(
+              k <- StreamData.integer(2..6),
+              seed <- StreamData.integer(1..10_000)
+            ) do
+        initiator = [[0.9, 0.5], [0.5, 0.1]]
+        g = Random.kronecker(k, initiator, seed: seed)
+        expected_nodes = Integer.pow(2, k)
+        assert Yog.node_count(g) == expected_nodes
+      end
+    end
+
+    property "kronecker/3 with directed: false creates undirected graph" do
+      check all(
+              k <- StreamData.integer(2..5),
+              seed <- StreamData.integer(1..10_000)
+            ) do
+        initiator = [[0.8, 0.4], [0.4, 0.2]]
+        g = Random.kronecker(k, initiator, directed: false, seed: seed)
+        assert Yog.node_count(g) == Integer.pow(2, k)
+        assert Yog.Model.type(g) == :undirected
+      end
+    end
+
+    property "rmat/7 creates graph with correct node count" do
+      check all(
+              log_n <- StreamData.integer(5..8),
+              seed <- StreamData.integer(1..10_000)
+            ) do
+        n = Integer.pow(2, log_n)
+        # Average degree of 4
+        m = n * 4
+        g = Random.rmat(n, m, 0.45, 0.15, 0.15, 0.25, seed: seed)
+        assert Yog.node_count(g) == n
+      end
+    end
+
+    property "rmat/7 with undirected: true creates undirected graph" do
+      check all(
+              log_n <- StreamData.integer(5..7),
+              seed <- StreamData.integer(1..10_000)
+            ) do
+        n = Integer.pow(2, log_n)
+        m = n * 4
+        g = Random.rmat(n, m, 0.5, 0.2, 0.2, 0.1, undirected: true, seed: seed)
+        assert Yog.node_count(g) == n
+        assert Yog.Model.type(g) == :undirected
+      end
+    end
+
+    property "kronecker/3 is reproducible with seed" do
+      check all(
+              k <- StreamData.integer(2..5),
+              seed <- StreamData.integer(1..10_000)
+            ) do
+        initiator = [[0.9, 0.5], [0.5, 0.1]]
+        g1 = Random.kronecker(k, initiator, seed: seed)
+        g2 = Random.kronecker(k, initiator, seed: seed)
+        assert Yog.all_edges(g1) |> MapSet.new() == Yog.all_edges(g2) |> MapSet.new()
+      end
+    end
+
+    property "rmat/7 is reproducible with seed" do
+      check all(
+              log_n <- StreamData.integer(5..7),
+              seed <- StreamData.integer(1..10_000)
+            ) do
+        n = Integer.pow(2, log_n)
+        m = n * 4
+        g1 = Random.rmat(n, m, 0.45, 0.15, 0.15, 0.25, seed: seed)
+        g2 = Random.rmat(n, m, 0.45, 0.15, 0.15, 0.25, seed: seed)
+        assert Yog.all_edges(g1) |> MapSet.new() == Yog.all_edges(g2) |> MapSet.new()
+      end
+    end
+
+    property "kronecker graphs have varying degrees (not regular)" do
+      check all(
+              k <- StreamData.integer(4..6),
+              seed <- StreamData.integer(1..10_000)
+            ) do
+        initiator = [[0.9, 0.5], [0.5, 0.1]]
+        g = Random.kronecker(k, initiator, seed: seed)
+        n = Yog.node_count(g)
+
+        # Get degrees
+        degrees = for v <- 0..(n - 1), do: Yog.Model.degree(g, v)
+
+        # Check that degrees vary (not all the same)
+        unique_degrees = Enum.uniq(degrees)
+        assert length(unique_degrees) > 1
+
+        # Check there are some high-degree nodes (hubs) relative to min
+        max_degree = Enum.max(degrees)
+        min_degree = Enum.min(degrees)
+
+        # In Kronecker graphs, there should be variation in degrees
+        assert max_degree >= min_degree * 2 or length(unique_degrees) >= 3
+      end
+    end
+
+    property "kronecker_general/3 creates graph with n^k nodes" do
+      check all(
+              k <- StreamData.integer(1..3),
+              seed <- StreamData.integer(1..10_000)
+            ) do
+        # 3x3 initiator
+        init_3x3 = [[0.8, 0.3, 0.2], [0.3, 0.6, 0.2], [0.2, 0.2, 0.5]]
+        g = Random.kronecker_general(k, init_3x3, seed: seed)
+        expected_nodes = Integer.pow(3, k)
+        assert Yog.node_count(g) == expected_nodes
+      end
+    end
+  end
 end

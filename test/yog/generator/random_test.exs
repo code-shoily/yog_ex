@@ -479,4 +479,55 @@ defmodule Yog.Generator.RandomTest do
       assert deg >= 2 and deg <= 5
     end
   end
+
+  # ============= Kronecker Graph Tests =============
+
+  test "kronecker/3 creates graph with 2^k nodes" do
+    initiator = [[0.9, 0.5], [0.5, 0.1]]
+    g = Random.kronecker(4, initiator, seed: 42)
+    assert Yog.Model.order(g) == 16
+  end
+
+  test "kronecker/3 with directed: false creates undirected graph" do
+    initiator = [[0.9, 0.5], [0.5, 0.1]]
+    g = Random.kronecker(3, initiator, directed: false, seed: 42)
+    assert Yog.Model.order(g) == 8
+    assert Yog.Model.type(g) == :undirected
+  end
+
+  test "rmat/7 creates graph with correct node count" do
+    g = Random.rmat(128, 512, 0.45, 0.15, 0.15, 0.25, seed: 42)
+    assert Yog.Model.order(g) == 128
+  end
+
+  test "rmat/7 with undirected: true creates undirected graph" do
+    g = Random.rmat(64, 256, 0.5, 0.2, 0.2, 0.1, undirected: true, seed: 42)
+    assert Yog.Model.order(g) == 64
+    assert Yog.Model.type(g) == :undirected
+  end
+
+  test "rmat/7 raises error for non-power-of-2 nodes" do
+    assert_raise ArgumentError, fn ->
+      Random.rmat(100, 200, 0.5, 0.2, 0.2, 0.1)
+    end
+  end
+
+  test "kronecker_general/3 creates graph with n^k nodes" do
+    init_3x3 = [[0.8, 0.3, 0.2], [0.3, 0.6, 0.2], [0.2, 0.2, 0.5]]
+    g = Random.kronecker_general(2, init_3x3, seed: 42)
+    assert Yog.Model.order(g) == 9
+  end
+
+  test "kronecker/3 is reproducible with seed" do
+    initiator = [[0.9, 0.5], [0.5, 0.1]]
+    g1 = Random.kronecker(4, initiator, seed: 123)
+    g2 = Random.kronecker(4, initiator, seed: 123)
+    assert Yog.all_edges(g1) |> MapSet.new() == Yog.all_edges(g2) |> MapSet.new()
+  end
+
+  test "rmat/7 is reproducible with seed" do
+    g1 = Random.rmat(64, 256, 0.45, 0.15, 0.15, 0.25, seed: 42)
+    g2 = Random.rmat(64, 256, 0.45, 0.15, 0.15, 0.25, seed: 42)
+    assert Yog.all_edges(g1) |> MapSet.new() == Yog.all_edges(g2) |> MapSet.new()
+  end
 end
