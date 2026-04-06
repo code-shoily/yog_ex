@@ -668,7 +668,7 @@ defmodule Yog.Model do
   """
   @spec node_count(graph()) :: integer()
   def node_count(graph) do
-    order(graph)
+    Graph.node_count(graph)
   end
 
   @doc """
@@ -691,21 +691,8 @@ defmodule Yog.Model do
 
   """
   @spec edge_count(graph()) :: integer()
-  def edge_count(%Graph{kind: :directed, out_edges: out_edges}) do
-    Enum.reduce(out_edges, 0, fn {_src, targets}, acc ->
-      acc + map_size(targets)
-    end)
-  end
-
-  def edge_count(%Graph{kind: :undirected, out_edges: out_edges}) do
-    {total, self_loops} =
-      Enum.reduce(out_edges, {0, 0}, fn {src, targets}, {acc_total, acc_self} ->
-        new_total = acc_total + map_size(targets)
-        new_self = if Map.has_key?(targets, src), do: acc_self + 1, else: acc_self
-        {new_total, new_self}
-      end)
-
-    div(total - self_loops, 2) + self_loops
+  def edge_count(graph) do
+    Graph.edge_count(graph)
   end
 
   @doc """
@@ -831,7 +818,8 @@ defmodule Yog.Model do
 
     case Map.fetch(graph.in_edges, id) do
       {:ok, inner} ->
-        out_ids = successor_ids(graph, id)
+        # Extract IDs from already-fetched outgoing list to avoid redundant lookup
+        out_ids = Enum.map(outgoing, fn {node_id, _} -> node_id end)
         incoming_to_add = inner |> Map.drop(out_ids) |> Map.to_list()
         outgoing ++ incoming_to_add
 
@@ -862,7 +850,8 @@ defmodule Yog.Model do
   def neighbor_ids(%Graph{kind: :directed} = graph, id) do
     out_ids = successor_ids(graph, id)
     in_ids = predecessor_ids(graph, id)
-    Enum.uniq(out_ids ++ in_ids)
+
+    MapSet.new(out_ids) |> MapSet.union(MapSet.new(in_ids)) |> MapSet.to_list()
   end
 
   @doc """
@@ -1017,8 +1006,8 @@ defmodule Yog.Model do
       [1, 2]
   """
   @spec all_nodes(graph()) :: [node_id()]
-  def all_nodes(%Graph{nodes: nodes}) do
-    Map.keys(nodes)
+  def all_nodes(graph) do
+    Map.keys(graph.nodes)
   end
 
   @doc """
