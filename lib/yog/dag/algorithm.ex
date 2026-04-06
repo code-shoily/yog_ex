@@ -8,7 +8,7 @@ defmodule Yog.DAG.Algorithm do
   """
 
   alias Yog.DAG.Model
-  alias Yog.Pathfinding.Utils, as: PathUtils
+  alias Yog.Pathfinding.Path
 
   @doc """
   Returns a topological ordering of all nodes in the DAG.
@@ -154,12 +154,11 @@ defmodule Yog.DAG.Algorithm do
       true
   """
   @spec shortest_path(Yog.DAG.t(), Yog.node_id(), Yog.node_id()) ::
-          {:ok, PathUtils.path(any())} | :error
+          {:ok, Path.t()} | :error
   def shortest_path(dag, from, to) do
     graph = Model.to_graph(dag)
     sorted_nodes = topological_sort(dag)
 
-    # Only consider nodes from 'from' onwards in topological order
     relevant_nodes = Enum.drop_while(sorted_nodes, fn node -> node != from end)
 
     if relevant_nodes == [] do
@@ -170,7 +169,7 @@ defmodule Yog.DAG.Algorithm do
       case Map.fetch(distances, to) do
         {:ok, total_dist} ->
           path = reconstruct_path_backward(to, from, predecessors, [])
-          {:ok, PathUtils.path(path, total_dist)}
+          {:ok, Path.new(path, total_dist)}
 
         _ ->
           :error
@@ -279,9 +278,24 @@ defmodule Yog.DAG.Algorithm do
 
   defp get_ancestors_set(dag, node) do
     graph = Model.to_graph(dag)
-    all_nodes = Yog.all_nodes(graph)
+    collect_ancestors(graph, [node], MapSet.new([node]))
+  end
 
-    # Ancestors of X are all nodes Y where X is reachable from Y
-    Enum.filter(all_nodes, fn n -> Yog.Traversal.reachable?(graph, n, node) end)
+  # Collects all ancestors by traversing backwards through in_edges (BFS/DFS hybrid)
+  defp collect_ancestors(_graph, [], visited), do: MapSet.to_list(visited)
+
+  defp collect_ancestors(graph, [current | rest], visited) do
+    preds = Yog.Model.predecessor_ids(graph, current)
+
+    {new_queue, new_visited} =
+      Enum.reduce(preds, {rest, visited}, fn pred, {q_acc, v_acc} ->
+        if MapSet.member?(v_acc, pred) do
+          {q_acc, v_acc}
+        else
+          {[pred | q_acc], MapSet.put(v_acc, pred)}
+        end
+      end)
+
+    collect_ancestors(graph, new_queue, new_visited)
   end
 end
