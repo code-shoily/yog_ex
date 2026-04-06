@@ -980,4 +980,330 @@ defmodule Yog.Generator.Random do
       div(bu, Enum.at(powers, l)) == div(bv, Enum.at(powers, l))
     end)
   end
+
+  # ============= Configuration Model =============
+
+  @doc """
+  Generates a random graph with specified degree sequence using the configuration model.
+
+  Creates a random graph where each node has exactly the degree specified,
+  using the stub-matching (configuration model) approach.
+
+  ## Parameters
+    - `degrees` - List of desired degrees for each node [d1, d2, ..., dn]
+
+  ## Options
+    - `:seed` - Random seed for reproducibility
+    - `:allow_multiedges` - Allow parallel edges (default: false)
+    - `:allow_selfloops` - Allow self-loops (default: false)
+    - `:max_retries` - Maximum attempts to create simple graph (default: 100)
+
+  ## Returns
+    `{:ok, graph}` on success, `{:error, reason}` if impossible or retries exceeded
+
+  ## Examples
+
+      iex> # Create graph with specific degree sequence
+      ...> degrees = [3, 3, 2, 2, 2]
+      ...> {:ok, g} = Yog.Generator.Random.configuration_model(degrees)
+      iex> Yog.Model.order(g)
+      5
+
+  ## Algorithm
+
+  1. Create stubs: For each node i, create d_i "half-edges"
+  2. Random matching: Randomly pair up all stubs
+  3. Form edges: Each pair of stubs becomes an edge
+
+  For simple graphs (no self-loops or multi-edges), the algorithm rejects
+  invalid configurations and retries up to max_retries.
+  """
+  @spec configuration_model([integer()], keyword()) ::
+          {:ok, Yog.graph()} | {:error, term()}
+  def configuration_model(degrees, opts \\ []) do
+    opts =
+      Keyword.merge(
+        [seed: nil, allow_multiedges: false, allow_selfloops: false, max_retries: 100],
+        opts
+      )
+
+    with_seed(opts[:seed], fn ->
+      do_configuration_model(degrees, opts)
+    end)
+  end
+
+  defp do_configuration_model(degrees, opts) do
+    # Validate input
+    cond do
+      Enum.empty?(degrees) ->
+        {:error, :empty_degree_sequence}
+
+      Enum.any?(degrees, &(&1 < 0)) ->
+        {:error, :negative_degrees}
+
+      rem(Enum.sum(degrees), 2) != 0 ->
+        {:error, :odd_degree_sum}
+
+      true ->
+        # Valid degree sequence - try to generate
+        max_retries = opts[:max_retries]
+        allow_selfloops = opts[:allow_selfloops]
+        allow_multiedges = opts[:allow_multiedges]
+
+        try_configuration_model(
+          degrees,
+          allow_selfloops,
+          allow_multiedges,
+          max_retries
+        )
+    end
+  end
+
+  defp try_configuration_model(_degrees, _allow_self, _allow_multi, 0) do
+    {:error, :max_retries_exceeded}
+  end
+
+  defp try_configuration_model(degrees, allow_selfloops, allow_multiedges, retries) do
+    # Create stubs: node i appears degrees[i] times
+    stubs =
+      degrees
+      |> Enum.with_index()
+      |> Enum.flat_map(fn {deg, node} -> List.duplicate(node, deg) end)
+
+    # Shuffle and pair
+    shuffled = Enum.shuffle(stubs)
+
+    # Pair consecutive elements
+    pairs = Enum.chunk_every(shuffled, 2)
+
+    # Check all pairs are valid (have 2 elements)
+    if Enum.any?(pairs, &(length(&1) != 2)) do
+      # Should not happen with even sum, but handle gracefully
+      {:error, :invalid_pairing}
+    else
+      # Build edge list
+      edges =
+        pairs
+        |> Enum.map(fn [a, b] -> {min(a, b), max(a, b)} end)
+        |> Enum.filter(fn {a, b} -> a != b or allow_selfloops end)
+
+      # Check for issues
+      has_selfloops = Enum.any?(pairs, fn [a, b] -> a == b end)
+      edge_set = MapSet.new(edges)
+      has_multiedges = MapSet.size(edge_set) < length(edges)
+
+      # Validate
+      valid =
+        (not has_selfloops or allow_selfloops) and
+          (not has_multiedges or allow_multiedges)
+
+      if valid do
+        # Build graph
+        n = length(degrees)
+
+        graph =
+          Enum.reduce(0..(n - 1), Yog.new(:undirected), fn i, g ->
+            Yog.add_node(g, i, nil)
+          end)
+
+        final_graph =
+          Enum.reduce(MapSet.to_list(edge_set), graph, fn {from, to}, g ->
+            Yog.add_edge!(g, from, to, 1)
+          end)
+
+        {:ok, final_graph}
+      else
+        # Retry
+        try_configuration_model(
+          degrees,
+          allow_selfloops,
+          allow_multiedges,
+          retries - 1
+        )
+      end
+    end
+  end
+
+  @doc """
+  Generates a random graph matching the degree sequence of a given graph.
+
+  Creates a randomized version of the input graph with the same degree
+  sequence but random connections (configuration model applied to observed degrees).
+
+  ## Options
+    - `:seed` - Random seed for reproducibility
+    - `:max_retries` - Maximum attempts (default: 100)
+
+  ## Examples
+
+      iex> original = Yog.Generator.Classic.star(5)
+      ...> {:ok, randomized} = Yog.Generator.Random.randomize_degree_sequence(original)
+      iex> Yog.Model.order(randomized)
+      5
+
+  ## Use Cases
+
+  - Null models in network analysis
+  - Degree-preserving randomization
+  - Testing which network properties are explained by degree sequence alone
+  """
+  @spec randomize_degree_sequence(Yog.graph(), keyword()) ::
+          {:ok, Yog.graph()} | {:error, term()}
+  def randomize_degree_sequence(graph, opts \\ []) do
+    nodes = Map.keys(graph.nodes)
+    n = length(nodes)
+
+    if n == 0 do
+      {:ok, Yog.new(:undirected)}
+    else
+      # Extract degree sequence using actual node IDs
+      degrees = Enum.map(nodes, &Yog.Model.degree(graph, &1))
+
+      # Use configuration model with same degrees
+      # Note: configuration_model creates nodes with integer IDs 0..n-1
+      # We need to map back to original node IDs if they're not integers
+      case configuration_model(degrees, opts) do
+        {:ok, int_graph} ->
+          # Remap node IDs if necessary
+          if nodes == Enum.to_list(0..(n - 1)) do
+            {:ok, int_graph}
+          else
+            {:ok, remap_node_ids(int_graph, nodes)}
+          end
+
+        error ->
+          error
+      end
+    end
+  end
+
+  # Remaps integer node IDs (0, 1, 2, ...) to original node IDs
+  defp remap_node_ids(graph, original_nodes) do
+    # Create mapping from integer ID to original ID
+    id_mapping =
+      original_nodes
+      |> Enum.with_index()
+      |> Map.new(fn {orig, idx} -> {idx, orig} end)
+
+    # Build new graph with remapped node IDs
+    base = Yog.new(:undirected)
+
+    # Add nodes with original IDs and their data
+    graph_with_nodes =
+      Enum.reduce(original_nodes, base, fn orig_id, g ->
+        data = Map.get(graph.nodes, Map.get(id_mapping, orig_id, orig_id), nil)
+        Yog.add_node(g, orig_id, data)
+      end)
+
+    # Add edges with remapped IDs
+    Enum.reduce(Yog.all_edges(graph), graph_with_nodes, fn {from, to, weight}, g ->
+      orig_from = Map.get(id_mapping, from, from)
+      orig_to = Map.get(id_mapping, to, to)
+      Yog.add_edge!(g, orig_from, orig_to, weight)
+    end)
+  end
+
+  @doc """
+  Generates a random graph with power-law degree distribution.
+
+  Creates a graph with degrees following a power law P(k) ~ k^(-gamma),
+  using the configuration model approach.
+
+  ## Options
+    - `:gamma` - Power-law exponent (default: 2.5, must be > 2)
+    - `:k_min` - Minimum degree (default: 1)
+    - `:k_max` - Maximum degree (default: n-1)
+    - `:seed` - Random seed
+    - `:max_retries` - Maximum attempts (default: 100)
+
+  ## Examples
+
+      iex> # Generate with fixed seed for reproducibility
+      ...> result = Yog.Generator.Random.power_law_graph(50, gamma: 2.5, seed: 42)
+      ...> case result do
+      ...>   {:ok, pl} -> Yog.Model.order(pl)
+      ...>   {:error, _} -> 0  # May fail due to retries
+      ...> end
+      50
+
+  ## Notes
+
+  The power-law distribution is generated using the configuration model,
+  which differs from the Barabási-Albert preferential attachment model.
+  This approach generates the degree sequence first, then randomizes connections.
+
+  For gamma > 2, the expected degree is finite and the graph is well-defined.
+  """
+  @spec power_law_graph(integer(), keyword()) ::
+          {:ok, Yog.graph()} | {:error, term()}
+  def power_law_graph(n, opts \\ []) when n > 0 do
+    gamma = Keyword.get(opts, :gamma, 2.5)
+    k_min = Keyword.get(opts, :k_min, 1)
+    k_max = min(Keyword.get(opts, :k_max, n - 1), n - 1)
+
+    cond do
+      gamma <= 2 ->
+        {:error, :gamma_must_be_greater_than_2}
+
+      k_min < 0 or k_max < k_min ->
+        {:error, :invalid_degree_bounds}
+
+      true ->
+        with_seed(opts[:seed], fn ->
+          # Generate power-law distributed degrees using discrete distribution
+          degrees = generate_power_law_degrees(n, gamma, k_min, k_max)
+
+          # Ensure even sum for handshaking lemma
+          degrees = ensure_even_degree_sum(degrees, k_min, k_max)
+
+          # Generate graph using configuration model
+          configuration_model(degrees, opts)
+        end)
+    end
+  end
+
+  defp generate_power_law_degrees(n, gamma, k_min, k_max) do
+    # Use inverse transform sampling for power law
+    # CDF: F(k) = 1 - (k/k_min)^(1-gamma) for k >= k_min
+
+    # Normalize constant
+    zeta = :math.pow(k_min, 1 - gamma) - :math.pow(k_max + 1, 1 - gamma)
+
+    for _ <- 1..n do
+      u = :rand.uniform()
+
+      # Inverse CDF
+      k =
+        :math.pow(
+          :math.pow(k_min, 1 - gamma) - u * zeta,
+          1 / (1 - gamma)
+        )
+
+      # Round and clamp
+      round_k = round(k)
+      max(k_min, min(k_max, round_k))
+    end
+  end
+
+  defp ensure_even_degree_sum(degrees, k_min, k_max) do
+    sum = Enum.sum(degrees)
+
+    if rem(sum, 2) == 0 do
+      degrees
+    else
+      # Make sum even by adjusting one node's degree
+      # Prefer increasing if possible, otherwise decrease
+      idx = :rand.uniform(length(degrees)) - 1
+      current = Enum.at(degrees, idx)
+
+      new_value =
+        cond do
+          current < k_max -> current + 1
+          current > k_min -> current - 1
+          true -> current
+        end
+
+      List.replace_at(degrees, idx, new_value)
+    end
+  end
 end
