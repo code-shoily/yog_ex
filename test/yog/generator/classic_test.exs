@@ -454,4 +454,185 @@ defmodule Yog.Generator.ClassicTest do
     assert dodeca_v == 20
     assert icosa_v == 12
   end
+
+  # ============= k-ary Tree Tests =============
+
+  test "kary_tree/2 creates correct node count" do
+    # Ternary tree (arity 3) depth 2: 1 + 3 + 9 = 13 nodes
+    tree = Classic.kary_tree(2, arity: 3)
+    assert Yog.Model.order(tree) == 13
+    # Edges: 13 - 1 = 12
+    assert Yog.Model.edge_count(tree) == 12
+  end
+
+  test "kary_tree/2 with arity 2 is binary tree" do
+    binary = Classic.kary_tree(3, arity: 2)
+    # 2^4 - 1 = 15
+    assert Yog.Model.order(binary) == 15
+    assert Yog.Model.edge_count(binary) == 14
+  end
+
+  test "kary_tree/2 arity 1 creates path" do
+    path = Classic.kary_tree(5, arity: 1)
+    # depth + 1
+    assert Yog.Model.order(path) == 6
+    assert Yog.Model.edge_count(path) == 5
+    # Check it's a path: end nodes have degree 1, interior have degree 2
+    assert length(Yog.neighbors(path, 0)) == 1
+    assert length(Yog.neighbors(path, 5)) == 1
+    for i <- 1..4, do: assert(length(Yog.neighbors(path, i)) == 2)
+  end
+
+  test "kary_tree/2 star is depth 1" do
+    star = Classic.kary_tree(1, arity: 5)
+    # 1 root + 5 leaves
+    assert Yog.Model.order(star) == 6
+    assert Yog.Model.edge_count(star) == 5
+    # Center has degree 5, leaves have degree 1
+    assert length(Yog.neighbors(star, 0)) == 5
+    for i <- 1..5, do: assert(length(Yog.neighbors(star, i)) == 1)
+  end
+
+  test "kary_tree/2 depth 0 is single node" do
+    tree = Classic.kary_tree(0, arity: 5)
+    assert Yog.Model.order(tree) == 1
+    assert Yog.Model.edge_count(tree) == 0
+  end
+
+  test "kary_tree/2 parent-child relationships" do
+    # In k-ary tree, node i has parent floor((i-1)/k)
+    tree = Classic.kary_tree(2, arity: 3)
+    # Node 1,2,3 have parent 0
+    for child <- 1..3 do
+      assert Yog.Model.has_edge?(tree, 0, child)
+    end
+
+    # Nodes 4,5,6 have parent 1
+    for child <- 4..6 do
+      assert Yog.Model.has_edge?(tree, 1, child)
+    end
+  end
+
+  test "kary_tree/2 respects graph type" do
+    directed = Classic.kary_tree(2, arity: 2, type: :directed)
+    assert Yog.Model.type(directed) == :directed
+  end
+
+  # ============= Complete k-ary Tree Tests =============
+
+  test "complete_kary/2 creates exactly n nodes" do
+    for n <- [1, 5, 10, 20, 50] do
+      tree = Classic.complete_kary(n, arity: 3)
+      assert Yog.Model.order(tree) == n
+      assert Yog.Model.edge_count(tree) == n - 1
+    end
+  end
+
+  test "complete_kary/2 with arity 2 creates binary heap structure" do
+    # Complete binary tree with 7 nodes
+    tree = Classic.complete_kary(7, arity: 2)
+    assert Yog.Model.order(tree) == 7
+    # Perfect binary tree of depth 2
+    assert Yog.Model.edge_count(tree) == 6
+    # All non-leaf nodes have 2 children except possibly the last
+  end
+
+  test "complete_kary/2 is connected and acyclic" do
+    tree = Classic.complete_kary(20, arity: 3)
+    # A tree has n-1 edges and is connected
+    assert Yog.Model.edge_count(tree) == 19
+    assert Yog.Model.order(tree) == 20
+  end
+
+  test "complete_kary/2 arity 1 is a path" do
+    path = Classic.complete_kary(5, arity: 1)
+    assert Yog.Model.order(path) == 5
+    assert Yog.Model.edge_count(path) == 4
+    # Check linear structure
+    for i <- 0..3, do: assert(Yog.Model.has_edge?(path, i, i + 1))
+  end
+
+  test "complete_kary/2 respects graph type" do
+    directed = Classic.complete_kary(10, arity: 2, type: :directed)
+    assert Yog.Model.type(directed) == :directed
+  end
+
+  # ============= Caterpillar Tests =============
+
+  test "caterpillar/2 creates correct node count" do
+    cat = Classic.caterpillar(20, spine_length: 5)
+    assert Yog.Model.order(cat) == 20
+    assert Yog.Model.edge_count(cat) == 19
+  end
+
+  test "caterpillar/2 spine path exists" do
+    cat = Classic.caterpillar(15, spine_length: 4)
+    # Spine nodes 0,1,2,3 form a path
+    for i <- 0..2, do: assert(Yog.Model.has_edge?(cat, i, i + 1))
+  end
+
+  test "caterpillar/2 all non-spine nodes are leaves" do
+    cat = Classic.caterpillar(20, spine_length: 5)
+    # Non-spine nodes (5-19) should have degree 1
+    for i <- 5..19 do
+      assert length(Yog.neighbors(cat, i)) == 1
+    end
+  end
+
+  test "caterpillar/2 spine nodes connect to leaves" do
+    cat = Classic.caterpillar(10, spine_length: 3)
+    # 10 nodes, 3 spine nodes, 7 leaves
+    # Each spine node should have at least one leaf
+    for spine <- 0..2 do
+      neighbors = Yog.neighbors(cat, spine)
+      # At least one leaf neighbor (not just spine neighbors)
+      leaf_neighbors = Enum.filter(neighbors, fn n -> n >= 3 end)
+      assert length(leaf_neighbors) >= 1
+    end
+  end
+
+  test "caterpillar/2 with spine_length = n is a path" do
+    cat = Classic.caterpillar(5, spine_length: 5)
+    assert Yog.Model.order(cat) == 5
+    assert Yog.Model.edge_count(cat) == 4
+    # All nodes on spine, no leaves
+    for i <- 0..4, do: assert(length(Yog.neighbors(cat, i)) <= 2)
+  end
+
+  test "caterpillar/2 with spine_length = 1 is a star" do
+    cat = Classic.caterpillar(6, spine_length: 1)
+    assert Yog.Model.order(cat) == 6
+    # Node 0 is center connected to 5 leaves
+    assert length(Yog.neighbors(cat, 0)) == 5
+    for i <- 1..5, do: assert(length(Yog.neighbors(cat, i)) == 1)
+  end
+
+  test "caterpillar/2 single node" do
+    cat = Classic.caterpillar(1, spine_length: 1)
+    assert Yog.Model.order(cat) == 1
+    assert Yog.Model.edge_count(cat) == 0
+  end
+
+  test "caterpillar/2 respects graph type" do
+    directed = Classic.caterpillar(10, spine_length: 3, type: :directed)
+    assert Yog.Model.type(directed) == :directed
+  end
+
+  # ============= Tree Property Tests =============
+
+  test "all tree generators produce valid trees" do
+    trees = [
+      Classic.kary_tree(3, arity: 2),
+      Classic.kary_tree(2, arity: 3),
+      Classic.complete_kary(20, arity: 3),
+      Classic.caterpillar(15, spine_length: 5)
+    ]
+
+    for tree <- trees do
+      n = Yog.Model.order(tree)
+      e = Yog.Model.edge_count(tree)
+      # Tree property: n - 1 edges
+      assert e == n - 1
+    end
+  end
 end

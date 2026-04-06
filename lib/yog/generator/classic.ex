@@ -470,6 +470,251 @@ defmodule Yog.Generator.Classic do
     end)
   end
 
+  # ============= General Tree Generators =============
+
+  @doc """
+  Generates a complete k-ary tree of given depth.
+
+  A complete k-ary tree where each node has exactly k children (except leaves).
+  Total nodes = (k^(depth+1) - 1) / (k - 1) for k > 1.
+  For k = 1, this is a path with depth+1 nodes.
+
+  ## Options
+    - `:arity` - Branching factor k (default: 2, binary tree)
+    - `:type` - Graph type (:undirected or :directed, default: :undirected)
+
+  ## Examples
+
+      iex> # Ternary tree (arity 3) of depth 2
+      ...> tree = Yog.Generator.Classic.kary_tree(2, arity: 3)
+      iex> Yog.Model.order(tree)
+      13
+
+      iex> # Star is kary_tree with depth 1
+      ...> star = Yog.Generator.Classic.kary_tree(1, arity: 5)
+      iex> Yog.Model.order(star)
+      6
+
+  ## Properties
+
+  - Regular tree structure useful for k-ary heaps
+  - Node i has parent at floor((i-1)/k)
+  - Node i has children at k*i+1 through k*i+k
+
+  ## Use Cases
+
+  - k-ary heap implementations
+  - Trie structures
+  - B-tree testing
+  """
+  @spec kary_tree(non_neg_integer(), keyword()) :: Yog.graph()
+  def kary_tree(depth, opts \\ []) when is_integer(depth) and depth >= 0 do
+    arity = Keyword.get(opts, :arity, 2)
+    graph_type = Keyword.get(opts, :type, :undirected)
+    kary_tree_with_type(depth, arity, graph_type)
+  end
+
+  @doc """
+  Generates a k-ary tree with specified graph type.
+  """
+  @spec kary_tree_with_type(non_neg_integer(), pos_integer(), Yog.graph_type()) :: Yog.graph()
+  def kary_tree_with_type(depth, _arity, _graph_type) when not is_integer(depth) or depth < 0,
+    do: Yog.new(:undirected)
+
+  def kary_tree_with_type(0, _arity, graph_type), do: Yog.new(graph_type) |> Yog.add_node(0, nil)
+
+  def kary_tree_with_type(depth, 1, graph_type) do
+    # k=1 is a path
+    base = Yog.new(graph_type)
+
+    graph =
+      Enum.reduce(0..depth//1, base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    edges = for i <- 0..(depth - 1)//1, do: {i, i + 1, 1}
+
+    Enum.reduce(edges, graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
+
+  def kary_tree_with_type(depth, arity, graph_type) when is_integer(arity) and arity > 1 do
+    base = Yog.new(graph_type)
+
+    # Total nodes: (arity^(depth+1) - 1) / (arity - 1)
+    total_nodes = div(Integer.pow(arity, depth + 1) - 1, arity - 1)
+
+    graph =
+      Enum.reduce(0..(total_nodes - 1)//1, base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # Number of non-leaf nodes: (arity^depth - 1) / (arity - 1)
+    non_leaf_count = div(Integer.pow(arity, depth) - 1, arity - 1)
+
+    # For each non-leaf node, add edges to its k children
+    # Node i has children at k*i+1, k*i+2, ..., k*i+k
+    edges =
+      for i <- 0..(non_leaf_count - 1)//1,
+          child <- (arity * i + 1)..(arity * i + arity)//1,
+          do: {i, child, 1}
+
+    Enum.reduce(edges, graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
+
+  @doc """
+  Generates a complete m-ary tree with exactly n nodes.
+
+  Creates a tree that is as complete as possible - all levels are fully
+  filled except possibly the last, which is filled from left to right.
+
+  ## Options
+    - `:arity` - Branching factor (default: 2)
+    - `:type` - Graph type (:undirected or :directed, default: :undirected)
+
+  ## Examples
+
+      iex> tree = Yog.Generator.Classic.complete_kary(20, arity: 3)
+      iex> Yog.Model.order(tree)
+      20
+
+      iex> tree = Yog.Generator.Classic.complete_kary(7, arity: 2)
+      iex> Yog.Model.edge_count(tree)
+      6
+
+  ## Use Cases
+
+  - Complete binary trees for heap implementations
+  - Testing tree algorithms with specific node counts
+  - B-tree node structure validation
+  """
+  @spec complete_kary(integer(), keyword()) :: Yog.graph()
+  def complete_kary(n, opts \\ []) when is_integer(n) and n >= 0 do
+    arity = Keyword.get(opts, :arity, 2)
+    graph_type = Keyword.get(opts, :type, :undirected)
+    complete_kary_with_type(n, arity, graph_type)
+  end
+
+  @doc """
+  Generates a complete m-ary tree with specified graph type.
+  """
+  @spec complete_kary_with_type(integer(), pos_integer(), Yog.graph_type()) :: Yog.graph()
+  def complete_kary_with_type(n, _arity, _graph_type) when n <= 0, do: Yog.new(:undirected)
+
+  def complete_kary_with_type(1, _arity, graph_type),
+    do: Yog.new(graph_type) |> Yog.add_node(0, nil)
+
+  def complete_kary_with_type(n, arity, graph_type) when is_integer(arity) and arity >= 1 do
+    base = Yog.new(graph_type)
+
+    graph =
+      Enum.reduce(0..(n - 1)//1, base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # For node i, children are at k*i+1 to k*i+k, if they exist
+    edges =
+      for i <- 0..(n - 2)//1,
+          child_start = arity * i + 1,
+          child_end = min(arity * i + arity, n - 1),
+          child <- child_start..child_end//1,
+          do: {i, child, 1}
+
+    Enum.reduce(edges, graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
+
+  @doc """
+  Generates a caterpillar tree.
+
+  A caterpillar is a tree where removing all leaves leaves a path (the "spine").
+
+  ## Options
+    - `:spine_length` - Length of central path (default: max(1, div(n, 3)))
+    - `:type` - Graph type (:undirected or :directed, default: :undirected)
+
+  ## Examples
+
+      iex> cat = Yog.Generator.Classic.caterpillar(20, spine_length: 5)
+      iex> Yog.Model.order(cat)
+      20
+
+  ## Properties
+
+  - All vertices are within distance 1 of the central path
+  - Useful for testing algorithms sensitive to tree structure
+  - Interpolates between paths (spine_length = n) and stars (spine_length = 1)
+
+  ## Use Cases
+
+  - Testing tree isomorphism algorithms
+  - Algorithms with different behavior on paths vs stars
+  - Graph drawing and layout algorithms
+  """
+  @spec caterpillar(integer(), keyword()) :: Yog.graph()
+  def caterpillar(n, opts \\ []) when is_integer(n) and n >= 0 do
+    spine_length = Keyword.get(opts, :spine_length, max(1, div(n, 3)))
+    graph_type = Keyword.get(opts, :type, :undirected)
+    caterpillar_with_type(n, spine_length, graph_type)
+  end
+
+  @doc """
+  Generates a caterpillar tree with specified graph type.
+  """
+  @spec caterpillar_with_type(integer(), integer(), Yog.graph_type()) :: Yog.graph()
+  def caterpillar_with_type(n, _spine_length, _graph_type) when n <= 0,
+    do: Yog.new(:undirected)
+
+  def caterpillar_with_type(1, _spine_length, graph_type),
+    do: Yog.new(graph_type) |> Yog.add_node(0, nil)
+
+  def caterpillar_with_type(n, spine_length, graph_type) do
+    spine_length = min(spine_length, n)
+    leaf_count = n - spine_length
+
+    base = Yog.new(graph_type)
+
+    # Add all nodes
+    graph =
+      Enum.reduce(0..(n - 1)//1, base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # Create spine path (nodes 0 to spine_length-1)
+    spine_edges =
+      for i <- 0..(spine_length - 2)//1, do: {i, i + 1, 1}
+
+    # Distribute leaves evenly across spine nodes
+    # Leaves are numbered from spine_length to n-1
+    leaves_per_spine = div(leaf_count, spine_length)
+    extra_leaves = rem(leaf_count, spine_length)
+
+    {leaf_edges, _next_leaf} =
+      Enum.reduce(0..(spine_length - 1)//1, {[], spine_length}, fn spine_idx,
+                                                                   {edges, next_leaf} ->
+        num_leaves = leaves_per_spine + if spine_idx < extra_leaves, do: 1, else: 0
+
+        new_edges =
+          if num_leaves > 0 do
+            for i <- 0..(num_leaves - 1)//1, do: {spine_idx, next_leaf + i, 1}
+          else
+            []
+          end
+
+        {edges ++ new_edges, next_leaf + num_leaves}
+      end)
+
+    all_edges = spine_edges ++ leaf_edges
+
+    Enum.reduce(all_edges, graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
+
   # ============= Grid Graphs =============
 
   @doc """
