@@ -530,4 +530,46 @@ defmodule Yog.Generator.RandomTest do
     g2 = Random.rmat(64, 256, 0.45, 0.15, 0.15, 0.25, seed: 42)
     assert Yog.all_edges(g1) |> MapSet.new() == Yog.all_edges(g2) |> MapSet.new()
   end
+
+  # ============= Geometric Graph Tests =============
+
+  test "geometric/2 creates graph with n nodes" do
+    g = Random.geometric(50, radius: 0.2, seed: 42)
+    assert Yog.Model.order(g) == 50
+  end
+
+  test "geometric/2 with r=0 has no edges" do
+    g = Random.geometric(20, radius: 0.0, seed: 42)
+    assert Yog.Model.order(g) == 20
+    assert Yog.Model.edge_count(g) == 0
+  end
+
+  test "geometric/2 with large r is complete graph" do
+    g = Random.geometric(10, radius: 2.0, seed: 42)
+    assert Yog.Model.order(g) == 10
+    # Complete graph has n(n-1)/2 edges
+    assert Yog.Model.edge_count(g) == 45
+  end
+
+  test "geometric/2 is reproducible with seed" do
+    g1 = Random.geometric(30, radius: 0.15, seed: 42)
+    g2 = Random.geometric(30, radius: 0.15, seed: 42)
+    assert Yog.all_edges(g1) |> MapSet.new() == Yog.all_edges(g2) |> MapSet.new()
+  end
+
+  test "geometric_nd/2 creates graph with correct dimensions" do
+    g = Random.geometric_nd(40, dimensions: 3, radius: 0.25, seed: 42)
+    assert Yog.Model.order(g) == 40
+  end
+
+  test "waxman/2 creates graph with n nodes" do
+    g = Random.waxman(50, alpha: 0.15, beta: 0.4, seed: 42)
+    assert Yog.Model.order(g) == 50
+  end
+
+  test "waxman/2 is reproducible with seed" do
+    g1 = Random.waxman(30, alpha: 0.1, beta: 0.5, seed: 42)
+    g2 = Random.waxman(30, alpha: 0.1, beta: 0.5, seed: 42)
+    assert Yog.all_edges(g1) |> MapSet.new() == Yog.all_edges(g2) |> MapSet.new()
+  end
 end

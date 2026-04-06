@@ -1646,6 +1646,236 @@ defmodule Yog.Generator.Random do
   defp cumsum([], _acc, result), do: Enum.reverse(result)
   defp cumsum([h | t], acc, result), do: cumsum(t, acc + h, [acc + h | result])
 
+  # ============= Geometric Random Graphs =============
+
+  @doc """
+  Generates a random geometric graph in 2D unit square.
+
+  Nodes are placed uniformly at random in [0,1]×[0,1], and edges connect
+  nodes within distance r.
+
+  ## Options
+    - `:radius` or `:r` - Connection threshold distance (default: 0.1)
+    - `:seed` - Random seed for reproducibility
+    - `:metric` - Distance metric: `:euclidean` (default) or `:manhattan`
+    - `:periodic` - Whether to use periodic boundary conditions (torus, default: false)
+
+  ## Examples
+
+      iex> # Dense network with large radius
+      ...> dense = Yog.Generator.Random.geometric(100, radius: 0.3)
+      iex> Yog.Model.order(dense)
+      100
+
+      iex> # Sparse network with small radius
+      ...> sparse = Yog.Generator.Random.geometric(100, radius: 0.05)
+      iex> Yog.Model.order(sparse)
+      100
+
+  ## References
+
+  - Penrose, M. "Random Geometric Graphs." Oxford University Press, 2003.
+  """
+  @spec geometric(integer(), keyword()) :: Yog.graph()
+  def geometric(n, opts \\ []) when n >= 0 do
+    opts = Keyword.merge([radius: 0.1, seed: nil, metric: :euclidean, periodic: false], opts)
+    radius = Keyword.get(opts, :r, opts[:radius])
+
+    with_seed(opts[:seed], fn ->
+      do_geometric(n, radius, opts[:metric], opts[:periodic])
+    end)
+  end
+
+  defp do_geometric(n, radius, metric, periodic) do
+    base = Yog.undirected()
+
+    # Generate random positions for nodes
+    positions =
+      for i <- 0..(n - 1) do
+        {i, {:rand.uniform(), :rand.uniform()}}
+      end
+      |> Map.new()
+
+    # Add nodes
+    graph =
+      Enum.reduce(0..(n - 1), base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # Find edges: O(n²) naive approach
+    edges =
+      for i <- 0..(n - 1),
+          j <- (i + 1)..(n - 1)//1,
+          within_distance?(positions[i], positions[j], radius, metric, periodic) do
+        {i, j}
+      end
+
+    Enum.reduce(edges, graph, fn {from, to}, g ->
+      Yog.add_edge!(g, from, to, 1)
+    end)
+  end
+
+  @doc """
+  Generates a random geometric graph in d-dimensional unit hypercube.
+
+  ## Options
+    - `:dimensions` or `:d` - Number of dimensions (default: 2)
+    - `:radius` - Connection threshold (default: 0.1)
+    - `:seed` - Random seed
+
+  ## Examples
+
+      iex> # 3D spatial network
+      ...> net3d = Yog.Generator.Random.geometric_nd(100, dimensions: 3, radius: 0.2)
+      iex> Yog.Model.order(net3d)
+      100
+
+  """
+  @spec geometric_nd(integer(), keyword()) :: Yog.graph()
+  def geometric_nd(n, opts \\ []) when n >= 0 do
+    opts = Keyword.merge([dimensions: 2, radius: 0.1, seed: nil], opts)
+    dims = Keyword.get(opts, :d, opts[:dimensions])
+    radius = opts[:radius]
+
+    with_seed(opts[:seed], fn ->
+      do_geometric_nd(n, dims, radius)
+    end)
+  end
+
+  defp do_geometric_nd(n, dimensions, radius) do
+    base = Yog.undirected()
+    radius_sq = radius * radius
+
+    # Generate random positions in d-dimensional unit hypercube
+    positions =
+      for i <- 0..(n - 1) do
+        pos = List.duplicate(nil, dimensions) |> Enum.map(fn _ -> :rand.uniform() end)
+        {i, pos}
+      end
+      |> Map.new()
+
+    # Add nodes
+    graph =
+      Enum.reduce(0..(n - 1), base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # Find edges using squared Euclidean distance (avoiding sqrt)
+    edges =
+      for i <- 0..(n - 1),
+          j <- (i + 1)..(n - 1)//1,
+          euclidean_distance_sq_nd(positions[i], positions[j]) <= radius_sq do
+        {i, j}
+      end
+
+    Enum.reduce(edges, graph, fn {from, to}, g ->
+      Yog.add_edge!(g, from, to, 1)
+    end)
+  end
+
+  @doc """
+  Generates a Waxman graph (distance-based probabilistic edges).
+
+  Unlike strict geometric graphs, Waxman graphs connect nodes with
+  probability decreasing with distance: P(u,v) = β × exp(-d(u,v)/(α×L))
+  where L is the maximum distance.
+
+  ## Options
+    - `:alpha` - Distance decay parameter (default: 0.1)
+    - `:beta` - Edge probability scaling (default: 0.5)
+    - `:seed` - Random seed
+
+  ## Examples
+
+      iex> wax = Yog.Generator.Random.waxman(50, alpha: 0.15, beta: 0.4)
+      iex> Yog.Model.order(wax)
+      50
+
+  ## References
+
+  - Waxman, B. M. "Routing of multipoint connections." IEEE JSAC, 1988.
+  """
+  @spec waxman(integer(), keyword()) :: Yog.graph()
+  def waxman(n, opts \\ []) when n >= 0 do
+    opts = Keyword.merge([alpha: 0.1, beta: 0.5, seed: nil], opts)
+    alpha = opts[:alpha]
+    beta = opts[:beta]
+
+    with_seed(opts[:seed], fn ->
+      do_waxman(n, alpha, beta)
+    end)
+  end
+
+  defp do_waxman(n, alpha, beta) do
+    base = Yog.undirected()
+
+    # Generate random positions in unit square
+    positions =
+      for i <- 0..(n - 1) do
+        {i, {:rand.uniform(), :rand.uniform()}}
+      end
+      |> Map.new()
+
+    # Maximum distance in unit square is sqrt(2)
+    max_dist = :math.sqrt(2)
+
+    # Add nodes
+    graph =
+      Enum.reduce(0..(n - 1), base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # Add edges probabilistically based on distance
+    edges =
+      for i <- 0..(n - 1),
+          j <- (i + 1)..(n - 1)//1,
+          waxman_prob(positions[i], positions[j], alpha, beta, max_dist) >=
+            :rand.uniform() do
+        {i, j}
+      end
+
+    Enum.reduce(edges, graph, fn {from, to}, g ->
+      Yog.add_edge!(g, from, to, 1)
+    end)
+  end
+
+  # ============ Geometric Helper Functions ============
+
+  defp within_distance?({x1, y1}, {x2, y2}, radius, metric, periodic) do
+    {dx, dy} =
+      if periodic do
+        # Periodic boundary conditions (torus)
+        dx = periodic_diff(x1, x2)
+        dy = periodic_diff(y1, y2)
+        {dx, dy}
+      else
+        {x1 - x2, y1 - y2}
+      end
+
+    case metric do
+      :euclidean -> dx * dx + dy * dy <= radius * radius
+      :manhattan -> abs(dx) + abs(dy) <= radius
+      :chebyshev -> max(abs(dx), abs(dy)) <= radius
+      _ -> dx * dx + dy * dy <= radius * radius
+    end
+  end
+
+  defp periodic_diff(a, b) do
+    # Shortest distance on a unit torus
+    d = abs(a - b)
+    if d > 0.5, do: 1.0 - d, else: d
+  end
+
+  defp euclidean_distance_sq_nd(p1, p2) do
+    Enum.zip(p1, p2)
+    |> Enum.reduce(0.0, fn {a, b}, acc -> acc + (a - b) * (a - b) end)
+  end
+
+  defp waxman_prob({x1, y1}, {x2, y2}, alpha, beta, max_dist) do
+    dist = :math.sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2))
+    beta * :math.exp(-dist / (alpha * max_dist))
+  end
+
   # Unused - kept for potential future use
   # defp estimate_edges(num_nodes, total_initiator, init_size, _k, directed) do
   #   # Rough estimate: average probability * possible edges

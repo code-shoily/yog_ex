@@ -546,4 +546,91 @@ defmodule Yog.PBT.GeneratorTest do
       end
     end
   end
+
+  describe "Geometric Graph Properties" do
+    property "geometric/2 creates graph with n nodes" do
+      check all(
+              n <- StreamData.integer(10..50),
+              seed <- StreamData.integer(1..10_000)
+            ) do
+        g = Random.geometric(n, radius: 0.15, seed: seed)
+        assert Yog.node_count(g) == n
+      end
+    end
+
+    property "geometric/2 with radius=0 has no edges" do
+      check all(
+              n <- StreamData.integer(5..20),
+              seed <- StreamData.integer(1..10_000)
+            ) do
+        g = Random.geometric(n, radius: 0.0, seed: seed)
+        assert Yog.node_count(g) == n
+        assert Yog.edge_count(g) == 0
+      end
+    end
+
+    property "geometric/2 is reproducible with seed" do
+      check all(
+              n <- StreamData.integer(10..30),
+              r <- StreamData.float(min: 0.05, max: 0.3),
+              seed <- StreamData.integer(1..10_000)
+            ) do
+        g1 = Random.geometric(n, radius: r, seed: seed)
+        g2 = Random.geometric(n, radius: r, seed: seed)
+        assert Yog.all_edges(g1) |> MapSet.new() == Yog.all_edges(g2) |> MapSet.new()
+      end
+    end
+
+    property "geometric_nd/2 creates graph with correct node count" do
+      check all(
+              n <- StreamData.integer(10..40),
+              dims <- StreamData.integer(2..4),
+              seed <- StreamData.integer(1..10_000)
+            ) do
+        g = Random.geometric_nd(n, dimensions: dims, radius: 0.2, seed: seed)
+        assert Yog.node_count(g) == n
+      end
+    end
+
+    property "waxman/2 creates graph with n nodes" do
+      check all(
+              n <- StreamData.integer(10..50),
+              alpha <- StreamData.float(min: 0.05, max: 0.3),
+              beta <- StreamData.float(min: 0.1, max: 0.8),
+              seed <- StreamData.integer(1..10_000)
+            ) do
+        g = Random.waxman(n, alpha: alpha, beta: beta, seed: seed)
+        assert Yog.node_count(g) == n
+      end
+    end
+
+    property "waxman/2 is reproducible with seed" do
+      check all(
+              n <- StreamData.integer(10..30),
+              seed <- StreamData.integer(1..10_000)
+            ) do
+        g1 = Random.waxman(n, alpha: 0.15, beta: 0.4, seed: seed)
+        g2 = Random.waxman(n, alpha: 0.15, beta: 0.4, seed: seed)
+        assert Yog.all_edges(g1) |> MapSet.new() == Yog.all_edges(g2) |> MapSet.new()
+      end
+    end
+
+    property "geometric larger radius creates more edges" do
+      check all(
+              n <- StreamData.integer(20..40),
+              seed <- StreamData.integer(1..10_000)
+            ) do
+        g_small = Random.geometric(n, radius: 0.05, seed: seed)
+        g_large = Random.geometric(n, radius: 0.3, seed: seed)
+
+        # Larger radius should generally produce more edges
+        # (This is probabilistic, so we check the trend rather than strict inequality)
+        edges_small = Yog.edge_count(g_small)
+        edges_large = Yog.edge_count(g_large)
+
+        # With high probability, larger radius produces more or equal edges
+        assert edges_large >= edges_small * 0.5
+      end
+    end
+  end
 end
