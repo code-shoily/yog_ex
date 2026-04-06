@@ -305,4 +305,153 @@ defmodule Yog.Generator.ClassicTest do
       assert not Yog.Model.has_edge?(turan, i, j)
     end
   end
+
+  # ============= Platonic Solid Tests =============
+
+  test "tetrahedron/0 generates K4" do
+    tetra = Classic.tetrahedron()
+    assert Yog.Model.order(tetra) == 4
+    assert Yog.Model.edge_count(tetra) == 6
+    # Regular degree 3
+    for v <- 0..3 do
+      assert length(Yog.neighbors(tetra, v)) == 3
+    end
+
+    # Complete graph - every pair connected
+    for i <- 0..3, j <- (i + 1)..3//1, i < j do
+      assert Yog.Model.has_edge?(tetra, i, j)
+    end
+  end
+
+  test "cube/0 generates Q3" do
+    cube = Classic.cube()
+    assert Yog.Model.order(cube) == 8
+    assert Yog.Model.edge_count(cube) == 12
+    # Regular degree 3
+    for v <- 0..7 do
+      assert length(Yog.neighbors(cube, v)) == 3
+    end
+  end
+
+  test "cube/0 is bipartite" do
+    cube = Classic.cube()
+    assert Yog.Property.Bipartite.bipartite?(cube) == true
+  end
+
+  test "octahedron/0 has correct structure" do
+    octa = Classic.octahedron()
+    assert Yog.Model.order(octa) == 6
+    assert Yog.Model.edge_count(octa) == 12
+    # Regular degree 4
+    for v <- 0..5 do
+      assert length(Yog.neighbors(octa, v)) == 4
+    end
+  end
+
+  test "octahedron/0 is 4-regular" do
+    octa = Classic.octahedron()
+    degrees = for v <- 0..5, do: length(Yog.neighbors(octa, v))
+    assert Enum.all?(degrees, fn d -> d == 4 end)
+  end
+
+  test "dodecahedron/0 has correct structure" do
+    dodeca = Classic.dodecahedron()
+    assert Yog.Model.order(dodeca) == 20
+    assert Yog.Model.edge_count(dodeca) == 30
+    # Regular degree 3
+    for v <- 0..19 do
+      assert length(Yog.neighbors(dodeca, v)) == 3
+    end
+  end
+
+  test "dodecahedron/0 is 3-regular" do
+    dodeca = Classic.dodecahedron()
+    degrees = for v <- 0..19, do: length(Yog.neighbors(dodeca, v))
+    assert Enum.all?(degrees, fn d -> d == 3 end)
+  end
+
+  test "dodecahedron/0 is planar" do
+    dodeca = Classic.dodecahedron()
+    # Euler's formula: V - E + F = 2, F = 12 (12 pentagonal faces)
+    # V - E + 2 = F + 2 = 12 for planar graphs
+    v = Yog.Model.order(dodeca)
+    e = Yog.Model.edge_count(dodeca)
+    # F = 2 - V + E = 2 - 20 + 30 = 12 faces ✓
+    assert 2 - v + e == 12
+  end
+
+  test "icosahedron/0 has correct structure" do
+    icosa = Classic.icosahedron()
+    assert Yog.Model.order(icosa) == 12
+    assert Yog.Model.edge_count(icosa) == 30
+    # Regular degree 5
+    for v <- 0..11 do
+      assert length(Yog.neighbors(icosa, v)) == 5
+    end
+  end
+
+  test "icosahedron/0 is 5-regular" do
+    icosa = Classic.icosahedron()
+    degrees = for v <- 0..11, do: length(Yog.neighbors(icosa, v))
+    assert Enum.all?(degrees, fn d -> d == 5 end)
+  end
+
+  test "icosahedron/0 is planar" do
+    icosa = Classic.icosahedron()
+    # Euler's formula: V - E + F = 2, F = 20 (20 triangular faces)
+    v = Yog.Model.order(icosa)
+    e = Yog.Model.edge_count(icosa)
+    # F = 2 - V + E = 2 - 12 + 30 = 20 faces ✓
+    assert 2 - v + e == 20
+  end
+
+  test "platonic solids have correct vertex counts" do
+    assert Yog.Model.order(Classic.tetrahedron()) == 4
+    assert Yog.Model.order(Classic.cube()) == 8
+    assert Yog.Model.order(Classic.octahedron()) == 6
+    assert Yog.Model.order(Classic.dodecahedron()) == 20
+    assert Yog.Model.order(Classic.icosahedron()) == 12
+  end
+
+  test "platonic solids have correct edge counts" do
+    assert Yog.Model.edge_count(Classic.tetrahedron()) == 6
+    assert Yog.Model.edge_count(Classic.cube()) == 12
+    assert Yog.Model.edge_count(Classic.octahedron()) == 12
+    assert Yog.Model.edge_count(Classic.dodecahedron()) == 30
+    assert Yog.Model.edge_count(Classic.icosahedron()) == 30
+  end
+
+  test "platonic solids are undirected" do
+    assert Yog.Model.type(Classic.tetrahedron()) == :undirected
+    assert Yog.Model.type(Classic.cube()) == :undirected
+    assert Yog.Model.type(Classic.octahedron()) == :undirected
+    assert Yog.Model.type(Classic.dodecahedron()) == :undirected
+    assert Yog.Model.type(Classic.icosahedron()) == :undirected
+  end
+
+  test "dual relationships hold" do
+    # Cube (8 vertices, 12 edges) ↔ Octahedron (6 vertices, 12 edges)
+    # Faces of cube = 6 = vertices of octahedron
+    # Faces of octahedron = 8 = vertices of cube
+    cube_v = Yog.Model.order(Classic.cube())
+    cube_e = Yog.Model.edge_count(Classic.cube())
+    octa_v = Yog.Model.order(Classic.octahedron())
+    octa_e = Yog.Model.edge_count(Classic.octahedron())
+
+    assert cube_e == octa_e
+    assert cube_v == 8
+    assert octa_v == 6
+
+    # Dodecahedron (20 vertices) ↔ Icosahedron (12 vertices)
+    # Both have 30 edges (dual graphs have same edge count)
+    dodeca_v = Yog.Model.order(Classic.dodecahedron())
+    dodeca_e = Yog.Model.edge_count(Classic.dodecahedron())
+    icosa_v = Yog.Model.order(Classic.icosahedron())
+    icosa_e = Yog.Model.edge_count(Classic.icosahedron())
+
+    assert dodeca_e == icosa_e
+    assert dodeca_e == 30
+    assert dodeca_v == 20
+    assert icosa_v == 12
+  end
 end

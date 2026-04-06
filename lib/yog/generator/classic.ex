@@ -883,4 +883,289 @@ defmodule Yog.Generator.Classic do
       Yog.add_edge!(g, from, to, weight)
     end)
   end
+
+  # ============= Platonic Solids =============
+
+  @doc """
+  Generates the tetrahedron graph K₄ (complete graph on 4 vertices).
+
+  The tetrahedron is the simplest Platonic solid with 4 vertices and 6 edges.
+  Each vertex has degree 3. It is a complete graph K₄.
+
+  ## Examples
+
+      iex> tetra = Yog.Generator.Classic.tetrahedron()
+      iex> Yog.Model.order(tetra)
+      4
+      iex> Yog.Model.edge_count(tetra)
+      6
+
+  ## Properties
+
+  - Vertices: 4
+  - Edges: 6
+  - Degree: 3 (regular)
+  - Diameter: 1
+  - Girth: 3
+  - Chromatic number: 4
+  """
+  @spec tetrahedron() :: Yog.graph()
+  def tetrahedron do
+    # Tetrahedron is K₄ - complete graph on 4 vertices
+    complete(4)
+  end
+
+  @doc """
+  Generates the cube graph Q₃ (3-dimensional hypercube).
+
+  The cube has 8 vertices and 12 edges. Each vertex has degree 3.
+  It is bipartite, planar, and is the 3D hypercube.
+
+  ## Examples
+
+      iex> cube = Yog.Generator.Classic.cube()
+      iex> Yog.Model.order(cube)
+      8
+      iex> Yog.Model.edge_count(cube)
+      12
+
+  ## Properties
+
+  - Vertices: 8
+  - Edges: 12
+  - Degree: 3 (regular)
+  - Diameter: 3
+  - Girth: 4
+  - Chromatic number: 2 (bipartite)
+  """
+  @spec cube() :: Yog.graph()
+  def cube do
+    # Cube is the 3D hypercube
+    hypercube(3)
+  end
+
+  @doc """
+  Generates the octahedron graph.
+
+  The octahedron has 6 vertices and 12 edges. Each vertex has degree 4.
+  It is the dual of the cube. Vertices can be viewed as the coordinate axes
+  (±1, 0, 0), (0, ±1, 0), (0, 0, ±1) - each vertex connects to all except its opposite.
+
+  ## Examples
+
+      iex> octa = Yog.Generator.Classic.octahedron()
+      iex> Yog.Model.order(octa)
+      6
+      iex> Yog.Model.edge_count(octa)
+      12
+
+  ## Properties
+
+  - Vertices: 6
+  - Edges: 12
+  - Degree: 4 (regular)
+  - Diameter: 2
+  - Girth: 3
+  - Chromatic number: 3
+  """
+  @spec octahedron() :: Yog.graph()
+  def octahedron do
+    base = Yog.undirected()
+
+    # Add 6 vertices
+    graph =
+      Enum.reduce(0..5, base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # Octahedron: opposite pairs are (0,3), (1,4), (2,5)
+    # Each vertex connects to all vertices EXCEPT its opposite
+    edges = [
+      # Vertex 0 connects to 1,2,4,5 (not 3)
+      {0, 1, 1},
+      {0, 2, 1},
+      {0, 4, 1},
+      {0, 5, 1},
+      # Vertex 1 connects to 0,2,3,5 (not 4)
+      {1, 2, 1},
+      {1, 3, 1},
+      {1, 5, 1},
+      # Vertex 2 connects to 0,1,3,4 (not 5)
+      {2, 3, 1},
+      {2, 4, 1},
+      # Vertex 3 connects to 1,2,4,5 (not 0)
+      {3, 4, 1},
+      {3, 5, 1},
+      # Vertex 4 connects to 0,2,3,5 (not 1)
+      {4, 5, 1}
+      # Vertex 5 already covered
+    ]
+
+    Enum.reduce(edges, graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
+
+  @doc """
+  Generates the dodecahedron graph.
+
+  The dodecahedron has 20 vertices and 30 edges. Each vertex has degree 3.
+  Famous as the basis of Hamilton's "Icosian game" and Hamiltonian cycle puzzles.
+  It has girth 5 (smallest cycle has 5 edges).
+
+  ## Examples
+
+      iex> dodec = Yog.Generator.Classic.dodecahedron()
+      iex> Yog.Model.order(dodec)
+      20
+      iex> Yog.Model.edge_count(dodec)
+      30
+
+  ## Properties
+
+  - Vertices: 20
+  - Edges: 30
+  - Degree: 3 (regular)
+  - Diameter: 5
+  - Girth: 5
+  - Chromatic number: 3
+  """
+  @spec dodecahedron() :: Yog.graph()
+  def dodecahedron do
+    base = Yog.undirected()
+
+    # Add 20 vertices
+    graph =
+      Enum.reduce(0..19, base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # Dodecahedron edge structure:
+    # Three concentric rings: outer pentagon (0-4), middle decagon (5-14), inner pentagon (15-19)
+    edges =
+      [
+        # Outer pentagon
+        {0, 1},
+        {1, 2},
+        {2, 3},
+        {3, 4},
+        {4, 0},
+        # Inner pentagon
+        {15, 16},
+        {16, 17},
+        {17, 18},
+        {18, 19},
+        {19, 15},
+        # Middle ring (two intertwined pentagons)
+        {5, 6},
+        {6, 7},
+        {7, 8},
+        {8, 9},
+        {9, 10},
+        {10, 11},
+        {11, 12},
+        {12, 13},
+        {13, 14},
+        {14, 5},
+        # Connections: outer to middle
+        {0, 5},
+        {1, 6},
+        {2, 7},
+        {3, 8},
+        {4, 9},
+        # Connections: middle to inner
+        {10, 15},
+        {11, 16},
+        {12, 17},
+        {13, 18},
+        {14, 19}
+      ]
+      |> Enum.map(fn {u, v} -> {u, v, 1} end)
+
+    Enum.reduce(edges, graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
+
+  @doc """
+  Generates the icosahedron graph.
+
+  The icosahedron has 12 vertices and 30 edges. Each vertex has degree 5.
+  It is the dual of the dodecahedron. It has the largest number of faces (20)
+  of any Platonic solid.
+
+  ## Examples
+
+      iex> icosa = Yog.Generator.Classic.icosahedron()
+      iex> Yog.Model.order(icosa)
+      12
+      iex> Yog.Model.edge_count(icosa)
+      30
+
+  ## Properties
+
+  - Vertices: 12
+  - Edges: 30
+  - Degree: 5 (regular)
+  - Diameter: 3
+  - Girth: 3
+  - Chromatic number: 4
+  """
+  @spec icosahedron() :: Yog.graph()
+  def icosahedron do
+    base = Yog.undirected()
+
+    # Add 12 vertices
+    graph =
+      Enum.reduce(0..11, base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # Icosahedron: can be thought of as two pentagonal pyramids (top/bottom)
+    # with a ring of 10 vertices between them
+    # Layout: 0 = north pole, 11 = south pole, 1-5 and 6-10 in alternating rings
+    edges =
+      [
+        # North pole (0) connects to vertices 1-5
+        {0, 1},
+        {0, 2},
+        {0, 3},
+        {0, 4},
+        {0, 5},
+        # South pole (11) connects to vertices 6-10
+        {11, 6},
+        {11, 7},
+        {11, 8},
+        {11, 9},
+        {11, 10},
+        # Upper ring connections (1-5)
+        {1, 2},
+        {2, 3},
+        {3, 4},
+        {4, 5},
+        {5, 1},
+        # Lower ring connections (6-10)
+        {6, 7},
+        {7, 8},
+        {8, 9},
+        {9, 10},
+        {10, 6},
+        # Cross connections between rings (each upper connects to 2 lower)
+        {1, 6},
+        {1, 10},
+        {2, 6},
+        {2, 7},
+        {3, 7},
+        {3, 8},
+        {4, 8},
+        {4, 9},
+        {5, 9},
+        {5, 10}
+      ]
+      |> Enum.map(fn {u, v} -> {u, v, 1} end)
+
+    Enum.reduce(edges, graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
 end
