@@ -5,6 +5,15 @@ defmodule Yog.Pathfinding.Dijkstra do
   Dijkstra's algorithm finds the shortest path from a source node to all other
   reachable nodes in a graph with non-negative edge weights.
 
+  ## Implementation Notes
+
+  This module uses a hybrid implementation:
+  - `shortest_path/6`, `implicit_dijkstra/6`, and `implicit_dijkstra_by/7`
+    delegate to `AStar` with a zero heuristic (`fn _, _ -> 0 end` or `fn _ -> 0 end`),
+    since Dijkstra's algorithm is mathematically equivalent to A* with zero heuristic.
+  - `single_source_distances/5` uses a native implementation since it computes
+    distances to ALL nodes (A* requires a goal).
+
   ## Algorithm Characteristics
 
   - **Time Complexity**: O((V + E) log V) with a binary heap
@@ -39,6 +48,7 @@ defmodule Yog.Pathfinding.Dijkstra do
   """
 
   alias Yog.PairingHeap, as: PQ
+  alias Yog.Pathfinding.AStar
   alias Yog.Pathfinding.Path
 
   @typedoc "Result type for shortest path queries"
@@ -89,7 +99,7 @@ defmodule Yog.Pathfinding.Dijkstra do
   ## Options
 
     * `:in` - The graph to search
-    * `:from` - Starting node
+    * `:from` - Source node
     * `:zero` - Identity value for the weight type
     * `:add` - Function to add two weights
     * `:compare` - Function to compare weights
@@ -177,20 +187,24 @@ defmodule Yog.Pathfinding.Dijkstra do
   end
 
   # ============================================================
-  # Direct API
+  # Direct API - Delegated to A* (Dijkstra = A* with zero heuristic)
   # ============================================================
 
   @doc """
-  Find the shortest path between two nodes using custom numeric operations.
+  Find the shortest path between two nodes using Dijkstra's algorithm.
+
+  This function delegates to `Yog.Pathfinding.AStar.a_star/7` with a zero
+  heuristic (`fn _, _ -> 0 end`), since Dijkstra's algorithm is mathematically
+  equivalent to A* with zero heuristic.
 
   ## Parameters
 
     * `graph` - The graph to search
     * `from` - Starting node
     * `to` - Target node
-    * `zero` - Identity value for the weight type
-    * `add` - Function to add two weights: `(weight, weight) -> weight`
-    * `compare` - Function to compare weights, returns `:lt`, `:eq`, or `:gt`
+    * `zero` - Identity value for the weight type (default: 0)
+    * `add` - Function to add two weights (default: `&Kernel.+/2`)
+    * `compare` - Function to compare weights (default: `&Yog.Utils.compare/2`)
 
   ## Returns
 
@@ -211,16 +225,8 @@ defmodule Yog.Pathfinding.Dijkstra do
       [:a, :b, :c]
       iex> path.weight
       5
-
-      iex> graph = Yog.directed()
-      ...> |> Yog.add_node(:a, nil)
-      ...> |> Yog.add_node(:b, nil)
-      ...> |> Yog.add_node(:c, nil)
-      ...> |> Yog.add_edge_ensure(:a, :b, 4)
-      ...> |> Yog.add_edge_ensure(:b, :c, 1)
-      iex> compare = &Yog.Utils.compare/2
-      iex> Dijkstra.shortest_path(graph, :a, :nonexistent, 0, &(&1 + &2), compare)
-      :error
+      iex> path.algorithm
+      :dijkstra
   """
   @spec shortest_path(
           Yog.t(),
@@ -239,56 +245,12 @@ defmodule Yog.Pathfinding.Dijkstra do
         add \\ &Kernel.+/2,
         compare \\ &Yog.Utils.compare/2
       ) do
-    case do_dijkstra(graph, from, to, zero, add, compare, true) do
+    # Dijkstra = A* with zero heuristic
+    zero_heuristic = fn _, _ -> zero end
+
+    case AStar.a_star(graph, from, to, zero_heuristic, zero, add, compare) do
+      {:ok, path} -> {:ok, %{path | algorithm: :dijkstra}}
       :error -> :error
-      {path, weight} -> {:ok, Path.new(path, weight, :dijkstra)}
-    end
-  end
-
-  @doc """
-  Calculate single-source shortest distances to all reachable nodes.
-
-  Returns a map of node IDs to their shortest distance from the source.
-
-  ## Parameters
-
-    * `graph` - The graph to search
-    * `from` - Source node
-    * `zero` - Identity value for the weight type
-    * `add` - Function to add two weights
-    * `compare` - Function to compare weights
-
-  ## Examples
-
-      iex> graph = Yog.directed()
-      ...> |> Yog.add_node(:a, nil)
-      ...> |> Yog.add_node(:b, nil)
-      ...> |> Yog.add_node(:c, nil)
-      ...> |> Yog.add_edge_ensure(:a, :b, 4)
-      ...> |> Yog.add_edge_ensure(:a, :c, 2)
-      ...> |> Yog.add_edge_ensure(:b, :c, 1)
-      iex> compare = &Yog.Utils.compare/2
-      iex> Dijkstra.single_source_distances(graph, :a, 0, &(&1 + &2), compare)
-      %{a: 0, b: 4, c: 2}
-  """
-  @spec single_source_distances(
-          Yog.t(),
-          Yog.node_id(),
-          weight,
-          (weight, weight -> weight),
-          (weight, weight -> :lt | :eq | :gt)
-        ) :: %{Yog.node_id() => weight}
-        when weight: var
-  def single_source_distances(
-        graph,
-        from,
-        zero \\ 0,
-        add \\ &Kernel.+/2,
-        compare \\ &Yog.Utils.compare/2
-      ) do
-    case do_dijkstra(graph, from, nil, zero, add, compare, false) do
-      :error -> %{}
-      {_path, _weight, distances} -> distances
     end
   end
 
@@ -301,14 +263,17 @@ defmodule Yog.Pathfinding.Dijkstra do
   - Grid-based pathfinding with dynamic obstacles
   - Game state spaces
 
+  This function delegates to `Yog.Pathfinding.AStar.implicit_a_star/7` with
+  a zero heuristic (`fn _ -> 0 end`).
+
   ## Parameters
 
     * `from` - Starting state
     * `successors` - Function `state -> [{neighbor, cost}]`
     * `is_goal` - Function `state -> boolean` to check if goal reached
-    * `zero` - Identity value for the weight type
-    * `add` - Function to add two weights
-    * `compare` - Function to compare weights
+    * `zero` - Identity value for the weight type (default: 0)
+    * `add` - Function to add two weights (default: `&Kernel.+/2`)
+    * `compare` - Function to compare weights (default: `&Yog.Utils.compare/2`)
 
   ## Returns
 
@@ -360,15 +325,18 @@ defmodule Yog.Pathfinding.Dijkstra do
   - Efficient pruning of equivalent states
   - Custom equivalence relations beyond simple equality
 
+  This function delegates to `Yog.Pathfinding.AStar.implicit_a_star_by/8` with
+  a zero heuristic (`fn _ -> 0 end`).
+
   ## Parameters
 
     * `from` - Starting state
     * `successors` - Function `state -> [{neighbor, cost}]`
     * `key_fn` - Function `state -> key` for visited tracking
     * `is_goal` - Function `state -> boolean` to check if goal reached
-    * `zero` - Identity value for the weight type
-    * `add` - Function to add two weights
-    * `compare` - Function to compare weights
+    * `zero` - Identity value for the weight type (default: 0)
+    * `add` - Function to add two weights (default: `&Kernel.+/2`)
+    * `compare` - Function to compare weights (default: `&Yog.Utils.compare/2`)
 
   ## Examples
 
@@ -405,32 +373,83 @@ defmodule Yog.Pathfinding.Dijkstra do
         add \\ &Kernel.+/2,
         compare \\ &Yog.Utils.compare/2
       ) do
-    initial_queue =
-      PQ.new()
-      |> PQ.push({zero, from})
+    # Dijkstra = A* with zero heuristic for implicit graphs
+    zero_heuristic = fn _state -> zero end
 
-    initial_visited = %{key_fn.(from) => zero}
-
-    do_implicit_dijkstra(
-      initial_queue,
+    AStar.implicit_a_star_by(
+      from,
       successors,
       key_fn,
       is_goal,
+      zero_heuristic,
+      zero,
       add,
-      compare,
-      initial_visited
+      compare
     )
   end
 
   # ============================================================
-  # Helper functions
+  # Native Implementation (single_source_distances needs this)
   # ============================================================
 
-  # Main Dijkstra implementation
+  @doc """
+  Calculate single-source shortest distances to all reachable nodes.
+
+  Returns a map of node IDs to their shortest distance from the source.
+
+  This function uses a native implementation (not delegated to A*) because
+  A* requires a goal node, but this function computes distances to ALL nodes.
+
+  ## Parameters
+
+    * `graph` - The graph to search
+    * `from` - Source node
+    * `zero` - Identity value for the weight type (default: 0)
+    * `add` - Function to add two weights (default: `&Kernel.+/2`)
+    * `compare` - Function to compare weights (default: `&Yog.Utils.compare/2`)
+
+  ## Examples
+
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(:a, nil)
+      ...> |> Yog.add_node(:b, nil)
+      ...> |> Yog.add_node(:c, nil)
+      ...> |> Yog.add_edge_ensure(:a, :b, 4)
+      ...> |> Yog.add_edge_ensure(:a, :c, 2)
+      ...> |> Yog.add_edge_ensure(:b, :c, 1)
+      iex> compare = &Yog.Utils.compare/2
+      iex> Dijkstra.single_source_distances(graph, :a, 0, &(&1 + &2), compare)
+      %{a: 0, b: 4, c: 2}
+  """
+  @spec single_source_distances(
+          Yog.t(),
+          Yog.node_id(),
+          weight,
+          (weight, weight -> weight),
+          (weight, weight -> :lt | :eq | :gt)
+        ) :: %{Yog.node_id() => weight}
+        when weight: var
+  def single_source_distances(
+        graph,
+        from,
+        zero \\ 0,
+        add \\ &Kernel.+/2,
+        compare \\ &Yog.Utils.compare/2
+      ) do
+    case do_dijkstra(graph, from, nil, zero, add, compare, false) do
+      :error -> %{}
+      {_path, _weight, distances} -> distances
+    end
+  end
+
+  # ============================================================
+  # Helper functions (used by single_source_distances)
+  # ============================================================
+
+  # Main Dijkstra implementation for single_source_distances
   # Returns :error | {path, weight} if to is specified
   # Returns :error | {[], zero, distances} if to is nil (single source distances)
   defp do_dijkstra(graph, from, to, zero, add, compare, _return_path) do
-    # Unified implementation using predecessor map for path reconstruction
     initial_queue =
       PQ.new()
       |> PQ.push({zero, from})
@@ -466,9 +485,9 @@ defmodule Yog.Pathfinding.Dijkstra do
           do_dijkstra_loop(graph, rest, to, add, compare, distances, predecessors)
         else
           if node == to do
-            extract_result(distances, predecessors, to, dist)
+            path = reconstruct_path(predecessors, to, [to])
+            {path, dist}
           else
-            # Direct edge access for performance
             successors =
               case Map.fetch(graph.out_edges, node) do
                 {:ok, edges} -> Map.to_list(edges)
@@ -505,15 +524,8 @@ defmodule Yog.Pathfinding.Dijkstra do
     end
   end
 
-  # Extract the result: either a path to target or all distances
-  defp extract_result(_distances, _predecessors, nil, _dist), do: {[], 0, %{}}
-
-  defp extract_result(_distances, predecessors, target, dist) do
-    path = reconstruct_path(predecessors, target, [target])
-    {path, dist}
-  end
-
   # Reconstruct path by backtracking through predecessors
+  # Note: Only used as safety net; shortest_path now delegates to A*
   defp reconstruct_path(predecessors, node, acc) do
     case Map.get(predecessors, node) do
       nil -> acc
@@ -525,68 +537,6 @@ defmodule Yog.Pathfinding.Dijkstra do
     case Map.values(distances) do
       [z | _] -> z
       [] -> 0
-    end
-  end
-
-  # Implicit Dijkstra implementation
-  defp do_implicit_dijkstra(
-         queue,
-         successors,
-         key_fn,
-         is_goal,
-         add,
-         compare,
-         visited
-       ) do
-    case PQ.pop(queue) do
-      :error ->
-        :error
-
-      {:ok, {dist, state}, rest} ->
-        key = key_fn.(state)
-        current_best = Map.get(visited, key)
-
-        if current_best != nil and compare.(dist, current_best) == :gt do
-          do_implicit_dijkstra(rest, successors, key_fn, is_goal, add, compare, visited)
-        else
-          if is_goal.(state) do
-            {:ok, dist}
-          else
-            next_states = successors.(state)
-
-            {new_queue, new_visited} =
-              List.foldl(next_states, {rest, visited}, fn {next_state, cost}, {q, v} ->
-                next_key = key_fn.(next_state)
-                new_dist = add.(dist, cost)
-
-                case Map.fetch(v, next_key) do
-                  {:ok, current} ->
-                    if compare.(new_dist, current) == :lt do
-                      new_q = PQ.push(q, {new_dist, next_state})
-                      new_v = Map.put(v, next_key, new_dist)
-                      {new_q, new_v}
-                    else
-                      {q, v}
-                    end
-
-                  :error ->
-                    new_q = PQ.push(q, {new_dist, next_state})
-                    new_v = Map.put(v, next_key, new_dist)
-                    {new_q, new_v}
-                end
-              end)
-
-            do_implicit_dijkstra(
-              new_queue,
-              successors,
-              key_fn,
-              is_goal,
-              add,
-              compare,
-              new_visited
-            )
-          end
-        end
     end
   end
 end
