@@ -1415,6 +1415,85 @@ defmodule Yog.Generator.Classic do
     end)
   end
 
+  # ============= Crown Graph =============
+
+  @doc """
+  Generates the crown graph S_n^0 with 2n vertices.
+
+  The crown graph is the complete bipartite graph K_{n,n} minus a perfect
+  matching. It has important applications in edge coloring and extremal
+  graph theory.
+
+  ## Examples
+
+      iex> crown = Yog.Generator.Classic.crown(4)
+      iex> Yog.Model.order(crown)
+      8
+      iex> Yog.Model.edge_count(crown)
+      12
+
+      iex> # crown(2) is C_4 (cycle on 4 vertices)
+      ...> c2 = Yog.Generator.Classic.crown(2)
+      ...> Yog.Model.order(c2)
+      4
+
+  ## Properties
+
+  - Vertices: 2n
+  - Edges: n(n-1) = n² - n
+  - (n-1)-regular (each vertex has degree n-1)
+  - Bipartite
+  - Diameter: 3 for n ≥ 3
+  - Girth: 4 for n ≥ 3
+
+  ## Special Cases
+
+  - crown(2) = C₄ (4-cycle)
+  - crown(3) is the utility graph (K_{3,3} minus a perfect matching)
+
+  ## Use Cases
+
+  - Edge coloring tests (chromatic index demonstrations)
+  - Extremal graph theory examples
+  - Bipartite graph testing with symmetric structure
+  """
+  @spec crown(integer()) :: Yog.graph()
+  def crown(n) when is_integer(n) and n >= 2 do
+    crown_with_type(n, :undirected)
+  end
+
+  def crown(_n), do: Yog.new(:undirected)
+
+  @doc """
+  Generates the crown graph with specified graph type.
+  """
+  @spec crown_with_type(integer(), Yog.graph_type()) :: Yog.graph()
+  def crown_with_type(n, _graph_type) when not is_integer(n) or n < 2,
+    do: Yog.new(:undirected)
+
+  def crown_with_type(n, graph_type) do
+    base = Yog.new(graph_type)
+
+    # Two partitions: U = {0, ..., n-1}, V = {n, ..., 2n-1}
+    graph =
+      Enum.reduce(0..(2 * n - 1)//1, base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # All edges between U and V EXCEPT (i, n+i) for i in 0..n-1
+    # This removes the perfect matching
+    edges =
+      for i <- 0..(n - 1)//1,
+          j <- 0..(n - 1)//1,
+          # Skip the perfect matching edges where i == j
+          i != j,
+          do: {i, n + j, 1}
+
+    Enum.reduce(edges, graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
+
   # ============= Turan Graph =============
 
   @doc """

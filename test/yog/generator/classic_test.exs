@@ -978,4 +978,118 @@ defmodule Yog.Generator.ClassicTest do
     assert Yog.Model.edge_count(f3) == 9
     assert Yog.Model.edge_count(b3) == 7
   end
+
+  # ============= Crown Graph Tests =============
+
+  test "crown/1 creates correct structure" do
+    crown = Classic.crown(4)
+    # 2n vertices
+    assert Yog.Model.order(crown) == 8
+    # n(n-1) = 4*3 = 12
+    assert Yog.Model.edge_count(crown) == 12
+  end
+
+  test "crown/1 is (n-1)-regular" do
+    crown = Classic.crown(5)
+    # Each vertex should have degree n-1 = 4
+    for v <- 0..9 do
+      assert length(Yog.neighbors(crown, v)) == 4
+    end
+  end
+
+  test "crown/1 is bipartite" do
+    crown = Classic.crown(4)
+    assert Yog.Property.Bipartite.bipartite?(crown) == true
+  end
+
+  test "crown/1 perfect matching is removed" do
+    crown = Classic.crown(4)
+    # Edges (i, n+i) for i in 0..n-1 should NOT exist
+    for i <- 0..3 do
+      assert not Yog.Model.has_edge?(crown, i, i + 4)
+    end
+  end
+
+  test "crown/1 all other bipartite edges exist" do
+    crown = Classic.crown(3)
+    # K_{3,3} has 9 edges, crown has 6 (removed 3)
+    # For each i in left (0,1,2), it should connect to all in right (3,4,5) except n+i
+    # Left 0 connects to 4, 5 (not 3)
+    assert not Yog.Model.has_edge?(crown, 0, 3)
+    assert Yog.Model.has_edge?(crown, 0, 4)
+    assert Yog.Model.has_edge?(crown, 0, 5)
+    # Left 1 connects to 3, 5 (not 4)
+    assert Yog.Model.has_edge?(crown, 1, 3)
+    assert not Yog.Model.has_edge?(crown, 1, 4)
+    assert Yog.Model.has_edge?(crown, 1, 5)
+    # Left 2 connects to 3, 4 (not 5)
+    assert Yog.Model.has_edge?(crown, 2, 3)
+    assert Yog.Model.has_edge?(crown, 2, 4)
+    assert not Yog.Model.has_edge?(crown, 2, 5)
+  end
+
+  test "crown/1 crown(2) structure" do
+    # crown(2): K_{2,2} minus perfect matching
+    # K_{2,2} has 4 edges forming C4: (0,2), (0,3), (1,2), (1,3)
+    # We remove (i, n+i) = (0,2), (1,3)
+    # Result: two disjoint edges (0,3) and (1,2)
+    c2 = Classic.crown(2)
+    assert Yog.Model.order(c2) == 4
+    # n(n-1) = 2*1 = 2 edges
+    assert Yog.Model.edge_count(c2) == 2
+    # Verify the remaining edges
+    assert Yog.Model.has_edge?(c2, 0, 3)
+    assert Yog.Model.has_edge?(c2, 1, 2)
+    assert not Yog.Model.has_edge?(c2, 0, 2)
+    assert not Yog.Model.has_edge?(c2, 1, 3)
+  end
+
+  test "crown/1 crown(3) is utility graph" do
+    # crown(3) = K_{3,3} minus perfect matching = 9 - 3 = 6 edges
+    c3 = Classic.crown(3)
+    assert Yog.Model.order(c3) == 6
+    # 3*2 = 6
+    assert Yog.Model.edge_count(c3) == 6
+  end
+
+  test "crown/1 partitions are correct" do
+    crown = Classic.crown(4)
+    # Left partition nodes (0,1,2,3) should only connect to right partition (4,5,6,7)
+    for u <- 0..3 do
+      neighbors = Yog.neighbors(crown, u)
+      neighbor_ids = Enum.map(neighbors, fn {id, _} -> id end)
+      # All neighbors should be in right partition
+      for v <- neighbor_ids do
+        assert v >= 4 and v <= 7
+      end
+    end
+
+    # Right partition nodes (4,5,6,7) should only connect to left partition (0,1,2,3)
+    for u <- 4..7 do
+      neighbors = Yog.neighbors(crown, u)
+      neighbor_ids = Enum.map(neighbors, fn {id, _} -> id end)
+
+      for v <- neighbor_ids do
+        assert v >= 0 and v <= 3
+      end
+    end
+  end
+
+  test "crown/1 edge cases" do
+    # n < 2 returns empty graph
+    assert Yog.Model.order(Classic.crown(1)) == 0
+    assert Yog.Model.order(Classic.crown(0)) == 0
+    assert Yog.Model.order(Classic.crown(-1)) == 0
+  end
+
+  test "crown/1 larger n" do
+    crown = Classic.crown(10)
+    assert Yog.Model.order(crown) == 20
+    # 10*9 = 90
+    assert Yog.Model.edge_count(crown) == 90
+    # All vertices have degree 9
+    for v <- 0..19 do
+      assert length(Yog.neighbors(crown, v)) == 9
+    end
+  end
 end
