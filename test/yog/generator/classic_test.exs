@@ -807,4 +807,175 @@ defmodule Yog.Generator.ClassicTest do
       assert length(Yog.neighbors(ml, v)) == 3
     end
   end
+
+  # ============= Friendship Graph Tests =============
+
+  test "friendship/1 creates correct structure" do
+    f3 = Classic.friendship(3)
+    # 2n + 1 = 7
+    assert Yog.Model.order(f3) == 7
+    # 3n = 9
+    assert Yog.Model.edge_count(f3) == 9
+  end
+
+  test "friendship/1 center has degree 2n" do
+    f5 = Classic.friendship(5)
+    # Node 0 is center
+    assert length(Yog.neighbors(f5, 0)) == 10
+  end
+
+  test "friendship/1 outer vertices have degree 2" do
+    f4 = Classic.friendship(4)
+    # Outer vertices are 1..8
+    for v <- 1..8 do
+      assert length(Yog.neighbors(f4, v)) == 2
+    end
+  end
+
+  test "friendship/1 forms n triangles" do
+    f3 = Classic.friendship(3)
+    # Check 3 triangles: (0,1,2), (0,3,4), (0,5,6)
+    assert Yog.Model.has_edge?(f3, 0, 1)
+    assert Yog.Model.has_edge?(f3, 0, 2)
+    assert Yog.Model.has_edge?(f3, 1, 2)
+
+    assert Yog.Model.has_edge?(f3, 0, 3)
+    assert Yog.Model.has_edge?(f3, 0, 4)
+    assert Yog.Model.has_edge?(f3, 3, 4)
+  end
+
+  test "friendship/1 edge cases" do
+    # n < 1 returns empty graph
+    assert Yog.Model.order(Classic.friendship(0)) == 0
+    assert Yog.Model.order(Classic.friendship(-1)) == 0
+
+    # F_1 is just a triangle
+    f1 = Classic.friendship(1)
+    assert Yog.Model.order(f1) == 3
+    assert Yog.Model.edge_count(f1) == 3
+  end
+
+  test "friendship theorem property" do
+    # In friendship graph, every pair of vertices has exactly one common neighbor
+    f3 = Classic.friendship(3)
+    # 7 vertices numbered 0 to 6
+    vertices = 0..6
+
+    for u <- vertices, v <- vertices, u < v do
+      common =
+        Enum.filter(Yog.neighbors(f3, u), fn n -> n in Yog.neighbors(f3, v) end)
+
+      assert length(common) == 1
+    end
+  end
+
+  # ============= Windmill Graph Tests =============
+
+  test "windmill/2 with clique_size 3 is friendship graph" do
+    w3 = Classic.windmill(3, clique_size: 3)
+    f3 = Classic.friendship(3)
+
+    assert Yog.Model.order(w3) == Yog.Model.order(f3)
+    assert Yog.Model.edge_count(w3) == Yog.Model.edge_count(f3)
+  end
+
+  test "windmill/2 creates correct node count" do
+    # W_3^{(4)}: 3 cliques of size 4 sharing a vertex
+    # Vertices: 1 + 3*(4-1) = 10
+    w = Classic.windmill(3, clique_size: 4)
+    assert Yog.Model.order(w) == 10
+    # Edges: 3 * C(4,2) = 3 * 6 = 18
+    assert Yog.Model.edge_count(w) == 18
+  end
+
+  test "windmill/2 center connects to all other vertices" do
+    # In W_n^{(k)}, center connects to all n*(k-1) outer vertices
+    w = Classic.windmill(4, clique_size: 3)
+    # Center (0) should have degree 4*(3-1) = 8
+    assert length(Yog.neighbors(w, 0)) == 8
+  end
+
+  test "windmill/2 each clique is complete" do
+    # In W_2^{(4)}, we have two K_4's sharing the center
+    w = Classic.windmill(2, clique_size: 4)
+    # Clique 1: vertices 0, 1, 2, 3
+    # All pairs should be connected
+    for u <- [0, 1, 2, 3], v <- [0, 1, 2, 3], u < v do
+      assert Yog.Model.has_edge?(w, u, v)
+    end
+  end
+
+  test "windmill/2 default clique_size is 3" do
+    w = Classic.windmill(3)
+    f = Classic.friendship(3)
+    assert Yog.Model.order(w) == Yog.Model.order(f)
+  end
+
+  test "windmill/2 edge cases" do
+    # n < 1 returns empty
+    assert Yog.Model.order(Classic.windmill(0)) == 0
+    # k < 2 returns empty
+    assert Yog.Model.order(Classic.windmill(3, clique_size: 1)) == 0
+  end
+
+  # ============= Book Graph Tests =============
+
+  test "book/1 creates correct structure" do
+    book = Classic.book(3)
+    # n + 2 = 5
+    assert Yog.Model.order(book) == 5
+    # 2n + 1 = 7
+    assert Yog.Model.edge_count(book) == 7
+  end
+
+  test "book/1 spine edge exists" do
+    book = Classic.book(3)
+    # Nodes 0 and 1 form the spine
+    assert Yog.Model.has_edge?(book, 0, 1)
+  end
+
+  test "book/1 each page forms triangle with spine" do
+    book = Classic.book(3)
+    # Pages are nodes 2, 3, 4
+    # Each page node should connect to both spine nodes (0 and 1)
+    for page <- 2..4 do
+      assert Yog.Model.has_edge?(book, 0, page)
+      assert Yog.Model.has_edge?(book, 1, page)
+    end
+  end
+
+  test "book/1 is outerplanar" do
+    # Book graphs are outerplanar (can be drawn without crossing, all vertices on outer face)
+    book = Classic.book(4)
+    assert Yog.Model.order(book) == 6
+    assert Yog.Model.edge_count(book) == 9
+  end
+
+  test "book/1 edge cases" do
+    # n < 1 returns empty
+    assert Yog.Model.order(Classic.book(0)) == 0
+
+    # B_1 is a single triangle
+    b1 = Classic.book(1)
+    assert Yog.Model.order(b1) == 3
+    assert Yog.Model.edge_count(b1) == 3
+  end
+
+  test "book vs friendship structural difference" do
+    # Both have triangles, but:
+    # - Friendship: triangles share a VERTEX
+    # - Book: triangles share an EDGE
+
+    f3 = Classic.friendship(3)
+    b3 = Classic.book(3)
+
+    # Same number of triangles (3)
+    # Friendship: 7 vertices, Book: 5 vertices
+    assert Yog.Model.order(f3) == 7
+    assert Yog.Model.order(b3) == 5
+
+    # Friendship: 9 edges, Book: 7 edges
+    assert Yog.Model.edge_count(f3) == 9
+    assert Yog.Model.edge_count(b3) == 7
+  end
 end

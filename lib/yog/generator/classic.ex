@@ -1180,6 +1180,241 @@ defmodule Yog.Generator.Classic do
     end)
   end
 
+  # ============= Friendship and Windmill Graphs =============
+
+  @doc """
+  Generates the friendship graph F_n with n triangles.
+
+  The friendship graph consists of n triangles all sharing a common vertex.
+  Also known as the Dutch windmill graph W_n^{(3)} or the friendship theorem graph.
+
+  Famous for the **Friendship Theorem**: if every pair of vertices in a finite
+  graph has exactly one common neighbor, then the graph must be a friendship graph.
+
+  ## Examples
+
+      iex> f3 = Yog.Generator.Classic.friendship(3)
+      iex> Yog.Model.order(f3)
+      7
+      iex> Yog.Model.edge_count(f3)
+      9
+
+  ## Properties
+
+  - Vertices: 2n + 1 (1 center + 2n outer vertices)
+  - Edges: 3n (n triangles, each with 3 edges)
+  - Center has degree 2n, outer vertices have degree 2
+  - Chromatic number: 3
+  - Diameter: 2, Radius: 1
+  - Planar
+
+  ## Use Cases
+
+  - Graph theory education (Friendship Theorem)
+  - Testing graphs with specific local properties
+  - Social network models (hub with triadic closure)
+  """
+  @spec friendship(integer()) :: Yog.graph()
+  def friendship(n) when is_integer(n) and n >= 1 do
+    friendship_with_type(n, :undirected)
+  end
+
+  def friendship(_n), do: Yog.new(:undirected)
+
+  @doc """
+  Generates the friendship graph with specified graph type.
+  """
+  @spec friendship_with_type(integer(), Yog.graph_type()) :: Yog.graph()
+  def friendship_with_type(n, _graph_type) when not is_integer(n) or n < 1,
+    do: Yog.new(:undirected)
+
+  def friendship_with_type(n, graph_type) do
+    base = Yog.new(graph_type)
+
+    # Node 0 is the center
+    # Nodes 1..2n are outer vertices (n pairs forming triangles with center)
+    total_vertices = 2 * n + 1
+
+    graph =
+      Enum.reduce(0..(total_vertices - 1)//1, base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # Create n triangles: (0, 2i-1, 2i) for i in 1..n
+    # Using 1-based indexing for pairs: pair i consists of nodes 2i-1 and 2i
+    edges =
+      for i <- 1..n//1,
+          outer1 = 2 * i - 1,
+          outer2 = 2 * i,
+          # Triangle edges: center to both outer, and outer to outer
+          edge <- [{0, outer1, 1}, {0, outer2, 1}, {outer1, outer2, 1}],
+          do: edge
+
+    Enum.reduce(edges, graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
+
+  @doc """
+  Generates the windmill graph W_n^{(k)}.
+
+  Generalization of the friendship graph where n copies of K_k (complete graph
+  on k vertices) share a common vertex. The friendship graph is W_n^{(3)}.
+
+  ## Options
+    - `:clique_size` - Size k of the cliques (default: 3)
+
+  ## Examples
+
+      iex> # Windmill of 4 triangles (same as friendship(4))
+      ...> w4 = Yog.Generator.Classic.windmill(4, clique_size: 3)
+      iex> Yog.Model.order(w4)
+      9
+
+      iex> # Windmill of 3 squares (4-cliques sharing a vertex)
+      ...> w3_4 = Yog.Generator.Classic.windmill(3, clique_size: 4)
+      iex> Yog.Model.order(w3_4)
+      10
+
+  ## Properties
+
+  - Vertices: 1 + n(k-1)
+  - Edges: n × C(k,2) = n × k(k-1)/2
+  - Center has degree n(k-1)
+
+  ## Use Cases
+
+  - Generalized friendship graphs
+  - Intersection graph theory
+  - Clique decomposition studies
+  """
+  @spec windmill(integer(), keyword()) :: Yog.graph()
+  def windmill(n, opts \\ [])
+
+  def windmill(n, opts) when is_integer(n) and n >= 1 do
+    k = Keyword.get(opts, :clique_size, 3)
+    graph_type = Keyword.get(opts, :type, :undirected)
+    windmill_with_type(n, k, graph_type)
+  end
+
+  def windmill(_n, _opts), do: Yog.new(:undirected)
+
+  @doc """
+  Generates the windmill graph with specified graph type.
+  """
+  @spec windmill_with_type(integer(), integer(), Yog.graph_type()) :: Yog.graph()
+  def windmill_with_type(n, _k, _graph_type) when not is_integer(n) or n < 1,
+    do: Yog.new(:undirected)
+
+  def windmill_with_type(_n, k, _graph_type) when not is_integer(k) or k < 2,
+    do: Yog.new(:undirected)
+
+  def windmill_with_type(n, k, graph_type) do
+    base = Yog.new(graph_type)
+
+    # Node 0 is the center shared by all cliques
+    # Each clique adds k-1 new vertices
+    total_vertices = 1 + n * (k - 1)
+
+    graph =
+      Enum.reduce(0..(total_vertices - 1)//1, base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # For each of the n cliques:
+    # - Clique i uses vertices: 0 (center), and vertices from (1 + i*(k-1)) to (1 + (i+1)*(k-1) - 1)
+    # - Add all edges within each clique (complete graph)
+    edges =
+      for i <- 0..(n - 1)//1,
+          # Vertices in this clique (excluding center)
+          clique_start = 1 + i * (k - 1),
+          clique_end = clique_start + k - 2,
+          clique_vertices = [0 | Enum.to_list(clique_start..clique_end//1)],
+          # All pairs in the clique form edges
+          {u, v} <- pairs(clique_vertices),
+          do: {u, v, 1}
+
+    Enum.reduce(edges, graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
+
+  # Helper function to generate all unordered pairs from a list
+  defp pairs([]), do: []
+  defp pairs([_]), do: []
+
+  defp pairs([h | t]) do
+    head_pairs = for elem <- t, do: {h, elem}
+    head_pairs ++ pairs(t)
+  end
+
+  @doc """
+  Generates the book graph B_n.
+
+  The book graph consists of n triangles (4-cycles in the general definition,
+  but commonly triangles) all sharing a common edge (the "spine").
+
+  ## Examples
+
+      iex> book = Yog.Generator.Classic.book(3)
+      iex> Yog.Model.order(book)
+      5
+      iex> Yog.Model.edge_count(book)
+      7
+
+  ## Properties
+
+  - Vertices: n + 2 (2 spine vertices + n page vertices)
+  - Edges: 2n + 1 (n triangles sharing the spine edge)
+  - Planar
+  - Outerplanar
+
+  ## Use Cases
+
+  - Graph drawing and book embeddings
+  - Outerplanar graph studies
+  - Pagenumber of graphs
+  """
+  @spec book(integer()) :: Yog.graph()
+  def book(n) when is_integer(n) and n >= 1 do
+    book_with_type(n, :undirected)
+  end
+
+  def book(_n), do: Yog.new(:undirected)
+
+  @doc """
+  Generates the book graph with specified graph type.
+  """
+  @spec book_with_type(integer(), Yog.graph_type()) :: Yog.graph()
+  def book_with_type(n, _graph_type) when not is_integer(n) or n < 1,
+    do: Yog.new(:undirected)
+
+  def book_with_type(n, graph_type) do
+    base = Yog.new(graph_type)
+
+    # Nodes 0 and 1 form the spine (shared edge)
+    # Nodes 2..(n+1) are the page vertices (each forms a triangle with spine)
+    total_vertices = n + 2
+
+    graph =
+      Enum.reduce(0..(total_vertices - 1)//1, base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    # Spine edge
+    edges = [{0, 1, 1}]
+
+    # Each page vertex forms a triangle with the spine
+    page_edges =
+      for i <- 2..(n + 1)//1,
+          edge <- [{0, i, 1}, {1, i, 1}],
+          do: edge
+
+    Enum.reduce(edges ++ page_edges, graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
+
   # ============= Turan Graph =============
 
   @doc """
