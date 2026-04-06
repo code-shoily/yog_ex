@@ -1056,23 +1056,34 @@ defmodule Yog.Transform do
   @spec transitive_reduction(Graph.t()) :: {:ok, Graph.t()} | {:error, :contains_cycle}
   def transitive_reduction(%Graph{} = graph) do
     case Yog.Traversal.topological_sort(graph) do
-      {:ok, _sorted} ->
-        nodes = Map.keys(graph.nodes)
+      {:ok, sorted} ->
+        reachability = compute_reachability_dp(graph, sorted)
         out_edges = graph.out_edges
 
         edges_to_remove =
-          List.foldl(nodes, [], fn node, acc ->
+          List.foldl(sorted, [], fn node, acc ->
             case Map.fetch(out_edges, node) do
-              {:ok, inner} ->
-                List.foldl(Map.to_list(inner), acc, fn {target, _weight}, inner_acc ->
-                  if has_indirect_path?(graph, node, target) do
+              {:ok, inner} when map_size(inner) > 0 ->
+                targets = Map.keys(inner)
+
+                List.foldl(targets, acc, fn target, inner_acc ->
+                  has_indirect =
+                    Enum.any?(targets, fn other_succ ->
+                      other_succ != target and
+                        MapSet.member?(
+                          Map.get(reachability, other_succ, MapSet.new()),
+                          target
+                        )
+                    end)
+
+                  if has_indirect do
                     [{node, target} | inner_acc]
                   else
                     inner_acc
                   end
                 end)
 
-              :error ->
+              _ ->
                 acc
             end
           end)
@@ -1164,22 +1175,29 @@ defmodule Yog.Transform do
     end)
   end
 
-  defp has_indirect_path?(graph, from, to) do
-    successors =
-      case Map.fetch(graph.out_edges, from) do
-        {:ok, edges} -> Map.keys(edges)
-        :error -> []
+  # Computes reachability using dynamic programming in reverse topological order.
+  # Returns a map of node => MapSet of reachable nodes.
+  # Time Complexity: O(V * (V+E)) - much faster than O(E * (V+E)) for dense graphs
+  defp compute_reachability_dp(graph, sorted_nodes) do
+    out_edges = graph.out_edges
+
+    List.foldl(Enum.reverse(sorted_nodes), %{}, fn node, acc ->
+      case Map.fetch(out_edges, node) do
+        {:ok, edges} when map_size(edges) > 0 ->
+          successors = Map.keys(edges)
+
+          reachable_from_successors =
+            Enum.reduce(successors, MapSet.new(), fn succ, set ->
+              succ_reachable = Map.get(acc, succ, MapSet.new())
+              MapSet.union(set, succ_reachable)
+            end)
+
+          all_reachable = MapSet.union(reachable_from_successors, MapSet.new(successors))
+          Map.put(acc, node, all_reachable)
+
+        _ ->
+          acc
       end
-
-    has_indirect? =
-      List.foldl(successors, false, fn successor, found? ->
-        if found? or successor == to do
-          found?
-        else
-          Yog.Traversal.reachable?(graph, successor, to) or found?
-        end
-      end)
-
-    has_indirect?
+    end)
   end
 end
