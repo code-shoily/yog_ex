@@ -12,6 +12,7 @@ defmodule YogEx.MixProject do
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
+      dialyzer: [plt_add_apps: [:mix], flags: [:no_opaque]],
 
       # Hex
       description: "A comprehensive pure Elixir graph algorithm library",
@@ -64,6 +65,7 @@ defmodule YogEx.MixProject do
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:stream_data, "~> 1.1", only: [:dev, :test]},
       {:benchee, "~> 1.3", only: :dev},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.18", only: :test}
     ]
   end
