@@ -365,6 +365,14 @@ defmodule Yog.Builder.Grid do
   4-way cardinal movement (up, down, left, right).
 
   Default for `from_2d_list/3`. Movement offsets: `{-1,0}, {1,0}, {0,-1}, {0,1}`
+
+  ```text
+  . ↑ .
+  ← · →
+  . ↓ .
+  ```
+
+  This is the topology used by `from_2d_list/3`.
   """
   @spec rook() :: topology()
   def rook do
@@ -375,6 +383,12 @@ defmodule Yog.Builder.Grid do
   4-way diagonal movement.
 
   Movement offsets: `{-1,-1}, {-1,1}, {1,-1}, {1,1}`
+
+  ```text
+  ↖ . ↗
+  . · .
+  ↙ . ↘
+  ```
   """
   @spec bishop() :: topology()
   def bishop do
@@ -385,6 +399,12 @@ defmodule Yog.Builder.Grid do
   8-way movement (cardinal + diagonal).
 
   Combines `rook/0` and `bishop/0`. Use with appropriate distance heuristic.
+
+  ```text
+  ↖ ↑ ↗
+  ← · →
+  ↙ ↓ ↘
+  ```
   """
   @spec queen() :: topology()
   def queen do
@@ -404,6 +424,14 @@ defmodule Yog.Builder.Grid do
   L-shaped knight jumps in all 8 orientations.
 
   Chess knight movement: `{-2,-1}, {-2,1}, {-1,-2}, {-1,2}, {1,-2}, {1,2}, {2,-1}, {2,1}`
+
+  ```text
+  . ♘ .
+  ♞ . ♞
+  . ♘ .
+  ```
+
+  This may seen less conventional, but if rook, bishop and queen could make it, why not knight?
   """
   @spec knight() :: topology()
   def knight do
