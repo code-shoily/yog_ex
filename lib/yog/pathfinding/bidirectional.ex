@@ -388,6 +388,7 @@ defmodule Yog.Pathfinding.Bidirectional do
     end
   end
 
+  @dialyzer :no_match
   defp do_bidirectional_dijkstra_step(
          _graph,
          :empty,

@@ -459,7 +459,7 @@ defmodule Yog.IO.JSON do
       iex> Yog.IO.JSON.json_type(d3_force_map)
       {:ok, :d3_force}
   """
-  @spec json_type(String.t() | map()) :: {:ok, atom()} | {:error, String.t()}
+  @spec json_type(String.t() | map()) :: {:ok, atom()} | {:error, Jason.DecodeError.t()}
   def json_type(input) when is_binary(input) do
     case Jason.decode(input) do
       {:ok, map} -> json_type(map)

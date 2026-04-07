@@ -217,18 +217,18 @@ defmodule Yog.Community.Infomap do
         total_weight = Map.get(node_weights, u, 0.0)
         u_pr = Map.get(pr, u, 0.0)
 
-        if total_weight > 0.0 and u_pr < 1.0e200 and is_number(u_pr) and u_pr > 0.0 do
+        if total_weight > 0.0 and u_pr < 1.0e200 and u_pr > 0.0 do
           ratio = u_pr / total_weight
 
-          if is_number(ratio) and ratio < 1.0e200 do
+          if ratio < 1.0e200 do
             contribution_per_weight = min(ratio * (1.0 - alpha), 1.0e200)
 
             List.foldl(neighbors, acc, fn {v, weight}, inner_acc ->
-              if is_number(contribution_per_weight) and contribution_per_weight < 1.0e200 do
+              if contribution_per_weight < 1.0e200 do
                 safe_weight = min(max(weight, 0.0), 1.0e100)
                 flow = contribution_per_weight * safe_weight
 
-                if is_number(flow) and flow < 1.0e200 do
+                if flow < 1.0e200 do
                   Map.update(inner_acc, v, flow, &(&1 + flow))
                 else
                   inner_acc

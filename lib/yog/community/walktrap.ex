@@ -231,11 +231,6 @@ defmodule Yog.Community.Walktrap do
   # =============================================================================
   # HIERARCHICAL MERGING
   # =============================================================================
-
-  defp do_walktrap_merge(levels, _p_t, _degrees, _nodes, _pt_cache) when levels == [] do
-    Dendrogram.new([], [])
-  end
-
   defp do_walktrap_merge(levels, p_t, degrees, nodes, pt_cache) do
     current_level = List.first(levels)
 

@@ -329,8 +329,6 @@ defmodule Yog.Connectivity.Reachability do
     do_clz(value, 32, 0)
   end
 
-  defp do_clz(0, _bits, count), do: count
-
   defp do_clz(value, bits, count) when value > 0 do
     if band(value, bsl(1, bits - 1)) == 0 do
       do_clz(value, bits - 1, count + 1)
