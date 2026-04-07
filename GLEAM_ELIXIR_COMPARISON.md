@@ -61,8 +61,8 @@ This document compares the Gleam and Elixir (YogEx) implementations of the Yog g
 | **Min Cut from Max Flow** | ✅ | ✅ | Both fully functional |
 | **Stoer-Wagner** (Global Min Cut) | ✅ | ✅ | Both fully functional |
 | **Network Simplex** (Min Cost Flow) | ✅ | ✅ | Both complete implementations |
-| **Successive Shortest Path** | ❌ | ✅ | **Elixir only** |
-| **Capacity Scaling** | ❌ | ✅ | **Elixir only** |
+| **Successive Shortest Path** | ❌ | ✅ | **Elixir only** - Min-cost flow with potentials |
+| **Capacity Scaling** | ❌ | ✅ | **Elixir only** - Max flow with scaling technique |
 
 **Status**: ✅ Elixir has additional flow algorithms (Successive Shortest Path, Capacity Scaling)
 
@@ -116,8 +116,10 @@ This document compares the Gleam and Elixir (YogEx) implementations of the Yog g
 | **Fluid Communities** | ✅ | ✅ | Exact `k` partitions, fast |
 | **Metrics & Modularity** | ✅ | ✅ | Quality evaluation |
 | **SBM Generator** | ❌ | ✅ | **Elixir only** - Stochastic Block Model for testing |
+| **Triangle Count** | ❌ | ✅ | **Elixir only** - Fast triangle enumeration per node and total |
+| **Clustering Coefficient** | ❌ | ✅ | **Elixir only** - Local and average clustering metrics |
 
-**Status**: ✅ Feature parity + Elixir has SBM generator for community testing
+**Status**: ✅ Feature parity + Elixir has SBM generator and triangle counting metrics
 
 ## Minimum Spanning Trees
 
@@ -144,8 +146,19 @@ This document compares the Gleam and Elixir (YogEx) implementations of the Yog g
 | **Complete Bipartite** | ✅ | ✅ | K_{m,n} |
 | **Petersen Graph** | ✅ | ✅ | Famous 10-node graph |
 | **Empty Graph** | ✅ | ✅ | Isolated nodes |
+| **Platonic Solids** | ❌ | ✅ | **Elixir only** - Tetrahedron, Cube, Octahedron, Dodecahedron, Icosahedron |
+| **k-ary Tree** | ❌ | ✅ | **Elixir only** - Complete k-ary tree with configurable arity |
+| **Caterpillar Tree** | ❌ | ✅ | **Elixir only** - Trees with central spine |
+| **Circular Ladder** | ❌ | ✅ | **Elixir only** - Prism graph CL_n = C_n × K_2 |
+| **Möbius Ladder** | ❌ | ✅ | **Elixir only** - Möbius ladder ML_n with twist topology |
+| **Friendship Graph** | ❌ | ✅ | **Elixir only** - F_n with n triangles sharing common vertex |
+| **Book Graph** | ❌ | ✅ | **Elixir only** - B_n with triangles sharing common edge |
+| **Crown Graph** | ❌ | ✅ | **Elixir only** - S_n^0 = K_{n,n} minus perfect matching |
+| **Balanced Tree** | ❌ | ✅ | **Elixir only** - Perfect r-ary tree of height h |
+| **Binomial Tree** | ❌ | ✅ | **Elixir only** - B_n recursive tree structure |
+| **Turán Graph** | ❌ | ✅ | **Elixir only** - T(n,r) complete r-partite graph |
 
-**Status**: ✅ Elixir has additional classic generators
+**Status**: ✅ Elixir has additional classic generators (Platonic solids, tree variants, ladder graphs, friendship/book graphs, Turán)
 
 ### Random Network Models
 
@@ -157,8 +170,12 @@ This document compares the Gleam and Elixir (YogEx) implementations of the Yog g
 | **Watts-Strogatz** | ✅ | ✅ | Small-world networks |
 | **Random Trees** | ✅ | ✅ | Uniformly random spanning trees |
 | **Stochastic Block Model** | ❌ | ✅ | **Elixir only** - Planted communities |
+| **Configuration Model** | ❌ | ✅ | **Elixir only** - Stub matching with degree sequence preservation |
+| **Kronecker Graphs** | ❌ | ✅ | **Elixir only** - R-MAT recursive matrix generator |
+| **Geometric Graphs** | ❌ | ✅ | **Elixir only** - 2D/ND spatial networks with distance threshold |
+| **Waxman Model** | ❌ | ✅ | **Elixir only** - Distance-probabilistic edge formation |
 
-**Status**: ✅ Elixir has additional random graph models
+**Status**: ✅ Elixir has additional random graph models (Configuration, Kronecker, Geometric, Waxman)
 
 ## Graph Operations
 
@@ -229,10 +246,18 @@ This document compares the Gleam and Elixir (YogEx) implementations of the Yog g
 | **Temporal Graphs** | Time-evolving graph structures |
 | **SBM Generator** | Stochastic Block Model for community detection testing |
 | **Johnson's Algorithm** | All-pairs shortest paths for sparse graphs |
+| **Single-Pair Shortest Path (Unweighted)** | BFS-based path finding with early termination |
 | **Line Graph** | Convert edges to nodes |
 | **Block Cut Tree** | Biconnected component tree structure |
 | **ASCII Rendering** | Terminal-based graph visualization |
 | **Extensive I/O** | GraphML, GDF, Pajek, LEDA, TGF support |
+| **Platonic Solid Generators** | Tetrahedron, Cube, Octahedron, Dodecahedron, Icosahedron |
+| **Tree Generators** | k-ary, Caterpillar, Balanced, Binomial trees |
+| **Ladder Graphs** | Circular and Möbius ladder variants |
+| **Friendship/Book Graphs** | Social network structured graphs |
+| **Turán Graph** | Complete multipartite graphs |
+| **Random Graph Models** | Configuration, Kronecker, Geometric, Waxman |
+| **Triangle Counting** | Fast triangle enumeration and clustering metrics |
 
 ### Gleam Only
 
