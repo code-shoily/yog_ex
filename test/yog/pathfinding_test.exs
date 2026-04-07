@@ -139,6 +139,151 @@ defmodule Yog.PathfindingTest do
   end
 
   # =============================================================================
+  # shortest_path_unweighted/3 - BFS single-pair shortest path
+  # =============================================================================
+
+  describe "shortest_path_unweighted/3" do
+    test "finds shortest path in a simple chain" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_node(3, nil)
+        |> Yog.add_node(4, nil)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+        |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
+
+      assert {:ok, [1, 2, 3, 4]} = Pathfinding.shortest_path_unweighted(graph, 1, 4)
+      assert {:ok, [1, 2]} = Pathfinding.shortest_path_unweighted(graph, 1, 2)
+      assert {:ok, [2, 3]} = Pathfinding.shortest_path_unweighted(graph, 2, 3)
+    end
+
+    test "returns same node when source equals target" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_node(1, nil)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+
+      assert {:ok, [1]} = Pathfinding.shortest_path_unweighted(graph, 1, 1)
+      assert {:ok, [2]} = Pathfinding.shortest_path_unweighted(graph, 2, 2)
+    end
+
+    test "returns error when no path exists" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_node(3, nil)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+
+      assert {:error, :no_path} = Pathfinding.shortest_path_unweighted(graph, 1, 3)
+      assert {:error, :no_path} = Pathfinding.shortest_path_unweighted(graph, 3, 1)
+    end
+
+    test "respects edge direction in directed graphs" do
+      graph =
+        Yog.directed()
+        |> Yog.add_node(:a, nil)
+        |> Yog.add_node(:b, nil)
+        |> Yog.add_node(:c, nil)
+        |> Yog.add_edge_ensure(from: :a, to: :b, with: 1)
+        |> Yog.add_edge_ensure(from: :b, to: :c, with: 1)
+
+      # Forward direction works
+      assert {:ok, [:a, :b, :c]} = Pathfinding.shortest_path_unweighted(graph, :a, :c)
+      # Backward direction fails
+      assert {:error, :no_path} = Pathfinding.shortest_path_unweighted(graph, :c, :a)
+    end
+
+    test "finds shortest path in a graph with multiple routes" do
+      # Graph: 1-2-4 and 1-3-4 (both length 3)
+      graph =
+        Yog.undirected()
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_node(3, nil)
+        |> Yog.add_node(4, nil)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 2, to: 4, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 3, with: 1)
+        |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
+
+      {:ok, path} = Pathfinding.shortest_path_unweighted(graph, 1, 4)
+      assert length(path) == 3
+      assert hd(path) == 1
+      assert List.last(path) == 4
+    end
+
+    test "handles cycle graphs" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_node(3, nil)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+        |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
+
+      # Should find the direct edge, not go around the cycle
+      {:ok, path} = Pathfinding.shortest_path_unweighted(graph, 1, 2)
+      assert length(path) == 2
+      assert path == [1, 2]
+    end
+
+    test "handles star graph" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_node(:center, nil)
+        |> Yog.add_node(:a, nil)
+        |> Yog.add_node(:b, nil)
+        |> Yog.add_node(:c, nil)
+        |> Yog.add_edge_ensure(from: :center, to: :a, with: 1)
+        |> Yog.add_edge_ensure(from: :center, to: :b, with: 1)
+        |> Yog.add_edge_ensure(from: :center, to: :c, with: 1)
+
+      # Leaf to leaf goes through center
+      assert {:ok, [:a, :center, :b]} = Pathfinding.shortest_path_unweighted(graph, :a, :b)
+      assert {:ok, [:a, :center, :c]} = Pathfinding.shortest_path_unweighted(graph, :a, :c)
+      assert {:ok, [:b, :center, :c]} = Pathfinding.shortest_path_unweighted(graph, :b, :c)
+    end
+
+    test "handles single node graph" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_node(1, nil)
+
+      assert {:ok, [1]} = Pathfinding.shortest_path_unweighted(graph, 1, 1)
+    end
+
+    test "handles isolated nodes" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+
+      assert {:error, :no_path} = Pathfinding.shortest_path_unweighted(graph, 1, 2)
+    end
+
+    test "handles integer and atom node IDs" do
+      int_graph =
+        Yog.undirected()
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+
+      atom_graph =
+        Yog.undirected()
+        |> Yog.add_node(:a, nil)
+        |> Yog.add_node(:b, nil)
+        |> Yog.add_edge_ensure(from: :a, to: :b, with: 1)
+
+      assert {:ok, [1, 2]} = Pathfinding.shortest_path_unweighted(int_graph, 1, 2)
+      assert {:ok, [:a, :b]} = Pathfinding.shortest_path_unweighted(atom_graph, :a, :b)
+    end
+  end
+
+  # =============================================================================
   # Dijkstra Facade - shortest_path/1, single_source_distances/1
   # =============================================================================
 

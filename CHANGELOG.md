@@ -44,6 +44,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `geometric_nd/2` - N-dimensional geometric graph
   - `waxman/2` - Waxman model with distance-probabilistic edge formation
 
+#### Pathfinding
+- **Single-Pair Shortest Path (Unweighted)**: Added `Yog.Pathfinding.shortest_path_unweighted/3` - finds the shortest path between two nodes in unweighted graphs using BFS with early termination. More efficient than Dijkstra for unweighted graphs (no heap overhead) and uses predecessor map for memory-efficient path reconstruction instead of storing full paths in the queue.
+  - Returns `{:ok, [node_id]}` with the path from source to target
+  - Returns `{:error, :no_path}` when target is unreachable
+  - Validates source/target existence before searching
+  - Works with both directed and undirected graphs
+
 #### Other Changes
 - **Pathfinding**: Added `Johnson's algorithm` to Matrix auto-selection for non-negative weights on sparse graphs with many POIs. Previously Johnson's was only used with negative weights; now it's also selected for sparse graphs (E < V²/4) with many POIs (P > V/3) instead of Floyd-Warshall.
 

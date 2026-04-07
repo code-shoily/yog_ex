@@ -312,15 +312,12 @@ defmodule Yog.Pathfinding do
   def all_pairs_shortest_paths_unweighted(graph) do
     nodes = Yog.Model.all_nodes(graph)
 
-    # 1. Determine concurrency based on hardware
-    # We use schedulers_online to ensure we hit every core without overloading
     parallel_opts = [
       max_concurrency: System.schedulers_online(),
       timeout: :infinity,
       ordered: false
     ]
 
-    # 2. Parallelize the BFS from every node
     nodes
     |> Task.async_stream(
       fn source ->
@@ -333,9 +330,174 @@ defmodule Yog.Pathfinding do
     end)
   end
 
+  # =============================================================================
+  # Single-Pair Shortest Path (Unweighted) - BFS with early termination
+  # =============================================================================
+
+  @doc """
+  Finds the shortest path between two nodes in an unweighted graph using BFS.
+
+  This is significantly faster than Dijkstra for unweighted graphs because:
+  1. Uses BFS instead of Dijkstra's algorithm (no heap overhead)
+  2. Stops as soon as the target is found (early termination)
+  3. Works for both directed and undirected graphs
+  4. Handles nil weights or uniform weights (e.g., all weight=1)
+
+  ## Parameters
+
+    * `graph` - The unweighted graph (directed or undirected)
+    * `source` - Starting node ID
+    * `target` - Target node ID
+
+  ## Returns
+
+    * `{:ok, [node_id]}` - List of nodes representing the shortest path from source to target
+    * `{:ok, [source]}` - When source == target
+    * `{:error, :no_path}` - When target is unreachable from source
+
+  ## Complexity
+
+    * **Time:** O(V + E) worst case, but typically much less due to early termination
+    * **Space:** O(V) for the queue and visited set
+
+  ## Examples
+
+      # Simple path: 1-2-3
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      iex> Yog.Pathfinding.shortest_path_unweighted(graph, 1, 3)
+      {:ok, [1, 2, 3]}
+
+      # Same source and target
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      iex> Yog.Pathfinding.shortest_path_unweighted(graph, 1, 1)
+      {:ok, [1]}
+
+      # No path exists
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(:a, nil)
+      ...> |> Yog.add_node(:b, nil)
+      iex> Yog.Pathfinding.shortest_path_unweighted(graph, :a, :b)
+      {:error, :no_path}
+
+      # Directed graph - respects edge direction
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      iex> Yog.Pathfinding.shortest_path_unweighted(graph, 1, 3)
+      {:ok, [1, 2, 3]}
+      iex> Yog.Pathfinding.shortest_path_unweighted(graph, 3, 1)
+      {:error, :no_path}
+
+  ## When to Use
+
+    * **Unweighted graphs** - All edges have the same cost (or nil weight)
+    * **Single pair query** - When you only need one source-target path
+    * **Performance critical** - Faster than Dijkstra for unweighted graphs
+
+  ## See Also
+
+    * `shortest_path/1` - Dijkstra for weighted graphs
+    * `bidirectional_unweighted/1` - Bidirectional BFS (potentially faster for large graphs)
+    * `all_pairs_shortest_paths_unweighted/1` - When you need all-pairs distances
+
+  """
+  @spec shortest_path_unweighted(Yog.graph(), Yog.node_id(), Yog.node_id()) ::
+          {:ok, [Yog.node_id()]} | {:error, :no_path}
+  def shortest_path_unweighted(graph, source, target) when source == target do
+    if Yog.Model.has_node?(graph, source) do
+      {:ok, [source]}
+    else
+      {:error, :no_path}
+    end
+  end
+
+  def shortest_path_unweighted(graph, source, target) do
+    cond do
+      not Yog.Model.has_node?(graph, source) ->
+        {:error, :no_path}
+
+      not Yog.Model.has_node?(graph, target) ->
+        {:error, :no_path}
+
+      true ->
+        q = :queue.in({source, 0}, :queue.new())
+        visited = MapSet.new([source])
+        predecessors = %{source => nil}
+
+        case do_bfs_path_optimized(graph, q, visited, predecessors, target) do
+          nil -> {:error, :no_path}
+          preds -> {:ok, reconstruct_path(preds, target)}
+        end
+    end
+  end
+
+  # BFS with predecessor map - memory efficient
+  defp do_bfs_path_optimized(graph, q, visited, predecessors, target) do
+    case :queue.out(q) do
+      {:empty, _} ->
+        nil
+
+      {{:value, {curr, _depth}}, rest_q} ->
+        if curr == target do
+          predecessors
+        else
+          neighbors =
+            case Yog.Model.successors(graph, curr) do
+              [] -> []
+              succs -> Enum.map(succs, &elem(&1, 0))
+            end
+
+          {next_q, next_visited, next_preds, found} =
+            Enum.reduce(neighbors, {rest_q, visited, predecessors, false}, fn nb,
+                                                                              {q_acc, v_acc,
+                                                                               p_acc, found_acc} ->
+              cond do
+                found_acc ->
+                  {q_acc, v_acc, p_acc, found_acc}
+
+                nb == target ->
+                  next_q = :queue.in({nb, 0}, q_acc)
+                  next_v = MapSet.put(v_acc, nb)
+                  next_p = Map.put(p_acc, nb, curr)
+                  {next_q, next_v, next_p, true}
+
+                MapSet.member?(v_acc, nb) ->
+                  {q_acc, v_acc, p_acc, found_acc}
+
+                true ->
+                  next_q = :queue.in({nb, 0}, q_acc)
+                  next_v = MapSet.put(v_acc, nb)
+                  next_p = Map.put(p_acc, nb, curr)
+                  {next_q, next_v, next_p, found_acc}
+              end
+            end)
+
+          if found do
+            next_preds
+          else
+            do_bfs_path_optimized(graph, next_q, next_visited, next_preds, target)
+          end
+        end
+    end
+  end
+
+  # Reconstruct path from target back to source using predecessor map
+  defp reconstruct_path(predecessors, target) do
+    do_reconstruct_path(predecessors, target, [])
+  end
+
+  defp do_reconstruct_path(predecessors, node, acc) do
+    case Map.get(predecessors, node) do
+      nil -> [node | acc]
+      parent -> do_reconstruct_path(predecessors, parent, [node | acc])
+    end
+  end
+
   # Standard BFS to find all distances from a single source: O(V + E)
   defp bfs_distances(graph, source) do
-    # Handle edge case: isolated node (no edges at all)
     case Yog.Model.successors(graph, source) do
       [] ->
         %{source => 0}
@@ -352,8 +514,6 @@ defmodule Yog.Pathfinding do
         visited
 
       {{:value, {curr, dist}}, rest_q} ->
-        # Use Model.successors for proper encapsulation
-        # Returns list of {neighbor, weight} tuples; we only need neighbor IDs for unweighted
         neighbors = Yog.Model.successors(graph, curr) |> Enum.map(&elem(&1, 0))
 
         {next_q, next_v} =

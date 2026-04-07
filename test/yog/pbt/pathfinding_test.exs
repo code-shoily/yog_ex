@@ -303,6 +303,152 @@ defmodule Yog.PBT.PathfindingTest do
     end
   end
 
+  # =============================================================================
+  # shortest_path_unweighted/3 Properties
+  # =============================================================================
+
+  describe "shortest_path_unweighted/3 Properties" do
+    property "Shortest path length matches BFS distance" do
+      check all(
+              nodes <- node_list_gen(2, 15),
+              weights <- weight_list_gen(length(nodes)),
+              graph = build_unweighted_graph(nodes, weights),
+              [s, t] <- StreamData.uniq_list_of(StreamData.member_of(nodes), length: 2)
+            ) do
+        # Single-pair BFS result
+        sp_result = Yog.Pathfinding.shortest_path_unweighted(graph, s, t)
+
+        # All-pairs BFS for verification
+        all_pairs = Yog.Pathfinding.all_pairs_shortest_paths_unweighted(graph)
+        expected_dist = all_pairs[s][t]
+
+        case {sp_result, expected_dist} do
+          {{:ok, path}, dist} when is_integer(dist) ->
+            # Path length should be distance + 1 (nodes vs edges)
+            assert length(path) == dist + 1
+            assert hd(path) == s
+            assert List.last(path) == t
+
+          {{:error, :no_path}, nil} ->
+            assert true
+
+          _ ->
+            flunk("Mismatch: sp=#{inspect(sp_result)}, dist=#{inspect(expected_dist)}")
+        end
+      end
+    end
+
+    property "Shortest path unweighted agrees with Dijkstra on unweighted graphs" do
+      check all(
+              nodes <- node_list_gen(2, 12),
+              weights <- weight_list_gen(length(nodes)),
+              graph = build_unweighted_graph(nodes, weights),
+              [s, t] <- StreamData.uniq_list_of(StreamData.member_of(nodes), length: 2)
+            ) do
+        bfs_result = Yog.Pathfinding.shortest_path_unweighted(graph, s, t)
+        dijkstra_result = Yog.Pathfinding.Dijkstra.shortest_path(graph, s, t)
+
+        case {bfs_result, dijkstra_result} do
+          {{:ok, bfs_path}, {:ok, d_path}} ->
+            # Both should find paths of same length
+            assert length(bfs_path) == length(d_path.nodes)
+
+          {{:error, :no_path}, :error} ->
+            assert true
+
+          _ ->
+            flunk(
+              "Inconsistent: BFS=#{inspect(bfs_result)}, Dijkstra=#{inspect(dijkstra_result)}"
+            )
+        end
+      end
+    end
+
+    property "Shortest path is symmetric in undirected graphs" do
+      check all(
+              nodes <- node_list_gen(2, 12),
+              edges <- weight_list_gen(length(nodes)),
+              graph = build_unweighted_graph_undirected(nodes, edges),
+              [s, t] <- StreamData.uniq_list_of(StreamData.member_of(nodes), length: 2)
+            ) do
+        st_result = Yog.Pathfinding.shortest_path_unweighted(graph, s, t)
+        ts_result = Yog.Pathfinding.shortest_path_unweighted(graph, t, s)
+
+        case {st_result, ts_result} do
+          {{:ok, st_path}, {:ok, ts_path}} ->
+            # Paths should have same length (though may be different routes)
+            assert length(st_path) == length(ts_path)
+
+          {{:error, :no_path}, {:error, :no_path}} ->
+            assert true
+
+          _ ->
+            flunk(
+              "Asymmetric result: #{s}->#{t}=#{inspect(st_result)}, #{t}->#{s}=#{inspect(ts_result)}"
+            )
+        end
+      end
+    end
+
+    property "Path concatenation: if s->t and t->u, then s->u exists (triangle inequality)" do
+      check all(
+              nodes <- node_list_gen(3, 12),
+              weights <- weight_list_gen(length(nodes)),
+              graph = build_unweighted_graph(nodes, weights)
+            ) do
+        # Pick 3 distinct nodes
+        uniq_nodes = Enum.uniq(nodes)
+
+        if length(uniq_nodes) >= 3 do
+          [s, t, u] = Enum.take(uniq_nodes, 3)
+
+          st = Yog.Pathfinding.shortest_path_unweighted(graph, s, t)
+          tu = Yog.Pathfinding.shortest_path_unweighted(graph, t, u)
+          su = Yog.Pathfinding.shortest_path_unweighted(graph, s, u)
+
+          case {st, tu, su} do
+            {{:ok, _}, {:ok, _}, {:ok, _}} ->
+              # Both segments exist, s->u should exist
+              assert true
+
+            {{:ok, _}, {:ok, _}, {:error, :no_path}} ->
+              # This violates triangle inequality - should not happen!
+              flunk(
+                "Triangle inequality violated: #{s}->#{t} and #{t}->#{u} exist but #{s}->#{u} does not"
+              )
+
+            _ ->
+              # Other cases are fine
+              assert true
+          end
+        end
+      end
+    end
+
+    property "Shortest path uses at most V-1 edges" do
+      check all(
+              nodes <- node_list_gen(2, 15),
+              weights <- weight_list_gen(length(nodes)),
+              graph = build_unweighted_graph(nodes, weights),
+              [s, t] <- StreamData.uniq_list_of(StreamData.member_of(nodes), length: 2)
+            ) do
+        result = Yog.Pathfinding.shortest_path_unweighted(graph, s, t)
+        num_nodes = length(nodes)
+
+        case result do
+          {:ok, path} ->
+            # Path length (nodes) <= num_nodes (no cycles)
+            assert length(path) <= num_nodes
+            # Path has at least 2 nodes (s and t)
+            assert length(path) >= 2
+
+          {:error, :no_path} ->
+            assert true
+        end
+      end
+    end
+  end
+
   # Helper to build unweighted directed graph (all weights = 1)
   defp build_unweighted_graph(nodes, edges) do
     graph = Yog.new(:directed)
