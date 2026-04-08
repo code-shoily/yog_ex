@@ -32,7 +32,7 @@ It started off as a wrapper around the Gleam [Yog](https://hex.pm/packages/yog) 
 See the [Gleam vs Elixir Comparison](GLEAM_ELIXIR_COMPARISON.md) for feature comparison between the two implementations.
  
 > [!WARNING]
-> **API Stability**: Until the version reaches `1.0.0`, there may be breaking changes. While I'll try my best to keep the API stable, there's no guarantee. The primary focus is on **performance**, **documentation**, and **bugfixes**.
+> **API Stability**: Until the version reaches `1.0.0`, there may be ~~breaking changes. While I'll try my best to keep the API stable, there's no guarantee~~ performance issue or typoes in documentation. Before version 0.99.0 is releaased in 12-12-2026, the primary focus is on **performance**, **documentation**, and **bugfixes**. From v0.95.0 onwards, there will be no breaking changes until v2.0 (No plans for that).
 
 ## Features
 
