@@ -180,10 +180,21 @@ defmodule Yog.PBT.GeneratorTest do
     end
 
     property "random_regular(n, d) has correct node and edge counts" do
+      # For a d-regular graph with n nodes to exist, n*d must be even (handshaking lemma)
+      # Generate n, then choose d such that n*d is always even:
+      # - If n is even, any d works (0 to n-1)
+      # - If n is odd, d must be even (0, 2, 4, ...)
       check all(
               n <- StreamData.integer(2..20),
-              d <- StreamData.integer(0..(n - 1)),
-              rem(n * d, 2) == 0
+              d <-
+                StreamData.bind(StreamData.integer(0..(n - 1)), fn d ->
+                  if rem(n, 2) == 0 do
+                    StreamData.constant(d)
+                  else
+                    # n is odd, ensure d is even by rounding down to nearest even
+                    StreamData.constant(d - rem(d, 2))
+                  end
+                end)
             ) do
         g = Random.random_regular(n, d)
 
