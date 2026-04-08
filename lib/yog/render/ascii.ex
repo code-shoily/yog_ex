@@ -196,26 +196,18 @@ defmodule Yog.Render.ASCII do
   end
 
   # Draws a single row of cells (the interior content and right walls)
-  @spec draw_cell_row(
-          Yog.graph(),
-          non_neg_integer(),
-          non_neg_integer(),
-          non_neg_integer(),
-          map()
-        ) ::
-          String.t()
   defp draw_cell_row(graph, _rows, cols, row, occupants) do
-    0..(cols - 1)
-    |> Enum.reduce("|", fn col, acc ->
-      cell_id = Grid.coord_to_id(row, col, cols)
-      right_id = Grid.coord_to_id(row, col + 1, cols)
+    segments =
+      0..(cols - 1)
+      |> Enum.map_join("", fn col ->
+        cell_id = Grid.coord_to_id(row, col, cols)
+        right_id = Grid.coord_to_id(row, col + 1, cols)
 
-      # Get cell content (centered in 3 spaces)
-      content = Map.get(occupants, cell_id, " ")
-      cell_text = " #{content} "
+        # Get cell content (centered in 3 spaces)
+        content = Map.get(occupants, cell_id, " ")
+        cell_text = " #{content} "
 
-      # Check if there's a passage to the right
-      wall =
+        # Check if there's a passage to the right
         if has_passage?(graph, cell_id, right_id) do
           # Passage - no wall
           cell_text <> " "
@@ -223,26 +215,20 @@ defmodule Yog.Render.ASCII do
           # Wall
           cell_text <> "|"
         end
+      end)
 
-      acc <> wall
-    end)
+    "|" <> segments
   end
 
   # Draws the horizontal walls below a row of cells
-  @spec draw_horizontal_walls(
-          Yog.graph(),
-          non_neg_integer(),
-          non_neg_integer(),
-          non_neg_integer()
-        ) :: String.t()
   defp draw_horizontal_walls(graph, _rows, cols, row) do
-    0..(cols - 1)
-    |> Enum.reduce("+", fn col, acc ->
-      cell_id = Grid.coord_to_id(row, col, cols)
-      below_id = Grid.coord_to_id(row + 1, col, cols)
+    segments =
+      0..(cols - 1)
+      |> Enum.map_join("", fn col ->
+        cell_id = Grid.coord_to_id(row, col, cols)
+        below_id = Grid.coord_to_id(row + 1, col, cols)
 
-      # Check if there's a passage below
-      wall =
+        # Check if there's a passage below
         if has_passage?(graph, cell_id, below_id) do
           # Passage - no wall
           "   +"
@@ -250,9 +236,9 @@ defmodule Yog.Render.ASCII do
           # Wall
           "---+"
         end
+      end)
 
-      acc <> wall
-    end)
+    "+" <> segments
   end
 
   # =============================================================================

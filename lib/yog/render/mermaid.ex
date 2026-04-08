@@ -348,11 +348,13 @@ defmodule Yog.Render.Mermaid do
   end
 
   # Helper to convert a list of nodes to a list of edges
-  defp path_to_edges([]), do: []
-  defp path_to_edges([_]), do: []
+  defp path_to_edges(nodes), do: do_path_to_edges(nodes, [])
 
-  defp path_to_edges([first, second | rest]) do
-    [{first, second} | path_to_edges([second | rest])]
+  defp do_path_to_edges([], acc), do: Enum.reverse(acc)
+  defp do_path_to_edges([_], acc), do: Enum.reverse(acc)
+
+  defp do_path_to_edges([first, second | rest], acc) do
+    do_path_to_edges([second | rest], [{first, second} | acc])
   end
 
   # =============================================================================
@@ -395,7 +397,7 @@ defmodule Yog.Render.Mermaid do
   # Escape special characters in labels for Mermaid
   defp escape_label(label) do
     label
-    |> String.replace("\"", "\\\"")
+    |> String.replace("\"", "#quot;")
     |> String.replace("\n", "<br/>")
   end
 end
