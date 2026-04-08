@@ -67,28 +67,30 @@ defmodule Yog.Utils do
       2.8284271247461903
 
       iex> Utils.norm_diff(%{a: 1.1, b: 2}, %{a: 3, b: 4}, :max)
-      2
+      2.0
   """
-  @spec norm_diff(map(), map(), :l1 | :l2 | :max) :: number()
+  @spec norm_diff(map(), map(), :l1 | :l2 | :max) :: float()
   def norm_diff(m1, m2, type) do
+    # Get all unique keys from both maps and compute element-wise differences
+    # Keys present in only one map are treated as 0 in the other
+    keys = Map.keys(m1) ++ Map.keys(m2)
+
+    diffs =
+      Map.new(keys, fn k ->
+        {k, Map.get(m1, k, 0) - Map.get(m2, k, 0)}
+      end)
+
     case type do
       :l1 ->
-        Enum.reduce(m1, 0.0, fn {k, v1}, acc ->
-          acc + abs(v1 - Map.get(m2, k, 0.0))
-        end)
+        map_fold(diffs, 0.0, fn _k, v, acc -> acc + abs(v) end)
 
       :l2 ->
-        sum_sq =
-          Enum.reduce(m1, 0.0, fn {k, v1}, acc ->
-            acc + :math.pow(v1 - Map.get(m2, k, 0.0), 2)
-          end)
-
+        sum_sq = map_fold(diffs, 0.0, fn _k, v, acc -> acc + v * v end)
         :math.sqrt(sum_sq)
 
       :max ->
-        Enum.reduce(m1, 0.0, fn {k, v1}, acc ->
-          max(acc, abs(v1 - Map.get(m2, k, 0.0)))
-        end)
+        max_val = map_fold(diffs, 0.0, fn _k, v, acc -> max(acc, abs(v)) end)
+        max_val * 1.0
     end
   end
 
