@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `windmill/2` - Generalized windmill graph W_n^{(k)} with configurable clique size
   - `book/1` - Book graph B_n with triangles sharing a common edge (spine)
 - **Crown Graph** (#106): Added `crown/1` - Crown graph S_n^0 = K_{n,n} minus perfect matching
+- **Maze Generators** (#120): Expanded `Yog.Generator.Maze` with several classic algorithms:
+  - `aldous_broder/3` - Random-walk based uniform spanning tree
+  - `wilson/3` - Loop-erased random walk for efficient uniform mazes
+  - `kruskal/3` - randomized MST-based generation using Disjoint Sets
+  - `ellers/3` - Row-by-row generation with O(cols) memory
+  - `growing_tree/3` - Versatile generator supporting LIFO, FIFO, and random strategies
+  - `recursive_division/3` - Fractal, chamber-based generation
+  - `prim_simplified/3` & `prim_true/3` - Frontier-based randomized growing
 
 #### Random Graph Generators
 - **Configuration Model** (#110): Added configurable random graph generators:

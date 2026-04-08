@@ -50,7 +50,7 @@ YogEx provides comprehensive graph algorithms organized into modules:
 
 ### Developer Experience
 
-**[Generators & Builders](https://hexdocs.pm/yog_ex/Yog.Generator.Classic.html)** — Classic patterns (complete, cycle, grid, Petersen) and random models (Erdős-Rényi, Barabási-Albert, Watts-Strogatz) with labeled and grid builders.
+**[Generators & Builders](https://hexdocs.pm/yog_ex/Yog.Generator.Classic.html)** — Classic patterns (complete, cycle, grid, Petersen), random models (SBM, R-MAT), and a comprehensive **Maze Generation** suite (Recursive Backtracker, Wilson's, Kruskal's, Eller's, etc.) with labeled and grid builders.
 
 **[I/O & Visualization](https://hexdocs.pm/yog_ex/Yog.IO.GraphML.html)** — GraphML, GDF, Pajek, LEDA, TGF, JSON serialization plus ASCII, DOT, and Mermaid rendering.
 

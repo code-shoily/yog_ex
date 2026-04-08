@@ -153,6 +153,22 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | HyperLogLog | `Yog.Connectivity.Reachability` | Cardinality estimation | add: O(1), count: O(1) | O(1) fixed |
 | :queue | Erlang stdlib | FIFO for BFS | enqueue/dequeue: O(1) | O(n) |
 
+## Maze Generation
+
+| Algorithm | Module | Purpose | Time Complexity | Space Complexity |
+|-----------|--------|---------|-----------------|------------------|
+| Binary Tree | `Yog.Generator.Maze` | Simplest, fastest | O(N) | O(1) |
+| Sidewinder | `Yog.Generator.Maze` | Vertical corridors | O(N) | O(cols) |
+| Recursive Backtracker | `Yog.Generator.Maze` | Classic "roguelike" passages | O(N) | O(N) |
+| Hunt-and-Kill | `Yog.Generator.Maze` | Organic, winding | O(N²) | O(1) |
+| Aldous-Broder | `Yog.Generator.Maze` | Uniform spanning tree | O(N²) | O(N) |
+| Wilson's | `Yog.Generator.Maze` | Efficient uniform tree | O(N) avg | O(N) |
+| Kruskal's | `Yog.Generator.Maze` | Balanced, randomized | O(N log N) | O(N) |
+| Prim's | `Yog.Generator.Maze` | Radial, many dead ends | O(N log N) | O(N) |
+| Eller's | `Yog.Generator.Maze` | Infinite height potential | O(N) | O(cols) |
+| Growing Tree | `Yog.Generator.Maze` | Meta-algorithm (versatile) | O(N) | O(N) |
+| Recursive Division | `Yog.Generator.Maze` | Fractal, room-based | O(N log N) | O(log N) |
+
 ## Underlying Algorithms & Data Structures
 
 Beyond graph algorithms, YogEx implements several fundamental computer science techniques:
