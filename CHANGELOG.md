@@ -71,6 +71,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Validates source/target existence before searching
   - Works with both directed and undirected graphs
 
+#### Community Metrics
+- **Transitivity (Global Clustering Coefficient)** (#89): Added `Yog.Community.Metrics.transitivity/1` - measures the ratio of triangles to connected triples in the graph.
+  - Formula: T = 3 × triangles / connected_triples
+  - Range: [0.0, 1.0]; 1.0 means every connected triple is closed (graph is union of disjoint cliques)
+  - Differs from average clustering coefficient - transitivity is weighted by node degree
+  - Returns 0.0 for graphs with no connected triples (e.g., trees, paths)
+
 #### Other Changes
 - **Pathfinding**: Added `Johnson's algorithm` to Matrix auto-selection for non-negative weights on sparse graphs with many POIs. Previously Johnson's was only used with negative weights; now it's also selected for sparse graphs (E < V²/4) with many POIs (P > V/3) instead of Floyd-Warshall.
 
