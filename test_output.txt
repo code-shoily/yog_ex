@@ -1,0 +1,53 @@
+Running ExUnit with seed: 784557, max_cases: 40
+
+...............................................................................................................................................................................................................
+
+  1) property Flow Properties Integrality: Integer capacities yield integer max flow (Yog.PBT.FlowTest)
+     test/yog/pbt/flow_test.exs:52
+     ** (StreamData.TooManyDuplicatesError) too many (10) non-unique elements were generated consecutively. Make sure to avoid generating from a small space of data (such as only a handful of terms) and make sure a small generation size doesn't affect uniqueness too heavily. There were still 1 elements left to generate, while the generated elements were:
+
+     MapSet.new([471])
+     code: check all(
+     stacktrace:
+       (stream_data 1.3.0) lib/stream_data.ex:1101: StreamData.uniq_list_of/9
+       (stream_data 1.3.0) lib/stream_data.ex:1072: anonymous fn/6 in StreamData.uniq_list_of/2
+       (stream_data 1.3.0) lib/stream_data.ex:198: StreamData.bind_filter/5
+       (stream_data 1.3.0) lib/stream_data.ex:355: anonymous fn/5 in StreamData.bind_filter/3
+       (stream_data 1.3.0) lib/stream_data.ex:198: anonymous fn/3 in StreamData.bind_filter/5
+       (stream_data 1.3.0) lib/stream_data/lazy_tree.ex:36: StreamData.LazyTree.map/2
+       (stream_data 1.3.0) lib/stream_data.ex:388: StreamData.bind_filter/5
+       (stream_data 1.3.0) lib/stream_data.ex:355: anonymous fn/5 in StreamData.bind_filter/3
+       (stream_data 1.3.0) lib/stream_data.ex:198: anonymous fn/3 in StreamData.bind_filter/5
+       (stream_data 1.3.0) lib/stream_data/lazy_tree.ex:36: StreamData.LazyTree.map/2
+       (stream_data 1.3.0) lib/stream_data.ex:388: StreamData.bind_filter/5
+       (stream_data 1.3.0) lib/stream_data.ex:355: anonymous fn/5 in StreamData.bind_filter/3
+       (stream_data 1.3.0) lib/stream_data.ex:198: StreamData.check_all/7
+       test/yog/pbt/flow_test.exs:53: (test)
+
+......................................................
+
+  2) property Pathfinding Properties Dijkstra vs Bellman-Ford vs A*: Consistency on non-negative weights (Yog.PBT.PathfindingTest)
+     test/yog/pbt/pathfinding_test.exs:43
+     ** (StreamData.TooManyDuplicatesError) too many (10) non-unique elements were generated consecutively. Make sure to avoid generating from a small space of data (such as only a handful of terms) and make sure a small generation size doesn't affect uniqueness too heavily. There were still 1 elements left to generate, while the generated elements were:
+
+     MapSet.new([471])
+     code: check all(
+     stacktrace:
+       (stream_data 1.3.0) lib/stream_data.ex:1101: StreamData.uniq_list_of/9
+       (stream_data 1.3.0) lib/stream_data.ex:1072: anonymous fn/6 in StreamData.uniq_list_of/2
+       (stream_data 1.3.0) lib/stream_data.ex:198: StreamData.bind_filter/5
+       (stream_data 1.3.0) lib/stream_data.ex:355: anonymous fn/5 in StreamData.bind_filter/3
+       (stream_data 1.3.0) lib/stream_data.ex:198: anonymous fn/3 in StreamData.bind_filter/5
+       (stream_data 1.3.0) lib/stream_data/lazy_tree.ex:36: StreamData.LazyTree.map/2
+       (stream_data 1.3.0) lib/stream_data.ex:388: StreamData.bind_filter/5
+       (stream_data 1.3.0) lib/stream_data.ex:355: anonymous fn/5 in StreamData.bind_filter/3
+       (stream_data 1.3.0) lib/stream_data.ex:198: anonymous fn/3 in StreamData.bind_filter/5
+       (stream_data 1.3.0) lib/stream_data/lazy_tree.ex:36: StreamData.LazyTree.map/2
+       (stream_data 1.3.0) lib/stream_data.ex:388: StreamData.bind_filter/5
+       (stream_data 1.3.0) lib/stream_data.ex:355: anonymous fn/5 in StreamData.bind_filter/3
+       (stream_data 1.3.0) lib/stream_data.ex:198: StreamData.check_all/7
+       test/yog/pbt/pathfinding_test.exs:44: (test)
+
+.............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+Finished in 3.8 seconds (3.3s async, 0.5s sync)
+609 doctests, 188 properties, 1671 tests, 2 failures

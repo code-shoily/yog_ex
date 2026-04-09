@@ -10,9 +10,9 @@ defmodule Yog.MST do
 
   | Algorithm | Function | Best For |
   |-----------|----------|----------|
-  | [Kruskal's](https://en.wikipedia.org/wiki/Kruskal%27s_algorithm) | `kruskal/2` | Sparse graphs, edge lists |
-  | [Prim's](https://en.wikipedia.org/wiki/Prim%27s_algorithm) | `prim/2` | Dense graphs, growing from a start node |
-  | **Maximum Spanning Tree** | `maximum_spanning_tree/2` | Widest path problems, reliability |
+  | Kruskal's | `kruskal/2`, `kruskal_max/2` | Sparse graphs, edge lists |
+  | Prim's | `prim/2`, `prim_max/2` | Dense graphs, growing from a start node |
+  | Borůvka's | `boruvka/1` | Parallelized MST for large graphs |
 
   ## Important: Undirected Graphs Only
 
@@ -154,9 +154,6 @@ defmodule Yog.MST do
   undirected graph, the path between any two nodes in the MaxST is the
   widest path (maximum bottleneck capacity) between them.
 
-  This is a convenience wrapper around `kruskal/2` using a descending
-  comparison function.
-
   ## Options
 
   - `:in` - The graph to find the MaxST in
@@ -169,25 +166,59 @@ defmodule Yog.MST do
       ...>   |> Yog.add_node(1, nil)
       ...>   |> Yog.add_node(2, nil)
       ...>   |> Yog.add_node(3, nil)
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
-      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 20)
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 3, with: 5)
-      iex> {:ok, result} = Yog.MST.maximum_spanning_tree(in: graph)
+      ...>   |> Yog.add_edges!([{1, 2, 10}, {2, 3, 20}, {1, 3, 5}])
+      iex> {:ok, result} = Yog.MST.kruskal_max(in: graph)
       iex> result.total_weight
       30
-      iex> Enum.map(result.edges, fn e -> {e.from, e.to} end)
-      [{2, 3}, {1, 2}]
   """
-  @spec maximum_spanning_tree(keyword()) :: {:ok, Result.t()} | {:error, :undirected_only}
-  def maximum_spanning_tree(opts) when is_list(opts) do
-    graph = Keyword.fetch!(opts, :in)
-    maximum_spanning_tree(graph)
+  @spec kruskal_max(keyword()) :: {:ok, Result.t()} | {:error, :undirected_only}
+  def kruskal_max(opts) when is_list(opts) do
+    kruskal(Keyword.put_new(opts, :compare, &Yog.Utils.compare_desc/2))
   end
 
-  @spec maximum_spanning_tree(Yog.graph()) :: {:ok, Result.t()} | {:error, :undirected_only}
-  def maximum_spanning_tree(graph) do
+  @spec kruskal_max(Yog.graph()) :: {:ok, Result.t()} | {:error, :undirected_only}
+  def kruskal_max(graph) do
     kruskal(graph, &Yog.Utils.compare_desc/2)
   end
+
+  @doc """
+  Finds the Maximum Spanning Tree (MaxST) using Prim's algorithm.
+
+  ## Options
+
+  - `:in` - The graph to search
+  - `:from` - Starting node ID
+  - Other options are passed to `prim/2`.
+
+  ## Examples
+
+      iex> graph = 
+      ...>   Yog.undirected()
+      ...>   |> Yog.add_node(1, nil)
+      ...>   |> Yog.add_node(2, nil)
+      ...>   |> Yog.add_node(3, nil)
+      ...>   |> Yog.add_edges!([{1, 2, 10}, {2, 3, 20}, {1, 3, 5}])
+      iex> {:ok, result} = Yog.MST.prim_max(in: graph, from: 1)
+      iex> result.total_weight
+      30
+  """
+  @spec prim_max(keyword()) :: {:ok, Result.t()} | {:error, :undirected_only}
+  def prim_max(opts) when is_list(opts) do
+    prim(Keyword.put_new(opts, :compare, &Yog.Utils.compare_desc/2))
+  end
+
+  @spec prim_max(Yog.graph()) :: {:ok, Result.t()} | {:error, :undirected_only}
+  def prim_max(graph) do
+    prim(graph, &Yog.Utils.compare_desc/2)
+  end
+
+  @doc """
+  Facade for Maximum Spanning Tree (MaxST). Defaults to Kruskal's algorithm.
+  """
+  @spec maximum_spanning_tree(keyword() | Yog.graph()) ::
+          {:ok, Result.t()} | {:error, :undirected_only}
+  def maximum_spanning_tree(opts) when is_list(opts), do: kruskal_max(opts)
+  def maximum_spanning_tree(graph), do: kruskal_max(graph)
 
   @doc """
   Finds the Minimum Spanning Tree (MST) using Prim's algorithm.

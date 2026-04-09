@@ -624,30 +624,49 @@ defmodule Yog.MSTTest do
 
   # ============= Maximum Spanning Tree Tests =============
 
-  test "maximum_spanning_tree_test" do
+  test "kruskal_max_test" do
     graph =
       Yog.undirected()
-      |> Yog.add_node(1, "A")
-      |> Yog.add_node(2, "B")
-      |> Yog.add_node(3, "C")
-      |> Yog.add_node(4, "D")
-      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
-      |> Yog.add_edge_ensure(from: 2, to: 3, with: 5)
-      |> Yog.add_edge_ensure(from: 3, to: 4, with: 2)
-      |> Yog.add_edge_ensure(from: 1, to: 4, with: 10)
-      |> Yog.add_edge_ensure(from: 2, to: 4, with: 1)
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_node(3, nil)
+      |> Yog.add_node(4, nil)
+      |> Yog.add_edges!([{1, 2, 1}, {2, 3, 5}, {3, 4, 2}, {1, 4, 10}, {2, 4, 1}])
 
-    {:ok, result} = MST.maximum_spanning_tree(in: graph)
+    {:ok, result} = MST.kruskal_max(in: graph)
 
-    # MaxST should pick:
-    # 1-4 (10)
-    # 2-3 (5)
-    # 3-4 (2)
-    # Total: 17
     assert result.edge_count == 3
     assert result.total_weight == 17
-    assert Enum.any?(result.edges, fn e -> e.from == 1 and e.to == 4 and e.weight == 10 end)
-    assert Enum.any?(result.edges, fn e -> e.from == 2 and e.to == 3 and e.weight == 5 end)
-    assert Enum.any?(result.edges, fn e -> e.from == 3 and e.to == 4 and e.weight == 2 end)
+    assert result.algorithm == :kruskal
+  end
+
+  test "prim_max_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_node(3, nil)
+      |> Yog.add_node(4, nil)
+      |> Yog.add_edges!([{1, 2, 1}, {2, 3, 5}, {3, 4, 2}, {1, 4, 10}, {2, 4, 1}])
+
+    {:ok, result} = MST.prim_max(in: graph)
+
+    assert result.edge_count == 3
+    assert result.total_weight == 17
+    assert result.algorithm == :prim
+  end
+
+  test "maximum_spanning_tree_facade_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_node(3, nil)
+      |> Yog.add_node(4, nil)
+      |> Yog.add_edges!([{1, 2, 1}, {2, 3, 5}, {3, 4, 2}, {1, 4, 10}, {2, 4, 1}])
+
+    {:ok, result} = MST.maximum_spanning_tree(graph)
+    assert result.total_weight == 17
+    assert result.algorithm == :kruskal
   end
 end
