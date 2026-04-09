@@ -56,22 +56,18 @@ defmodule Yog.MST.Wilson do
     end
   end
 
-  defp do_wilson(_graph, unvisited, _tree, acc_edges) when unvisited == %MapSet{} do
-    acc_edges
-  end
-
   defp do_wilson(graph, unvisited, tree, acc_edges) do
-    # 1. Pick an arbitrary node not in the tree
-    start_node = Enum.random(unvisited)
+    if MapSet.size(unvisited) == 0 do
+      acc_edges
+    else
+      start_node = Enum.random(unvisited)
+      path_map = perform_lerw(graph, start_node, tree, %{})
 
-    # 2. Perform loop-erased random walk
-    path_map = perform_lerw(graph, start_node, tree, %{})
+      {new_tree, new_unvisited, path_edges} =
+        add_path_to_tree(graph, start_node, path_map, tree, unvisited)
 
-    # 3. Add path to tree
-    {new_tree, new_unvisited, path_edges} =
-      add_path_to_tree(graph, start_node, path_map, tree, unvisited)
-
-    do_wilson(graph, new_unvisited, new_tree, acc_edges ++ path_edges)
+      do_wilson(graph, new_unvisited, new_tree, acc_edges ++ path_edges)
+    end
   end
 
   # Performs a loop-erased random walk until hits tree
@@ -79,16 +75,12 @@ defmodule Yog.MST.Wilson do
     if MapSet.member?(tree, current) do
       path_map
     else
-      # Get neighbors
       neighbors = Map.get(graph.out_edges, current, %{}) |> Map.keys()
 
       if neighbors == [] do
-        # Dead end! In a connected graph this shouldn't happen except for isolated nodes.
-        # Wilson's assumes a connected graph.
         path_map
       else
         next_node = Enum.random(neighbors)
-        # By putting next_node, we overwrite any previous walk out of 'current', erasing loops.
         perform_lerw(graph, next_node, tree, Map.put(path_map, current, next_node))
       end
     end
