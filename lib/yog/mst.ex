@@ -13,21 +13,13 @@ defmodule Yog.MST do
   | Kruskal's | `kruskal/2`, `kruskal_max/2` | Sparse graphs, edge lists |
   | Prim's | `prim/2`, `prim_max/2` | Dense graphs, growing from a start node |
   | Borůvka's | `boruvka/1` | Parallelized MST for large graphs |
+  | Edmonds' | `minimum_arborescence/2` | Directed MST (Minimum Spanning Arborescence) |
 
   ## Important: Undirected Graphs Only
 
-  MST algorithms are **only defined for undirected graphs**. Passing a directed graph
-  will return `{:error, :undirected_only}`.
-
-  ### What About Directed Graphs?
-
-  For directed graphs, the equivalent problem is the **Minimum Spanning Arborescence** (MSA),
-  also known as the **Minimum Cost Arborescence** or **Optimum Branching**. This finds a
-  directed tree (arborescence) rooted at a specific node that reaches all other nodes
-  with minimum total weight.
-
-  The MSA problem is solved by **Edmonds' algorithm** (also called Chu-Liu/Edmonds algorithm),
-  which is not currently implemented in this module.
+  MST algorithms (Kruskal, Prim, Borůvka) are **only defined for undirected graphs**.
+  Passing a directed graph to these will return `{:error, :undirected_only}`.
+  Use `minimum_arborescence/2` for directed graphs.
 
   ## Properties of MSTs
 
@@ -36,66 +28,34 @@ defmodule Yog.MST do
   - Minimizes the sum of edge weights
   - May not be unique if multiple edges have the same weight
 
-  ## Example Use Cases
-
-  - **Network Design**: Minimizing cable length to connect buildings
-  - **Cluster Analysis**: Hierarchical clustering via MST
-  - **Approximation**: Traveling Salesman Problem approximations
-  - **Image Segmentation**: Computer vision applications
-
   ## References
 
   - [Wikipedia: Minimum Spanning Tree](https://en.wikipedia.org/wiki/Minimum_spanning_tree)
   - [CP-Algorithms: MST](https://cp-algorithms.com/graph/mst_kruskal.html)
-  - [Wikipedia: Edmonds' Algorithm](https://en.wikipedia.org/wiki/Edmonds%27_algorithm) (for directed graphs)
   """
 
-  alias Yog.DisjointSet
-  alias Yog.MST.Result
-  alias Yog.PairingHeap, as: PQ
+  alias Yog.MST.{Boruvka, Edmonds, Kruskal, Prim, Result}
 
   @typedoc """
-  Represents an edge in the minimum spanning tree.
-
-  - `from`: Source node ID
-  - `to`: Destination node ID
-  - `weight`: Edge weight
+  Represents an edge in a spanning tree or arborescence.
   """
   @type edge :: %{from: Yog.node_id(), to: Yog.node_id(), weight: term()}
+
+  # =============================================================================
+  # Kruskal's Algorithm
+  # =============================================================================
 
   @doc """
   Finds the Minimum Spanning Tree (MST) using Kruskal's algorithm.
 
-  Returns `{:ok, %Yog.MST.Result{}}` containing the edges that form the MST.
-  The total weight of these edges is minimized while ensuring all nodes are connected.
+  **Time Complexity:** O(E log E)
 
-  **Time Complexity:** O(E log E) where E is the number of edges
+  ## Examples
 
-  ## Options
-
-  - `:in` - The graph to find the MST in
-  - `:compare` - A comparison function that takes two weights and returns
-    `:lt`, `:eq`, or `:gt` (like `&Integer.compare/2` or a custom function)
-
-  ## Example
-
-      iex> graph =
-      ...>   Yog.undirected()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
-      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 2)
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 3, with: 3)
-      iex> {:ok, result} = Yog.MST.kruskal(in: graph, compare: fn a, b ->
-      ...>   cond do
-      ...>     a < b -> :lt
-      ...>     a > b -> :gt
-      ...>     true -> :eq
-      ...>   end
-      ...> end)
-      iex> result.edge_count
-      2
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edges!([{1, 2, 1}, {2, 3, 2}, {1, 3, 3}])
+      iex> {:ok, result} = Yog.MST.kruskal(in: graph)
       iex> result.total_weight
       3
   """
@@ -108,28 +68,6 @@ defmodule Yog.MST do
 
   @doc """
   Finds the Minimum Spanning Tree (MST) using Kruskal's algorithm.
-
-  Same as `kruskal/1` but with explicit positional arguments for pipeline use.
-
-  ## Example
-
-      iex> graph =
-      ...>   Yog.undirected()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
-      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 2)
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 3, with: 3)
-      iex> {:ok, result} = graph |> Yog.MST.kruskal(fn a, b ->
-      ...>   cond do
-      ...>     a < b -> :lt
-      ...>     a > b -> :gt
-      ...>     true -> :eq
-      ...>   end
-      ...> end)
-      iex> result.edge_count
-      2
   """
   @spec kruskal(Yog.graph(), (term(), term() -> :lt | :eq | :gt)) ::
           {:ok, Result.t()} | {:error, :undirected_only}
@@ -140,36 +78,22 @@ defmodule Yog.MST do
   end
 
   def kruskal(graph, compare) do
-    edges = extract_edges(graph)
-    sorted_edges = Enum.sort(edges, fn a, b -> compare.(a.weight, b.weight) == :lt end)
-
-    result = do_kruskal(sorted_edges, DisjointSet.new(), [])
-    {:ok, Result.new(result, :kruskal, map_size(graph.nodes))}
+    Kruskal.compute(graph, compare)
   end
 
   @doc """
   Finds the Maximum Spanning Tree (MaxST) using Kruskal's algorithm.
 
-  Connects all nodes with the maximum possible total edge weight. In an
-  undirected graph, the path between any two nodes in the MaxST is the
-  widest path (maximum bottleneck capacity) between them.
-
-  ## Options
-
-  - `:in` - The graph to find the MaxST in
-  - Other options are passed to `kruskal/2`.
+  **Time Complexity:** O(E log E)
 
   ## Examples
 
-      iex> graph =
-      ...>   Yog.undirected()
-      ...>   |> Yog.add_node(1, nil)
-      ...>   |> Yog.add_node(2, nil)
-      ...>   |> Yog.add_node(3, nil)
-      ...>   |> Yog.add_edges!([{1, 2, 10}, {2, 3, 20}, {1, 3, 5}])
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edges!([{1, 2, 1}, {2, 3, 20}, {1, 3, 3}])
       iex> {:ok, result} = Yog.MST.kruskal_max(in: graph)
       iex> result.total_weight
-      30
+      23
   """
   @spec kruskal_max(keyword()) :: {:ok, Result.t()} | {:error, :undirected_only}
   def kruskal_max(opts) when is_list(opts) do
@@ -181,86 +105,21 @@ defmodule Yog.MST do
     kruskal(graph, &Yog.Utils.compare_desc/2)
   end
 
-  @doc """
-  Finds the Maximum Spanning Tree (MaxST) using Prim's algorithm.
-
-  ## Options
-
-  - `:in` - The graph to search
-  - `:from` - Starting node ID
-  - Other options are passed to `prim/2`.
-
-  ## Examples
-
-      iex> graph =
-      ...>   Yog.undirected()
-      ...>   |> Yog.add_node(1, nil)
-      ...>   |> Yog.add_node(2, nil)
-      ...>   |> Yog.add_node(3, nil)
-      ...>   |> Yog.add_edges!([{1, 2, 10}, {2, 3, 20}, {1, 3, 5}])
-      iex> {:ok, result} = Yog.MST.prim_max(in: graph, from: 1)
-      iex> result.total_weight
-      30
-  """
-  @spec prim_max(keyword()) :: {:ok, Result.t()} | {:error, :undirected_only}
-  def prim_max(opts) when is_list(opts) do
-    prim(Keyword.put_new(opts, :compare, &Yog.Utils.compare_desc/2))
-  end
-
-  @spec prim_max(Yog.graph()) :: {:ok, Result.t()} | {:error, :undirected_only}
-  def prim_max(graph) do
-    prim(graph, &Yog.Utils.compare_desc/2)
-  end
-
-  @doc """
-  Facade for Maximum Spanning Tree (MaxST). Defaults to Kruskal's algorithm.
-  """
-  @spec maximum_spanning_tree(keyword() | Yog.graph()) ::
-          {:ok, Result.t()} | {:error, :undirected_only}
-  def maximum_spanning_tree(opts) when is_list(opts), do: kruskal_max(opts)
-  def maximum_spanning_tree(graph), do: kruskal_max(graph)
+  # =============================================================================
+  # Prim's Algorithm
+  # =============================================================================
 
   @doc """
   Finds the Minimum Spanning Tree (MST) using Prim's algorithm.
 
-  Returns `{:ok, %Yog.MST.Result{}}` containing the edges that form the MST.
-  Unlike Kruskal's which processes all edges globally, Prim's grows the MST
-  from a starting node by repeatedly adding the minimum-weight edge that
-  connects a visited node to an unvisited node.
+  **Time Complexity:** O(E log V)
 
-  **Time Complexity:** O(E log V) where E is the number of edges and V is the number of vertices
+  ## Examples
 
-  **Disconnected Graphs:** For disconnected graphs, Prim's only returns edges
-  for the connected component containing the starting node (or the first node
-  in the graph if no start node is provided). Use Kruskal's if you need a
-  minimum spanning forest that covers all components.
-
-  ## Options
-
-  - `:in` - The graph to find the MST in
-  - `:compare` - A comparison function that takes two weights and returns
-    `:lt`, `:eq`, or `:gt`
-  - `:from` - The starting node ID (optional; defaults to the first node in the graph)
-
-  ## Example
-
-      iex> graph =
-      ...>   Yog.undirected()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
-      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 2)
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 3, with: 3)
-      iex> {:ok, result} = Yog.MST.prim(in: graph, compare: fn a, b ->
-      ...>   cond do
-      ...>     a < b -> :lt
-      ...>     a > b -> :gt
-      ...>     true -> :eq
-      ...>   end
-      ...> end)
-      iex> result.edge_count
-      2
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edges!([{1, 2, 1}, {2, 3, 2}, {1, 3, 3}])
+      iex> {:ok, result} = Yog.MST.prim(in: graph, from: 1)
       iex> result.total_weight
       3
   """
@@ -274,28 +133,6 @@ defmodule Yog.MST do
 
   @doc """
   Finds the Minimum Spanning Tree (MST) using Prim's algorithm.
-
-  Same as `prim/1` but with explicit positional arguments for pipeline use.
-
-  ## Example
-
-      iex> graph =
-      ...>   Yog.undirected()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
-      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 2)
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 3, with: 3)
-      iex> {:ok, result} = graph |> Yog.MST.prim(fn a, b ->
-      ...>   cond do
-      ...>     a < b -> :lt
-      ...>     a > b -> :gt
-      ...>     true -> :eq
-      ...>   end
-      ...> end)
-      iex> result.edge_count
-      2
   """
   @spec prim(Yog.graph(), (term(), term() -> :lt | :eq | :gt)) ::
           {:ok, Result.t()} | {:error, :undirected_only}
@@ -303,33 +140,38 @@ defmodule Yog.MST do
     prim(graph, compare, nil)
   end
 
+  @spec prim(Yog.graph(), (term(), term() -> :lt | :eq | :gt), term() | nil) ::
+          {:ok, Result.t()} | {:error, :undirected_only}
   def prim(%Yog.Graph{kind: :directed}, _compare, _start_node) do
     {:error, :undirected_only}
   end
 
-  def prim(graph, compare, nil) do
-    node_ids = Map.keys(graph.nodes)
-
-    case node_ids do
-      [] ->
-        {:ok, Result.new([], :prim, 0)}
-
-      [start | _] ->
-        do_prim(graph, start, compare)
-    end
-  end
-
   def prim(graph, compare, start_node) do
-    if Map.has_key?(graph.nodes, start_node) do
-      do_prim(graph, start_node, compare)
-    else
-      {:ok, Result.new([], :prim, map_size(graph.nodes))}
-    end
+    Prim.compute(graph, compare, start_node)
   end
 
-  # Helper to push all edges into the priority queue
-  defp push_all(pq, edges) do
-    List.foldl(edges, pq, fn edge, acc -> PQ.push(acc, edge) end)
+  @doc """
+  Finds the Maximum Spanning Tree (MaxST) using Prim's algorithm.
+
+  **Time Complexity:** O(E log V)
+
+  ## Examples
+
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edges!([{1, 2, 1}, {2, 3, 20}, {1, 3, 3}])
+      iex> {:ok, result} = Yog.MST.prim_max(in: graph, from: 1)
+      iex> result.total_weight
+      23
+  """
+  @spec prim_max(keyword()) :: {:ok, Result.t()} | {:error, :undirected_only}
+  def prim_max(opts) when is_list(opts) do
+    prim(Keyword.put_new(opts, :compare, &Yog.Utils.compare_desc/2))
+  end
+
+  @spec prim_max(Yog.graph()) :: {:ok, Result.t()} | {:error, :undirected_only}
+  def prim_max(graph) do
+    prim(graph, &Yog.Utils.compare_desc/2)
   end
 
   # =============================================================================
@@ -339,23 +181,12 @@ defmodule Yog.MST do
   @doc """
   Finds the Minimum Spanning Tree (MST) using Borůvka's algorithm.
 
-  Borůvka's algorithm works in stages, in each stage adding the minimum-weight
-  edge that connects each component to another component. It is inherently
-  amenable to parallelism.
-
   **Time Complexity:** O(E log V)
-
-  ## Options
-
-    * `:in` - The graph to search
-    * `:compare` - Comparison function (default: `&Yog.Utils.compare/2`)
 
   ## Examples
 
       iex> graph = Yog.undirected()
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_node(3, nil)
       ...> |> Yog.add_edges!([{1, 2, 10}, {2, 3, 5}, {1, 3, 20}])
       iex> {:ok, result} = Yog.MST.boruvka(in: graph)
       iex> result.total_weight
@@ -380,81 +211,66 @@ defmodule Yog.MST do
   end
 
   def boruvka(graph, compare) do
-    dsu =
-      List.foldl(Map.keys(graph.nodes), DisjointSet.new(), fn node, acc ->
-        DisjointSet.add(acc, node)
-      end)
-
-    edges = extract_edges(graph)
-    mst_edges = do_boruvka_loop(graph, edges, dsu, [], compare)
-    {:ok, Result.new(mst_edges, :boruvka, map_size(graph.nodes))}
-  end
-
-  defp do_boruvka_loop(graph, all_edges, dsu, mst_edges, compare) do
-    if DisjointSet.count_sets(dsu) <= 1 do
-      mst_edges
-    else
-      cheapest = find_best_edges_for_components(all_edges, dsu, compare)
-
-      if map_size(cheapest) == 0 do
-        mst_edges
-      else
-        edges_to_add =
-          cheapest
-          |> Map.values()
-          |> Enum.uniq_by(fn e -> Enum.sort([e.from, e.to]) |> List.to_tuple() end)
-
-        {new_dsu, new_mst} =
-          List.foldl(edges_to_add, {dsu, mst_edges}, fn edge, {d_acc, m_acc} ->
-            {DisjointSet.union(d_acc, edge.from, edge.to), [edge | m_acc]}
-          end)
-
-        if map_size(new_dsu.parents) == map_size(dsu.parents) and
-             DisjointSet.count_sets(new_dsu) == DisjointSet.count_sets(dsu) do
-          mst_edges
-        else
-          do_boruvka_loop(graph, all_edges, new_dsu, new_mst, compare)
-        end
-      end
-    end
-  end
-
-  defp find_best_edges_for_components(edges, dsu, compare) do
-    List.foldl(edges, %{}, fn edge, acc ->
-      {dsu1, root_u} = DisjointSet.find(dsu, edge.from)
-      {_dsu2, root_v} = DisjointSet.find(dsu1, edge.to)
-
-      if root_u == root_v do
-        acc
-      else
-        acc
-        |> update_best(root_u, edge, compare)
-        |> update_best(root_v, edge, compare)
-      end
-    end)
-  end
-
-  defp update_best(best_map, root, edge, compare) do
-    case Map.get(best_map, root) do
-      nil ->
-        Map.put(best_map, root, edge)
-
-      existing ->
-        if compare.(edge.weight, existing.weight) == :lt do
-          Map.put(best_map, root, edge)
-        else
-          best_map
-        end
-    end
+    Boruvka.compute(graph, compare)
   end
 
   # =============================================================================
-  # Private Helper Functions - Kruskal's Algorithm
+  # Edmonds' Algorithm (Minimum Spanning Arborescence)
   # =============================================================================
 
-  # Extracts all edges from a graph.
-  # For undirected graphs, only includes each edge once (when from_id <= to_id).
-  defp extract_edges(%Yog.Graph{kind: kind, out_edges: out_edges}) do
+  @doc """
+  Finds the Minimum Spanning Arborescence (MSA) using the Chu-Liu/Edmonds algorithm.
+
+  **Time Complexity:** O(VE)
+
+  ## Examples
+
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(1, "Root") |> Yog.add_node(2, "A") |> Yog.add_node(3, "B")
+      ...> |> Yog.add_edges!([{1, 2, 10}, {1, 3, 20}, {2, 3, 5}])
+      iex> {:ok, result} = Yog.MST.minimum_arborescence(in: graph, root: 1)
+      iex> result.total_weight
+      15
+  """
+  @spec minimum_arborescence(keyword()) :: {:ok, Result.t()} | {:error, term()}
+  def minimum_arborescence(opts) when is_list(opts) do
+    graph = Keyword.fetch!(opts, :in)
+    root = Keyword.fetch!(opts, :root)
+    Edmonds.compute(graph, root)
+  end
+
+  @spec minimum_arborescence(Yog.graph(), term()) :: {:ok, Result.t()} | {:error, term()}
+  def minimum_arborescence(graph, root) do
+    Edmonds.compute(graph, root)
+  end
+
+  @doc """
+  Alias for `minimum_arborescence/2`.
+  """
+  @spec chu_liu_edmonds(keyword() | Yog.graph(), term()) ::
+          {:ok, Result.t()} | {:error, term()}
+  def chu_liu_edmonds(opts_or_graph, root \\ nil)
+  def chu_liu_edmonds(opts, nil) when is_list(opts), do: minimum_arborescence(opts)
+  def chu_liu_edmonds(graph, root), do: minimum_arborescence(graph, root)
+
+  # =============================================================================
+  # Facades
+  # =============================================================================
+
+  @doc """
+  Facade for Maximum Spanning Tree (MaxST). Defaults to Kruskal's algorithm.
+  """
+  @spec maximum_spanning_tree(keyword() | Yog.graph()) ::
+          {:ok, Result.t()} | {:error, :undirected_only}
+  def maximum_spanning_tree(opts) when is_list(opts), do: kruskal_max(opts)
+  def maximum_spanning_tree(graph), do: kruskal_max(graph)
+
+  # =============================================================================
+  # Shared Internal Helpers
+  # =============================================================================
+
+  @doc false
+  def extract_edges(%Yog.Graph{kind: kind, out_edges: out_edges}) do
     List.foldl(Map.to_list(out_edges), [], fn {from_id, targets}, acc ->
       List.foldl(Map.to_list(targets), acc, fn {to_id, weight}, inner_acc ->
         if kind == :undirected && from_id > to_id do
@@ -466,95 +282,8 @@ defmodule Yog.MST do
     end)
   end
 
-  # Main Kruskal loop - processes edges in order, adding them if they don't form cycles.
-  defp do_kruskal([], _disjoint_set, acc) do
-    Enum.reverse(acc)
-  end
-
-  defp do_kruskal([edge | rest], disjoint_set, acc) do
-    {ds1, root_from} = DisjointSet.find(disjoint_set, edge.from)
-
-    # Optimization: early check if from and to are same set before second find
-    case Map.fetch(ds1.parents, edge.to) do
-      :error ->
-        # to not in DS yet, add it and include edge
-        ds2 = DisjointSet.add(ds1, edge.to)
-        ds3 = DisjointSet.union(ds2, edge.from, edge.to)
-        do_kruskal(rest, ds3, [edge | acc])
-
-      {:ok, _} ->
-        {ds2, root_to} = DisjointSet.find(ds1, edge.to)
-
-        if root_from == root_to do
-          do_kruskal(rest, ds2, acc)
-        else
-          ds3 = DisjointSet.union(ds2, edge.from, edge.to)
-          do_kruskal(rest, ds3, [edge | acc])
-        end
-    end
-  end
-
-  # =============================================================================
-  # Private Helper Functions - Prim's Algorithm
-  # =============================================================================
-
-  defp do_prim(graph, start, compare) do
-    initial_edges = get_all_edges_from_node(graph, start)
-
-    initial_pq =
-      PQ.new(fn a, b -> compare.(a.weight, b.weight) == :lt end)
-      |> push_all(initial_edges)
-
-    initial_visited = %{start => true}
-
-    result = do_prim_loop(graph, initial_pq, initial_visited, [], compare)
-    {:ok, Result.new(result, :prim, map_size(graph.nodes))}
-  end
-
-  # Main Prim loop - grows MST from starting node.
-  defp do_prim_loop(_graph, pq, _visited, acc, _compare) when pq == %{} do
-    Enum.reverse(acc)
-  end
-
-  defp do_prim_loop(graph, pq, visited, acc, compare) do
-    if PQ.empty?(pq) do
-      Enum.reverse(acc)
-    else
-      {:ok, edge, rest_pq} = PQ.pop(pq)
-
-      if Map.has_key?(visited, edge.to) do
-        do_prim_loop(graph, rest_pq, visited, acc, compare)
-      else
-        new_visited = Map.put(visited, edge.to, true)
-        new_acc = [edge | acc]
-
-        new_edges = get_all_edges_from_node(graph, edge.to)
-
-        # Filter and push edges in one pass using List.foldl
-        new_pq =
-          List.foldl(new_edges, rest_pq, fn e, acc_pq ->
-            if Map.has_key?(new_visited, e.to) do
-              acc_pq
-            else
-              PQ.push(acc_pq, e)
-            end
-          end)
-
-        do_prim_loop(graph, new_pq, new_visited, new_acc, compare)
-      end
-    end
-  end
-
-  # Gets all outgoing edges from a specific node.
-  defp get_all_edges_from_node(graph, from_id) do
-    case Map.fetch(graph.out_edges, from_id) do
-      {:ok, edges} ->
-        List.foldl(Map.to_list(edges), [], fn {to_id, weight}, acc ->
-          [%{from: from_id, to: to_id, weight: weight} | acc]
-        end)
-
-      :error ->
-        []
-    end
+  @doc false
+  def push_all(pq, edges) do
+    List.foldl(edges, pq, fn edge, acc -> Yog.PairingHeap.push(acc, edge) end)
   end
 end

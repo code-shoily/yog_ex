@@ -58,9 +58,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Algorithm: Modified Dijkstra with `min` for capacity combination and `Yog.Utils.compare_desc/2` for priority
   - Returns `{:ok, %Path{}}` with `algorithm: :widest_path` and the bottleneck capacity as `weight`
   - Returns `:error` when no path exists between the nodes
-- **Maximum Spanning Tree**: Added `Yog.MST.maximum_spanning_tree/2` - connects all nodes with maximum total edge weight.
-  - Useful for finding all-pairs widest paths and network reliability problems.
-  - Implemented as a Kruskal's variation using descending edge weight sorting.
+- **Maximum Spanning Tree**: Added `Yog.MST.maximum_spanning_tree/2`, `kruskal_max/2`, and `prim_max/2` - connects all nodes with maximum total edge weight.
+  - Useful for finding all-pairs widest paths and network reliability problems
+  - Implemented as variations of Kruskal's and Prim's algorithms using descending edge weight sorting
+- **Borůvka's Algorithm**: Added `Yog.MST.boruvka/2` - the oldest MST algorithm, efficient for parallelization.
+  - Works by repeatedly finding the cheapest edge connecting each component to another component
+  - **Time Complexity:** O(E log V) - efficient for large sparse graphs
+  - Particularly useful for distributed/parallel MST computation
 - **Single-Pair Shortest Path (Unweighted)**: Added `Yog.Pathfinding.shortest_path_unweighted/3` - finds the shortest path between two nodes in unweighted graphs using BFS with early termination. More efficient than Dijkstra for unweighted graphs (no heap overhead) and uses predecessor map for memory-efficient path reconstruction instead of storing full paths in the queue.
   - Returns `{:ok, [node_id]}` with the path from source to target
   - Returns `{:error, :no_path}` when target is unreachable

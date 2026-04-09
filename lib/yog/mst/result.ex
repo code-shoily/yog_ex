@@ -10,7 +10,8 @@ defmodule Yog.MST.Result do
   - `total_weight` - Sum of all edge weights in the MST
   - `node_count` - Number of nodes in the original graph
   - `edge_count` - Number of edges in the MST
-  - `algorithm` - The algorithm used (`:kruskal`, `:prim`, or `:boruvka`)
+  - `algorithm` - The algorithm used (`:kruskal`, `:prim`, `:boruvka`, or `:chu_liu_edmonds`)
+  - `root` - The root node ID (for arborescence algorithms)
 
   ## Examples
 
@@ -26,14 +27,15 @@ defmodule Yog.MST.Result do
   """
 
   @enforce_keys [:edges, :total_weight, :node_count, :edge_count, :algorithm]
-  defstruct [:edges, :total_weight, :node_count, :edge_count, :algorithm]
+  defstruct [:edges, :total_weight, :node_count, :edge_count, :algorithm, :root]
 
   @type t :: %__MODULE__{
           edges: [Yog.MST.edge()],
           total_weight: number(),
           node_count: non_neg_integer(),
           edge_count: non_neg_integer(),
-          algorithm: :kruskal | :prim | :boruvka
+          algorithm: :kruskal | :prim | :boruvka | :chu_liu_edmonds,
+          root: Yog.node_id() | nil
         }
 
   @doc """
@@ -51,8 +53,13 @@ defmodule Yog.MST.Result do
         algorithm: :prim
       }
   """
-  @spec new([Yog.MST.edge()], :kruskal | :prim | :boruvka, non_neg_integer()) :: t()
-  def new(edges, algorithm, node_count) do
+  @spec new(
+          [Yog.MST.edge()],
+          :kruskal | :prim | :boruvka | :chu_liu_edmonds,
+          non_neg_integer(),
+          term()
+        ) :: t()
+  def new(edges, algorithm, node_count, root \\ nil) do
     total_weight = Enum.reduce(edges, 0, fn e, acc -> acc + e.weight end)
 
     %__MODULE__{
@@ -60,7 +67,8 @@ defmodule Yog.MST.Result do
       total_weight: total_weight,
       node_count: node_count,
       edge_count: length(edges),
-      algorithm: algorithm
+      algorithm: algorithm,
+      root: root
     }
   end
 end

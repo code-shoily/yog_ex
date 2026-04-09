@@ -685,4 +685,69 @@ defmodule Yog.MSTTest do
     assert result.total_weight == 4
     assert result.algorithm == :boruvka
   end
+
+  # ============= Minimum Spanning Arborescence Tests =============
+
+  test "minimum_arborescence_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "Root")
+      |> Yog.add_node(2, "A")
+      |> Yog.add_node(3, "B")
+      |> Yog.add_node(4, "C")
+      |> Yog.add_edges!([
+        {1, 2, 10},
+        {1, 3, 20},
+        {2, 3, 5},
+        {3, 4, 15},
+        {4, 2, 2}
+      ])
+
+    # This graph has a cycle: 2 -> 3 -> 4 -> 2
+    # best incoming for 2 is from 4 (w=2)
+    # best incoming for 3 is from 2 (w=5)
+    # best incoming for 4 is from 3 (w=15)
+    # Cycle weight: 2 + 5 + 15 = 22
+    #
+    # Now we need an edge from root (1) to enter the cycle.
+    # 1 -> 2 (10): adjusts to 10 - 2 = 8
+    # 1 -> 3 (20): adjusts to 20 - 5 = 15
+    #
+    # Minimum entry is 1 -> 2 (adjust 8).
+    #
+    # Resulting MSA:
+    # 1 -> 2 (10)
+    # 2 -> 3 (5)
+    # 3 -> 4 (15)
+    # Total weight: 10 + 5 + 15 = 30
+
+    {:ok, result} = MST.minimum_arborescence(in: graph, root: 1)
+
+    assert result.edge_count == 3
+    assert result.total_weight == 30
+    assert result.algorithm == :chu_liu_edmonds
+  end
+
+  test "no_arborescence_exists_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "Root")
+      |> Yog.add_node(2, "A")
+      |> Yog.add_node(3, "B")
+      |> Yog.add_edges!([{1, 2, 10}, {3, 2, 5}])
+
+    # 3 is unreachable from 1
+    assert MST.minimum_arborescence(in: graph, root: 1) == {:error, :no_arborescence_exists}
+  end
+
+  test "chu_liu_edmonds_alias_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "Root")
+      |> Yog.add_node(2, "Node")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+
+    {:ok, result} = MST.chu_liu_edmonds(graph, 1)
+    assert result.total_weight == 5
+  end
 end
