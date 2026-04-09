@@ -192,7 +192,7 @@ defmodule Yog.MST do
 
   ## Examples
 
-      iex> graph = 
+      iex> graph =
       ...>   Yog.undirected()
       ...>   |> Yog.add_node(1, nil)
       ...>   |> Yog.add_node(2, nil)
@@ -394,15 +394,11 @@ defmodule Yog.MST do
     if DisjointSet.count_sets(dsu) <= 1 do
       mst_edges
     else
-      # Find the cheapest edge leaving each component
-      # We use a map to track the best edge for each component root
       cheapest = find_best_edges_for_components(all_edges, dsu, compare)
 
       if map_size(cheapest) == 0 do
         mst_edges
       else
-        # Collect distinct edges to add (multiple components might pick the same edge)
-        # We sort by node pairs to ensure stable identification
         edges_to_add =
           cheapest
           |> Map.values()
@@ -413,7 +409,6 @@ defmodule Yog.MST do
             {DisjointSet.union(d_acc, edge.from, edge.to), [edge | m_acc]}
           end)
 
-        # If we couldn't merge any components, we're done (disconnected graph)
         if map_size(new_dsu.parents) == map_size(dsu.parents) and
              DisjointSet.count_sets(new_dsu) == DisjointSet.count_sets(dsu) do
           mst_edges
