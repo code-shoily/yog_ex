@@ -10,7 +10,7 @@ defmodule Yog.MST.Result do
   - `total_weight` - Sum of all edge weights in the MST
   - `node_count` - Number of nodes in the original graph
   - `edge_count` - Number of edges in the MST
-  - `algorithm` - The algorithm used (`:kruskal` or `:prim`)
+  - `algorithm` - The algorithm used (`:kruskal`, `:prim`, or `:boruvka`)
 
   ## Examples
 
@@ -33,7 +33,7 @@ defmodule Yog.MST.Result do
           total_weight: number(),
           node_count: non_neg_integer(),
           edge_count: non_neg_integer(),
-          algorithm: :kruskal | :prim
+          algorithm: :kruskal | :prim | :boruvka
         }
 
   @doc """
@@ -51,7 +51,7 @@ defmodule Yog.MST.Result do
         algorithm: :prim
       }
   """
-  @spec new([Yog.MST.edge()], :kruskal | :prim, non_neg_integer()) :: t()
+  @spec new([Yog.MST.edge()], :kruskal | :prim | :boruvka, non_neg_integer()) :: t()
   def new(edges, algorithm, node_count) do
     total_weight = Enum.reduce(edges, 0, fn e, acc -> acc + e.weight end)
 

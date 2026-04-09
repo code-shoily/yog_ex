@@ -333,6 +333,127 @@ defmodule Yog.MST do
   end
 
   # =============================================================================
+  # Borůvka's Algorithm
+  # =============================================================================
+
+  @doc """
+  Finds the Minimum Spanning Tree (MST) using Borůvka's algorithm.
+
+  Borůvka's algorithm works in stages, in each stage adding the minimum-weight
+  edge that connects each component to another component. It is inherently
+  amenable to parallelism.
+
+  **Time Complexity:** O(E log V)
+
+  ## Options
+
+    * `:in` - The graph to search
+    * `:compare` - Comparison function (default: `&Yog.Utils.compare/2`)
+
+  ## Examples
+
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edges!([{1, 2, 10}, {2, 3, 5}, {1, 3, 20}])
+      iex> {:ok, result} = Yog.MST.boruvka(in: graph)
+      iex> result.total_weight
+      15
+  """
+  @spec boruvka(keyword()) :: {:ok, Result.t()} | {:error, :undirected_only}
+  def boruvka(opts) when is_list(opts) do
+    graph = Keyword.fetch!(opts, :in)
+    compare = opts[:compare] || (&Yog.Utils.compare/2)
+    boruvka(graph, compare)
+  end
+
+  @doc """
+  Finds the Minimum Spanning Tree (MST) using Borůvka's algorithm.
+  """
+  @spec boruvka(Yog.graph(), (term(), term() -> :lt | :eq | :gt)) ::
+          {:ok, Result.t()} | {:error, :undirected_only}
+  def boruvka(graph, compare \\ &Yog.Utils.compare/2)
+
+  def boruvka(%Yog.Graph{kind: :directed}, _compare) do
+    {:error, :undirected_only}
+  end
+
+  def boruvka(graph, compare) do
+    dsu =
+      List.foldl(Map.keys(graph.nodes), DisjointSet.new(), fn node, acc ->
+        DisjointSet.add(acc, node)
+      end)
+
+    edges = extract_edges(graph)
+    mst_edges = do_boruvka_loop(graph, edges, dsu, [], compare)
+    {:ok, Result.new(mst_edges, :boruvka, map_size(graph.nodes))}
+  end
+
+  defp do_boruvka_loop(graph, all_edges, dsu, mst_edges, compare) do
+    if DisjointSet.count_sets(dsu) <= 1 do
+      mst_edges
+    else
+      # Find the cheapest edge leaving each component
+      # We use a map to track the best edge for each component root
+      cheapest = find_best_edges_for_components(all_edges, dsu, compare)
+
+      if map_size(cheapest) == 0 do
+        mst_edges
+      else
+        # Collect distinct edges to add (multiple components might pick the same edge)
+        # We sort by node pairs to ensure stable identification
+        edges_to_add =
+          cheapest
+          |> Map.values()
+          |> Enum.uniq_by(fn e -> Enum.sort([e.from, e.to]) |> List.to_tuple() end)
+
+        {new_dsu, new_mst} =
+          List.foldl(edges_to_add, {dsu, mst_edges}, fn edge, {d_acc, m_acc} ->
+            {DisjointSet.union(d_acc, edge.from, edge.to), [edge | m_acc]}
+          end)
+
+        # If we couldn't merge any components, we're done (disconnected graph)
+        if map_size(new_dsu.parents) == map_size(dsu.parents) and
+             DisjointSet.count_sets(new_dsu) == DisjointSet.count_sets(dsu) do
+          mst_edges
+        else
+          do_boruvka_loop(graph, all_edges, new_dsu, new_mst, compare)
+        end
+      end
+    end
+  end
+
+  defp find_best_edges_for_components(edges, dsu, compare) do
+    List.foldl(edges, %{}, fn edge, acc ->
+      {dsu1, root_u} = DisjointSet.find(dsu, edge.from)
+      {_dsu2, root_v} = DisjointSet.find(dsu1, edge.to)
+
+      if root_u == root_v do
+        acc
+      else
+        acc
+        |> update_best(root_u, edge, compare)
+        |> update_best(root_v, edge, compare)
+      end
+    end)
+  end
+
+  defp update_best(best_map, root, edge, compare) do
+    case Map.get(best_map, root) do
+      nil ->
+        Map.put(best_map, root, edge)
+
+      existing ->
+        if compare.(edge.weight, existing.weight) == :lt do
+          Map.put(best_map, root, edge)
+        else
+          best_map
+        end
+    end
+  end
+
+  # =============================================================================
   # Private Helper Functions - Kruskal's Algorithm
   # =============================================================================
 

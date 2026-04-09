@@ -669,4 +669,20 @@ defmodule Yog.MSTTest do
     assert result.total_weight == 17
     assert result.algorithm == :kruskal
   end
+
+  test "boruvka_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_node(3, nil)
+      |> Yog.add_node(4, nil)
+      |> Yog.add_edges!([{1, 2, 1}, {2, 3, 5}, {3, 4, 2}, {1, 4, 10}, {2, 4, 1}])
+
+    {:ok, result} = MST.boruvka(in: graph)
+
+    assert result.edge_count == 3
+    assert result.total_weight == 4
+    assert result.algorithm == :boruvka
+  end
 end
