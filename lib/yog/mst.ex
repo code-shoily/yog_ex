@@ -12,6 +12,7 @@ defmodule Yog.MST do
   |-----------|----------|----------|
   | [Kruskal's](https://en.wikipedia.org/wiki/Kruskal%27s_algorithm) | `kruskal/2` | Sparse graphs, edge lists |
   | [Prim's](https://en.wikipedia.org/wiki/Prim%27s_algorithm) | `prim/2` | Dense graphs, growing from a start node |
+  | **Maximum Spanning Tree** | `maximum_spanning_tree/2` | Widest path problems, reliability |
 
   ## Important: Undirected Graphs Only
 
@@ -144,6 +145,48 @@ defmodule Yog.MST do
 
     result = do_kruskal(sorted_edges, DisjointSet.new(), [])
     {:ok, Result.new(result, :kruskal, map_size(graph.nodes))}
+  end
+
+  @doc """
+  Finds the Maximum Spanning Tree (MaxST) using Kruskal's algorithm.
+
+  Connects all nodes with the maximum possible total edge weight. In an
+  undirected graph, the path between any two nodes in the MaxST is the
+  widest path (maximum bottleneck capacity) between them.
+
+  This is a convenience wrapper around `kruskal/2` using a descending
+  comparison function.
+
+  ## Options
+
+  - `:in` - The graph to find the MaxST in
+  - Other options are passed to `kruskal/2`.
+
+  ## Examples
+
+      iex> graph =
+      ...>   Yog.undirected()
+      ...>   |> Yog.add_node(1, nil)
+      ...>   |> Yog.add_node(2, nil)
+      ...>   |> Yog.add_node(3, nil)
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 20)
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 3, with: 5)
+      iex> {:ok, result} = Yog.MST.maximum_spanning_tree(in: graph)
+      iex> result.total_weight
+      30
+      iex> Enum.map(result.edges, fn e -> {e.from, e.to} end)
+      [{2, 3}, {1, 2}]
+  """
+  @spec maximum_spanning_tree(keyword()) :: {:ok, Result.t()} | {:error, :undirected_only}
+  def maximum_spanning_tree(opts) when is_list(opts) do
+    graph = Keyword.fetch!(opts, :in)
+    maximum_spanning_tree(graph)
+  end
+
+  @spec maximum_spanning_tree(Yog.graph()) :: {:ok, Result.t()} | {:error, :undirected_only}
+  def maximum_spanning_tree(graph) do
+    kruskal(graph, &Yog.Utils.compare_desc/2)
   end
 
   @doc """

@@ -621,4 +621,33 @@ defmodule Yog.MSTTest do
     assert MST.prim(in: graph, compare: &compare/2) == {:error, :undirected_only}
     assert MST.prim(graph, &compare/2) == {:error, :undirected_only}
   end
+
+  # ============= Maximum Spanning Tree Tests =============
+
+  test "maximum_spanning_tree_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_node(4, "D")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 5)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 2)
+      |> Yog.add_edge_ensure(from: 1, to: 4, with: 10)
+      |> Yog.add_edge_ensure(from: 2, to: 4, with: 1)
+
+    {:ok, result} = MST.maximum_spanning_tree(in: graph)
+
+    # MaxST should pick:
+    # 1-4 (10)
+    # 2-3 (5)
+    # 3-4 (2)
+    # Total: 17
+    assert result.edge_count == 3
+    assert result.total_weight == 17
+    assert Enum.any?(result.edges, fn e -> e.from == 1 and e.to == 4 and e.weight == 10 end)
+    assert Enum.any?(result.edges, fn e -> e.from == 2 and e.to == 3 and e.weight == 5 end)
+    assert Enum.any?(result.edges, fn e -> e.from == 3 and e.to == 4 and e.weight == 2 end)
+  end
 end

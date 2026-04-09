@@ -616,7 +616,7 @@ defmodule Yog.Pathfinding.Dijkstra do
            zero_heuristic,
            :infinity,
            &min/2,
-           &Yog.Utils.widest_compare/2
+           &Yog.Utils.compare_desc/2
          ) do
       {:ok, path} -> {:ok, %{path | algorithm: :widest_path}}
       :error -> :error

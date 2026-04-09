@@ -25,13 +25,14 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | Network Simplex | `Yog.Flow.NetworkSimplex` | Global min-cost flow optimization | O(E) pivots | O(V+E) |
 | Stoer-Wagner | `Yog.Flow.MinCut` | Global minimum cut | O(V³) | O(V²) |
 
-## Minimum Spanning Tree
+## Spanning Tree
 
 | Algorithm | Module | Purpose | Time Complexity | Space Complexity |
 |-----------|--------|---------|-----------------|------------------|
 | Kruskal's | `Yog.MST` | MST via edge sorting | O(E log E) | O(V) |
 | Prim's | `Yog.MST` | MST via vertex growing | O(E log V) | O(V) |
 | Borůvka's | `Yog.MST` | Parallel MST | O(E log V) | O(V) |
+| **Max Spanning Tree** | `Yog.MST` | Maximum weight tree | O(E log E) | O(V) |
 
 ## Connectivity & Components
 

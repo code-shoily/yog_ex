@@ -50,35 +50,34 @@ defmodule Yog.Utils do
   def compare(_, _), do: :eq
 
   @doc """
-  Comparison function for widest path (maximum capacity path) algorithms.
+  Descending comparison function.
 
   This is the reverse of the standard comparison - it treats larger values
-  as "less than" smaller values, so that priority queues will pop the
-  largest capacity first. It also handles `:infinity` as the maximum value.
+  as "less than" (`:lt`) smaller values, so that priority queues (min-heaps)
+  will pop the largest value first. It correctly handles `:infinity` as the
+  maximum possible value.
 
-  Used by `Yog.Pathfinding.widest_path/3` to find paths that maximize
-  the minimum edge weight (bottleneck capacity).
+  Used by algorithms that need to maximize a value, such as `widest_path/3`
+  or maximum spanning tree algorithms.
 
   ## Examples
 
-      iex> Yog.Utils.widest_compare(100, 50)
-      :lt  # 100 is "better" than 50 for widest path
-      iex> Yog.Utils.widest_compare(50, 100)
-      :gt  # 50 is "worse" than 100 for widest path
-      iex> Yog.Utils.widest_compare(:infinity, 100)
-      :lt  # infinity is "better" than any number
-      iex> Yog.Utils.widest_compare(50, :infinity)
-      :gt  # any number is "worse" than infinity
-      iex> Yog.Utils.widest_compare(100, 100)
+      iex> Yog.Utils.compare_desc(100, 50)
+      :lt
+      iex> Yog.Utils.compare_desc(50, 100)
+      :gt
+      iex> Yog.Utils.compare_desc(:infinity, 100)
+      :lt
+      iex> Yog.Utils.compare_desc(100, 100)
       :eq
   """
-  @spec widest_compare(number() | :infinity, number() | :infinity) :: :lt | :eq | :gt
-  def widest_compare(:infinity, :infinity), do: :eq
-  def widest_compare(:infinity, _), do: :lt
-  def widest_compare(_, :infinity), do: :gt
-  def widest_compare(a, b) when a > b, do: :lt
-  def widest_compare(a, b) when a < b, do: :gt
-  def widest_compare(_, _), do: :eq
+  @spec compare_desc(number() | :infinity, number() | :infinity) :: :lt | :eq | :gt
+  def compare_desc(:infinity, :infinity), do: :eq
+  def compare_desc(:infinity, _), do: :lt
+  def compare_desc(_, :infinity), do: :gt
+  def compare_desc(a, b) when a > b, do: :lt
+  def compare_desc(a, b) when a < b, do: :gt
+  def compare_desc(_, _), do: :eq
 
   @doc """
   Calculates the difference (distance) between two vectors (maps of scores)
