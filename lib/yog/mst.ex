@@ -34,7 +34,7 @@ defmodule Yog.MST do
   - [CP-Algorithms: MST](https://cp-algorithms.com/graph/mst_kruskal.html)
   """
 
-  alias Yog.MST.{Boruvka, Edmonds, Kruskal, Prim, Result}
+  alias Yog.MST.{Boruvka, Edmonds, Kruskal, Prim, Result, Wilson}
 
   @typedoc """
   Represents an edge in a spanning tree or arborescence.
@@ -212,6 +212,41 @@ defmodule Yog.MST do
 
   def boruvka(graph, compare) do
     Boruvka.compute(graph, compare)
+  end
+
+  # =============================================================================
+  # Wilson's Algorithm (Uniform Spanning Tree)
+  # =============================================================================
+
+  @doc """
+  Generates a Uniform Spanning Tree (UST) using Wilson's algorithm.
+
+  Returns `{:ok, %Yog.MST.Result{}}` containing the edges of the spanning tree.
+
+  ## Parameters
+
+  - `opts`: Options including:
+    - `:in` - The graph to sample from.
+    - `:root` - (Optional) The node to start the tree with.
+
+  ## Examples
+
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}, {1, 3, 1}])
+      iex> {:ok, result} = Yog.MST.uniform_spanning_tree(in: graph)
+      iex> result.edge_count
+      2
+  """
+  @spec uniform_spanning_tree(keyword()) :: {:ok, Result.t()}
+  def uniform_spanning_tree(opts) when is_list(opts) do
+    graph = Keyword.fetch!(opts, :in)
+    Wilson.compute(graph, opts)
+  end
+
+  @spec uniform_spanning_tree(Yog.graph(), keyword()) :: {:ok, Result.t()}
+  def uniform_spanning_tree(graph, opts \\ []) do
+    Wilson.compute(graph, opts)
   end
 
   # =============================================================================

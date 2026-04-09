@@ -32,6 +32,8 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | Kruskal's | `Yog.MST` | MST via edge sorting | O(E log E) | O(V) |
 | Prim's | `Yog.MST` | MST via vertex growing | O(E log V) | O(V) |
 | Borůvka's | `Yog.MST` | Parallel MST | O(E log V) | O(V) |
+| Edmonds' | `Yog.MST` | Minimum Spanning Arborescence (Directed) | O(VE) | O(V) |
+| Wilson's | `Yog.MST` | Uniform Spanning Tree (Probabilistic) | O(V) hit time | O(V) |
 | **Max Spanning Tree** | `Yog.MST` | Maximum weight tree | O(E log E) | O(V) |
 
 ## Connectivity & Components

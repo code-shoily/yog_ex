@@ -10,7 +10,7 @@ defmodule Yog.MST.Result do
   - `total_weight` - Sum of all edge weights in the MST
   - `node_count` - Number of nodes in the original graph
   - `edge_count` - Number of edges in the MST
-  - `algorithm` - The algorithm used (`:kruskal`, `:prim`, `:boruvka`, or `:chu_liu_edmonds`)
+  - `algorithm` - The algorithm used (`:kruskal`, `:prim`, `:boruvka`, `:chu_liu_edmonds`, or `:wilson`)
   - `root` - The root node ID (for arborescence algorithms)
 
   ## Examples
@@ -34,7 +34,7 @@ defmodule Yog.MST.Result do
           total_weight: number(),
           node_count: non_neg_integer(),
           edge_count: non_neg_integer(),
-          algorithm: :kruskal | :prim | :boruvka | :chu_liu_edmonds,
+          algorithm: :kruskal | :prim | :boruvka | :chu_liu_edmonds | :wilson,
           root: Yog.node_id() | nil
         }
 
@@ -55,7 +55,7 @@ defmodule Yog.MST.Result do
   """
   @spec new(
           [Yog.MST.edge()],
-          :kruskal | :prim | :boruvka | :chu_liu_edmonds,
+          :kruskal | :prim | :boruvka | :chu_liu_edmonds | :wilson,
           non_neg_integer(),
           term()
         ) :: t()

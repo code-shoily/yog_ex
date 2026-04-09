@@ -1,13 +1,44 @@
 defmodule Yog.MST.Prim do
   @moduledoc """
-  Prim's algorithm for Minimum Spanning Tree (MST).
+  Prim's algorithm for finding the Minimum Spanning Tree (MST).
+
+  Prim's algorithm builds an MST by starting from an arbitrary node and
+  repeatedly adding the cheapest edge that connects a node in the tree to a
+  node outside the tree. It uses a priority queue to efficiently find the next
+  edge to add.
+
+  ## Performance
+
+  - **Time Complexity**: O(E log V) with a binary heap (as implemented via `Yog.PairingHeap`).
+  - **Space Complexity**: O(V + E) to store the priority queue and visited status.
   """
 
   alias Yog.MST.Result
   alias Yog.PairingHeap, as: PQ
 
   @doc """
-  Computes MST using Prim's algorithm.
+  Computes the Minimum Spanning Tree (MST) using Prim's algorithm.
+
+  Returns `{:ok, %Yog.MST.Result{}}` containing the edges of the MST.
+
+  ## Parameters
+
+  - `graph`: The undirected graph to process.
+  - `compare`: A comparison function `(a, b -> :lt | :eq | :gt)` used to order
+    edge weights.
+  - `start_node`: The node ID to start growing the tree from. If `nil`, the
+    first node in the graph is used.
+
+  ## Examples
+
+      iex> graph = Yog.undirected()
+      ...> |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edges!([{1, 2, 1}, {2, 3, 2}, {1, 3, 3}])
+      iex> {:ok, result} = Yog.MST.Prim.compute(graph, &Yog.Utils.compare/2, 1)
+      iex> result.total_weight
+      3
+      iex> result.edge_count
+      2
   """
   @spec compute(Yog.graph(), (term(), term() -> :lt | :eq | :gt), term() | nil) ::
           {:ok, Result.t()}

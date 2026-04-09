@@ -1,12 +1,46 @@
 defmodule Yog.MST.Edmonds do
   @moduledoc """
-  Chu-Liu/Edmonds' algorithm for Minimum Spanning Arborescence (MSA).
+  Chu-Liu/Edmonds' algorithm for finding the Minimum Spanning Arborescence (MSA).
+
+  An arborescence (also known as a directed spanning tree) is a directed counterpart
+  to a Minimum Spanning Tree. For a given root node, it finds a set of edges that
+  allows all other nodes to be reached from the root with minimum total weight.
+
+  The algorithm works by:
+  1. Picking the cheapest incoming edge for every node except the root.
+  2. If the resulting graph is acyclic, it is the MSA.
+  3. If cycles exist, it contracts each cycle into a "super-node", adjusts the
+     weights of remaining incoming edges, and recurses.
+  4. Finally, it expands the contracted cycles to restore the original graph structure.
+
+  ## Performance
+
+  - **Time Complexity**: O(VE) for simple implementations like this one.
+  - **Space Complexity**: O(V + E) to store the graph and recursion metadata.
   """
 
   alias Yog.MST.Result
 
   @doc """
-  Finds the Minimum Spanning Arborescence (MSA) of a directed graph.
+  Computes the Minimum Spanning Arborescence (MSA) of a directed graph.
+
+  Returns `{:ok, %Yog.MST.Result{}}` containing the edges of the MSA.
+
+  ## Parameters
+
+  - `graph`: The directed graph to process.
+  - `root`: The node ID to use as the root of the arborescence.
+
+  ## Examples
+
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(1, "Root") |> Yog.add_node(2, "A") |> Yog.add_node(3, "B")
+      ...> |> Yog.add_edges!([{1, 2, 10}, {1, 3, 20}, {2, 3, 5}])
+      iex> {:ok, result} = Yog.MST.Edmonds.compute(graph, 1)
+      iex> result.total_weight
+      15
+      iex> result.root
+      1
   """
   @spec compute(Yog.graph(), term()) :: {:ok, Result.t()} | {:error, term()}
   def compute(graph, root) do
@@ -28,7 +62,6 @@ defmodule Yog.MST.Edmonds do
     best_in = find_best_in_edges(graph, root)
 
     # If any node besides root has no incoming edges, it might be unreachable
-    # But wait, Edmonds' handles this if the graph is connected.
     # Actually, if a node has no incoming edges and it's not the root, it's impossible.
     node_ids = Map.keys(graph.nodes)
 
