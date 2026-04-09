@@ -3,6 +3,11 @@ defmodule Yog.MSTTest do
 
   doctest Yog.MST
   doctest Yog.MST.Result
+  doctest Yog.MST.Kruskal
+  doctest Yog.MST.Prim
+  doctest Yog.MST.Boruvka
+  doctest Yog.MST.Edmonds
+  doctest Yog.MST.Wilson
 
   alias Yog.MST
 
@@ -749,5 +754,43 @@ defmodule Yog.MSTTest do
 
     {:ok, result} = MST.chu_liu_edmonds(graph, 1)
     assert result.total_weight == 5
+  end
+
+  describe "Wilson's Algorithm" do
+    test "generates a valid spanning tree for a simple graph" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_node(3, nil)
+        |> Yog.add_node(4, nil)
+        |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}, {3, 4, 1}, {4, 1, 1}, {1, 3, 1}])
+
+      {:ok, result} = MST.uniform_spanning_tree(in: graph)
+
+      assert result.edge_count == 3
+      assert result.node_count == 4
+      assert result.algorithm == :wilson
+
+      # Verify it's connected (all 4 nodes reachable in result edges)
+      nodes_in_tree =
+        Enum.flat_map(result.edges, fn e -> [e.from, e.to] end) |> Enum.uniq() |> Enum.sort()
+
+      assert nodes_in_tree == [1, 2, 3, 4]
+    end
+
+    test "works with different roots" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_edge!(1, 2, 1)
+
+      {:ok, res1} = MST.uniform_spanning_tree(in: graph, root: 1)
+      {:ok, res2} = MST.uniform_spanning_tree(in: graph, root: 2)
+
+      assert res1.edge_count == 1
+      assert res2.edge_count == 1
+    end
   end
 end
