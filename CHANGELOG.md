@@ -53,6 +53,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `waxman/2` - Waxman model with distance-probabilistic edge formation
 
 #### Pathfinding
+- **Widest Path (Maximum Capacity Path)** (#95): Added `Yog.Pathfinding.widest_path/3` - finds the path with maximum bottleneck capacity between two nodes. Useful for network bandwidth routing, finding reliable paths, and max-min fair allocation problems.
+  - Maximizes the minimum edge weight along the path (the bottleneck)
+  - Algorithm: Modified Dijkstra with `min` for capacity combination and reverse comparison to prioritize higher capacities
+  - Returns `{:ok, %Path{}}` with `algorithm: :widest_path` and the bottleneck capacity as `weight`
+  - Returns `:error` when no path exists between the nodes
+  - **Complexity**: O((V + E) log V) time, O(V) space
 - **Single-Pair Shortest Path (Unweighted)**: Added `Yog.Pathfinding.shortest_path_unweighted/3` - finds the shortest path between two nodes in unweighted graphs using BFS with early termination. More efficient than Dijkstra for unweighted graphs (no heap overhead) and uses predecessor map for memory-efficient path reconstruction instead of storing full paths in the queue.
   - Returns `{:ok, [node_id]}` with the path from source to target
   - Returns `{:error, :no_path}` when target is unreachable

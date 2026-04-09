@@ -23,6 +23,10 @@ defmodule Yog.Pathfinding do
   - `johnson/5` — Johnson's algorithm for sparse graphs with negative weights
   - `distance_matrix/6` — Distance matrix between specific points of interest
 
+  ## Special Path Types
+
+  - `widest_path/3` — Maximum capacity path (bottleneck routing)
+
   ## Algorithm Selection Guide
 
   | Algorithm | Use When | Time Complexity |
@@ -34,6 +38,7 @@ defmodule Yog.Pathfinding do
   | **All-Pairs Unweighted** | All-pairs, unweighted graphs (parallel) | O(V² + VE) |
   | **Floyd-Warshall** | All-pairs, dense weighted graphs | O(V³) |
   | **Johnson's** | All-pairs, sparse graphs, negative weights | O(V² log V + VE) |
+  | **Widest Path** | Maximize minimum edge capacity | O((V+E) log V) |
   """
 
   alias Yog.Pathfinding.AStar
@@ -85,6 +90,65 @@ defmodule Yog.Pathfinding do
     * `:compare` - Comparison function (default: &Yog.Utils.compare/2)
   """
   defdelegate single_source_distances(opts), to: Dijkstra
+
+  @doc """
+  Finds the widest path (maximum capacity path) between two nodes.
+
+  The widest path maximizes the minimum edge weight along the path (the bottleneck).
+  This is useful for network bandwidth routing, finding reliable paths, and
+  max-min fair allocation problems.
+
+  ## Parameters
+
+    * `graph` - The graph to search
+    * `source` - Starting node ID
+    * `target` - Target node ID
+
+  ## Returns
+
+    * `{:ok, path}` - A `Path.t()` struct with maximum bottleneck capacity
+    * `:error` - If no path exists between the nodes
+
+  ## Example
+
+      # Network with bandwidths
+      graph = Yog.directed()
+      |> Yog.add_edges!([
+        {:a, :b, 100},  # 100 Mbps link
+        {:a, :c, 50},   # 50 Mbps link
+        {:b, :d, 80},   # 80 Mbps link
+        {:c, :d, 200}   # 200 Mbps link
+      ])
+
+      {:ok, path} = Yog.Pathfinding.widest_path(graph, :a, :d)
+      # Path via b has bottleneck min(100, 80) = 80
+      # Path via c has bottleneck min(50, 200) = 50
+      # So widest path is a->b->d with capacity 80
+
+  ## Algorithm
+
+  This is a modification of Dijkstra's algorithm:
+  - Standard Dijkstra: `distance[v] = min(distance[u] + weight(u,v))`
+  - Widest Path: `capacity[v] = max(capacity[v], min(capacity[u], weight(u,v)))`
+
+  The path's "width" is the minimum edge weight along it. We want to maximize
+  this minimum (the bottleneck capacity).
+
+  ## Complexity
+
+  - **Time:** O((V + E) log V)
+  - **Space:** O(V)
+
+  ## See Also
+
+  - `shortest_path/1` - Standard Dijkstra for shortest paths
+  - Wikipedia: https://en.wikipedia.org/wiki/Widest_path_problem
+  """
+  @spec widest_path(Yog.Graph.t(), source :: Yog.node_id(), target :: Yog.node_id()) ::
+          {:ok, Path.t()} | :error
+  def widest_path(graph, source, target) do
+    Dijkstra.widest_path(graph, source, target)
+  end
 
   # =============================================================================
   # A*

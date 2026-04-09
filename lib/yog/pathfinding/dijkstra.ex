@@ -539,4 +539,87 @@ defmodule Yog.Pathfinding.Dijkstra do
       [] -> 0
     end
   end
+
+  # ============================================================
+  # Widest Path (Maximum Capacity Path)
+  # ============================================================
+
+  @doc """
+  Find the widest path (maximum capacity path) between two nodes.
+
+  The widest path maximizes the minimum edge weight along the path (the bottleneck).
+  This is useful for network bandwidth routing, finding reliable paths, and
+  max-min fair allocation problems.
+
+  This is a simple modification of Dijkstra's algorithm:
+  - Initialize source capacity to `:infinity` (no bottleneck yet)
+  - Use `min/2` to combine capacities (bottleneck is the minimum edge)
+  - Use `>=` comparison to prioritize higher capacities (maximize)
+
+  ## Parameters
+
+    * `graph` - The graph to search
+    * `from` - Starting node
+    * `to` - Target node
+
+  ## Returns
+
+    * `{:ok, path}` - A `Path` struct containing the nodes and bottleneck capacity
+    * `:error` - No path exists between the nodes
+
+  ## Examples
+
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_node(:a, nil)
+      ...> |> Yog.add_node(:b, nil)
+      ...> |> Yog.add_node(:c, nil)
+      ...> |> Yog.add_node(:d, nil)
+      ...> |> Yog.add_edge_ensure(:a, :b, 100)
+      ...> |> Yog.add_edge_ensure(:a, :c, 50)
+      ...> |> Yog.add_edge_ensure(:b, :d, 80)
+      ...> |> Yog.add_edge_ensure(:c, :d, 200)
+      iex> {:ok, path} = Dijkstra.widest_path(graph, :a, :d)
+      iex> path.nodes
+      [:a, :b, :d]
+      iex> path.weight
+      80
+      iex> path.algorithm
+      :widest_path
+
+  ## Algorithm
+
+  Standard Dijkstra minimizes: `dist[v] = min(dist[u] + weight(u,v))`
+  Widest Path maximizes: `cap[v] = max(cap[v], min(cap[u], weight(u,v)))`
+
+  The path's "width" is the minimum edge weight along it. We want to
+  maximize this minimum (the bottleneck capacity).
+
+  ## See Also
+
+  - `shortest_path/6` - Standard Dijkstra for shortest paths
+  - Wikipedia: https://en.wikipedia.org/wiki/Widest_path_problem
+  """
+  @spec widest_path(Yog.t(), Yog.node_id(), Yog.node_id()) ::
+          {:ok, Path.t()} | :error
+  def widest_path(graph, from, to) do
+    # Widest path = Dijkstra with modified semiring:
+    # - Identity: :infinity (starting with infinite capacity)
+    # - Combine: min/2 (bottleneck is the minimum edge along path)
+    # - Compare: >= (maximize the bottleneck)
+
+    zero_heuristic = fn _, _ -> :infinity end
+
+    case AStar.a_star(
+           graph,
+           from,
+           to,
+           zero_heuristic,
+           :infinity,
+           &min/2,
+           &Yog.Utils.widest_compare/2
+         ) do
+      {:ok, path} -> {:ok, %{path | algorithm: :widest_path}}
+      :error -> :error
+    end
+  end
 end

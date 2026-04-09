@@ -710,6 +710,173 @@ defmodule Yog.PathfindingTest do
   end
 
   # =============================================================================
+  # Widest Path Tests
+  # =============================================================================
+
+  describe "widest_path/3" do
+    test "finds path with maximum bottleneck capacity" do
+      # Example from the issue:
+      # Path via c has bottleneck 50
+      # Path via b has bottleneck min(100, 80) = 80
+      # So widest path is a->b->d with capacity 80
+      graph =
+        Yog.directed()
+        |> Yog.add_node(:a, nil)
+        |> Yog.add_node(:b, nil)
+        |> Yog.add_node(:c, nil)
+        |> Yog.add_node(:d, nil)
+        |> Yog.add_edge_ensure(from: :a, to: :b, with: 100)
+        |> Yog.add_edge_ensure(from: :a, to: :c, with: 50)
+        |> Yog.add_edge_ensure(from: :b, to: :d, with: 80)
+        |> Yog.add_edge_ensure(from: :c, to: :d, with: 200)
+
+      {:ok, path} = Pathfinding.widest_path(graph, :a, :d)
+
+      assert path.nodes == [:a, :b, :d]
+      assert path.weight == 80
+      assert path.algorithm == :widest_path
+    end
+
+    test "returns direct edge when it has maximum capacity" do
+      graph =
+        Yog.directed()
+        |> Yog.add_node(:a, nil)
+        |> Yog.add_node(:b, nil)
+        |> Yog.add_edge_ensure(from: :a, to: :b, with: 100)
+
+      {:ok, path} = Pathfinding.widest_path(graph, :a, :b)
+
+      assert path.nodes == [:a, :b]
+      assert path.weight == 100
+    end
+
+    test "handles simple path bottleneck correctly" do
+      # Chain: a -> b -> c with weights 50 and 30
+      # Bottleneck should be min(50, 30) = 30
+      graph =
+        Yog.directed()
+        |> Yog.add_node(:a, nil)
+        |> Yog.add_node(:b, nil)
+        |> Yog.add_node(:c, nil)
+        |> Yog.add_edge_ensure(from: :a, to: :b, with: 50)
+        |> Yog.add_edge_ensure(from: :b, to: :c, with: 30)
+
+      {:ok, path} = Pathfinding.widest_path(graph, :a, :c)
+
+      assert path.nodes == [:a, :b, :c]
+      assert path.weight == 30
+    end
+
+    test "chooses path with better bottleneck over shorter path" do
+      # Two paths from a to d:
+      # a -> b -> d: weights 100, 10 -> bottleneck 10
+      # a -> c -> d: weights 50, 40 -> bottleneck 40 (widest)
+      graph =
+        Yog.directed()
+        |> Yog.add_node(:a, nil)
+        |> Yog.add_node(:b, nil)
+        |> Yog.add_node(:c, nil)
+        |> Yog.add_node(:d, nil)
+        |> Yog.add_edge_ensure(from: :a, to: :b, with: 100)
+        |> Yog.add_edge_ensure(from: :b, to: :d, with: 10)
+        |> Yog.add_edge_ensure(from: :a, to: :c, with: 50)
+        |> Yog.add_edge_ensure(from: :c, to: :d, with: 40)
+
+      {:ok, path} = Pathfinding.widest_path(graph, :a, :d)
+
+      # Should choose a -> c -> d because bottleneck 40 > 10
+      assert path.nodes == [:a, :c, :d]
+      assert path.weight == 40
+    end
+
+    test "returns error when no path exists" do
+      graph =
+        Yog.directed()
+        |> Yog.add_node(:a, nil)
+        |> Yog.add_node(:b, nil)
+
+      assert :error = Pathfinding.widest_path(graph, :a, :b)
+    end
+
+    test "handles same source and target" do
+      graph =
+        Yog.directed()
+        |> Yog.add_node(:a, nil)
+        |> Yog.add_edge_ensure(from: :a, to: :a, with: 100)
+
+      {:ok, path} = Pathfinding.widest_path(graph, :a, :a)
+
+      # Self-loop should have bottleneck = edge weight
+      # Or if starting at source, we're already there
+      assert path.nodes == [:a]
+      assert path.weight == :infinity
+    end
+
+    test "handles undirected graphs" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_node(:a, nil)
+        |> Yog.add_node(:b, nil)
+        |> Yog.add_node(:c, nil)
+        |> Yog.add_edge_ensure(from: :a, to: :b, with: 50)
+        |> Yog.add_edge_ensure(from: :b, to: :c, with: 30)
+
+      {:ok, path} = Pathfinding.widest_path(graph, :a, :c)
+
+      assert path.nodes == [:a, :b, :c]
+      assert path.weight == 30
+    end
+
+    test "handles larger graph with multiple paths" do
+      # Diamond shape with multiple paths
+      #    1
+      #   / \
+      #  2   3
+      #  |\ /|
+      #  4-X-5
+      #   \ /
+      #    6
+      graph =
+        Yog.directed()
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_node(3, nil)
+        |> Yog.add_node(4, nil)
+        |> Yog.add_node(5, nil)
+        |> Yog.add_node(6, nil)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 100)
+        |> Yog.add_edge_ensure(from: 1, to: 3, with: 80)
+        |> Yog.add_edge_ensure(from: 2, to: 4, with: 60)
+        |> Yog.add_edge_ensure(from: 2, to: 5, with: 40)
+        |> Yog.add_edge_ensure(from: 3, to: 4, with: 50)
+        |> Yog.add_edge_ensure(from: 3, to: 5, with: 70)
+        |> Yog.add_edge_ensure(from: 4, to: 6, with: 30)
+        |> Yog.add_edge_ensure(from: 5, to: 6, with: 90)
+
+      {:ok, path} = Pathfinding.widest_path(graph, 1, 6)
+
+      # Best path: 1 -> 3 -> 5 -> 6
+      # Bottleneck: min(80, 70, 90) = 70
+      assert path.nodes == [1, 3, 5, 6]
+      assert path.weight == 70
+    end
+
+    test "handles edge weights of 1 (minimum non-zero)" do
+      graph =
+        Yog.directed()
+        |> Yog.add_node(:a, nil)
+        |> Yog.add_node(:b, nil)
+        |> Yog.add_node(:c, nil)
+        |> Yog.add_edge_ensure(from: :a, to: :b, with: 1)
+        |> Yog.add_edge_ensure(from: :b, to: :c, with: 1)
+
+      {:ok, path} = Pathfinding.widest_path(graph, :a, :c)
+
+      assert path.weight == 1
+    end
+  end
+
+  # =============================================================================
   # Cross-Algorithm Consistency Tests
   # =============================================================================
 

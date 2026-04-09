@@ -50,6 +50,37 @@ defmodule Yog.Utils do
   def compare(_, _), do: :eq
 
   @doc """
+  Comparison function for widest path (maximum capacity path) algorithms.
+
+  This is the reverse of the standard comparison - it treats larger values
+  as "less than" smaller values, so that priority queues will pop the
+  largest capacity first. It also handles `:infinity` as the maximum value.
+
+  Used by `Yog.Pathfinding.widest_path/3` to find paths that maximize
+  the minimum edge weight (bottleneck capacity).
+
+  ## Examples
+
+      iex> Yog.Utils.widest_compare(100, 50)
+      :lt  # 100 is "better" than 50 for widest path
+      iex> Yog.Utils.widest_compare(50, 100)
+      :gt  # 50 is "worse" than 100 for widest path
+      iex> Yog.Utils.widest_compare(:infinity, 100)
+      :lt  # infinity is "better" than any number
+      iex> Yog.Utils.widest_compare(50, :infinity)
+      :gt  # any number is "worse" than infinity
+      iex> Yog.Utils.widest_compare(100, 100)
+      :eq
+  """
+  @spec widest_compare(number() | :infinity, number() | :infinity) :: :lt | :eq | :gt
+  def widest_compare(:infinity, :infinity), do: :eq
+  def widest_compare(:infinity, _), do: :lt
+  def widest_compare(_, :infinity), do: :gt
+  def widest_compare(a, b) when a > b, do: :lt
+  def widest_compare(a, b) when a < b, do: :gt
+  def widest_compare(_, _), do: :eq
+
+  @doc """
   Calculates the difference (distance) between two vectors (maps of scores)
   using the specified norm type.
 
