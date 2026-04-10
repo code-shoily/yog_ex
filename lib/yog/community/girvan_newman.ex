@@ -51,7 +51,7 @@ defmodule Yog.Community.GirvanNewman do
   """
 
   alias Yog.Community.{Dendrogram, Result}
-  alias Yog.PairingHeap, as: PQ
+  alias Yog.Pathfinding.Brandes
 
   @typedoc "Options for Girvan-Newman algorithm"
   @type girvan_newman_options :: %{target_communities: integer() | nil}
@@ -84,8 +84,10 @@ defmodule Yog.Community.GirvanNewman do
 
     edge_scores =
       List.foldl(node_list, %{}, fn s, acc ->
-        discovery = run_discovery(graph, s)
-        edge_dependencies = accumulate_edge_dependencies(discovery)
+        {stack, preds, sigmas} = Brandes.discovery(graph, s)
+
+        edge_dependencies =
+          Brandes.accumulate_edge_dependencies(stack, preds, sigmas)
 
         List.foldl(Map.to_list(edge_dependencies), acc, fn {edge, score}, inner_acc ->
           Map.update(inner_acc, edge, score, &(&1 + score))
@@ -177,122 +179,6 @@ defmodule Yog.Community.GirvanNewman do
   # =============================================================================
   # EDGE BETWEENNESS CALCULATION (Brandes' Algorithm)
   # =============================================================================
-
-  defp run_discovery(graph, source) do
-    # Min-heap: smaller distances have higher priority
-    compare_fn = fn {d1, _}, {d2, _} -> d1 <= d2 end
-
-    queue =
-      PQ.new(compare_fn)
-      |> PQ.push({0, source})
-
-    dists = %{source => 0}
-    sigmas = %{source => 1}
-    preds = %{}
-    stack = []
-
-    do_brandes_dijkstra(graph, queue, dists, sigmas, preds, stack)
-  end
-
-  defp do_brandes_dijkstra(
-         %Yog.Graph{out_edges: out_edges} = graph,
-         queue,
-         dists,
-         sigmas,
-         preds,
-         stack
-       ) do
-    case PQ.pop(queue) do
-      :error ->
-        {stack, preds, sigmas}
-
-      {:ok, {d_v, v}, rest_q} ->
-        current_best = Map.get(dists, v, d_v)
-
-        if d_v > current_best do
-          do_brandes_dijkstra(graph, rest_q, dists, sigmas, preds, stack)
-        else
-          new_stack = [v | stack]
-
-          successors =
-            case Map.fetch(out_edges, v) do
-              {:ok, edges} -> Map.to_list(edges)
-              :error -> []
-            end
-
-          {next_q, next_dists, next_sigmas, next_preds} =
-            List.foldl(successors, {rest_q, dists, sigmas, preds}, fn {w, weight},
-                                                                      {q, ds, ss, ps} ->
-              weight_float = if is_nil(weight), do: 1.0, else: weight
-              new_dist = d_v + weight_float
-
-              case Map.get(ds, w) do
-                nil ->
-                  q2 = PQ.push(q, {new_dist, w})
-                  ds2 = Map.put(ds, w, new_dist)
-                  ss2 = Map.put(ss, w, get_sigma(ss, v))
-                  ps2 = Map.put(ps, w, [v])
-                  {q2, ds2, ss2, ps2}
-
-                old_dist ->
-                  cond do
-                    new_dist < old_dist ->
-                      q2 = PQ.push(q, {new_dist, w})
-                      ds2 = Map.put(ds, w, new_dist)
-                      ss2 = Map.put(ss, w, get_sigma(ss, v))
-                      ps2 = Map.put(ps, w, [v])
-                      {q2, ds2, ss2, ps2}
-
-                    new_dist == old_dist ->
-                      ss2 = Map.update(ss, w, 0, fn curr -> curr + get_sigma(ss, v) end)
-                      ps2 = Map.update(ps, w, [], fn curr -> [v | curr] end)
-                      {q, ds, ss2, ps2}
-
-                    true ->
-                      {q, ds, ss, ps}
-                  end
-              end
-            end)
-
-          do_brandes_dijkstra(graph, next_q, next_dists, next_sigmas, next_preds, new_stack)
-        end
-    end
-  end
-
-  defp get_sigma(sigmas, id) do
-    Map.get(sigmas, id, 0)
-  end
-
-  defp accumulate_edge_dependencies({stack, preds, sigmas}) do
-    node_deltas = %{}
-    edge_deltas = %{}
-
-    {_node_deltas, final_edge_deltas} =
-      List.foldl(stack, {node_deltas, edge_deltas}, fn v, {nd, ed} ->
-        sigma_v = get_sigma(sigmas, v) * 1.0
-        delta_v = Map.get(nd, v, 0.0)
-        v_preds = Map.get(preds, v, [])
-
-        List.foldl(v_preds, {nd, ed}, fn u, {inner_nd, inner_ed} ->
-          sigma_u = get_sigma(sigmas, u) * 1.0
-
-          c = sigma_u / sigma_v * (1.0 + delta_v)
-
-          edge =
-            if u < v do
-              {u, v}
-            else
-              {v, u}
-            end
-
-          new_nd = Map.update(inner_nd, u, c, fn curr -> curr + c end)
-          new_ed = Map.update(inner_ed, edge, c, fn curr -> curr + c end)
-          {new_nd, new_ed}
-        end)
-      end)
-
-    final_edge_deltas
-  end
 
   # =============================================================================
   # HIERARCHICAL SPLITTING

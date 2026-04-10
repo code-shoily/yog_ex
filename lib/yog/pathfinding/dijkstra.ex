@@ -436,9 +436,11 @@ defmodule Yog.Pathfinding.Dijkstra do
         add \\ &Kernel.+/2,
         compare \\ &Yog.Utils.compare/2
       ) do
-    case do_dijkstra(graph, from, nil, zero, add, compare, false) do
-      :error -> %{}
-      {_path, _weight, distances} -> distances
+    if Yog.Model.has_node?(graph, from) do
+      {_path, _weight, distances} = do_dijkstra(graph, from, zero, add, compare)
+      distances
+    else
+      %{}
     end
   end
 
@@ -447,9 +449,8 @@ defmodule Yog.Pathfinding.Dijkstra do
   # ============================================================
 
   # Main Dijkstra implementation for single_source_distances
-  # Returns :error | {path, weight} if to is specified
-  # Returns :error | {[], zero, distances} if to is nil (single source distances)
-  defp do_dijkstra(graph, from, to, zero, add, compare, _return_path) do
+  # Returns {[], zero, distances}
+  defp do_dijkstra(graph, from, zero, add, compare) do
     initial_queue =
       PQ.new()
       |> PQ.push({zero, from})
@@ -460,7 +461,6 @@ defmodule Yog.Pathfinding.Dijkstra do
     do_dijkstra_loop(
       graph,
       initial_queue,
-      to,
       add,
       compare,
       initial_distances,
@@ -468,70 +468,53 @@ defmodule Yog.Pathfinding.Dijkstra do
     )
   end
 
-  defp do_dijkstra_loop(graph, queue, to, add, compare, distances, predecessors) do
+  # Main Dijkstra implementation for single_source_distances
+  defp do_dijkstra_loop(graph, queue, add, compare, distances, predecessors) do
     case PQ.pop(queue) do
       :error ->
-        if to do
-          :error
-        else
-          zero_val = zero_from_distances(distances)
-          {[], zero_val, distances}
-        end
+        zero_val = zero_from_distances(distances)
+        {[], zero_val, distances}
 
       {:ok, {dist, node}, rest} ->
-        current_best = Map.get(distances, node)
+        maybe_visit_node(graph, node, dist, rest, add, compare, distances, predecessors)
+    end
+  end
 
-        if current_best != nil and compare.(dist, current_best) == :gt do
-          do_dijkstra_loop(graph, rest, to, add, compare, distances, predecessors)
-        else
-          if node == to do
-            path = reconstruct_path(predecessors, to, [to])
-            {path, dist}
-          else
-            successors =
-              case Map.fetch(graph.out_edges, node) do
-                {:ok, edges} -> Map.to_list(edges)
-                :error -> []
-              end
+  defp maybe_visit_node(graph, node, dist, rest, add, compare, distances, predecessors) do
+    current_best = Map.get(distances, node)
 
-            {new_queue, new_distances, new_predecessors} =
-              List.foldl(successors, {rest, distances, predecessors}, fn {neighbor, weight},
-                                                                         {q, d, p} ->
-                new_dist = add.(dist, weight)
+    if current_best != nil and compare.(dist, current_best) == :gt do
+      do_dijkstra_loop(graph, rest, add, compare, distances, predecessors)
+    else
+      visit_node(graph, node, dist, rest, add, compare, distances, predecessors)
+    end
+  end
 
-                case Map.fetch(d, neighbor) do
-                  {:ok, current} ->
-                    if compare.(new_dist, current) == :lt do
-                      new_q = PQ.push(q, {new_dist, neighbor})
-                      new_d = Map.put(d, neighbor, new_dist)
-                      new_p = Map.put(p, neighbor, node)
-                      {new_q, new_d, new_p}
-                    else
-                      {q, d, p}
-                    end
+  defp visit_node(graph, node, dist, rest, add, compare, distances, predecessors) do
+    successors = Map.get(graph.out_edges, node, %{})
 
-                  :error ->
-                    new_q = PQ.push(q, {new_dist, neighbor})
-                    new_d = Map.put(d, neighbor, new_dist)
-                    new_p = Map.put(p, neighbor, node)
-                    {new_q, new_d, new_p}
-                end
-              end)
+    {new_queue, new_distances, new_predecessors} =
+      Enum.reduce(successors, {rest, distances, predecessors}, fn {neighbor, weight}, acc ->
+        relax_neighbor(acc, node, neighbor, weight, dist, add, compare)
+      end)
 
-            do_dijkstra_loop(graph, new_queue, to, add, compare, new_distances, new_predecessors)
-          end
-        end
+    do_dijkstra_loop(graph, new_queue, add, compare, new_distances, new_predecessors)
+  end
+
+  defp relax_neighbor({q, d, p}, node, neighbor, weight, dist, add, compare) do
+    new_dist = add.(dist, weight)
+    current_best = Map.get(d, neighbor)
+
+    if is_nil(current_best) or compare.(new_dist, current_best) == :lt do
+      {PQ.push(q, {new_dist, neighbor}), Map.put(d, neighbor, new_dist),
+       Map.put(p, neighbor, node)}
+    else
+      {q, d, p}
     end
   end
 
   # Reconstruct path by backtracking through predecessors
   # Note: Only used as safety net; shortest_path now delegates to A*
-  defp reconstruct_path(predecessors, node, acc) do
-    case Map.get(predecessors, node) do
-      nil -> acc
-      parent -> reconstruct_path(predecessors, parent, [parent | acc])
-    end
-  end
 
   defp zero_from_distances(distances) do
     case Map.values(distances) do

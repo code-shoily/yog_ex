@@ -234,51 +234,28 @@ defmodule Yog.Pathfinding.Bidirectional do
     end
   end
 
-  defp do_bfs_step_expand(
-         graph,
-         queue_fwd,
-         queue_bwd,
-         visited_fwd,
-         visited_bwd,
-         size_fwd,
-         size_bwd
-       ) do
-    if size_fwd <= size_bwd do
-      case expand_bfs_level(graph, queue_fwd, visited_fwd, visited_bwd) do
-        {:found, new_path, other_path} ->
-          full_path = Enum.reverse(new_path) ++ tl(other_path)
-          weight = length(new_path) + length(other_path) - 2
-          {:ok, Path.new(full_path, weight, :bidirectional_bfs)}
+  defp do_bfs_step_expand(graph, q_fwd, q_bwd, v_fwd, v_bwd, s_fwd, s_bwd) do
+    {q_active, q_other, v_active, v_other, s_active, s_other, side} =
+      if s_fwd <= s_bwd,
+        do: {q_fwd, q_bwd, v_fwd, v_bwd, s_fwd, s_bwd, :fwd},
+        else: {q_bwd, q_fwd, v_bwd, v_fwd, s_bwd, s_fwd, :bwd}
 
-        {:continue, new_queue_fwd, new_visited_fwd, added_count} ->
-          do_bfs_step(
-            graph,
-            new_queue_fwd,
-            queue_bwd,
-            new_visited_fwd,
-            visited_bwd,
-            size_fwd - 1 + added_count,
-            size_bwd
-          )
-      end
-    else
-      case expand_bfs_level(graph, queue_bwd, visited_bwd, visited_fwd) do
-        {:found, new_path, other_path} ->
-          full_path = Enum.reverse(other_path) ++ tl(new_path)
-          weight = length(new_path) + length(other_path) - 2
-          {:ok, Path.new(full_path, weight, :bidirectional_bfs)}
+    case expand_bfs_level(graph, q_active, v_active, v_other) do
+      {:found, new_path, other_path} ->
+        full_path =
+          if side == :fwd,
+            do: Enum.reverse(new_path) ++ tl(other_path),
+            else: Enum.reverse(other_path) ++ tl(new_path)
 
-        {:continue, new_queue_bwd, new_visited_bwd, added_count} ->
-          do_bfs_step(
-            graph,
-            queue_fwd,
-            new_queue_bwd,
-            visited_fwd,
-            new_visited_bwd,
-            size_fwd,
-            size_bwd - 1 + added_count
-          )
-      end
+        weight = length(new_path) + length(other_path) - 2
+        {:ok, Path.new(full_path, weight, :bidirectional_bfs)}
+
+      {:continue, new_q, new_v, added} ->
+        if side == :fwd do
+          do_bfs_step(graph, new_q, q_other, new_v, v_other, s_active - 1 + added, s_other)
+        else
+          do_bfs_step(graph, q_other, new_q, v_other, new_v, s_other, s_active - 1 + added)
+        end
     end
   end
 
@@ -367,47 +344,6 @@ defmodule Yog.Pathfinding.Bidirectional do
   end
 
   defp do_bidirectional_dijkstra_step(
-         _graph,
-         q_fwd,
-         q_bwd,
-         _df,
-         _db,
-         _pf,
-         _pb,
-         _from,
-         _to,
-         _add,
-         _compare,
-         path,
-         weight
-       )
-       when path != nil and (q_fwd == :empty or q_bwd == :empty) do
-    case weight do
-      nil -> :error
-      _ -> {:ok, Path.new(path, weight, :bidirectional_dijkstra)}
-    end
-  end
-
-  @dialyzer :no_match
-  defp do_bidirectional_dijkstra_step(
-         _graph,
-         :empty,
-         :empty,
-         _df,
-         _db,
-         _pf,
-         _pb,
-         _from,
-         _to,
-         _add,
-         _compare,
-         nil,
-         nil
-       ) do
-    :error
-  end
-
-  defp do_bidirectional_dijkstra_step(
          graph,
          q_fwd,
          q_bwd,
@@ -415,191 +351,243 @@ defmodule Yog.Pathfinding.Bidirectional do
          dist_bwd,
          pred_fwd,
          pred_bwd,
-         from,
-         to,
+         source,
+         target,
          add,
          compare,
          best_path,
          best_weight
        ) do
-    continue? =
-      case best_weight do
-        nil ->
-          true
+    if should_continue?(q_fwd, q_bwd, best_weight, compare) do
+      expansion_side = decide_expansion_side(q_fwd, q_bwd, compare)
 
-        _ ->
-          fwd_min =
-            case PQ.peek(q_fwd) do
-              {:ok, {d, _}} -> compare.(d, best_weight) == :lt
-              :error -> false
-            end
-
-          bwd_min =
-            case PQ.peek(q_bwd) do
-              {:ok, {d, _}} -> compare.(d, best_weight) == :lt
-              :error -> false
-            end
-
-          fwd_min or bwd_min
-      end
-
-    # credo:disable-for-next-line Credo.Check.Refactor.NegatedConditionsWithElse
-    if not continue? do
-      {:ok, Path.new(best_path, best_weight, :bidirectional_dijkstra)}
+      perform_expansion_step(
+        expansion_side,
+        graph,
+        q_fwd,
+        q_bwd,
+        dist_fwd,
+        dist_bwd,
+        pred_fwd,
+        pred_bwd,
+        source,
+        target,
+        add,
+        compare,
+        best_path,
+        best_weight
+      )
     else
-      expand_fwd? =
-        case {PQ.peek(q_fwd), PQ.peek(q_bwd)} do
-          {{:ok, {d_fwd, _}}, {:ok, {d_bwd, _}}} -> compare.(d_fwd, d_bwd) != :gt
-          {{:ok, _}, :error} -> true
-          _ -> false
-        end
-
-      if expand_fwd? do
-        case PQ.pop(q_fwd) do
-          :error ->
-            if best_path,
-              do: {:ok, Path.new(best_path, best_weight, :bidirectional_dijkstra)},
-              else: :error
-
-          {:ok, {dist_u, u}, rest_q_fwd} ->
-            case Map.fetch(dist_fwd, u) do
-              {:ok, best_dist} when best_dist != dist_u ->
-                do_bidirectional_dijkstra_step(
-                  graph,
-                  rest_q_fwd,
-                  q_bwd,
-                  dist_fwd,
-                  dist_bwd,
-                  pred_fwd,
-                  pred_bwd,
-                  from,
-                  to,
-                  add,
-                  compare,
-                  best_path,
-                  best_weight
-                )
-
-              _ ->
-                successors =
-                  case Map.fetch(graph.out_edges, u) do
-                    {:ok, edges} -> Map.to_list(edges)
-                    :error -> []
-                  end
-
-                {new_q_fwd, new_dist_fwd, new_pred_fwd, new_best_path, new_best_weight} =
-                  process_neighbors_fwd(
-                    successors,
-                    rest_q_fwd,
-                    dist_fwd,
-                    dist_bwd,
-                    pred_fwd,
-                    pred_bwd,
-                    u,
-                    dist_u,
-                    add,
-                    compare,
-                    best_path,
-                    best_weight
-                  )
-
-                do_bidirectional_dijkstra_step(
-                  graph,
-                  new_q_fwd,
-                  q_bwd,
-                  new_dist_fwd,
-                  dist_bwd,
-                  new_pred_fwd,
-                  pred_bwd,
-                  from,
-                  to,
-                  add,
-                  compare,
-                  new_best_path,
-                  new_best_weight
-                )
-            end
-        end
-      else
-        case PQ.pop(q_bwd) do
-          :error ->
-            if best_path,
-              do: {:ok, Path.new(best_path, best_weight, :bidirectional_dijkstra)},
-              else: :error
-
-          {:ok, {dist_v, v}, rest_q_bwd} ->
-            # Check if this node has been settled with a better distance
-            case Map.fetch(dist_bwd, v) do
-              {:ok, best_dist} when best_dist != dist_v ->
-                # Stale entry, skip
-                do_bidirectional_dijkstra_step(
-                  graph,
-                  q_fwd,
-                  rest_q_bwd,
-                  dist_fwd,
-                  dist_bwd,
-                  pred_fwd,
-                  pred_bwd,
-                  from,
-                  to,
-                  add,
-                  compare,
-                  best_path,
-                  best_weight
-                )
-
-              _ ->
-                predecessors =
-                  case Map.fetch(graph.in_edges, v) do
-                    {:ok, edges} -> Map.to_list(edges)
-                    :error -> []
-                  end
-
-                {new_q_bwd, new_dist_bwd, new_pred_bwd, new_best_path, new_best_weight} =
-                  process_neighbors_bwd(
-                    predecessors,
-                    rest_q_bwd,
-                    dist_fwd,
-                    dist_bwd,
-                    pred_fwd,
-                    pred_bwd,
-                    v,
-                    dist_v,
-                    add,
-                    compare,
-                    best_path,
-                    best_weight
-                  )
-
-                do_bidirectional_dijkstra_step(
-                  graph,
-                  q_fwd,
-                  new_q_bwd,
-                  dist_fwd,
-                  new_dist_bwd,
-                  pred_fwd,
-                  new_pred_bwd,
-                  from,
-                  to,
-                  add,
-                  compare,
-                  new_best_path,
-                  new_best_weight
-                )
-            end
-        end
-      end
+      finalize_result(best_path, best_weight)
     end
   end
 
-  # Process forward neighbors
-  defp process_neighbors_fwd(
+  defp should_continue?(q_fwd, q_bwd, nil, _compare) do
+    not PQ.empty?(q_fwd) and not PQ.empty?(q_bwd)
+  end
+
+  defp should_continue?(q_fwd, q_bwd, best_weight, compare) do
+    fwd_possible =
+      case PQ.peek(q_fwd) do
+        {:ok, {d, _}} -> compare.(d, best_weight) == :lt
+        :error -> false
+      end
+
+    bwd_possible =
+      case PQ.peek(q_bwd) do
+        {:ok, {d, _}} -> compare.(d, best_weight) == :lt
+        :error -> false
+      end
+
+    fwd_possible or bwd_possible
+  end
+
+  defp decide_expansion_side(q_fwd, q_bwd, compare) do
+    case {PQ.peek(q_fwd), PQ.peek(q_bwd)} do
+      {{:ok, {d_fwd, _}}, {:ok, {d_bwd, _}}} ->
+        if compare.(d_fwd, d_bwd) != :gt, do: :fwd, else: :bwd
+
+      {{:ok, _}, :error} ->
+        :fwd
+
+      {:error, {:ok, _}} ->
+        :bwd
+
+      _ ->
+        :none
+    end
+  end
+
+  defp finalize_result(nil, _weight), do: :error
+  defp finalize_result(path, weight), do: {:ok, Path.new(path, weight, :bidirectional_dijkstra)}
+
+  defp perform_expansion_step(
+         :fwd,
+         graph,
+         q_fwd,
+         q_bwd,
+         dist_fwd,
+         dist_bwd,
+         pred_fwd,
+         pred_bwd,
+         source,
+         target,
+         add,
+         compare,
+         best_path,
+         best_weight
+       ) do
+    case PQ.pop(q_fwd) do
+      :error ->
+        finalize_result(best_path, best_weight)
+
+      {:ok, {dist_u, u}, rest_q} ->
+        if Map.get(dist_fwd, u) != dist_u do
+          # Stale entry
+          do_bidirectional_dijkstra_step(
+            graph,
+            rest_q,
+            q_bwd,
+            dist_fwd,
+            dist_bwd,
+            pred_fwd,
+            pred_bwd,
+            source,
+            target,
+            add,
+            compare,
+            best_path,
+            best_weight
+          )
+        else
+          successors = Map.get(graph.out_edges, u, %{}) |> Map.to_list()
+
+          {new_q, new_dist, new_pred, new_path, new_weight} =
+            process_neighbors(
+              :fwd,
+              successors,
+              rest_q,
+              dist_fwd,
+              dist_bwd,
+              pred_fwd,
+              pred_bwd,
+              u,
+              dist_u,
+              add,
+              compare,
+              best_path,
+              best_weight
+            )
+
+          do_bidirectional_dijkstra_step(
+            graph,
+            new_q,
+            q_bwd,
+            new_dist,
+            dist_bwd,
+            new_pred,
+            pred_bwd,
+            source,
+            target,
+            add,
+            compare,
+            new_path,
+            new_weight
+          )
+        end
+    end
+  end
+
+  defp perform_expansion_step(
+         :bwd,
+         graph,
+         q_fwd,
+         q_bwd,
+         dist_fwd,
+         dist_bwd,
+         pred_fwd,
+         pred_bwd,
+         source,
+         target,
+         add,
+         compare,
+         best_path,
+         best_weight
+       ) do
+    case PQ.pop(q_bwd) do
+      :error ->
+        finalize_result(best_path, best_weight)
+
+      {:ok, {dist_v, v}, rest_q} ->
+        if Map.get(dist_bwd, v) != dist_v do
+          # Stale entry
+          do_bidirectional_dijkstra_step(
+            graph,
+            q_fwd,
+            rest_q,
+            dist_fwd,
+            dist_bwd,
+            pred_fwd,
+            pred_bwd,
+            source,
+            target,
+            add,
+            compare,
+            best_path,
+            best_weight
+          )
+        else
+          predecessors = Map.get(graph.in_edges, v, %{}) |> Map.to_list()
+
+          {new_q, new_dist, new_pred, new_path, new_weight} =
+            process_neighbors(
+              :bwd,
+              predecessors,
+              rest_q,
+              dist_bwd,
+              dist_fwd,
+              pred_bwd,
+              pred_fwd,
+              v,
+              dist_v,
+              add,
+              compare,
+              best_path,
+              best_weight
+            )
+
+          do_bidirectional_dijkstra_step(
+            graph,
+            q_fwd,
+            new_q,
+            dist_fwd,
+            new_dist,
+            pred_fwd,
+            new_pred,
+            source,
+            target,
+            add,
+            compare,
+            new_path,
+            new_weight
+          )
+        end
+    end
+  end
+
+  defp perform_expansion_step(:none, _, _, _, _, _, _, _, _, _, _, _, path, weight) do
+    finalize_result(path, weight)
+  end
+
+  # Unified neighbor processing for both directions
+  defp process_neighbors(
+         _side,
          [],
          queue,
-         dist_fwd,
-         _dist_bwd,
-         pred_fwd,
-         _pred_bwd,
+         dist_own,
+         _dist_other,
+         pred_own,
+         _pred_other,
          _u,
          _dist_u,
          _add,
@@ -607,16 +595,17 @@ defmodule Yog.Pathfinding.Bidirectional do
          best_path,
          best_weight
        ) do
-    {queue, dist_fwd, pred_fwd, best_path, best_weight}
+    {queue, dist_own, pred_own, best_path, best_weight}
   end
 
-  defp process_neighbors_fwd(
+  defp process_neighbors(
+         side,
          [{v, weight} | rest],
          queue,
-         dist_fwd,
-         dist_bwd,
-         pred_fwd,
-         pred_bwd,
+         dist_own,
+         dist_other,
+         pred_own,
+         pred_other,
          u,
          dist_u,
          add,
@@ -625,252 +614,79 @@ defmodule Yog.Pathfinding.Bidirectional do
          best_weight
        ) do
     new_dist_v = add.(dist_u, weight)
+    current_best_v = Map.get(dist_own, v)
 
-    case Map.fetch(dist_fwd, v) do
-      {:ok, current_dist} ->
-        if compare.(new_dist_v, current_dist) == :lt do
-          new_queue = PQ.push(queue, {new_dist_v, v})
-          new_dist = Map.put(dist_fwd, v, new_dist_v)
-          new_pred = Map.put(pred_fwd, v, u)
+    if is_nil(current_best_v) or compare.(new_dist_v, current_best_v) == :lt do
+      new_queue = PQ.push(queue, {new_dist_v, v})
+      new_dist_own = Map.put(dist_own, v, new_dist_v)
+      new_pred_own = Map.put(pred_own, v, u)
 
-          {updated_path, updated_weight} =
-            check_meeting_point(
-              v,
-              new_dist_v,
-              dist_bwd,
-              pred_bwd,
-              pred_fwd,
-              compare,
-              best_path,
-              best_weight
-            )
+      # Determine pred_fwd and pred_bwd for path reconstruction
+      {p_fwd, p_bwd} =
+        if side == :fwd, do: {new_pred_own, pred_other}, else: {pred_other, new_pred_own}
 
-          process_neighbors_fwd(
-            rest,
-            new_queue,
-            new_dist,
-            dist_bwd,
-            new_pred,
-            pred_bwd,
-            u,
-            dist_u,
-            add,
-            compare,
-            updated_path,
-            updated_weight
-          )
-        else
-          process_neighbors_fwd(
-            rest,
-            queue,
-            dist_fwd,
-            dist_bwd,
-            pred_fwd,
-            pred_bwd,
-            u,
-            dist_u,
-            add,
-            compare,
-            best_path,
-            best_weight
-          )
-        end
-
-      :error ->
-        new_queue = PQ.push(queue, {new_dist_v, v})
-        new_dist = Map.put(dist_fwd, v, new_dist_v)
-        new_pred = Map.put(pred_fwd, v, u)
-
-        {updated_path, updated_weight} =
-          check_meeting_point(
-            v,
-            new_dist_v,
-            dist_bwd,
-            pred_bwd,
-            new_pred,
-            compare,
-            best_path,
-            best_weight
-          )
-
-        process_neighbors_fwd(
-          rest,
-          new_queue,
-          new_dist,
-          dist_bwd,
-          new_pred,
-          pred_bwd,
-          u,
-          dist_u,
-          add,
-          compare,
-          updated_path,
-          updated_weight
-        )
-    end
-  end
-
-  # Process backward neighbors (predecessors in reverse direction)
-  defp process_neighbors_bwd(
-         [],
-         queue,
-         _dist_fwd,
-         dist_bwd,
-         _pred_fwd,
-         pred_bwd,
-         _v,
-         _dist_v,
-         _add,
-         _compare,
-         best_path,
-         best_weight
-       ) do
-    {queue, dist_bwd, pred_bwd, best_path, best_weight}
-  end
-
-  defp process_neighbors_bwd(
-         [{u, weight} | rest],
-         queue,
-         dist_fwd,
-         dist_bwd,
-         pred_fwd,
-         pred_bwd,
-         v,
-         dist_v,
-         add,
-         compare,
-         best_path,
-         best_weight
-       ) do
-    new_dist_u = add.(dist_v, weight)
-
-    case Map.fetch(dist_bwd, u) do
-      {:ok, current_dist} ->
-        if compare.(new_dist_u, current_dist) == :lt do
-          new_queue = PQ.push(queue, {new_dist_u, u})
-          new_dist = Map.put(dist_bwd, u, new_dist_u)
-          new_pred = Map.put(pred_bwd, u, v)
-
-          {updated_path, updated_weight} =
-            check_meeting_point_bwd(
-              u,
-              new_dist_u,
-              dist_fwd,
-              pred_fwd,
-              new_pred,
-              compare,
-              best_path,
-              best_weight
-            )
-
-          process_neighbors_bwd(
-            rest,
-            new_queue,
-            dist_fwd,
-            new_dist,
-            pred_fwd,
-            new_pred,
-            v,
-            dist_v,
-            add,
-            compare,
-            updated_path,
-            updated_weight
-          )
-        else
-          process_neighbors_bwd(
-            rest,
-            queue,
-            dist_fwd,
-            dist_bwd,
-            pred_fwd,
-            pred_bwd,
-            v,
-            dist_v,
-            add,
-            compare,
-            best_path,
-            best_weight
-          )
-        end
-
-      :error ->
-        new_queue = PQ.push(queue, {new_dist_u, u})
-        new_dist = Map.put(dist_bwd, u, new_dist_u)
-        new_pred = Map.put(pred_bwd, u, v)
-
-        {updated_path, updated_weight} =
-          check_meeting_point_bwd(
-            u,
-            new_dist_u,
-            dist_fwd,
-            pred_fwd,
-            new_pred,
-            compare,
-            best_path,
-            best_weight
-          )
-
-        process_neighbors_bwd(
-          rest,
-          new_queue,
-          dist_fwd,
-          new_dist,
-          pred_fwd,
-          new_pred,
+      {updated_path, updated_weight} =
+        check_meeting_point(
           v,
-          dist_v,
-          add,
+          new_dist_v,
+          dist_other,
+          p_fwd,
+          p_bwd,
           compare,
-          updated_path,
-          updated_weight
+          best_path,
+          best_weight
         )
+
+      process_neighbors(
+        side,
+        rest,
+        new_queue,
+        new_dist_own,
+        dist_other,
+        new_pred_own,
+        pred_other,
+        u,
+        dist_u,
+        add,
+        compare,
+        updated_path,
+        updated_weight
+      )
+    else
+      process_neighbors(
+        side,
+        rest,
+        queue,
+        dist_own,
+        dist_other,
+        pred_own,
+        pred_other,
+        u,
+        dist_u,
+        add,
+        compare,
+        best_path,
+        best_weight
+      )
     end
   end
 
-  # Check if a node from forward search has been reached by backward search
+  # Check if a node reached from one side has been reached by the other side
   defp check_meeting_point(
          node,
-         dist_fwd_node,
-         dist_bwd,
-         pred_bwd,
-         pred_fwd,
-         compare,
-         best_path,
-         best_weight
-       ) do
-    case Map.fetch(dist_bwd, node) do
-      {:ok, dist_bwd_node} ->
-        total_dist = dist_fwd_node + dist_bwd_node
-
-        if best_weight == nil or compare.(total_dist, best_weight) == :lt do
-          path = reconstruct_bidirectional_path(node, pred_fwd, pred_bwd)
-          {path, total_dist}
-        else
-          {best_path, best_weight}
-        end
-
-      :error ->
-        {best_path, best_weight}
-    end
-  end
-
-  # Check if a node from backward search has been reached by forward search
-  defp check_meeting_point_bwd(
-         node,
-         dist_bwd_node,
-         dist_fwd,
+         dist_side,
+         dist_other,
          pred_fwd,
          pred_bwd,
          compare,
          best_path,
          best_weight
        ) do
-    case Map.fetch(dist_fwd, node) do
-      {:ok, dist_fwd_node} ->
-        total_dist = dist_fwd_node + dist_bwd_node
+    case Map.fetch(dist_other, node) do
+      {:ok, d_other} ->
+        total_dist = dist_side + d_other
 
-        if best_weight == nil or compare.(total_dist, best_weight) == :lt do
+        if is_nil(best_weight) or compare.(total_dist, best_weight) == :lt do
           path = reconstruct_bidirectional_path(node, pred_fwd, pred_bwd)
           {path, total_dist}
         else

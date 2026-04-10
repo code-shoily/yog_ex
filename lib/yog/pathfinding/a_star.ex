@@ -430,69 +430,74 @@ defmodule Yog.Pathfinding.AStar do
         :error
 
       {:ok, {_f, g, node}, rest} ->
-        key = node
+        maybe_expand_node(
+          graph,
+          node,
+          g,
+          rest,
+          to,
+          add,
+          compare,
+          heuristic,
+          g_scores,
+          predecessors
+        )
+    end
+  end
 
-        case Map.fetch(g_scores, key) do
-          {:ok, best_g} ->
-            if compare.(g, best_g) == :gt do
-              do_a_star(graph, rest, to, add, compare, heuristic, g_scores, predecessors)
-            else
-              if node == to do
-                path = reconstruct_path(predecessors, to, [to])
-                {:ok, Path.new(path, g, :a_star)}
-              else
-                # Direct edge access for performance
-                successors =
-                  case Map.fetch(graph.out_edges, node) do
-                    {:ok, edges} -> Map.to_list(edges)
-                    :error -> []
-                  end
-
-                {new_queue, new_g_scores, new_predecessors} =
-                  List.foldl(successors, {rest, g_scores, predecessors}, fn {neighbor, cost},
-                                                                            {q, gs, preds} ->
-                    new_g = add.(g, cost)
-                    neighbor_key = neighbor
-
-                    case Map.fetch(gs, neighbor_key) do
-                      {:ok, existing_g} ->
-                        if compare.(new_g, existing_g) == :lt do
-                          h = heuristic.(neighbor, to)
-                          f = add.(new_g, h)
-                          new_q = PQ.push(q, {f, new_g, neighbor})
-                          new_gs = Map.put(gs, neighbor_key, new_g)
-                          new_preds = Map.put(preds, neighbor, node)
-                          {new_q, new_gs, new_preds}
-                        else
-                          {q, gs, preds}
-                        end
-
-                      :error ->
-                        h = heuristic.(neighbor, to)
-                        f = add.(new_g, h)
-                        new_q = PQ.push(q, {f, new_g, neighbor})
-                        new_gs = Map.put(gs, neighbor_key, new_g)
-                        new_preds = Map.put(preds, neighbor, node)
-                        {new_q, new_gs, new_preds}
-                    end
-                  end)
-
-                do_a_star(
-                  graph,
-                  new_queue,
-                  to,
-                  add,
-                  compare,
-                  heuristic,
-                  new_g_scores,
-                  new_predecessors
-                )
-              end
-            end
-
-          :error ->
-            do_a_star(graph, rest, to, add, compare, heuristic, g_scores, predecessors)
+  defp maybe_expand_node(graph, node, g, rest, to, add, compare, heuristic, g_scores, preds) do
+    case Map.get(g_scores, node) do
+      best_g when not is_nil(best_g) ->
+        if compare.(g, best_g) == :gt do
+          do_a_star(graph, rest, to, add, compare, heuristic, g_scores, preds)
+        else
+          expand_node(graph, node, g, rest, to, add, compare, heuristic, g_scores, preds)
         end
+
+      nil ->
+        # Should not happen if correctly initialized
+        do_a_star(graph, rest, to, add, compare, heuristic, g_scores, preds)
+    end
+  end
+
+  defp expand_node(graph, node, g, rest, to, add, compare, heuristic, g_scores, preds) do
+    if node == to do
+      path = reconstruct_path(preds, to, [to])
+      {:ok, Path.new(path, g, :a_star)}
+    else
+      # Direct edge access for performance
+      successors = Map.get(graph.out_edges, node, %{})
+
+      {new_queue, new_g_scores, new_predecessors} =
+        Enum.reduce(successors, {rest, g_scores, preds}, fn {neighbor, cost}, acc ->
+          relax_neighbor(acc, node, neighbor, cost, g, to, add, compare, heuristic)
+        end)
+
+      do_a_star(
+        graph,
+        new_queue,
+        to,
+        add,
+        compare,
+        heuristic,
+        new_g_scores,
+        new_predecessors
+      )
+    end
+  end
+
+  defp relax_neighbor({q, gs, preds}, node, neighbor, cost, g, to, add, compare, heuristic) do
+    new_g = add.(g, cost)
+    existing_g = Map.get(gs, neighbor)
+
+    if is_nil(existing_g) or compare.(new_g, existing_g) == :lt do
+      h = heuristic.(neighbor, to)
+      f = add.(new_g, h)
+
+      {PQ.push(q, {f, new_g, neighbor}), Map.put(gs, neighbor, new_g),
+       Map.put(preds, neighbor, node)}
+    else
+      {q, gs, preds}
     end
   end
 
@@ -504,8 +509,31 @@ defmodule Yog.Pathfinding.AStar do
     end
   end
 
-  defp do_implicit_a_star(
-         queue,
+  defp do_implicit_a_star(queue, successors, key_fn, is_goal, add, compare, heuristic, g_scores) do
+    case PQ.pop(queue) do
+      :error ->
+        :error
+
+      {:ok, {_f, g, state}, rest} ->
+        maybe_expand_implicit_node(
+          rest,
+          state,
+          g,
+          successors,
+          key_fn,
+          is_goal,
+          add,
+          compare,
+          heuristic,
+          g_scores
+        )
+    end
+  end
+
+  defp maybe_expand_implicit_node(
+         rest,
+         state,
+         g,
          successors,
          key_fn,
          is_goal,
@@ -514,83 +542,78 @@ defmodule Yog.Pathfinding.AStar do
          heuristic,
          g_scores
        ) do
-    case PQ.pop(queue) do
-      :error ->
-        :error
+    key = key_fn.(state)
 
-      {:ok, {_f, g, state}, rest} ->
-        key = key_fn.(state)
-
-        case Map.fetch(g_scores, key) do
-          {:ok, best_g} ->
-            if compare.(g, best_g) == :gt do
-              do_implicit_a_star(
-                rest,
-                successors,
-                key_fn,
-                is_goal,
-                add,
-                compare,
-                heuristic,
-                g_scores
-              )
-            else
-              if is_goal.(state) do
-                {:ok, g}
-              else
-                next_states = successors.(state)
-
-                {new_queue, new_g_scores} =
-                  List.foldl(next_states, {rest, g_scores}, fn {next_state, cost}, {q, gs} ->
-                    new_g = add.(g, cost)
-                    next_key = key_fn.(next_state)
-
-                    case Map.fetch(gs, next_key) do
-                      {:ok, existing_g} ->
-                        if compare.(new_g, existing_g) == :lt do
-                          h = heuristic.(next_state)
-                          f = add.(new_g, h)
-                          new_q = PQ.push(q, {f, new_g, next_state})
-                          new_gs = Map.put(gs, next_key, new_g)
-                          {new_q, new_gs}
-                        else
-                          {q, gs}
-                        end
-
-                      :error ->
-                        h = heuristic.(next_state)
-                        f = add.(new_g, h)
-                        new_q = PQ.push(q, {f, new_g, next_state})
-                        new_gs = Map.put(gs, next_key, new_g)
-                        {new_q, new_gs}
-                    end
-                  end)
-
-                do_implicit_a_star(
-                  new_queue,
-                  successors,
-                  key_fn,
-                  is_goal,
-                  add,
-                  compare,
-                  heuristic,
-                  new_g_scores
-                )
-              end
-            end
-
-          :error ->
-            do_implicit_a_star(
-              rest,
-              successors,
-              key_fn,
-              is_goal,
-              add,
-              compare,
-              heuristic,
-              g_scores
-            )
+    case Map.get(g_scores, key) do
+      best_g when not is_nil(best_g) ->
+        if compare.(g, best_g) == :gt do
+          do_implicit_a_star(rest, successors, key_fn, is_goal, add, compare, heuristic, g_scores)
+        else
+          expand_implicit_node(
+            rest,
+            state,
+            g,
+            successors,
+            key_fn,
+            is_goal,
+            add,
+            compare,
+            heuristic,
+            g_scores
+          )
         end
+
+      nil ->
+        do_implicit_a_star(rest, successors, key_fn, is_goal, add, compare, heuristic, g_scores)
+    end
+  end
+
+  defp expand_implicit_node(
+         rest,
+         state,
+         g,
+         successors,
+         key_fn,
+         is_goal,
+         add,
+         compare,
+         heuristic,
+         g_scores
+       ) do
+    if is_goal.(state) do
+      {:ok, g}
+    else
+      next_states = successors.(state)
+
+      {new_queue, new_g_scores} =
+        Enum.reduce(next_states, {rest, g_scores}, fn {next_state, cost}, acc ->
+          relax_implicit_neighbor(acc, next_state, cost, g, key_fn, add, compare, heuristic)
+        end)
+
+      do_implicit_a_star(
+        new_queue,
+        successors,
+        key_fn,
+        is_goal,
+        add,
+        compare,
+        heuristic,
+        new_g_scores
+      )
+    end
+  end
+
+  defp relax_implicit_neighbor({q, gs}, next_state, cost, g, key_fn, add, compare, heuristic) do
+    new_g = add.(g, cost)
+    key = key_fn.(next_state)
+    existing_g = Map.get(gs, key)
+
+    if is_nil(existing_g) or compare.(new_g, existing_g) == :lt do
+      h = heuristic.(next_state)
+      f = add.(new_g, h)
+      {PQ.push(q, {f, new_g, next_state}), Map.put(gs, key, new_g)}
+    else
+      {q, gs}
     end
   end
 end

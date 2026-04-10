@@ -378,40 +378,56 @@ defmodule Yog.Flow.SuccessiveShortestPath do
 
       {:ok, {d, u}, new_pq} ->
         if u == sink do
-          path = reconstruct_path(prev, source, sink)
-          {path, d, dist}
+          handle_sink_reached(source, sink, d, dist, prev)
         else
-          best_dist = Map.get(dist, u)
-
-          if best_dist != nil and d > best_dist do
-            do_dijkstra(adj, caps, costs, pots, source, sink, new_pq, dist, prev)
-          else
-            neighbors = Map.get(adj, u, [])
-
-            {next_pq, next_dist, next_prev} =
-              Enum.reduce(neighbors, {new_pq, dist, prev}, fn v, {pq_acc, dist_acc, prev_acc} ->
-                if caps[{u, v}] > 0 do
-                  reduced_cost = costs[{u, v}] + pots[u] - pots[v]
-                  new_dist = d + reduced_cost
-                  old_dist = Map.get(dist_acc, v)
-
-                  if old_dist == nil or new_dist < old_dist do
-                    {
-                      Yog.PairingHeap.push(pq_acc, {new_dist, v}),
-                      Map.put(dist_acc, v, new_dist),
-                      Map.put(prev_acc, v, u)
-                    }
-                  else
-                    {pq_acc, dist_acc, prev_acc}
-                  end
-                else
-                  {pq_acc, dist_acc, prev_acc}
-                end
-              end)
-
-            do_dijkstra(adj, caps, costs, pots, source, sink, next_pq, next_dist, next_prev)
-          end
+          maybe_expand_node(adj, caps, costs, pots, source, sink, u, d, new_pq, dist, prev)
         end
+    end
+  end
+
+  defp handle_sink_reached(source, sink, d, dist, prev) do
+    path = reconstruct_path(prev, source, sink)
+    {path, d, dist}
+  end
+
+  defp maybe_expand_node(adj, caps, costs, pots, source, sink, u, d, pq, dist, prev) do
+    best_dist = Map.get(dist, u)
+
+    if best_dist != nil and d > best_dist do
+      do_dijkstra(adj, caps, costs, pots, source, sink, pq, dist, prev)
+    else
+      expand_node(adj, caps, costs, pots, source, sink, u, d, pq, dist, prev)
+    end
+  end
+
+  defp expand_node(adj, caps, costs, pots, source, sink, u, d, pq, dist, prev) do
+    neighbors = Map.get(adj, u, [])
+
+    {next_pq, next_dist, next_prev} =
+      Enum.reduce(neighbors, {pq, dist, prev}, fn v, state ->
+        relax_neighbor(u, v, d, caps, costs, pots, state)
+      end)
+
+    do_dijkstra(adj, caps, costs, pots, source, sink, next_pq, next_dist, next_prev)
+  end
+
+  defp relax_neighbor(u, v, d, caps, costs, pots, {pq_acc, dist_acc, prev_acc}) do
+    if caps[{u, v}] > 0 do
+      reduced_cost = costs[{u, v}] + pots[u] - pots[v]
+      new_dist = d + reduced_cost
+      old_dist = Map.get(dist_acc, v)
+
+      if old_dist == nil or new_dist < old_dist do
+        {
+          Yog.PairingHeap.push(pq_acc, {new_dist, v}),
+          Map.put(dist_acc, v, new_dist),
+          Map.put(prev_acc, v, u)
+        }
+      else
+        {pq_acc, dist_acc, prev_acc}
+      end
+    else
+      {pq_acc, dist_acc, prev_acc}
     end
   end
 

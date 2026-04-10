@@ -476,91 +476,79 @@ defmodule Yog.Pathfinding.BellmanFord do
 
   # Returns {distances, predecessors, changed?}
   defp relax_all_edges_from_graph(graph, distances, predecessors, add, compare) do
-    out_edges = graph.out_edges
     nodes = Map.keys(graph.nodes)
 
-    List.foldl(nodes, {distances, predecessors, false}, fn u, {dist, pred, changed?} ->
-      case Map.fetch(dist, u) do
-        {:ok, dist_u} ->
-          successors =
-            case Map.fetch(out_edges, u) do
-              {:ok, edges} -> Map.to_list(edges)
-              :error -> []
-            end
-
-          List.foldl(successors, {dist, pred, changed?}, fn {v, weight}, {d, p, ch} ->
-            new_dist_v = add.(dist_u, weight)
-
-            case Map.fetch(d, v) do
-              {:ok, current_dist_v} ->
-                if compare.(new_dist_v, current_dist_v) == :lt do
-                  {Map.put(d, v, new_dist_v), Map.put(p, v, u), true}
-                else
-                  {d, p, ch}
-                end
-
-              :error ->
-                {Map.put(d, v, new_dist_v), Map.put(p, v, u), true}
-            end
-          end)
-
-        :error ->
-          {dist, pred, changed?}
-      end
+    Enum.reduce(nodes, {distances, predecessors, false}, fn u, acc ->
+      relax_node_edges(graph, u, acc, add, compare)
     end)
+  end
+
+  defp relax_node_edges(graph, u, {dist, pred, changed}, add, compare) do
+    case Map.get(dist, u) do
+      nil ->
+        {dist, pred, changed}
+
+      dist_u ->
+        successors = Map.get(graph.out_edges, u, %{})
+
+        Enum.reduce(successors, {dist, pred, changed}, fn {v, weight}, acc ->
+          relax_edge(acc, u, v, weight, dist_u, add, compare)
+        end)
+    end
+  end
+
+  defp relax_edge({d, p, ch}, u, v, weight, dist_u, add, compare) do
+    new_dist_v = add.(dist_u, weight)
+    current_dist_v = Map.get(d, v)
+
+    if is_nil(current_dist_v) or compare.(new_dist_v, current_dist_v) == :lt do
+      {Map.put(d, v, new_dist_v), Map.put(p, v, u), true}
+    else
+      {d, p, ch}
+    end
   end
 
   # Relax all edges without tracking predecessors (protocol-compatible)
   # Returns {distances, changed?}
   defp relax_all_edges_from_graph_no_pred(graph, distances, add, compare) do
-    out_edges = graph.out_edges
     nodes = Map.keys(graph.nodes)
 
-    List.foldl(nodes, {distances, false}, fn u, {dist, changed?} ->
-      case Map.fetch(dist, u) do
-        {:ok, dist_u} ->
-          successors =
-            case Map.fetch(out_edges, u) do
-              {:ok, edges} -> Map.to_list(edges)
-              :error -> []
-            end
-
-          List.foldl(successors, {dist, changed?}, fn {v, weight}, {d, ch} ->
-            new_dist_v = add.(dist_u, weight)
-
-            case Map.fetch(d, v) do
-              {:ok, current_dist_v} ->
-                if compare.(new_dist_v, current_dist_v) == :lt do
-                  {Map.put(d, v, new_dist_v), true}
-                else
-                  {d, ch}
-                end
-
-              :error ->
-                {Map.put(d, v, new_dist_v), true}
-            end
-          end)
-
-        :error ->
-          {dist, changed?}
-      end
+    Enum.reduce(nodes, {distances, false}, fn u, acc ->
+      relax_node_edges_no_pred(graph, u, acc, add, compare)
     end)
   end
 
-  defp negative_cycle_detected?(nodes, old_distances, new_distances, compare) do
-    List.foldl(nodes, false, fn node, found? ->
-      if found? do
-        true
-      else
-        old_val = Map.get(old_distances, node)
-        new_val = Map.get(new_distances, node)
+  defp relax_node_edges_no_pred(graph, u, {dist, changed}, add, compare) do
+    case Map.get(dist, u) do
+      nil ->
+        {dist, changed}
 
-        if old_val == nil or new_val == nil do
-          false
-        else
-          compare.(new_val, old_val) == :lt
-        end
-      end
+      dist_u ->
+        successors = Map.get(graph.out_edges, u, %{})
+
+        Enum.reduce(successors, {dist, changed}, fn {v, weight}, acc ->
+          relax_edge_no_pred(acc, v, weight, dist_u, add, compare)
+        end)
+    end
+  end
+
+  defp relax_edge_no_pred({d, ch}, v, weight, dist_u, add, compare) do
+    new_dist_v = add.(dist_u, weight)
+    current_dist_v = Map.get(d, v)
+
+    if is_nil(current_dist_v) or compare.(new_dist_v, current_dist_v) == :lt do
+      {Map.put(d, v, new_dist_v), true}
+    else
+      {d, ch}
+    end
+  end
+
+  defp negative_cycle_detected?(nodes, old_distances, new_distances, compare) do
+    Enum.any?(nodes, fn node ->
+      old_val = Map.get(old_distances, node)
+      new_val = Map.get(new_distances, node)
+
+      not is_nil(old_val) and not is_nil(new_val) and compare.(new_val, old_val) == :lt
     end)
   end
 
@@ -580,63 +568,84 @@ defmodule Yog.Pathfinding.BellmanFord do
   end
 
   defp do_implicit_bellman_ford(successors, key_fn, is_goal, add, compare, distances, max_iter) do
-    goal_result =
-      Enum.find_value(distances, fn {_, {state, dist}} ->
-        if is_goal.(state) do
-          {:ok, dist}
+    case find_implicit_goal(distances, is_goal) do
+      {:ok, dist} ->
+        {:ok, dist}
+
+      nil ->
+        if max_iter <= 0 do
+          {:error, :negative_cycle}
         else
-          nil
-        end
-      end)
-
-    if goal_result do
-      goal_result
-    else
-      if max_iter <= 0 do
-        {:error, :negative_cycle}
-      else
-        state_dist_pairs =
-          List.foldl(Map.to_list(distances), [], fn {_, {state, dist}}, acc ->
-            [{state, dist} | acc]
-          end)
-
-        {next_distances, any_change} =
-          List.foldl(state_dist_pairs, {distances, false}, fn {state, state_dist},
-                                                              {dists, changed} ->
-            next_states = successors.(state)
-
-            List.foldl(next_states, {dists, changed}, fn {next_state, cost}, {acc, ch} ->
-              key = key_fn.(next_state)
-              new_dist = add.(state_dist, cost)
-
-              case Map.fetch(acc, key) do
-                {:ok, {_, current_dist}} ->
-                  if compare.(new_dist, current_dist) == :lt do
-                    {Map.put(acc, key, {next_state, new_dist}), true}
-                  else
-                    {acc, ch}
-                  end
-
-                :error ->
-                  {Map.put(acc, key, {next_state, new_dist}), true}
-              end
-            end)
-          end)
-
-        if any_change do
-          do_implicit_bellman_ford(
+          perform_implicit_iteration(
             successors,
             key_fn,
             is_goal,
             add,
             compare,
-            next_distances,
-            max_iter - 1
+            distances,
+            max_iter
           )
-        else
-          {:error, :no_goal}
         end
-      end
+    end
+  end
+
+  defp find_implicit_goal(distances, is_goal) do
+    Enum.find_value(distances, fn {_, {state, dist}} ->
+      if is_goal.(state), do: {:ok, dist}, else: nil
+    end)
+  end
+
+  defp perform_implicit_iteration(successors, key_fn, is_goal, add, compare, distances, max_iter) do
+    {next_distances, any_change} =
+      Enum.reduce(distances, {distances, false}, fn {_, {state, dist}}, acc ->
+        relax_implicit_neighbors(acc, state, dist, successors, key_fn, add, compare)
+      end)
+
+    if any_change do
+      do_implicit_bellman_ford(
+        successors,
+        key_fn,
+        is_goal,
+        add,
+        compare,
+        next_distances,
+        max_iter - 1
+      )
+    else
+      {:error, :no_goal}
+    end
+  end
+
+  defp relax_implicit_neighbors(
+         {dists, changed},
+         state,
+         state_dist,
+         successors,
+         key_fn,
+         add,
+         compare
+       ) do
+    next_states = successors.(state)
+
+    Enum.reduce(next_states, {dists, changed}, fn {next_state, cost}, acc ->
+      relax_implicit_edge(acc, next_state, cost, state_dist, key_fn, add, compare)
+    end)
+  end
+
+  defp relax_implicit_edge({acc, ch}, next_state, cost, state_dist, key_fn, add, compare) do
+    key = key_fn.(next_state)
+    new_dist = add.(state_dist, cost)
+
+    case Map.get(acc, key) do
+      {_, current_dist} ->
+        if compare.(new_dist, current_dist) == :lt do
+          {Map.put(acc, key, {next_state, new_dist}), true}
+        else
+          {acc, ch}
+        end
+
+      nil ->
+        {Map.put(acc, key, {next_state, new_dist}), true}
     end
   end
 end

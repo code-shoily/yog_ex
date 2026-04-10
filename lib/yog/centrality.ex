@@ -20,8 +20,7 @@ defmodule Yog.Centrality do
 
   """
 
-  alias Yog.PairingHeap, as: PQ
-  alias Yog.Pathfinding.Dijkstra
+  alias Yog.Pathfinding.{Brandes, Dijkstra}
 
   @typedoc """
   A mapping of Node IDs to their calculated centrality scores.
@@ -317,14 +316,11 @@ defmodule Yog.Centrality do
     zero = opts[:zero] || 0
     add = opts[:add] || (&Kernel.+/2)
     compare = opts[:compare] || (&Yog.Utils.compare/2)
-    _to_float = opts[:to_float] || fn x -> x * 1.0 end
 
     nodes = Map.keys(graph.nodes)
 
     initial =
-      List.foldl(nodes, %{}, fn id, acc ->
-        Map.put(acc, id, 0.0)
-      end)
+      Map.new(nodes, fn id -> {id, 0.0} end)
 
     parallel_opts = [
       max_concurrency: System.schedulers_online(),
@@ -335,8 +331,11 @@ defmodule Yog.Centrality do
       nodes
       |> Task.async_stream(
         fn s ->
-          discovery = brandes_dijkstra(graph, s, zero, add, compare)
-          dependencies = accumulate_dependencies(discovery)
+          {stack, preds, sigmas} = Brandes.discovery(graph, s, zero, add, compare)
+
+          dependencies =
+            Brandes.accumulate_node_dependencies(stack, preds, sigmas)
+
           {s, dependencies}
         end,
         parallel_opts
@@ -609,106 +608,6 @@ defmodule Yog.Centrality do
   # Dijkstra's algorithm for single-source shortest paths
   defp dijkstra_single_source(graph, source, zero, add, compare) do
     Dijkstra.single_source_distances(graph, source, zero, add, compare)
-  end
-
-  # Brandes' algorithm for betweenness centrality
-  # Returns {stack, predecessors, sigma}
-  defp brandes_dijkstra(graph, source, zero, add, compare) do
-    pq = PQ.new(fn {d1, _}, {d2, _} -> compare.(d1, d2) != :gt end)
-    queue = PQ.push(pq, {zero, source})
-
-    dist = %{source => zero}
-    sigma = %{source => 1}
-    preds = %{}
-    stack = []
-
-    do_brandes_dijkstra(graph, queue, dist, sigma, preds, stack, add, compare)
-  end
-
-  defp do_brandes_dijkstra(graph, pq, dist, sigma, preds, stack, add, compare) do
-    out_edges = graph.out_edges
-
-    if PQ.empty?(pq) do
-      {stack, preds, sigma}
-    else
-      {:ok, {d_v, v}, rest_q} = PQ.pop(pq)
-      current_best = Map.get(dist, v)
-
-      if compare.(d_v, current_best) == :gt do
-        do_brandes_dijkstra(graph, rest_q, dist, sigma, preds, stack, add, compare)
-      else
-        new_stack = [v | stack]
-
-        successors =
-          case Map.fetch(out_edges, v) do
-            {:ok, edges} -> Map.to_list(edges)
-            :error -> []
-          end
-
-        {new_q, new_dist, new_sigma, new_preds} =
-          List.foldl(successors, {rest_q, dist, sigma, preds}, fn {w, weight}, {q, ds, ss, ps} ->
-            new_dist_w = add.(d_v, weight)
-
-            case Map.fetch(ds, w) do
-              :error ->
-                q2 = PQ.push(q, {new_dist_w, w})
-                ds2 = Map.put(ds, w, new_dist_w)
-                ss2 = Map.put(ss, w, Map.get(ss, v, 0))
-                ps2 = Map.put(ps, w, [v])
-                {q2, ds2, ss2, ps2}
-
-              {:ok, old_dist} ->
-                case compare.(new_dist_w, old_dist) do
-                  :lt ->
-                    q2 = PQ.push(q, {new_dist_w, w})
-                    ds2 = Map.put(ds, w, new_dist_w)
-                    ss2 = Map.put(ss, w, Map.get(ss, v, 0))
-                    ps2 = Map.put(ps, w, [v])
-                    {q2, ds2, ss2, ps2}
-
-                  :eq ->
-                    sigma_v = Map.get(ss, v, 0)
-                    ss2 = Map.update(ss, w, sigma_v, fn curr -> curr + sigma_v end)
-                    ps2 = Map.put(ps, w, [v | Map.get(ps, w, [])])
-
-                    {q, ds, ss2, ps2}
-
-                  :gt ->
-                    {q, ds, ss, ps}
-                end
-            end
-          end)
-
-        do_brandes_dijkstra(graph, new_q, new_dist, new_sigma, new_preds, new_stack, add, compare)
-      end
-    end
-  end
-
-  defp accumulate_dependencies({stack, preds, sigma}) do
-    do_accumulate(stack, preds, sigma, %{})
-  end
-
-  defp do_accumulate([], _preds, _sigma, deltas) do
-    deltas
-  end
-
-  defp do_accumulate([v | rest], preds, sigma, deltas) do
-    sigma_v = Map.get(sigma, v, 0)
-    delta_v = Map.get(deltas, v, 0.0)
-    v_preds = Map.get(preds, v, [])
-
-    new_deltas =
-      Enum.reduce(v_preds, deltas, fn u, acc_deltas ->
-        sigma_u = Map.get(sigma, u, 0)
-        # delta[u] += (sigma[u]/sigma[v]) * (1 + delta[v])
-        fraction = sigma_u / sigma_v * (1.0 + delta_v)
-
-        Map.update(acc_deltas, u, fraction, fn curr ->
-          curr + fraction
-        end)
-      end)
-
-    do_accumulate(rest, preds, sigma, new_deltas)
   end
 
   defp merge_scores(acc, dependencies, source) do

@@ -176,96 +176,100 @@ defmodule Yog.Community.Infomap do
 
   defp do_pagerank(%Yog.Graph{out_edges: out_edges} = graph, nodes, pr, alpha, remaining_iters) do
     n_float = length(nodes) / 1.0
-    teleport = alpha / n_float
 
-    node_weights =
-      nodes
-      |> List.foldl(%{}, fn u, acc ->
-        total =
-          case Map.fetch(out_edges, u) do
-            {:ok, edges} ->
-              List.foldl(Map.to_list(edges), 0.0, fn {_, w}, sum -> sum + w end)
+    node_weights = calculate_node_weights(nodes, out_edges)
+    dangling_pr = calculate_dangling_pr(nodes, pr, node_weights)
+    next_pr = calculate_node_flows(nodes, out_edges, node_weights, pr, alpha)
 
-            :error ->
-              0.0
-          end
-
-        Map.put(acc, u, max(total, 1.0e-10))
-      end)
-
-    # Calculate total PageRank from dangling nodes (nodes with no outgoing edges)
-    dangling_pr =
-      List.foldl(nodes, 0.0, fn u, sum ->
-        total_weight = Map.get(node_weights, u, 0.0)
-
-        if total_weight < 1.0e-10 do
-          sum + Map.get(pr, u, 0.0)
-        else
-          sum
-        end
-      end)
-
-    # Calculate flow from each node to its neighbors using weighted transitions
-    next_pr =
-      List.foldl(nodes, %{}, fn u, acc ->
-        neighbors =
-          case Map.fetch(out_edges, u) do
-            {:ok, edges} -> Map.to_list(edges)
-            :error -> []
-          end
-
-        total_weight = Map.get(node_weights, u, 0.0)
-        u_pr = Map.get(pr, u, 0.0)
-
-        if total_weight > 0.0 and u_pr < 1.0e200 and u_pr > 0.0 do
-          ratio = u_pr / total_weight
-
-          if ratio < 1.0e200 do
-            contribution_per_weight = min(ratio * (1.0 - alpha), 1.0e200)
-
-            List.foldl(neighbors, acc, fn {v, weight}, inner_acc ->
-              if contribution_per_weight < 1.0e200 do
-                safe_weight = min(max(weight, 0.0), 1.0e100)
-                flow = contribution_per_weight * safe_weight
-
-                if flow < 1.0e200 do
-                  Map.update(inner_acc, v, flow, &(&1 + flow))
-                else
-                  inner_acc
-                end
-              else
-                inner_acc
-              end
-            end)
-          else
-            acc
-          end
-        else
-          acc
-        end
-      end)
-
-    final_pr =
-      Enum.reduce(nodes, %{}, fn u, acc ->
-        val = Map.get(next_pr, u, 0.0)
-        dangling_contribution = dangling_pr * (1.0 - alpha) / n_float
-        final_val = val + teleport + dangling_contribution
-        Map.put(acc, u, final_val)
-      end)
-
-    # Normalize to ensure PageRank sums to 1 (prevents numerical drift)
-    total_pr = Enum.sum(Map.values(final_pr))
-
-    normalized_pr =
-      if total_pr > 0 do
-        Enum.reduce(final_pr, %{}, fn {u, v}, acc ->
-          Map.put(acc, u, v / total_pr)
-        end)
-      else
-        final_pr
-      end
+    final_pr = finalize_pr(nodes, next_pr, dangling_pr, alpha, n_float)
+    normalized_pr = normalize_pr(final_pr)
 
     do_pagerank(graph, nodes, normalized_pr, alpha, remaining_iters - 1)
+  end
+
+  defp calculate_node_weights(nodes, out_edges) do
+    Enum.reduce(nodes, %{}, fn u, acc ->
+      total =
+        case Map.get(out_edges, u) do
+          nil -> 0.0
+          edges -> edges |> Map.values() |> Enum.sum()
+        end
+
+      Map.put(acc, u, max(total, 1.0e-10))
+    end)
+  end
+
+  defp calculate_dangling_pr(nodes, pr, node_weights) do
+    Enum.reduce(nodes, 0.0, fn u, sum ->
+      if Map.get(node_weights, u, 0.0) < 1.0e-10 do
+        sum + Map.get(pr, u, 0.0)
+      else
+        sum
+      end
+    end)
+  end
+
+  defp calculate_node_flows(nodes, out_edges, node_weights, pr, alpha) do
+    Enum.reduce(nodes, %{}, fn u, acc ->
+      total_weight = Map.get(node_weights, u, 0.0)
+      u_pr = Map.get(pr, u, 0.0)
+
+      if total_weight > 0.0 and u_pr > 0.0 and u_pr < 1.0e200 do
+        add_node_flow(acc, u, u_pr, total_weight, out_edges, alpha)
+      else
+        acc
+      end
+    end)
+  end
+
+  defp add_node_flow(acc, u, u_pr, total_weight, out_edges, alpha) do
+    ratio = u_pr / total_weight
+
+    if ratio < 1.0e200 do
+      contribution = min(ratio * (1.0 - alpha), 1.0e200)
+      neighbors = Map.get(out_edges, u, %{})
+
+      Enum.reduce(neighbors, acc, fn {v, weight}, inner_acc ->
+        update_flow(inner_acc, v, weight, contribution)
+      end)
+    else
+      acc
+    end
+  end
+
+  defp update_flow(acc, v, weight, contribution) do
+    if contribution < 1.0e200 do
+      safe_weight = min(max(weight, 0.0), 1.0e100)
+      flow = contribution * safe_weight
+
+      if flow < 1.0e200 do
+        Map.update(acc, v, flow, &(&1 + flow))
+      else
+        acc
+      end
+    else
+      acc
+    end
+  end
+
+  defp finalize_pr(nodes, next_pr, dangling_pr, alpha, n_float) do
+    teleport = alpha / n_float
+    dangling_contribution = dangling_pr * (1.0 - alpha) / n_float
+
+    Map.new(nodes, fn u ->
+      val = Map.get(next_pr, u, 0.0)
+      {u, val + teleport + dangling_contribution}
+    end)
+  end
+
+  defp normalize_pr(pr_map) do
+    total = pr_map |> Map.values() |> Enum.sum()
+
+    if total > 0 do
+      Map.new(pr_map, fn {u, v} -> {u, v / total} end)
+    else
+      pr_map
+    end
   end
 
   # =============================================================================
