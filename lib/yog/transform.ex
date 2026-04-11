@@ -230,6 +230,25 @@ defmodule Yog.Transform do
   end
 
   @doc """
+  Transforms node data using a function that also takes the node ID.
+
+  ## Example
+
+      iex> graph =
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(1, "A")
+      ...>   |> Yog.add_node(2, "B")
+      iex> mapped = Yog.Transform.map_nodes_indexed(graph, fn id, data -> "\#{id}:\#{data}" end)
+      iex> mapped.nodes[1]
+      "1:A"
+  """
+  @spec map_nodes_indexed(Graph.t(), (Yog.node_id(), term() -> term())) :: Graph.t()
+  def map_nodes_indexed(%Graph{} = graph, fun) do
+    new_nodes = Map.new(graph.nodes, fn {id, data} -> {id, fun.(id, data)} end)
+    %{graph | nodes: new_nodes}
+  end
+
+  @doc """
   Transforms node data using a function in parallel, preserving graph structure.
 
   This is the async version of `map_nodes/2` that uses `Task.async_stream/3` to
@@ -361,6 +380,38 @@ defmodule Yog.Transform do
   @spec filter_nodes(Graph.t(), (term() -> boolean())) :: Graph.t()
   def filter_nodes(%Graph{} = graph, predicate) do
     kept_nodes = Map.filter(graph.nodes, fn {_id, data} -> predicate.(data) end)
+
+    %{
+      graph
+      | nodes: kept_nodes,
+        out_edges: prune_edges(graph.out_edges, kept_nodes),
+        in_edges: prune_edges(graph.in_edges, kept_nodes)
+    }
+  end
+
+  @doc """
+  Filters nodes by a predicate that also receives the node ID.
+
+  Returns a new graph containing only nodes for which the predicate returns true.
+  Connected edges are automatically pruned.
+
+  ## Example
+
+      iex> graph =
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(1, "apple")
+      ...>   |> Yog.add_node(2, "apple")
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      iex> # Keep only even numbered nodes
+      iex> filtered = Yog.Transform.filter_nodes_indexed(graph, fn id, _data -> rem(id, 2) == 0 end)
+      iex> map_size(filtered.nodes)
+      1
+      iex> Map.has_key?(filtered.nodes, 2)
+      true
+  """
+  @spec filter_nodes_indexed(Graph.t(), (Yog.node_id(), term() -> boolean())) :: Graph.t()
+  def filter_nodes_indexed(%Graph{} = graph, predicate) do
+    kept_nodes = Map.filter(graph.nodes, fn {id, data} -> predicate.(id, data) end)
 
     %{
       graph

@@ -371,7 +371,7 @@ defmodule Yog.Operation do
         Yog.add_node(acc, {u, v}, w)
       end)
 
-    connect_line_graph(init_lg, edges, kind, default_weight)
+    connect_line_graph(init_lg, graph, edges, kind, default_weight)
   end
 
   @doc """
@@ -539,11 +539,6 @@ defmodule Yog.Operation do
   # Private Helper Functions
   # =============================================================================
 
-  # Returns true if two edges share at least one endpoint
-  defp shares_endpoint?(u, v, x, y) do
-    u == x or u == y or v == x or v == y
-  end
-
   defp has_edge?(graph, u, v) do
     graph.out_edges |> Map.get(u, %{}) |> Map.has_key?(v)
   end
@@ -657,11 +652,13 @@ defmodule Yog.Operation do
     end
   end
 
-  defp connect_line_graph(lg, edges, :directed, default_weight) do
+  defp connect_line_graph(lg, graph, edges, :directed, default_weight) do
     Enum.reduce(edges, lg, fn {u, v, _w}, acc ->
-      Enum.reduce(edges, acc, fn {x, y, _w2}, inner_acc ->
-        if v == x and {u, v} != {x, y} do
-          {:ok, new_g} = Yog.add_edge(inner_acc, {u, v}, {x, y}, default_weight)
+      v_successors = Yog.successors(graph, v)
+
+      Enum.reduce(v_successors, acc, fn {y, _w2}, inner_acc ->
+        if {u, v} != {v, y} do
+          {:ok, new_g} = Yog.add_edge(inner_acc, {u, v}, {v, y}, default_weight)
           new_g
         else
           inner_acc
@@ -670,17 +667,36 @@ defmodule Yog.Operation do
     end)
   end
 
-  defp connect_line_graph(lg, edges, :undirected, default_weight) do
-    Enum.reduce(edges, lg, fn {u, v, _w}, acc ->
-      Enum.reduce(edges, acc, fn {x, y, _w2}, inner_acc ->
-        if {u, v} != {x, y} and shares_endpoint?(u, v, x, y) do
-          {:ok, new_g} = Yog.add_edge(inner_acc, {u, v}, {x, y}, default_weight)
+  defp connect_line_graph(lg, graph, _edges, :undirected, default_weight) do
+    nodes = Map.keys(graph.nodes)
+
+    Enum.reduce(nodes, lg, fn node, acc ->
+      neighbors = Yog.neighbors(graph, node)
+
+      incident_edges =
+        Enum.map(neighbors, fn succ ->
+          if node <= succ, do: {node, succ}, else: {succ, node}
+        end)
+        |> Enum.sort()
+
+      connect_incident_pairs(incident_edges, acc, default_weight)
+    end)
+  end
+
+  defp connect_incident_pairs([], acc, _weight), do: acc
+
+  defp connect_incident_pairs([e1 | rest], acc, weight) do
+    new_acc =
+      Enum.reduce(rest, acc, fn e2, inner_acc ->
+        if e1 != e2 do
+          {:ok, new_g} = Yog.add_edge(inner_acc, e1, e2, weight)
           new_g
         else
           inner_acc
         end
       end)
-    end)
+
+    connect_incident_pairs(rest, new_acc, weight)
   end
 
   defp maybe_add_power_edge(g, src, dst, default_weight) do
