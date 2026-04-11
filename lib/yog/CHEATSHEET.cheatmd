@@ -1,0 +1,463 @@
+# YogEx Cheatsheet
+
+## Data Structure {:.col-2}
+
+### Internal Representation
+The core graph is a dual-map adjacency structure designed for efficiency.
+
+- **`kind`**: `:directed` or `:undirected`.
+- **`nodes`**: A map of **Node ID** to **Node Data**.
+- **`out_edges`**: A map of **Source ID** to a map of `{Target ID => Edge Data}`.
+- **`in_edges`**: A map of **Target ID** to a map of `{Source ID => Edge Data}`.
+
+```elixir
+# Internal structure visualization
+%Yog.Graph{
+  kind: :directed,
+  nodes: %{1 => "A", 2 => "B"},
+  out_edges: %{
+    1 => %{2 => 10} # 1 -> 2 (Weight 10)
+  },
+  in_edges: %{
+    2 => %{1 => 10} # Predecessor of 2 is 1
+  }
+}
+```
+* The dual-map enables **O(1) graph transpose** and efficient predecessor lookups.
+
+### Performance Profile
+- **Storage**: O(V + E) memory.
+- **Node Access**: O(1) lookup in `nodes` map.
+- **Edge Check**: O(1) lookup in `out_edges`.
+- **Successors**: O(1) access to adjacency map.
+- **Predecessors**: O(1) access to `in_edges` map.
+
+## Core Graph Operations {:.col-2}
+
+### Creation
+We can create a graph directly or from edges. 
+
+`Yog` module contains helper functions to create graphs from edges and has 
+`:directed` or `:undirected` as first arg.
+
+- `weighted` - Weight is provided
+- `unweighted` - Weight is not provided (`nil`)
+- `simple` - Weight is one
+
+```elixir
+# Create directed graph
+Yog.directed()
+
+# Create undirected graph
+Yog.undirected()
+
+# Custom graph type
+Yog.new(:directed)
+
+# From edges
+Yog.from_edges(:directed, [{1, 2, 10}, {2, 3, 20}])
+Yog.from_unweighted_edges(:undirected, [{1, 2}, {2, 3}])
+Yog.from_simple_edges(:undirected, [{1, 2}, {2, 3}])
+
+```
+* Refer to `Yog` and `Yog.Model` for more information.
+* See `Yog.Builder` modules for more ways to create graphs.
+* See `Yog.IO` for more ways to import/export graphs.
+* See `Yog.Generator` for more ways to generate graphs.
+
+### Modification
+
+A node ID can be any term but it is recommended to use numbers and keep the information
+as node data.
+
+`add_edge` and `add_edges` return `{:ok, graph}` or `{:error, reason}`. Use `add_edge!` and `add_edges!` to 
+raise an error if the edge cannot be added.
+
+Please note that all modification functions return a new graph.
+
+```elixir
+# Add node with data
+graph = Yog.add_node(graph, 1, %{name: "Center", lat: 0, lng: 0})
+
+# Add edge - nodes must exist
+{:ok, graph} = Yog.add_edge(graph, from: 1, to: 2, with: %{distance: 10, toll: false, speed_limit: 100})
+{:ok, graph} = Yog.add_edges(graph, [{1, 2, 5}, {2, 3, 10}])
+
+## Add edges - nodes are created if they don't exist
+{:ok, graph} = Yog.add_edge_ensure(graph, from: 1, to: 0, with: 10, default: 0) # `nil` if default not provided
+{:ok, graph} = Yog.add_edge_with(graph, 1, 0, 10, fn node_id -> DataStore.get(node_id) end)
+
+# Remove node/edge
+graph = Yog.remove_node(graph, 1)
+graph = Yog.remove_edge(graph, 1, 2)
+```
+* See `Yog.Model` for more ways to add nodes and edges.
+* Use `Yog.Builder.Labeled` for ergonomic graph construction without worrying 
+about node IDs.
+
+## Transform & Operations {:.col-2}
+
+### Graph Transformations
+Modify the structure or direction of the graph without adding specific data.
+
+```elixir
+# Reverse all edge directions
+Yog.Transform.transpose(graph)
+
+# Convert to undirected (mirrors edges)
+Yog.Transform.to_undirected(graph)
+
+# Simplify (removes self-loops and parallel edges)
+Yog.Transform.simplify(graph)
+```
+* See `Yog.Transform` for more topological mutations.
+
+### Set Operations
+Combine multiple graphs using familiar set theory principles.
+
+```elixir
+# Combine all nodes and edges
+Yog.Operation.union(graph_a, graph_b)
+
+# Only nodes/edges present in both
+Yog.Operation.intersection(graph_a, graph_b)
+
+# Subtract graph_b from graph_a
+Yog.Operation.difference(graph_a, graph_b)
+```
+* See `Yog.Operation` for binary graph interactions.
+
+## Properties & Checks {:.col-2}
+
+### Reachability
+Check if one node can reach another or compute the entire connectivity matrix.
+
+```elixir
+# True if a path exists from A to B
+Yog.Traversal.reachable?(graph, 1, 5)
+
+# Full Transitive Closure (O(V^3))
+Yog.Connectivity.Reachability.transitive_closure(graph)
+```
+
+### Graph Structure Invariants
+Quickly verify biological properties or structural constraints.
+
+```elixir
+# Check if graph has no cycles
+Yog.Property.Cyclicity.acyclic?(graph)
+
+# Check for bipartite (2-colorable) property
+Yog.Property.Bipartite.bipartite?(graph)
+
+# Connectivity stats
+Yog.order(graph)      # total number of nodes
+Yog.edge_count(graph) # total number of edges
+```
+* See `Yog.Property` for more structural analysis.
+
+## Pathfinding & Traversal {:.col-2}
+
+### Shortest Paths
+Calculate the optimal sequence of nodes between points based on edge weights or heuristics.
+
+- **Dijkstra**: Standard for non-negative weights (O((V+E) log V)).
+- **A***: Faster for single targets using a distance estimate.
+- **BFS Path**: Minimum step count for unweighted graphs (O(V+E)).
+
+```elixir
+# Standard Dijkstra search
+Yog.Pathfinding.Dijkstra.shortest_path(graph, from: 1, to: 10)
+
+# Faster search with heuristic (A*)
+Yog.Pathfinding.AStar.shortest_path(graph,
+  from: 1, 
+  to: 10, 
+  h: fn node, target -> Euclidean.distance(node, target) end)
+
+# Fast path for unweighted connections
+Yog.Traversal.find_path(graph, 1, 10)
+```
+* Use `Yog.Pathfinding.Bidirectional` for even faster single-pair search.
+
+### Graph Exploration (BFS/DFS)
+Systematically visit every reachable node from a starting point.
+
+- **BFS**: Level-by-level. Best for "k-neighbors" or flow analysis.
+- **DFS**: Exhaustive path search. Best for topological sorting.
+
+```elixir
+# Get IDs in BFS order
+Yog.Traversal.walk(graph, 1, :breadth_first)
+
+# Stateful search with control (:continue, :halt, :stop)
+Yog.Traversal.fold_walk(
+  over: graph, from: 1, using: :breadth_first, initial: [],
+  with: fn acc, id, meta ->
+    if meta.depth <= 3, do: {:continue, [id | acc]}, else: {:stop, acc}
+  end
+)
+```
+* See `Yog.Traversal` for lexicographical and acyclic-guaranteed walks.
+
+### Implicit Traversal
+Explore "virtual" graphs defined by logic rather than stored in memory.
+
+```elixir
+# BFS on a virtual state space
+successors = fn n -> if n < 100, do: [n + 1, n * 2], else: [] end
+
+Yog.Traversal.implicit_fold(
+  from: 1,
+  using: :breadth_first,
+  initial: 0,
+  successors_of: successors,
+  with: fn count, _node, _meta -> {:continue, count + 1} end
+)
+```
+* Refer to `Yog.Traversal.Implicit` for memory-efficient state space search.
+
+### Path Results
+Path results typically evaluate as a list or a dedicated result struct.
+
+```elixir
+%{
+  nodes: [1, 5, 10],   # Sequence of IDs
+  total_weight: 42.0,  # Accumulation of edge weights
+  distance: 2          # Step count
+}
+```
+
+### Path Hydration
+Search results return node IDs. You can "hydrate" them to retrieve the actual data (GPS coords, labels, etc.).
+
+```elixir
+# Map IDs to their associated data
+path = Yog.Pathfinding.Dijkstra.shortest_path(graph, from: 1, to: 10)
+
+Enum.map(path.nodes, fn id -> 
+  data = Yog.Model.node(graph, id)
+  {id, data}
+end)
+```
+* Link to `Yog.Traversal.Walk` for path reconstruction logic.
+
+## Algorithms & Metrics {:.col-2}
+
+### Centrality & Rankings
+Determine the relative importance of nodes within a network. 
+
+- **Betweenness**: Nodes that act as bridges.
+- **Closeness**: Nodes that can reach others quickly.
+- **PageRank**: Probability-based ranking.
+
+```elixir
+# Measure node importance
+Yog.Centrality.Brandes.betweenness_centrality(graph)
+
+# Direct neighbor counts
+Yog.Model.successors(graph, 1)
+Yog.Model.predecessors(graph, 1)
+```
+* See `Yog.Centrality` for advanced sorting and weighting.
+
+### Network Health
+Measure the global structural quality and efficiency of the graph.
+
+- **Diameter**: Longest shortest path (max separation).
+- **Radius**: Min eccentricity (best central hub).
+- **Assortativity**: Do hubs connect to hubs or leaves?
+
+```elixir
+# Check graph compactness
+Yog.Health.diameter(graph)
+Yog.Health.radius(graph)
+
+# Social (positive) vs Bio (negative) patterns
+assort = Yog.Health.assortativity(graph)
+```
+* Use `Yog.Health` for average path lengths and eccentricity.
+
+### Community Detection
+Partition nodes into densely connected modules (clusters).
+
+- **Louvain/Leiden**: Fast, quality-guaranteed modularity optimization.
+- **Label Propagation**: Linear-time, near-instant detection.
+- **Modularity (Q)**: Metric for "strength" of the grouping.
+
+```elixir
+# Auto-detect clusters
+res = Yog.Community.Louvain.detect(graph)
+
+# Get metrics
+Yog.Community.modularity(graph, res)
+Yog.Community.sizes(res) # %{comm_id => count}
+```
+* See `Yog.Community` for hierarchical and local detection.
+
+### Minimum Spanning Trees (MST)
+Find a subset of edges that connects all nodes with the minimum (or maximum) total weight.
+
+- **Prim/Kruskal**: Standards for minimizing edge weight.
+- **Maximum MST**: Connect nodes using the heaviest edges (for redundancy/capacity).
+- **Uniform Forest**: Sample a random spanning tree from all possible trees.
+
+```elixir
+# Standard Minimum Tree (Kruskal)
+Yog.MST.kruskal(graph)
+
+# Maximum Spanning Tree (MaxST)
+Yog.MST.kruskal_max(graph)
+Yog.MST.prim_max(graph, from: 1)
+
+# Random Spanning Forest (Wilson's)
+Yog.MST.uniform_spanning_tree(graph)
+```
+* Refer to `Yog.MST` for algorithm selection and weighted/unweighted variations.
+
+### Connectivity & SCC
+Analyze how nodes are grouped together in directed and undirected graphs.
+
+- **SCC (Strongly Connected)**: For directed graphs (Tarjan/Kosaraju).
+- **Critical Points**: Bridges and Articulation Points.
+
+```elixir
+# Find all Strongly Connected Components
+Yog.Connectivity.scc(directed_graph)
+
+# Analyze bridges and articulation points
+results = Yog.Connectivity.analyze(undirected_graph)
+results.bridges             # [{1, 2}, {3, 4}]
+results.articulation_points  # [2, 5]
+```
+* See `Yog.Connectivity` for k-core and weakly connected components.
+
+## DAG {:.col-2}
+
+### Type Safety
+Validate and wrap a directed graph as a `DAG` to guarantee it has no cycles.
+
+```elixir
+# Wrap a graph and prove acyclicity
+{:ok, dag} = Yog.DAG.from_graph(graph)
+
+# Convert back to general graph
+Yog.DAG.to_graph(dag)
+```
+* Use `Yog.DAG.Model` for operations that maintain DAG invariants.
+
+### Total Functions
+Specialized algorithms that are guaranteed to succeed on a DAG without checking for cycles internally.
+
+```elixir
+# Linear time topological sort (Infallible)
+sorted_nodes = Yog.DAG.topological_sort(dag)
+
+# Find the longest path (Critical Path analysis)
+path = Yog.DAG.longest_path(dag)
+```
+* See `Yog.DAG.Algorithm` for more DAG-specific logic.
+
+## Maze & Grid {:.col-2}
+
+### Grid Construction
+Build 2D structures from nested lists with movement constraints.
+
+- **Topologies**: `rook` (4-way), `queen` (8-way), `bishop` (diagonal).
+- **Predicates**: `walkable` (only specific values), `avoiding` (all but values).
+
+```elixir
+maze_data = [
+  [".", ".", "#"],
+  [".", "#", "."],
+  [".", ".", "G"]
+]
+
+# Create an undirected grid where "." is walkable
+grid = Yog.Builder.Grid.from_2d_list(
+  maze_data, 
+  :undirected, 
+  Yog.Builder.Grid.walkable(".")
+)
+
+# Convert to standard graph for pathfinding
+graph = Yog.Builder.GridGraph.to_graph(grid)
+```
+* Use `Yog.Builder.Grid` for coordinate-to-node-ID mapping.
+
+### Navigation & Heuristics
+Estimate costs between grid cells for informed search (A*).
+
+- **Manhattan**: Sum of cardinal steps (for Rook).
+- **Chebyshev**: Max of row/col diffs (for Queen/8-way).
+- **Octile**: Precise 8-way cost using √2 for diagonals.
+
+```elixir
+# Convert coordinates back and forth
+id = Yog.Builder.Grid.coord_to_id(row, col, cols)
+{r, c} = Yog.Builder.Grid.id_to_coord(id, cols)
+
+# Distance estimate for A*
+heuristic = fn a, b -> 
+  Yog.Builder.Grid.manhattan_distance(a, b, cols)
+end
+```
+* Refer to `Yog.Builder.Grid` for all distance formulas.
+
+### Maze Generation
+Create procedurally generated "perfect mazes" (spanning trees on a grid).
+
+- **Recursive Backtracker**: Classic, twisty corridors.
+- **Prim**: Radial texture, many dead ends.
+- **Kruskal**: Well-balanced, uniform look.
+
+```elixir
+# Generate a 20x20 twisty maze
+maze = Yog.Generator.Maze.recursive_backtracker(20, 20, seed: 123)
+
+# Render to string for CLI output
+IO.puts(Yog.Render.ASCII.grid_to_string(maze))
+```
+* See `Yog.Generator.Maze` for algorithm selection guide.
+
+## IO & Serialization {:.col-2}
+
+### Constructors
+Import graphs from standard formats or data structures.
+
+```elixir
+# From adjacency lists/matrices
+Yog.from_adjacency_list(:directed, [{"A", ["B", "C"]}])
+
+# Parse external formats
+Yog.IO.JSON.decode(json)
+Yog.IO.GraphML.decode(xml)
+```
+
+### Export & Render
+Serialize graphs for storage or visualization.
+
+```elixir
+# Export to basic list
+Yog.to_adjacency_list(graph)
+
+# Render to diagram strings
+Yog.Render.Dot.render(graph)
+Yog.Render.Mermaid.render(graph)
+```
+* See `Yog.IO` for LEDA, Pajek, and GDF support.
+
+## Documentation & Navigation {:.col-2}
+
+### Browser Shortcuts
+- **`s`**: Open quick-search bar
+- **`g`**: Go to Hex package docs
+- **`?`**: Toggle shortcut help
+- **`/`**: Focus search bar
+
+### Linking Syntax (Backticks)
+- `` `Module` ``: Link to a module
+- `` `mod.fun/2` ``: Link to a function
+- `` `t:mod.type/0` ``: Link to a type
+- `` `c:mod.fun/1` ``: Link to a callback
+- `` `[txt](`fun/1`)` ``: Custom link text

@@ -88,16 +88,72 @@ defmodule YogEx.MixProject do
       main: "readme",
       extras: [
         "README.md",
-        "ALGORITHMS.md",
+        {"lib/yog/CHEATSHEET.cheatmd", title: "Cheat Sheet"},
         {"examples/README.md", [filename: "examples_readme", title: "Examples README"]},
         {"lib/yog/functional/README.md",
          [filename: "functional_readme", title: "Functional API README"]},
+        "ALGORITHMS.md",
         "PROPERTIES.md",
         "GLEAM_ELIXIR_COMPARISON.md",
         "CHANGELOG.md"
       ],
       source_ref: "v#{@version}",
-      source_url: @source_url
+      source_url: @source_url,
+      groups_for_modules: [
+        Core: [
+          Yog,
+          Yog.Model,
+          Yog.Graph,
+          Yog.Multi,
+          Yog.Multi.Graph,
+          Yog.Multi.Model
+        ],
+        "Directed Acyclic Graphs (DAG)": [
+          Yog.DAG,
+          Yog.DAG.Model,
+          Yog.DAG.Algorithm
+        ],
+        Algorithms: [
+          ~r/Yog\.(Pathfinding|Traversal|MST|Flow|Community|Centrality|Connectivity)/
+        ],
+        Properties: [
+          ~r/Yog\.Property/
+        ],
+        Generators: [
+          ~r/Yog\.Generator/
+        ],
+        "I/O & Serialization": [
+          ~r/Yog\.IO/,
+          ~r/Yog\.Render/
+        ],
+        "Utilities & Transformations": [
+          Yog.Transform,
+          Yog.Operation,
+          Yog.Utils,
+          Yog.Health
+        ],
+        "Internal Structures": [
+          Yog.PriorityQueue,
+          Yog.DisjointSet,
+          Yog.PairingHeap
+        ]
+      ],
+      groups_for_extras: [
+        Guides: [
+          "README.md",
+          "examples_readme",
+          "functional_readme",
+          "GLEAM_ELIXIR_COMPARISON.md"
+        ],
+        Reference: [
+          "ALGORITHMS.md",
+          "PROPERTIES.md"
+        ],
+        Resources: [
+          "lib/yog/CHEATSHEET.cheatmd",
+          "CHANGELOG.md"
+        ]
+      ]
     ]
   end
 end
