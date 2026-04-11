@@ -266,42 +266,14 @@ defmodule Yog.Multi.Model do
   """
   @spec to_simple_graph(t(), (any(), any() -> any())) :: Yog.graph()
   def to_simple_graph(graph, combine_fn) do
-    base =
-      Enum.reduce(graph.nodes, %{}, fn {id, data}, g ->
-        Map.put(g, id, data)
+    base_graph =
+      Enum.reduce(graph.nodes, Yog.Model.new(graph.kind), fn {id, data}, g ->
+        Yog.Model.add_node(g, id, data)
       end)
 
-    edges =
-      Enum.reduce(graph.edges, %{}, fn {_eid, {src, dst, data}}, acc ->
-        key = {src, dst}
-
-        existing = Map.get(acc, key)
-
-        new_data =
-          if existing != nil do
-            combine_fn.(existing, data)
-          else
-            data
-          end
-
-        Map.put(acc, key, new_data)
-      end)
-
-    forward_edges =
-      Enum.reduce(edges, %{}, fn {{src, dst}, data}, acc ->
-        Map.update(acc, src, %{dst => data}, fn existing ->
-          Map.put(existing, dst, data)
-        end)
-      end)
-
-    reverse_edges =
-      Enum.reduce(edges, %{}, fn {{src, dst}, data}, acc ->
-        Map.update(acc, dst, %{src => data}, fn existing ->
-          Map.put(existing, src, data)
-        end)
-      end)
-
-    %Yog.Graph{kind: graph.kind, nodes: base, out_edges: forward_edges, in_edges: reverse_edges}
+    Enum.reduce(graph.edges, base_graph, fn {_eid, {src, dst, data}}, current_graph ->
+      Yog.Model.add_edge_with_combine!(current_graph, src, dst, data, combine_fn)
+    end)
   end
 
   @doc """
