@@ -173,13 +173,13 @@ defmodule Yog.Model do
         {:ok, add_edge_unchecked(graph, src, dst, edge_data)}
 
       not has_src and not has_dst ->
-        {:error, "Nodes #{src} and #{dst} do not exist"}
+        {:error, "Nodes #{inspect(src)} and #{inspect(dst)} do not exist"}
 
       not has_src ->
-        {:error, "Node #{src} does not exist"}
+        {:error, "Node #{inspect(src)} does not exist"}
 
       true ->
-        {:error, "Node #{dst} does not exist"}
+        {:error, "Node #{inspect(dst)} does not exist"}
     end
   end
 
@@ -537,13 +537,13 @@ defmodule Yog.Model do
         {:ok, result}
 
       not has_src and not has_dst ->
-        {:error, "Nodes #{src} and #{dst} do not exist"}
+        {:error, "Nodes #{inspect(src)} and #{inspect(dst)} do not exist"}
 
       not has_src ->
-        {:error, "Node #{src} does not exist"}
+        {:error, "Node #{inspect(src)} does not exist"}
 
       true ->
-        {:error, "Node #{dst} does not exist"}
+        {:error, "Node #{inspect(dst)} does not exist"}
     end
   end
 

@@ -51,24 +51,39 @@ defmodule Yog.Functional.Algorithms do
       iex> order
       [1, 2]
   """
-  def topsort(graph), do: do_topsort(graph, [])
+  def topsort(graph) do
+    zeros =
+      Enum.filter(Model.nodes(graph), fn ctx -> map_size(ctx.in_edges) == 0 end)
+      |> Enum.map(& &1.id)
 
-  defp do_topsort(graph, acc) do
+    do_topsort(graph, zeros, [])
+  end
+
+  defp do_topsort(graph, [], acc) do
     if Model.empty?(graph) do
       {:ok, Enum.reverse(acc)}
     else
-      find_and_match_next(graph, acc)
+      {:error, :cycle_detected}
     end
   end
 
-  defp find_and_match_next(graph, acc) do
-    case Enum.find(Model.nodes(graph), fn ctx -> map_size(ctx.in_edges) == 0 end) do
-      nil ->
-        {:error, :cycle_detected}
+  defp do_topsort(graph, [current | rest_zeros], acc) do
+    case Model.match(graph, current) do
+      {:error, :not_found} ->
+        do_topsort(graph, rest_zeros, acc)
 
-      ctx ->
-        {:ok, _ctx, remaining_graph} = Model.match(graph, ctx.id)
-        do_topsort(remaining_graph, [ctx.id | acc])
+      {:ok, ctx, remaining_graph} ->
+        new_zeros =
+          ctx.out_edges
+          |> Map.keys()
+          |> Enum.filter(fn neighbor_id ->
+            case Model.get_node(remaining_graph, neighbor_id) do
+              {:ok, nctx} -> map_size(nctx.in_edges) == 0
+              {:error, _} -> false
+            end
+          end)
+
+        do_topsort(remaining_graph, new_zeros ++ rest_zeros, [current | acc])
     end
   end
 
@@ -198,24 +213,32 @@ defmodule Yog.Functional.Algorithms do
       [start | _] ->
         {:ok, ctx, remaining_graph} = Model.match(graph, start)
         edges = extract_undirected_edges(ctx)
-        do_mst_prim(remaining_graph, Enum.sort(edges), [])
+
+        pq = PQ.new(fn {w1, _, _}, {w2, _, _} -> w1 <= w2 end)
+        pq = Enum.reduce(edges, pq, &PQ.push(&2, &1))
+
+        do_mst_prim(remaining_graph, pq, [])
     end
   end
 
-  defp do_mst_prim(_graph, [], acc), do: {:ok, Enum.reverse(acc)}
+  defp do_mst_prim(graph, pq, acc) do
+    if PQ.empty?(pq) do
+      {:ok, Enum.reverse(acc)}
+    else
+      {:ok, {weight, from, to}, rest_pq} = PQ.pop(pq)
 
-  defp do_mst_prim(graph, [{weight, from, to} | pq], acc) do
-    case Model.match(graph, to) do
-      {:error, :not_found} ->
-        do_mst_prim(graph, pq, acc)
+      case Model.match(graph, to) do
+        {:error, :not_found} ->
+          do_mst_prim(graph, rest_pq, acc)
 
-      {:ok, ctx, remaining_graph} ->
-        new_acc = [{from, to, weight} | acc]
+        {:ok, ctx, remaining_graph} ->
+          new_acc = [{from, to, weight} | acc]
+          new_edges = extract_undirected_edges(ctx)
 
-        new_edges = extract_undirected_edges(ctx)
-        new_pq = merge_sorted_lists(pq, Enum.sort(new_edges))
+          new_pq = Enum.reduce(new_edges, rest_pq, &PQ.push(&2, &1))
 
-        do_mst_prim(remaining_graph, new_pq, new_acc)
+          do_mst_prim(remaining_graph, new_pq, new_acc)
+      end
     end
   end
 
@@ -285,6 +308,4 @@ defmodule Yog.Functional.Algorithms do
     in_e = Enum.map(ctx.in_edges, fn {from, w} -> {w || 1, ctx.id, from} end)
     out_e ++ in_e
   end
-
-  defp merge_sorted_lists(list1, list2), do: :lists.merge(list1, list2)
 end

@@ -674,7 +674,7 @@ defmodule Yog.Operation do
       neighbors = Yog.neighbors(graph, node)
 
       incident_edges =
-        Enum.map(neighbors, fn succ ->
+        Enum.map(neighbors, fn {succ, _weight} ->
           if node <= succ, do: {node, succ}, else: {succ, node}
         end)
         |> Enum.sort()
