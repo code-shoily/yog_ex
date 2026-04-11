@@ -5,33 +5,59 @@
 ### Internal Representation
 The core graph is a dual-map adjacency structure designed for efficiency.
 
-- **`kind`**: `:directed` or `:undirected`.
-- **`nodes`**: A map of **Node ID** to **Node Data**.
-- **`out_edges`**: A map of **Source ID** to a map of `{Target ID => Edge Data}`.
-- **`in_edges`**: A map of **Target ID** to a map of `{Source ID => Edge Data}`.
+* A graph can be `:directed` or `:undirected`.
+* A Node ID can be any term.
+* Node and Edge can hold any `term()` as data.
 
 ```elixir
-# Internal structure visualization
+# Internal structure visualization (Nodes: 1-6)
 %Yog.Graph{
   kind: :directed,
-  nodes: %{1 => "A", 2 => "B"},
+  nodes: %{1 => "A", 2 => "B", 3 => "C", 4 => "D", 5 => "E", 6 => "F"},
   out_edges: %{
-    1 => %{2 => 10} # 1 -> 2 (Weight 10)
+    1 => %{2 => 10, 3 => 5},
+    2 => %{4 => 8, 6 => 15},
+    3 => %{4 => 7, 5 => 12},
+    4 => %{5 => 10, 6 => 9},
+    5 => %{1 => 14},
+    6 => %{2 => 11}
   },
   in_edges: %{
-    2 => %{1 => 10} # Predecessor of 2 is 1
+    2 => %{1 => 10, 6 => 11},
+    3 => %{1 => 5},
+    4 => %{2 => 8, 3 => 7},
+    5 => %{3 => 12, 4 => 10},
+    6 => %{2 => 15, 4 => 9},
+    1 => %{5 => 14}
   }
 }
 ```
-* The dual-map enables **O(1) graph transpose** and efficient predecessor lookups.
+
+### Representation
+<div class="graphviz">
+digraph G {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [shape=circle, fontname="inherit"];
+  edge [fontname="inherit", fontsize=10];
+  1 [label="A"]; 2 [label="B"]; 3 [label="C"];
+  4 [label="D"]; 5 [label="E"]; 6 [label="F"];
+  1 -> 2 [label="10"]; 1 -> 3 [label="5"];
+  2 -> 4 [label="8"]; 2 -> 6 [label="15"];
+  3 -> 4 [label="7"]; 3 -> 5 [label="12"];
+  4 -> 5 [label="10"]; 4 -> 6 [label="9"];
+  5 -> 1 [label="14"];
+  6 -> 2 [label="11"];
+}
+</div>
 
 ### Performance Profile
 - **Storage**: O(V + E) memory.
 - **Node Access**: O(1) lookup in `nodes` map.
 - **Edge Check**: O(1) lookup in `out_edges`.
-- **Successors**: O(1) access to adjacency map.
-- **Predecessors**: O(1) access to `in_edges` map.
-
+- **Successors**: O(1) lookup of neighbor map in `out_edges`.
+- **Predecessors**: O(1) lookup of parent map in `in_edges`.
+- **Transpose**: O(1) swapping of in_edges and out_edges
 ## Core Graph Operations {:.col-2}
 
 ### Creation
@@ -92,155 +118,131 @@ graph = Yog.remove_node(graph, 1)
 graph = Yog.remove_edge(graph, 1, 2)
 ```
 * See `Yog.Model` for more ways to add nodes and edges.
-* Use `Yog.Builder.Labeled` for ergonomic graph construction without worrying 
-about node IDs.
 
 ## Transform & Operations {:.col-2}
 
-### Graph Transformations
-Modify the structure or direction of the graph without adding specific data.
+### Mapping & Filtering
+Modify data or prune structure using functional primitives.
 
 ```elixir
-# Reverse all edge directions
+# Transform node data
+Yog.Transform.map_nodes(graph, &String.upcase/1)
+
+# Transform edge weights
+Yog.Transform.map_edges(graph, fn w -> w * 2 end)
+
+# Prune structure
+Yog.Transform.filter_nodes(graph, fn data -> data.active? end)
+Yog.Transform.filter_edges(graph, fn u, v, _w -> u != v end)
+```
+
+### Graph Transformations
+Topological mutations and re-orientations.
+
+```elixir
+# Reverse edge directions (O(1))
 Yog.Transform.transpose(graph)
 
-# Convert to undirected (mirrors edges)
-Yog.Transform.to_undirected(graph)
-
-# Simplify (removes self-loops and parallel edges)
-Yog.Transform.simplify(graph)
+# Convert directionality
+Yog.Transform.to_undirected(graph, &min/2)
+Yog.Transform.to_directed(graph)
 ```
-* See `Yog.Transform` for more topological mutations.
 
 ### Set Operations
-Combine multiple graphs using familiar set theory principles.
+Combine or compare graphs as sets of nodes and edges.
 
 ```elixir
-# Combine all nodes and edges
+# Operations from Yog.Operation
 Yog.Operation.union(graph_a, graph_b)
-
-# Only nodes/edges present in both
 Yog.Operation.intersection(graph_a, graph_b)
-
-# Subtract graph_b from graph_a
 Yog.Operation.difference(graph_a, graph_b)
 ```
-* See `Yog.Operation` for binary graph interactions.
+* See `Yog.Operation` for `composition` and `isomorphic?`.
+
+## Pathfinding & Traversal {:.col-2}
+
+### Pathfinding Options
+Algorithms use **semiring** parameters for custom optimizations.
+
+```elixir
+# Dijkstra/A* options
+opts = [
+  from: 1, to: 10,
+  zero: 0,                # Identity
+  add: &+/2,              # Accumulator
+  compare: &Yog.Utils.compare/2 # Relation
+]
+Yog.Pathfinding.shortest_path(graph, opts)
+```
+
+### Algorithms & Traversal
+Standard search and exploration functions.
+
+```elixir
+# Standard Dijkstra / A*
+Yog.Pathfinding.Dijkstra.shortest_path(graph, from: 1, to: 10)
+Yog.Pathfinding.BFS.shortest_path(graph, from: 1, to: 10)
+
+# Fold over structure (BFS/DFS)
+Yog.Traversal.fold(graph, from: 1, initial: [], with: callback)
+```
+
+### Implicit Search & Traversal
+Explore dynamic or infinite state spaces defined by logic.
+
+```elixir
+# Expansion-based search (A*)
+Yog.Pathfinding.AStar.implicit_a_star(
+  from: start_state,
+  successors: fn s -> [{next, cost}] end,
+  is_goal: fn s -> s == target end
+)
+
+# Walk over a virtual graph
+Yog.Traversal.implicit_fold(
+  from: 1, using: :breadth_first,
+  successors_of: fn n -> [n + 1, n * 2] end,
+  with: fn count, _id, _meta -> {:continue, count + 1} end
+)
+```
+
+### Path Results & Hydration
+Results return node IDs; "hydration" retrieves the associated data.
+
+```elixir
+# Result internal structure
+%{nodes: [1, 5, 10], total_weight: 42.0, distance: 2}
+
+# Map IDs to their associated data
+path = Yog.Pathfinding.Dijkstra.shortest_path(graph, from: 1, to: 10)
+Enum.map(path.nodes, &Yog.Model.node(graph, &1))
+```
 
 ## Properties & Checks {:.col-2}
 
 ### Reachability
-Check if one node can reach another or compute the entire connectivity matrix.
+Check connectivity and extract components.
 
 ```elixir
-# True if a path exists from A to B
-Yog.Traversal.reachable?(graph, 1, 5)
+# Path existence check
+Yog.Connectivity.reachable?(graph, 1, 10)
 
-# Full Transitive Closure (O(V^3))
-Yog.Connectivity.Reachability.transitive_closure(graph)
+# Strongly Connected Components
+Yog.Connectivity.strongly_connected_components(graph)
 ```
 
-### Graph Structure Invariants
-Quickly verify biological properties or structural constraints.
+### Invariants & Metrics
+Verify structural properties and calculate health.
 
 ```elixir
-# Check if graph has no cycles
-Yog.Property.Cyclicity.acyclic?(graph)
-
-# Check for bipartite (2-colorable) property
+# DAG & Bipartite checks
+Yog.Property.Cyclicity.is_dag?(graph)
 Yog.Property.Bipartite.bipartite?(graph)
 
-# Connectivity stats
-Yog.order(graph)      # total number of nodes
-Yog.edge_count(graph) # total number of edges
-```
-* See `Yog.Property` for more structural analysis.
-
-## Pathfinding & Traversal {:.col-2}
-
-### Shortest Paths
-Calculate the optimal sequence of nodes between points based on edge weights or heuristics.
-
-- **Dijkstra**: Standard for non-negative weights (O((V+E) log V)).
-- **A***: Faster for single targets using a distance estimate.
-- **BFS Path**: Minimum step count for unweighted graphs (O(V+E)).
-
-```elixir
-# Standard Dijkstra search
-Yog.Pathfinding.Dijkstra.shortest_path(graph, from: 1, to: 10)
-
-# Faster search with heuristic (A*)
-Yog.Pathfinding.AStar.shortest_path(graph,
-  from: 1, 
-  to: 10, 
-  h: fn node, target -> Euclidean.distance(node, target) end)
-
-# Fast path for unweighted connections
-Yog.Traversal.find_path(graph, 1, 10)
-```
-* Use `Yog.Pathfinding.Bidirectional` for even faster single-pair search.
-
-### Graph Exploration (BFS/DFS)
-Systematically visit every reachable node from a starting point.
-
-- **BFS**: Level-by-level. Best for "k-neighbors" or flow analysis.
-- **DFS**: Exhaustive path search. Best for topological sorting.
-
-```elixir
-# Get IDs in BFS order
-Yog.Traversal.walk(graph, 1, :breadth_first)
-
-# Stateful search with control (:continue, :halt, :stop)
-Yog.Traversal.fold_walk(
-  over: graph, from: 1, using: :breadth_first, initial: [],
-  with: fn acc, id, meta ->
-    if meta.depth <= 3, do: {:continue, [id | acc]}, else: {:stop, acc}
-  end
-)
+# Walk-based analysis
+Yog.Traversal.fold_walk(over: graph, from: 1, with: callback)
 ```
 * See `Yog.Traversal` for lexicographical and acyclic-guaranteed walks.
-
-### Implicit Traversal
-Explore "virtual" graphs defined by logic rather than stored in memory.
-
-```elixir
-# BFS on a virtual state space
-successors = fn n -> if n < 100, do: [n + 1, n * 2], else: [] end
-
-Yog.Traversal.implicit_fold(
-  from: 1,
-  using: :breadth_first,
-  initial: 0,
-  successors_of: successors,
-  with: fn count, _node, _meta -> {:continue, count + 1} end
-)
-```
-* Refer to `Yog.Traversal.Implicit` for memory-efficient state space search.
-
-### Path Results
-Path results typically evaluate as a list or a dedicated result struct.
-
-```elixir
-%{
-  nodes: [1, 5, 10],   # Sequence of IDs
-  total_weight: 42.0,  # Accumulation of edge weights
-  distance: 2          # Step count
-}
-```
-
-### Path Hydration
-Search results return node IDs. You can "hydrate" them to retrieve the actual data (GPS coords, labels, etc.).
-
-```elixir
-# Map IDs to their associated data
-path = Yog.Pathfinding.Dijkstra.shortest_path(graph, from: 1, to: 10)
-
-Enum.map(path.nodes, fn id -> 
-  data = Yog.Model.node(graph, id)
-  {id, data}
-end)
-```
-* Link to `Yog.Traversal.Walk` for path reconstruction logic.
 
 ## Algorithms & Metrics {:.col-2}
 
