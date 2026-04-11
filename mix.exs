@@ -88,7 +88,7 @@ defmodule YogEx.MixProject do
       main: "readme",
       extras: [
         "README.md",
-        {"lib/yog/CHEATSHEET.cheatmd", title: "Cheat Sheet"},
+        {"lib/yog/CHEATSHEET.cheatmd", [title: "Cheat Sheet", filename: "cheat_sheet"]},
         {"examples/README.md", [filename: "examples_readme", title: "Examples README"]},
         {"lib/yog/functional/README.md",
          [filename: "functional_readme", title: "Functional API README"]},
@@ -99,22 +99,39 @@ defmodule YogEx.MixProject do
       ],
       source_ref: "v#{@version}",
       source_url: @source_url,
+      mermaid: true,
+      before_closing_body_tag: &before_closing_body_tag/1,
       groups_for_modules: [
         Core: [
           Yog,
           Yog.Model,
-          Yog.Graph,
-          Yog.Multi,
-          Yog.Multi.Graph,
-          Yog.Multi.Model
+          Yog.Graph
+        ],
+        "Transformers & Operations": [
+          Yog.Transform,
+          Yog.Operation
+        ],
+        Builder: [
+          ~r/Yog\.Builder/
+        ],
+        "Pathfinding & Traversal": [
+          ~r/Yog\.(Pathfinding|Traversal)/
+        ],
+        "Network Algorithms": [
+          ~r/Yog\.(MST|Flow|Connectivity)/
+        ],
+        "Network Analysis": [
+          ~r/Yog\.(Community|Centrality)/,
+          Yog.Health
+        ],
+        Multi: [
+          ~r/Yog\.Multi/
+        ],
+        Functional: [
+          ~r/Yog\.Functional/
         ],
         "Directed Acyclic Graphs (DAG)": [
-          Yog.DAG,
-          Yog.DAG.Model,
-          Yog.DAG.Algorithm
-        ],
-        Algorithms: [
-          ~r/Yog\.(Pathfinding|Traversal|MST|Flow|Community|Centrality|Connectivity)/
+          ~r/Yog\.DAG/
         ],
         Properties: [
           ~r/Yog\.Property/
@@ -122,23 +139,19 @@ defmodule YogEx.MixProject do
         Generators: [
           ~r/Yog\.Generator/
         ],
-        "I/O & Serialization": [
+        "I/O & Rendering": [
           ~r/Yog\.IO/,
           ~r/Yog\.Render/
         ],
-        "Utilities & Transformations": [
-          Yog.Transform,
-          Yog.Operation,
-          Yog.Utils,
-          Yog.Health
-        ],
-        "Internal Structures": [
-          Yog.PriorityQueue,
-          Yog.DisjointSet,
-          Yog.PairingHeap
+        "Data Structures & Utils": [
+          ~r/Yog\.(PriorityQueue|DisjointSet|PairingHeap)/,
+          Yog.Utils
         ]
       ],
       groups_for_extras: [
+        "Cheat Sheets": [
+          "cheat_sheet"
+        ],
         Guides: [
           "README.md",
           "examples_readme",
@@ -150,10 +163,56 @@ defmodule YogEx.MixProject do
           "PROPERTIES.md"
         ],
         Resources: [
-          "lib/yog/CHEATSHEET.cheatmd",
           "CHANGELOG.md"
         ]
       ]
     ]
   end
+
+  defp before_closing_body_tag(:html) do
+    """
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/viz.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/full.render.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        if (typeof Viz !== "undefined") {
+          const viz = new Viz();
+          document.querySelectorAll(".graphviz").forEach(function(el) {
+            viz.renderSVGElement(el.textContent)
+              .then(function(element) {
+                el.innerHTML = "";
+                el.appendChild(element);
+                el.style.display = "block";
+              })
+              .catch(function(error) {
+                console.error("GraphViz Render Error:", error);
+                el.style.display = "block";
+              });
+          });
+        } else {
+          console.error("Viz.js library failed to load");
+          document.querySelectorAll(".graphviz").forEach(function(el) {
+            el.style.display = "block";
+          });
+        }
+      });
+    </script>
+    <style>
+      .graphviz { display: none; }
+      .graphviz svg { 
+        max-width: 100%; 
+        height: auto; 
+        display: block; 
+        margin: 0 auto; 
+      }
+      /* Ensure SVG elements inherit theme colors */
+      .graphviz svg text { fill: currentColor !important; font-family: inherit !important; }
+      .graphviz svg path { stroke: currentColor !important; }
+      .graphviz svg polygon { fill: currentColor !important; stroke: currentColor !important; }
+      .graphviz svg ellipse, .graphviz svg circle { fill: none !important; stroke: currentColor !important; }
+    </style>
+    """
+  end
+
+  defp before_closing_body_tag(_), do: ""
 end
