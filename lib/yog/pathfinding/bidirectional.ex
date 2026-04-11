@@ -240,7 +240,7 @@ defmodule Yog.Pathfinding.Bidirectional do
         do: {q_fwd, q_bwd, v_fwd, v_bwd, s_fwd, s_bwd, :fwd},
         else: {q_bwd, q_fwd, v_bwd, v_fwd, s_bwd, s_fwd, :bwd}
 
-    case expand_bfs_level(graph, q_active, v_active, v_other) do
+    case expand_bfs_level(graph, side, q_active, v_active, v_other) do
       {:found, new_path, other_path} ->
         full_path =
           if side == :fwd,
@@ -262,18 +262,22 @@ defmodule Yog.Pathfinding.Bidirectional do
   # Expands one BFS level, checking for intersection with the opposite visited set
   # as soon as each new node is discovered.
   # Returns {:found, path, other_path} | {:continue, new_queue, new_visited, added_count}
-  defp expand_bfs_level(graph, queue, visited, other_visited) do
-    out_edges = graph.out_edges
+  defp expand_bfs_level(graph, side, queue, visited, other_visited) do
+    edges_map =
+      case side do
+        :fwd -> graph.out_edges
+        :bwd -> graph.in_edges
+      end
 
     case :queue.out(queue) do
       {{:value, {node, path}}, rest_queue} ->
-        successors =
-          case Map.fetch(out_edges, node) do
+        neighbors =
+          case Map.fetch(edges_map, node) do
             {:ok, edges} -> Map.keys(edges)
             :error -> []
           end
 
-        expand_neighbors(successors, rest_queue, visited, other_visited, path, 0)
+        expand_neighbors(neighbors, rest_queue, visited, other_visited, path, 0)
 
       {:empty, _} ->
         {:continue, queue, visited, 0}
