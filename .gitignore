@@ -33,3 +33,4 @@ yog_ex-*.tar
 *.swp
 *.swo
 *~
+.dexter.db*
