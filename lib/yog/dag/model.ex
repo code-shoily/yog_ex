@@ -1,9 +1,24 @@
 defmodule Yog.DAG.Model do
   @moduledoc """
-  Core DAG type and basic operations.
+  Core Directed Acyclic Graph (DAG) type and basic operations.
 
-  This module provides the `Yog.DAG` struct that wraps a regular graph
-  and guarantees acyclicity at the type level.
+  This module provides the `Yog.DAG` struct that wraps a regular directed `Yog.Graph`
+  and guarantees acyclicity at the type level. Unlike a general graph, a DAG allows
+  for specialized algorithms like topological sorting and critical path analysis
+  to be total functions.
+
+  ## Design Goals
+
+  - **Safety**: Ensure acyclicity at creation and during all edge insertions.
+  - **Efficiency**: Use targeted path checks for O(V+E) validation on insertion.
+  - **Interoperability**: Easy conversion to and from regular `Yog.Graph` structures.
+
+  ## Example
+
+      iex> dag = Yog.DAG.Model.new(:directed)
+      iex> {:ok, dag} = Yog.DAG.Model.add_edge(dag, 1, 2, "depends")
+      iex> Yog.DAG.Model.add_edge(dag, 2, 1, "cycle")
+      {:error, :cycle_detected}
   """
 
   alias Yog.DAG
@@ -21,7 +36,13 @@ defmodule Yog.DAG.Model do
   @type error :: :cycle_detected
 
   @doc """
-  Creates a new, empty DAG.
+  Creates a new, empty DAG. Only `:directed` graphs are supported.
+
+  ## Example
+
+      iex> dag = Yog.DAG.Model.new(:directed)
+      iex> Yog.Graph.node_count(Yog.DAG.Model.to_graph(dag))
+      0
   """
   @spec new(Yog.Model.graph_type()) :: t()
   def new(:directed) do
@@ -38,9 +59,18 @@ defmodule Yog.DAG.Model do
   Validates that the graph contains no cycles. If validation passes, returns
   `{:ok, dag}`; otherwise returns `{:error, :cycle_detected}`.
 
-  ## Time Complexity
+  **Time Complexity:** O(V + E)
 
-  O(V + E)
+  ## Example
+
+      iex> graph = Yog.from_unweighted_edges(:directed, [{1, 2}, {2, 3}])
+      iex> {:ok, dag} = Yog.DAG.Model.from_graph(graph)
+      iex> Yog.DAG.Model.to_graph(dag) == graph
+      true
+
+      iex> graph = Yog.from_unweighted_edges(:directed, [{1, 2}, {2, 1}])
+      iex> Yog.DAG.Model.from_graph(graph)
+      {:error, :cycle_detected}
   """
   @spec from_graph(Yog.graph()) :: {:ok, t()} | {:error, :cycle_detected}
   def from_graph(%Yog.Graph{kind: :undirected}) do
@@ -60,6 +90,13 @@ defmodule Yog.DAG.Model do
 
   This is useful when you need to use operations that work on any graph type,
   or when you want to export the DAG to formats that accept general graphs.
+
+  ## Example
+
+      iex> dag = Yog.DAG.Model.new(:directed)
+      iex> graph = Yog.DAG.Model.to_graph(dag)
+      iex> Yog.graph?(graph)
+      true
   """
   @spec to_graph(t()) :: Yog.graph()
   def to_graph(%DAG{graph: graph}), do: graph
@@ -69,9 +106,13 @@ defmodule Yog.DAG.Model do
 
   Adding a node cannot create a cycle, so this operation is infallible.
 
-  ## Time Complexity
+  **Time Complexity:** O(1)
 
-  O(1)
+  ## Example
+
+      iex> dag = Yog.DAG.Model.new(:directed) |> Yog.DAG.Model.add_node(1, "A")
+      iex> Yog.DAG.Model.to_graph(dag) |> Yog.node(1)
+      "A"
   """
   @spec add_node(t(), Yog.node_id(), any()) :: t()
   def add_node(%DAG{graph: graph}, id, data) do
@@ -83,9 +124,15 @@ defmodule Yog.DAG.Model do
 
   Removing nodes/edges cannot create a cycle, so this operation is infallible.
 
-  ## Time Complexity
+  **Time Complexity:** O(deg(v)) - proportional to the number of edges
+  connected to the node.
 
-  O(V + E) in the worst case (removing all edges of the node).
+  ## Example
+
+      iex> dag = Yog.DAG.Model.new(:directed) |> Yog.DAG.Model.add_node(1, "A")
+      iex> dag = Yog.DAG.Model.remove_node(dag, 1)
+      iex> Yog.DAG.Model.to_graph(dag) |> Yog.has_node?(1)
+      false
   """
   @spec remove_node(t(), Yog.node_id()) :: t()
   def remove_node(%DAG{graph: graph}, id) do
@@ -97,9 +144,14 @@ defmodule Yog.DAG.Model do
 
   Removing edges cannot create a cycle, so this operation is infallible.
 
-  ## Time Complexity
+  **Time Complexity:** O(1)
 
-  O(1)
+  ## Example
+
+      iex> {:ok, dag} = Yog.DAG.Model.new(:directed) |> Yog.DAG.Model.add_edge(1, 2, 10)
+      iex> dag = Yog.DAG.Model.remove_edge(dag, 1, 2)
+      iex> Yog.DAG.Model.to_graph(dag) |> Yog.has_edge?(1, 2)
+      false
   """
   @spec remove_edge(t(), Yog.node_id(), Yog.node_id()) :: t()
   def remove_edge(%DAG{graph: graph}, from, to) do
@@ -110,11 +162,17 @@ defmodule Yog.DAG.Model do
   Adds an edge to the DAG.
 
   Because adding an edge can potentially create a cycle, this operation must
-  validate the resulting graph and returns a Result type.
+  validate the resulting graph. Returns `{:ok, dag}` if no cycle is created,
+  and `{:error, :cycle_detected}` otherwise.
 
-  ## Time Complexity
+  **Time Complexity:** O(V + E) (due to required cycle check on insertion).
 
-  O(V + E) (due to required cycle check on insertion).
+  ## Example
+
+      iex> dag = Yog.DAG.Model.new(:directed)
+      iex> {:ok, dag} = Yog.DAG.Model.add_edge(dag, 1, 2, 10)
+      iex> Yog.DAG.Model.add_edge(dag, 2, 1, 5)
+      {:error, :cycle_detected}
   """
   @spec add_edge(t(), Yog.node_id(), Yog.node_id(), any()) ::
           {:ok, t()} | {:error, :cycle_detected}

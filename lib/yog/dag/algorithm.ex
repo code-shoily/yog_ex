@@ -21,11 +21,9 @@ defmodule Yog.DAG.Algorithm do
   In a topological ordering, every node appears before all nodes it has edges to.
   This is useful for scheduling tasks with dependencies, build systems, etc.
 
-  ## Time Complexity
+  **Time Complexity:** O(V + E)
 
-  O(V + E)
-
-  ## Examples
+  ## Example
 
       iex> {:ok, dag} = Yog.DAG.Model.from_graph(
       ...>   Yog.directed()
@@ -65,16 +63,14 @@ defmodule Yog.DAG.Algorithm do
   - Dependency chains with durations
   - Determining minimum time to complete all tasks
 
-  ## Time Complexity
-
-  O(V + E) - linear via dynamic programming on the topologically sorted DAG.
+  **Time Complexity:** O(V + E) - linear via dynamic programming on the topologically sorted DAG.
 
   ## Note
 
   For unweighted graphs, this finds the path with most edges.
   Weights must be non-negative for meaningful results.
 
-  ## Examples
+  ## Example
 
       iex> {:ok, dag} = Yog.DAG.Model.from_graph(
       ...>   Yog.directed()
@@ -141,11 +137,9 @@ defmodule Yog.DAG.Algorithm do
 
   Uses dynamic programming on the topologically sorted DAG.
 
-  ## Time Complexity
+  **Time Complexity:** O(V + E)
 
-  O(V + E)
-
-  ## Examples
+  ## Example
 
       iex> {:ok, dag} = Yog.DAG.Model.from_graph(
       ...>   Yog.directed()
@@ -224,11 +218,9 @@ defmodule Yog.DAG.Algorithm do
   - Identifying shared dependencies
   - Computing dominators in control flow graphs
 
-  ## Time Complexity
+  **Time Complexity:** O(V × (V + E))
 
-  O(V × (V + E))
-
-  ## Examples
+  ## Example
 
       iex> {:ok, dag} = Yog.DAG.Model.from_graph(
       ...>   Yog.directed()
