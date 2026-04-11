@@ -477,14 +477,27 @@ defmodule Yog.Centrality do
 
     %Yog.Graph{kind: kind, out_edges: out_edges, in_edges: in_edges} = graph
 
-    in_neighbors_map =
-      List.foldl(nodes, %{}, fn id, acc ->
-        Map.put(acc, id, get_in_neighbor_ids_fast(kind, out_edges, in_edges, id))
-      end)
-
     out_degrees_map =
       List.foldl(nodes, %{}, fn id, acc ->
         Map.put(acc, id, get_out_degree_fast(kind, out_edges, id))
+      end)
+
+    in_neighbors_map =
+      List.foldl(nodes, %{}, fn id, acc ->
+        in_nodes = get_in_neighbor_ids_fast(kind, out_edges, in_edges, id)
+
+        factored =
+          Enum.map(in_nodes, fn neighbor ->
+            out_deg = Map.get(out_degrees_map, neighbor, 0)
+
+            if out_deg > 0 do
+              {neighbor, 1.0 / out_deg}
+            else
+              {neighbor, 0.0}
+            end
+          end)
+
+        Map.put(acc, id, factored)
       end)
 
     sinks =
@@ -704,7 +717,18 @@ defmodule Yog.Centrality do
       |> Keyword.get(:initial, 1.0)
       |> normalize_initial_scores(nodes)
 
-    iterate_alpha(graph, nodes, initial_scores, initial_scores, alpha, max_iter, tol)
+    in_map =
+      List.foldl(nodes, %{}, fn id, acc ->
+        predecessors =
+          case Map.fetch(graph.in_edges, id) do
+            {:ok, edges} -> Map.keys(edges)
+            :error -> []
+          end
+
+        Map.put(acc, id, predecessors)
+      end)
+
+    iterate_alpha(nodes, initial_scores, initial_scores, alpha, max_iter, tol, in_map)
   end
 
   @doc """
@@ -786,12 +810,9 @@ defmodule Yog.Centrality do
         in_neighbors = Map.get(in_map, node, [])
 
         rank_sum =
-          List.foldl(in_neighbors, 0.0, fn neighbor, sum ->
-            neighbor_rank = Map.get(ranks, neighbor, 0.0)
-            out_degree = Map.get(out_map, neighbor, 0)
-
-            if out_degree > 0 do
-              sum + neighbor_rank / out_degree
+          List.foldl(in_neighbors, 0.0, fn {neighbor, split_factor}, sum ->
+            if split_factor > 0.0 do
+              sum + Map.get(ranks, neighbor, 0.0) * split_factor
             else
               sum
             end
@@ -891,18 +912,12 @@ defmodule Yog.Centrality do
   end
 
   # Alpha centrality iteration
-  defp iterate_alpha(_graph, _nodes, scores, _initial, _alpha, 0, _tol), do: scores
+  defp iterate_alpha(_nodes, scores, _initial, _alpha, 0, _tol, _in_map), do: scores
 
-  defp iterate_alpha(graph, nodes, scores, initial_scores, alpha, iterations, tol) do
-    in_edges = graph.in_edges
-
+  defp iterate_alpha(nodes, scores, initial_scores, alpha, iterations, tol, in_map) do
     new_scores =
       List.foldl(nodes, %{}, fn node, acc ->
-        predecessors =
-          case Map.fetch(in_edges, node) do
-            {:ok, edges} -> Map.keys(edges)
-            :error -> []
-          end
+        predecessors = Map.get(in_map, node, [])
 
         neighbor_influence =
           List.foldl(predecessors, 0.0, fn pred, sum ->
@@ -916,7 +931,7 @@ defmodule Yog.Centrality do
     if converged?(scores, new_scores, nodes, tol) do
       new_scores
     else
-      iterate_alpha(graph, nodes, new_scores, initial_scores, alpha, iterations - 1, tol)
+      iterate_alpha(nodes, new_scores, initial_scores, alpha, iterations - 1, tol, in_map)
     end
   end
 

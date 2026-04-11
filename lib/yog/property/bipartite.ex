@@ -422,13 +422,9 @@ defmodule Yog.Property.Bipartite do
       end)
 
     free_left = Map.keys(left_prefs)
-
     matches = %{}
 
-    # Track the index of the next person to propose to in the preference list
-    next_proposal_idx = Map.new(left_prefs, fn {id, _} -> {id, 0} end)
-
-    do_stable_marriage(free_left, left_prefs, right_prefs_indexed, matches, next_proposal_idx)
+    do_stable_marriage(free_left, left_prefs, right_prefs_indexed, matches)
   end
 
   def stable_marriage(opts) when is_list(opts) do
@@ -437,31 +433,25 @@ defmodule Yog.Property.Bipartite do
     stable_marriage(left, right)
   end
 
-  defp do_stable_marriage([], _, _, matches, _), do: make_bidirectional(matches)
+  defp do_stable_marriage([], _, _, matches), do: make_bidirectional(matches)
 
   defp do_stable_marriage(
          [left | rest],
          left_prefs,
          right_prefs_indexed,
-         matches,
-         next_proposal_idx
+         matches
        ) do
-    prefs = Map.get(left_prefs, left, [])
-    idx = Map.get(next_proposal_idx, left, 0)
+    case Map.get(left_prefs, left, []) do
+      [] ->
+        do_stable_marriage(rest, left_prefs, right_prefs_indexed, matches)
 
-    # Get the next person to propose to (O(1) access by index)
-    case Enum.at(prefs, idx) do
-      nil ->
-        # No more preferences left
-        do_stable_marriage(rest, left_prefs, right_prefs_indexed, matches, next_proposal_idx)
-
-      preferred ->
-        new_idx_map = Map.put(next_proposal_idx, left, idx + 1)
+      [preferred | remaining_prefs] ->
+        new_left_prefs = Map.put(left_prefs, left, remaining_prefs)
 
         case Map.get(matches, preferred) do
           nil ->
             new_matches = Map.put(matches, preferred, left)
-            do_stable_marriage(rest, left_prefs, right_prefs_indexed, new_matches, new_idx_map)
+            do_stable_marriage(rest, new_left_prefs, right_prefs_indexed, new_matches)
 
           current_left ->
             right_pref_index = Map.get(right_prefs_indexed, preferred, %{})
@@ -471,18 +461,16 @@ defmodule Yog.Property.Bipartite do
 
               do_stable_marriage(
                 [current_left | rest],
-                left_prefs,
+                new_left_prefs,
                 right_prefs_indexed,
-                new_matches,
-                new_idx_map
+                new_matches
               )
             else
               do_stable_marriage(
                 [left | rest],
-                left_prefs,
+                new_left_prefs,
                 right_prefs_indexed,
-                matches,
-                new_idx_map
+                matches
               )
             end
         end

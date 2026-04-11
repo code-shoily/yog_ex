@@ -687,7 +687,8 @@ defmodule Yog.Community.Leiden do
       end)
 
     List.foldl(Map.to_list(edge_weights), new_graph, fn {{u, v}, weight}, g ->
-      {:ok, new_g} = Yog.add_edge(g, u, v, weight)
+      weight_to_add = if kind == :undirected and u != v, do: weight / 2.0, else: weight
+      {:ok, new_g} = Yog.add_edge(g, u, v, weight_to_add)
       new_g
     end)
   end

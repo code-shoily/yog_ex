@@ -10,6 +10,7 @@ defmodule Yog.Community.Metrics do
 
   alias Yog.Community.Result
 
+  @spec modularity(Yog.Graph.t(), any(), any()) :: any()
   @doc """
   Calculates modularity for a given community partition.
 
@@ -36,14 +37,21 @@ defmodule Yog.Community.Metrics do
     modularity(graph, %{assignments: assignments}, opts)
   end
 
-  def modularity(%Yog.Graph{out_edges: out_edges} = graph, communities, opts) do
-    edge_count = Yog.Graph.edge_count(graph)
+  def modularity(
+        %Yog.Graph{out_edges: out_edges, in_edges: in_edges, kind: kind} = _graph,
+        communities,
+        opts
+      ) do
+    total_weight =
+      List.foldl(Map.keys(out_edges), 0.0, fn node, acc ->
+        edges = Map.get(out_edges, node, %{})
+        acc + List.foldl(Map.to_list(edges), 0.0, fn {_, w}, sum -> sum + w end)
+      end)
 
-    if edge_count == 0 do
+    if total_weight == 0.0 do
       0.0
     else
-      m = edge_count / 1.0
-      m2 = 2 * m
+      m = if kind == :undirected, do: total_weight / 2.0, else: total_weight
       gamma = Keyword.get(opts, :resolution, 1.0)
 
       community_nodes = group_nodes_by_community(communities.assignments)
@@ -51,23 +59,45 @@ defmodule Yog.Community.Metrics do
       List.foldl(Map.to_list(community_nodes), 0.0, fn {_, nodes_in_comm}, acc ->
         node_set = MapSet.new(nodes_in_comm)
 
-        {internal_edges, degree_sum} =
-          List.foldl(nodes_in_comm, {0, 0}, fn node, {int_acc, deg_acc} ->
+        internal_edges =
+          List.foldl(nodes_in_comm, 0.0, fn node, int_acc ->
             successors = get_successors(out_edges, node)
 
-            degree = List.foldl(successors, 0, fn {_, w}, sum -> sum + w end)
-
             internal =
-              List.foldl(successors, 0, fn {neighbor, weight}, sum ->
+              List.foldl(successors, 0.0, fn {neighbor, weight}, sum ->
                 if MapSet.member?(node_set, neighbor), do: sum + weight, else: sum
               end)
 
-            {int_acc + internal, deg_acc + degree}
+            int_acc + internal
           end)
 
-        internal_edges = internal_edges / 2.0
-        term1 = internal_edges / m
-        term2 = gamma * :math.pow(degree_sum / m2, 2)
+        term1 = if kind == :undirected, do: internal_edges / 2.0 / m, else: internal_edges / m
+
+        term2 =
+          if kind == :undirected do
+            degree_sum =
+              List.foldl(nodes_in_comm, 0.0, fn node, sum ->
+                edges = Map.get(out_edges, node, %{})
+                sum + List.foldl(Map.to_list(edges), 0.0, fn {_, w}, s -> s + w end)
+              end)
+
+            gamma * :math.pow(degree_sum / (2.0 * m), 2)
+          else
+            in_degree_sum =
+              List.foldl(nodes_in_comm, 0.0, fn node, sum ->
+                edges = Map.get(in_edges, node, %{})
+                sum + List.foldl(Map.to_list(edges), 0.0, fn {_, w}, s -> s + w end)
+              end)
+
+            out_degree_sum =
+              List.foldl(nodes_in_comm, 0.0, fn node, sum ->
+                edges = Map.get(out_edges, node, %{})
+                sum + List.foldl(Map.to_list(edges), 0.0, fn {_, w}, s -> s + w end)
+              end)
+
+            gamma * (in_degree_sum * out_degree_sum / (m * m))
+          end
+
         acc + (term1 - term2)
       end)
     end
@@ -103,8 +133,8 @@ defmodule Yog.Community.Metrics do
         v_neighbors = Map.get(neighbor_sets, v)
 
         common =
-          v_neighbors
-          |> Enum.count(fn w -> w > v and MapSet.member?(u_neighbors, w) end)
+          MapSet.intersection(u_neighbors, v_neighbors)
+          |> Enum.count(&(&1 > v))
 
         inner_acc + common
       end)

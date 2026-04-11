@@ -14,6 +14,7 @@ defmodule Yog.MST.Wilson do
   - **Space Complexity**: O(V) to store the tree and the current walk.
   """
 
+  alias Yog.Connectivity.Components
   alias Yog.MST.Result
 
   @doc """
@@ -41,18 +42,27 @@ defmodule Yog.MST.Wilson do
   def compute(graph, opts \\ []) do
     node_ids = Map.keys(graph.nodes)
 
-    case node_ids do
-      [] ->
-        {:ok, Result.new([], :wilson, 0)}
+    if node_ids == [] do
+      {:ok, Result.new([], :wilson, 0)}
+    else
+      # Since loop-erased random walks will infinitely loop if the walker is in
+      # a disconnected component from the initial tree root, we must process
+      # isolated components natively into a Spanning Forest.
+      components = Components.connected_components(graph)
 
-      [first_node | _] ->
-        root = opts[:root] || first_node
-        # Start tree with root
-        tree = MapSet.new([root])
-        unvisited = MapSet.new(node_ids) |> MapSet.delete(root)
+      edges =
+        Enum.flat_map(components, fn comp ->
+          # Safely define the root per-component
+          target_root = opts[:root]
+          root = Enum.find(comp, fn n -> n == target_root end) || hd(comp)
 
-        edges = do_wilson(graph, unvisited, tree, [])
-        {:ok, Result.new(edges, :wilson, map_size(graph.nodes))}
+          tree = MapSet.new([root])
+          unvisited = MapSet.new(comp) |> MapSet.delete(root)
+
+          do_wilson(graph, unvisited, tree, [])
+        end)
+
+      {:ok, Result.new(edges, :wilson, map_size(graph.nodes))}
     end
   end
 

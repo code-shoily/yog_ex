@@ -362,33 +362,37 @@ defmodule Yog.Health do
         Map.put(acc, node, deg)
       end)
 
-    edges_data =
-      List.foldl(nodes, [], fn u, acc ->
+    {m_int, sum_jk, sum_j_plus_k, sum_j2_plus_k2} =
+      List.foldl(nodes, {0, 0.0, 0.0, 0.0}, fn u, acc ->
         successors =
           case Map.fetch(out_edges, u) do
             {:ok, inner} -> Map.to_list(inner)
             :error -> []
           end
 
-        List.foldl(successors, acc, fn {v, _weight}, inner_acc ->
-          [{Map.get(degrees, u, 0), Map.get(degrees, v, 0)} | inner_acc]
-        end)
+        j = Map.get(degrees, u, 0)
+
+        List.foldl(
+          successors,
+          acc,
+          fn {v, _weight}, {acc_m, acc_sjk, acc_sjk_add, acc_sjk2_add} ->
+            k = Map.get(degrees, v, 0)
+
+            {
+              acc_m + 1,
+              acc_sjk + j * k,
+              acc_sjk_add + (j + k),
+              acc_sjk2_add + (j * j + k * k)
+            }
+          end
+        )
       end)
 
-    m = length(edges_data) * 1.0
+    m = m_int * 1.0
 
     if m == 0.0 do
       0.0
     else
-      {sum_jk, sum_j_plus_k, sum_j2_plus_k2} =
-        List.foldl(edges_data, {0.0, 0.0, 0.0}, fn {j, k}, {sjk, sjk_add, sjk2_add} ->
-          {
-            sjk + j * k,
-            sjk_add + (j + k),
-            sjk2_add + (j * j + k * k)
-          }
-        end)
-
       # Simplified Newman formula for symmetric edge lists
       term1 = sum_j_plus_k / 2.0
       numerator = sum_jk / m - :math.pow(term1 / m, 2)

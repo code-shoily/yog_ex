@@ -636,6 +636,7 @@ defmodule Yog.Pathfinding.Bidirectional do
           dist_other,
           p_fwd,
           p_bwd,
+          add,
           compare,
           best_path,
           best_weight
@@ -682,13 +683,14 @@ defmodule Yog.Pathfinding.Bidirectional do
          dist_other,
          pred_fwd,
          pred_bwd,
+         add,
          compare,
          best_path,
          best_weight
        ) do
     case Map.fetch(dist_other, node) do
       {:ok, d_other} ->
-        total_dist = dist_side + d_other
+        total_dist = add.(dist_side, d_other)
 
         if is_nil(best_weight) or compare.(total_dist, best_weight) == :lt do
           path = reconstruct_bidirectional_path(node, pred_fwd, pred_bwd)

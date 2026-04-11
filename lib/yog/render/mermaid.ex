@@ -310,18 +310,24 @@ defmodule Yog.Render.Mermaid do
   end
 
   defp build_edge_lines(edges, options, kind) do
-    edges
-    |> Enum.flat_map(fn {from_id, targets} ->
-      targets
-      |> Enum.filter(fn {to_id, _weight} ->
-        # For undirected graphs, only render each edge once (when from_id <= to_id)
-        # This prevents showing the same edge twice (once from each direction)
-        case kind do
-          :undirected -> from_id <= to_id
-          _ -> true
-        end
+    flat_edges =
+      edges
+      |> Enum.flat_map(fn {from_id, targets} ->
+        targets
+        |> Enum.filter(fn {to_id, _weight} ->
+          # For undirected graphs, only render each edge once (when from_id <= to_id)
+          case kind do
+            :undirected -> from_id <= to_id
+            _ -> true
+          end
+        end)
+        |> Enum.map(fn {to_id, weight} -> {from_id, to_id, weight} end)
       end)
-      |> Enum.map(fn {to_id, weight} ->
+
+    {edge_declarations, link_styles} =
+      flat_edges
+      |> Enum.with_index()
+      |> Enum.reduce({[], []}, fn {{from_id, to_id, weight}, idx}, {defs_acc, styles_acc} ->
         # Choose arrow style based on graph type
         arrow =
           case kind do
@@ -329,22 +335,39 @@ defmodule Yog.Render.Mermaid do
             :undirected -> "---"
           end
 
+        edge_def = "  #{from_id} #{arrow}|#{options.edge_label.(weight)}| #{to_id}"
+
         # Check if this edge should be highlighted
         is_highlighted =
           options.highlighted_edges &&
             ({from_id, to_id} in options.highlighted_edges ||
                {to_id, from_id} in options.highlighted_edges)
 
-        edge_def = "  #{from_id} #{arrow}|#{options.edge_label.(weight)}| #{to_id}"
-
         if is_highlighted do
-          edge_def <> ":::highlightEdge"
+          style_str =
+            "  linkStyle #{idx} stroke:#{options.highlight_link_stroke},stroke-width:#{css_length_to_string(options.highlight_link_stroke_width)}"
+
+          {[edge_def | defs_acc], [style_str | styles_acc]}
         else
-          edge_def
+          {[edge_def | defs_acc], styles_acc}
         end
       end)
-    end)
-    |> Enum.join("\n")
+
+    edges_str =
+      edge_declarations
+      |> Enum.reverse()
+      |> Enum.join("\n")
+
+    styles_str =
+      link_styles
+      |> Enum.reverse()
+      |> Enum.join("\n")
+
+    if String.trim(styles_str) == "" do
+      edges_str
+    else
+      edges_str <> "\n" <> styles_str
+    end
   end
 
   # Helper to convert a list of nodes to a list of edges

@@ -54,7 +54,7 @@ defmodule Yog.Pathfinding.AStar do
     * `:zero` - Identity value for the weight type
     * `:add` - Function to add two weights
     * `:compare` - Function to compare weights (`:lt`, `:eq`, `:gt`)
-    * `:heuristic` - Function estimating cost to goal: `fn(node) -> cost`
+    * `:heuristic` - Function estimating cost to goal: `fn(node, goal) -> cost`
 
   ## Examples
 

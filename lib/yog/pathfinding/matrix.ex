@@ -166,12 +166,10 @@ defmodule Yog.Pathfinding.Matrix do
         poi_count <= div(node_count, 3) ->
           run_dijkstra_multi(graph, points_of_interest, poi_set, zero, add, compare)
 
-        # Many POIs but sparse graph: Johnson's is better than Floyd-Warshall
-        # Johnson's: O(V² log V + VE) vs Floyd-Warshall: O(V³)
+        # Many POIs but sparse graph: running Dijkstra from each POI is correct
+        # and avoids needing a subtraction function for Johnson's reweighting.
         edge_count < div(node_count * node_count, 4) ->
-          # For non-negative weights, we can use a dummy subtract (not used in reweighting)
-          # or run Johnson's with standard subtraction
-          run_johnson_nonneg(graph, points_of_interest, poi_set, zero, add, compare)
+          run_dijkstra_multi(graph, points_of_interest, poi_set, zero, add, compare)
 
         # Dense graph with many POIs: Floyd-Warshall
         true ->
@@ -193,11 +191,6 @@ defmodule Yog.Pathfinding.Matrix do
       {:error, :negative_cycle} ->
         {:error, :negative_cycle}
     end
-  end
-
-  # Run Johnson's for non-negative weights (uses standard subtraction for reweighting)
-  defp run_johnson_nonneg(graph, points_of_interest, poi_set, zero, add, compare) do
-    run_johnson(graph, points_of_interest, poi_set, zero, add, &Kernel.-/2, compare)
   end
 
   # Run Floyd-Warshall algorithm and filter to POIs

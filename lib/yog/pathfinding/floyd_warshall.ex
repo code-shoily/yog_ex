@@ -121,7 +121,7 @@ defmodule Yog.Pathfinding.FloydWarshall do
   def floyd_warshall(graph, zero \\ 0, add \\ &Kernel.+/2, compare \\ &Yog.Utils.compare/2) do
     nodes = Map.keys(graph.nodes)
 
-    initial_dist = initialize_distances(nodes, graph, zero)
+    initial_dist = initialize_distances(nodes, graph, zero, compare)
 
     final_dist =
       List.foldl(nodes, initial_dist, fn k, acc_dist ->
@@ -132,7 +132,7 @@ defmodule Yog.Pathfinding.FloydWarshall do
         end)
       end)
 
-    if has_negative_cycle?(nodes, final_dist, compare) do
+    if has_negative_cycle?(nodes, final_dist, compare, zero) do
       {:error, :negative_cycle}
     else
       {:ok, final_dist}
@@ -158,7 +158,7 @@ defmodule Yog.Pathfinding.FloydWarshall do
         compare \\ &Yog.Utils.compare/2
       ) do
     nodes = Map.keys(graph.nodes)
-    initial_dist = initialize_distances(nodes, graph, zero)
+    initial_dist = initialize_distances(nodes, graph, zero, compare)
 
     result =
       Enum.reduce_while(nodes, initial_dist, fn k, acc_dist ->
@@ -192,7 +192,7 @@ defmodule Yog.Pathfinding.FloydWarshall do
   # ============================================================
 
   # Initialize distance matrix with direct edge weights
-  defp initialize_distances(nodes, graph, zero) do
+  defp initialize_distances(nodes, graph, zero, compare) do
     out_edges = graph.out_edges
 
     initial =
@@ -210,7 +210,7 @@ defmodule Yog.Pathfinding.FloydWarshall do
       List.foldl(successors, acc, fn {j, weight}, acc_inner ->
         case Map.fetch(acc_inner, {i, j}) do
           {:ok, existing} ->
-            if compare_weights(weight, existing, &Yog.Utils.compare/2) == :lt do
+            if compare_weights(weight, existing, compare) == :lt do
               Map.put(acc_inner, {i, j}, weight)
             else
               acc_inner
@@ -246,10 +246,10 @@ defmodule Yog.Pathfinding.FloydWarshall do
   end
 
   # Check if any node has negative distance to itself
-  defp has_negative_cycle?(nodes, dist, compare) do
+  defp has_negative_cycle?(nodes, dist, compare, zero) do
     Enum.any?(nodes, fn i ->
       case Map.fetch(dist, {i, i}) do
-        {:ok, d} -> compare_weights(d, 0, compare) == :lt
+        {:ok, d} -> compare_weights(d, zero, compare) == :lt
         :error -> false
       end
     end)
