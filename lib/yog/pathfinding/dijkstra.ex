@@ -30,21 +30,41 @@ defmodule Yog.Pathfinding.Dijkstra do
 
   ## Examples
 
-      # Find shortest path between two nodes
+  <div class="graphviz">
+  digraph G {
+    rankdir=LR;
+    bgcolor="transparent";
+    node [shape=circle, fontname="inherit"];
+    edge [fontname="inherit", fontsize=10];
+    A [label="A"]; B [label="B"]; C [label="C"];
+    D [label="D"]; E [label="E"]; F [label="F"];
+    A -> B [label="4"];
+    A -> C [label="2", color="#ff5555", penwidth=2.5];
+    B -> D [label="5", color="#ff5555", penwidth=2.5];
+    C -> B [label="1", color="#ff5555", penwidth=2.5];
+    C -> D [label="8"];
+    C -> E [label="10"];
+    D -> E [label="2", color="#ff5555", penwidth=2.5];
+    D -> F [label="6"];
+    E -> F [label="2", color="#ff5555", penwidth=2.5];
+  }
+  </div>
+
+      # Complex graph with multiple paths
       graph = Yog.directed()
-      |> Yog.add_node(:a, nil)
-      |> Yog.add_node(:b, nil)
-      |> Yog.add_node(:c, nil)
-      |> Yog.add_edge_ensure(:a, :b, 4)
-      |> Yog.add_edge_ensure(:b, :c, 1)
+      |> Yog.add_edges([
+        {:a, :b, 4}, {:a, :c, 2}, {:b, :d, 5},
+        {:c, :b, 1}, {:c, :d, 8}, {:c, :e, 10},
+        {:d, :e, 2}, {:d, :f, 6}, {:e, :f, 2}
+      ])
 
       compare = &Yog.Utils.compare/2
-      Dijkstra.shortest_path(graph, :a, :c, 0, &(&1 + &2), compare)
-      #=> {:ok, {:path, [:a, :b, :c], 5}}
+      Dijkstra.shortest_path(graph, :a, :f, 0, &(&1 + &2), compare)
+      #=> {:ok, %Yog.Pathfinding.Path{nodes: [:a, :c, :b, :d, :e, :f], weight: 12}}
 
       # Find all distances from a source
       Dijkstra.single_source_distances(graph, :a, 0, &(&1 + &2), compare)
-      #=> %{:a => 0, :b => 4, :c => 5}
+      #=> %{a: 0, c: 2, b: 3, d: 8, e: 10, f: 12}
   """
 
   alias Yog.PairingHeap, as: PQ

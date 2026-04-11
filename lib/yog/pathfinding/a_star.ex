@@ -28,9 +28,41 @@ defmodule Yog.Pathfinding.AStar do
 
   ## Examples
 
-      # Grid pathfinding with Manhattan distance heuristic
-      heuristic = fn {x1, y1}, {x2, y2} -> abs(x1-x2) + abs(y1-y2) end
-      Yog.Pathfinding.AStar.a_star(graph, start, goal, 0, &(&1+&2), &Integer.compare/2, heuristic)
+  <div class="graphviz">
+  digraph G {
+    rankdir=LR;
+    bgcolor="transparent";
+    node [shape=record, fontname="inherit"];
+    edge [fontname="inherit", fontsize=10];
+    A [label="{A|h=6}"]; B [label="{B|h=4}"]; C [label="{C|h=6}"];
+    D [label="{D|h=4}"]; E [label="{E|h=2}"]; F [label="{F|h=4}"];
+    G [label="{G|h=0}"];
+    A -> B [label="2", color="#ff5555", penwidth=2.5];
+    A -> C [label="2"];
+    B -> D [label="2", color="#ff5555", penwidth=2.5];
+    C -> D [label="3"];
+    B -> E [label="5"];
+    D -> E [label="2", color="#ff5555", penwidth=2.5];
+    D -> F [label="2"];
+    E -> G [label="2", color="#ff5555", penwidth=2.5];
+    F -> G [label="4"];
+  }
+  </div>
+
+      # Heuristic search on a weighted graph
+      graph = Yog.directed()
+      |> Yog.add_edges([
+        {:a, :b, 2}, {:a, :c, 2}, {:b, :d, 2},
+        {:c, :d, 3}, {:b, :e, 5}, {:d, :e, 2},
+        {:d, :f, 2}, {:e, :g, 2}, {:f, :g, 4}
+      ])
+
+      # Heuristic values (h) to goal node :g
+      h = %{a: 6, b: 4, c: 6, d: 4, e: 2, f: 4, g: 0}
+      heuristic = fn n, _goal -> Map.get(h, n) end
+
+      Yog.Pathfinding.AStar.a_star(graph, :a, :g, heuristic)
+      #=> {:ok, %Yog.Pathfinding.Path{nodes: [:a, :b, :d, :e, :g], weight: 8}}
   """
 
   alias Yog.PairingHeap, as: PQ

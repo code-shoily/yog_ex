@@ -27,15 +27,37 @@ defmodule Yog.Pathfinding.BellmanFord do
 
   ## Examples
 
-      # Graph with negative weights but no negative cycles
-      graph = Yog.new()
-      |> Yog.add_edge(:a, :b, 4)
-      |> Yog.add_edge(:b, :c, -3)
-      |> Yog.add_edge(:a, :c, 2)
+  <div class="graphviz">
+  digraph G {
+    rankdir=LR;
+    bgcolor="transparent";
+    node [shape=circle, fontname="inherit"];
+    edge [fontname="inherit", fontsize=10];
+    A [label="A"]; B [label="B"]; C [label="C"];
+    D [label="D"]; E [label="E"];
+    A -> B [label="5", color="#ff5555", penwidth=2.5];
+    A -> C [label="2"];
+    B -> D [label="4"];
+    B -> C [label="-4", color="#ff5555", penwidth=2.5];
+    C -> D [label="2", color="#ff5555", penwidth=2.5];
+    C -> E [label="10"];
+    D -> B [label="1"];
+    D -> E [label="-3", color="#ff5555", penwidth=2.5];
+    B -> E [label="7"];
+  }
+  </div>
+
+      # Graph with negative weights
+      graph = Yog.directed()
+      |> Yog.add_edges([
+        {:a, :b, 5}, {:a, :c, 2}, {:b, :d, 4},
+        {:c, :b, -4}, {:c, :d, 2}, {:c, :e, 10},
+        {:d, :b, 1}, {:d, :e, -3}, {:b, :e, 7}
+      ])
 
       compare = &Yog.Utils.compare/2
-      BellmanFord.bellman_ford(graph, :a, :c, 0, &(&1+&2), compare)
-      #=> {:shortest_path, {:path, [:a, :b, :c], 1}}
+      BellmanFord.shortest_path(graph, :a, :e, 0, &(&1 + &2), compare)
+      #=> {:ok, %Yog.Pathfinding.Path{nodes: [:a, :b, :c, :d, :e], weight: 0}}
   """
 
   alias Yog.Pathfinding.Path
