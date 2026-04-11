@@ -203,107 +203,130 @@ defmodule Yog.Pathfinding.Bidirectional do
   # ============================================================
 
   # Bidirectional BFS implementation
-  # Uses :queue for efficient O(1) queue operations and tracks sizes to avoid O(n) length checks
+  # Uses level-by-level expansion and tracks the best meeting point to guarantee
+  # the shortest path is found, not just the first meeting point.
   defp do_bidirectional_bfs(graph, from, to) do
-    queue_fwd = :queue.in({from, [from]}, :queue.new())
-    queue_bwd = :queue.in({to, [to]}, :queue.new())
+    fwd_frontier = [{from, [from]}]
+    bwd_frontier = [{to, [to]}]
     visited_fwd = %{from => [from]}
     visited_bwd = %{to => [to]}
 
-    do_bfs_step(graph, queue_fwd, queue_bwd, visited_fwd, visited_bwd, 1, 1)
+    do_bfs_level(graph, fwd_frontier, bwd_frontier, visited_fwd, visited_bwd, 0, 0, nil)
   end
 
-  defp do_bfs_step(graph, queue_fwd, queue_bwd, visited_fwd, visited_bwd, size_fwd, size_bwd) do
-    case {:queue.peek(queue_fwd), :queue.peek(queue_bwd)} do
-      {:empty, _} ->
-        :error
+  defp do_bfs_level(_graph, [], _, _, _, _, _, nil), do: :error
+  defp do_bfs_level(_graph, _, [], _, _, _, _, nil), do: :error
 
-      {_, :empty} ->
-        :error
+  defp do_bfs_level(_graph, [], _, _, _, _, _, {best_len, best_path}),
+    do: {:ok, Path.new(best_path, best_len, :bidirectional_bfs)}
 
-      _ ->
-        do_bfs_step_expand(
+  defp do_bfs_level(_graph, _, [], _, _, _, _, {best_len, best_path}),
+    do: {:ok, Path.new(best_path, best_len, :bidirectional_bfs)}
+
+  defp do_bfs_level(graph, fwd_frontier, bwd_frontier, v_fwd, v_bwd, depth_fwd, depth_bwd, best) do
+    best_len = if best, do: elem(best, 0), else: nil
+
+    # Stop when both sides have expanded enough that no shorter path can exist
+    if best_len != nil and depth_fwd + depth_bwd >= best_len do
+      {best_len, best_path} = best
+      {:ok, Path.new(best_path, best_len, :bidirectional_bfs)}
+    else
+      if length(fwd_frontier) <= length(bwd_frontier) do
+        {new_frontier, new_v, new_best} =
+          expand_frontier(graph, :fwd, fwd_frontier, v_fwd, v_bwd, best)
+
+        do_bfs_level(
           graph,
-          queue_fwd,
-          queue_bwd,
-          visited_fwd,
-          visited_bwd,
-          size_fwd,
-          size_bwd
+          new_frontier,
+          bwd_frontier,
+          new_v,
+          v_bwd,
+          depth_fwd + 1,
+          depth_bwd,
+          new_best
         )
+      else
+        {new_frontier, new_v, new_best} =
+          expand_frontier(graph, :bwd, bwd_frontier, v_bwd, v_fwd, best)
+
+        do_bfs_level(
+          graph,
+          fwd_frontier,
+          new_frontier,
+          v_fwd,
+          new_v,
+          depth_fwd,
+          depth_bwd + 1,
+          new_best
+        )
+      end
     end
   end
 
-  defp do_bfs_step_expand(graph, q_fwd, q_bwd, v_fwd, v_bwd, s_fwd, s_bwd) do
-    {q_active, q_other, v_active, v_other, s_active, s_other, side} =
-      if s_fwd <= s_bwd,
-        do: {q_fwd, q_bwd, v_fwd, v_bwd, s_fwd, s_bwd, :fwd},
-        else: {q_bwd, q_fwd, v_bwd, v_fwd, s_bwd, s_fwd, :bwd}
-
-    case expand_bfs_level(graph, side, q_active, v_active, v_other) do
-      {:found, new_path, other_path} ->
-        full_path =
-          if side == :fwd,
-            do: Enum.reverse(new_path) ++ tl(other_path),
-            else: Enum.reverse(other_path) ++ tl(new_path)
-
-        weight = length(new_path) + length(other_path) - 2
-        {:ok, Path.new(full_path, weight, :bidirectional_bfs)}
-
-      {:continue, new_q, new_v, added} ->
-        if side == :fwd do
-          do_bfs_step(graph, new_q, q_other, new_v, v_other, s_active - 1 + added, s_other)
-        else
-          do_bfs_step(graph, q_other, new_q, v_other, new_v, s_other, s_active - 1 + added)
-        end
-    end
-  end
-
-  # Expands one BFS level, checking for intersection with the opposite visited set
-  # as soon as each new node is discovered.
-  # Returns {:found, path, other_path} | {:continue, new_queue, new_visited, added_count}
-  defp expand_bfs_level(graph, side, queue, visited, other_visited) do
+  defp expand_frontier(graph, side, frontier, visited, other_visited, best) do
     edges_map =
       case side do
         :fwd -> graph.out_edges
         :bwd -> graph.in_edges
       end
 
-    case :queue.out(queue) do
-      {{:value, {node, path}}, rest_queue} ->
-        neighbors =
-          case Map.fetch(edges_map, node) do
-            {:ok, edges} -> Map.keys(edges)
-            :error -> []
-          end
-
-        expand_neighbors(neighbors, rest_queue, visited, other_visited, path, 0)
-
-      {:empty, _} ->
-        {:continue, queue, visited, 0}
-    end
+    expand_frontier_nodes(frontier, edges_map, side, visited, other_visited, [], best)
   end
 
-  defp expand_neighbors([], queue, visited, _other_visited, _path, added_count) do
-    {:continue, queue, visited, added_count}
+  defp expand_frontier_nodes([], _edges_map, _side, visited, _other_visited, acc, best) do
+    {acc, visited, best}
   end
 
-  defp expand_neighbors([neighbor | rest], queue, visited, other_visited, path, added_count) do
-    if Map.has_key?(visited, neighbor) do
-      expand_neighbors(rest, queue, visited, other_visited, path, added_count)
-    else
-      new_path = [neighbor | path]
-      new_visited = Map.put(visited, neighbor, new_path)
-
-      case Map.fetch(other_visited, neighbor) do
-        {:ok, other_path} ->
-          {:found, new_path, other_path}
-
-        :error ->
-          new_queue = :queue.in({neighbor, new_path}, queue)
-          expand_neighbors(rest, new_queue, new_visited, other_visited, path, added_count + 1)
+  defp expand_frontier_nodes(
+         [{node, path} | rest],
+         edges_map,
+         side,
+         visited,
+         other_visited,
+         acc,
+         best
+       ) do
+    neighbors =
+      case Map.fetch(edges_map, node) do
+        {:ok, edges} -> Map.keys(edges)
+        :error -> []
       end
-    end
+
+    {new_acc, new_visited, new_best} =
+      Enum.reduce(neighbors, {acc, visited, best}, fn neighbor, {a, v, b} ->
+        if Map.has_key?(v, neighbor) do
+          {a, v, b}
+        else
+          new_path = [neighbor | path]
+          new_v = Map.put(v, neighbor, new_path)
+
+          b2 =
+            case Map.fetch(other_visited, neighbor) do
+              {:ok, other_path} ->
+                full_path =
+                  if side == :fwd do
+                    Enum.reverse(new_path) ++ tl(other_path)
+                  else
+                    Enum.reverse(other_path) ++ tl(new_path)
+                  end
+
+                len = length(full_path) - 1
+
+                if is_nil(b) or len < elem(b, 0) do
+                  {len, full_path}
+                else
+                  b
+                end
+
+              :error ->
+                b
+            end
+
+          {[{neighbor, new_path} | a], new_v, b2}
+        end
+      end)
+
+    expand_frontier_nodes(rest, edges_map, side, new_visited, other_visited, new_acc, new_best)
   end
 
   # Bidirectional Dijkstra implementation
