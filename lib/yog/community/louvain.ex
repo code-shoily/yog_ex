@@ -231,6 +231,7 @@ defmodule Yog.Community.Louvain do
 
       neighbor_weights = calculate_neighbor_weights_by_comm(graph, current_state, node)
       neighbor_comms = Map.keys(neighbor_weights)
+      ki_in_current = Map.get(neighbor_weights, current_comm, 0.0)
 
       {best_comm, best_gain} =
         Enum.reduce(neighbor_comms, {current_comm, 0.0}, fn neighbor_comm, {best_c, best_g} ->
@@ -242,6 +243,7 @@ defmodule Yog.Community.Louvain do
               current_comm,
               neighbor_comm,
               node_weight,
+              ki_in_current,
               ki_in_comm,
               current_state,
               options.resolution
@@ -288,6 +290,7 @@ defmodule Yog.Community.Louvain do
          current_comm,
          target_comm,
          _node_weight,
+         _ki_in_current,
          _ki_in_target,
          _state,
          _gamma
@@ -301,6 +304,7 @@ defmodule Yog.Community.Louvain do
          current_comm,
          target_comm,
          node_weight,
+         ki_in_current,
          ki_in_target,
          state,
          gamma
@@ -316,8 +320,10 @@ defmodule Yog.Community.Louvain do
       sigma_tot_target = Map.get(state.community_totals, target_comm, 0.0)
       sigma_tot_current = Map.get(state.community_totals, current_comm, 0.0)
 
-      ki_in_target / m - gamma * sigma_tot_target * ki / two_m_sq -
-        gamma * (sigma_tot_current - ki) * ki / two_m_sq
+      delta_q_add = ki_in_target / m - gamma * sigma_tot_target * ki / two_m_sq
+      delta_q_remove = ki_in_current / m - gamma * (sigma_tot_current - ki) * ki / two_m_sq
+
+      delta_q_add - delta_q_remove
     end
   end
 
