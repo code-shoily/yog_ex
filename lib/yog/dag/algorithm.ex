@@ -101,9 +101,15 @@ defmodule Yog.DAG.Algorithm do
         update_longest_distances(out_edges, node, node_dist, dist_acc, pred_acc)
       end)
 
+    # All nodes are potential sources with distance 0
+    all_distances =
+      Enum.reduce(sorted_nodes, distances, fn node, acc ->
+        Map.put_new(acc, node, 0)
+      end)
+
     # Find the node with maximum distance
     {max_node, _max_dist} =
-      distances
+      all_distances
       |> Enum.max_by(fn {_node, dist} -> dist end, fn -> {nil, 0} end)
 
     # Reconstruct path by following predecessors backward
@@ -244,7 +250,8 @@ defmodule Yog.DAG.Algorithm do
     ancestors_b = get_ancestors_set(dag, node_b)
 
     common_ancestors =
-      Enum.filter(ancestors_a, fn a -> a in ancestors_b end)
+      MapSet.intersection(ancestors_a, ancestors_b)
+      |> MapSet.to_list()
 
     Enum.filter(common_ancestors, fn candidate ->
       is_ancestor_of_another =
@@ -282,7 +289,7 @@ defmodule Yog.DAG.Algorithm do
   end
 
   # Collects all ancestors by traversing backwards through in_edges (BFS/DFS hybrid)
-  defp collect_ancestors(_graph, [], visited), do: MapSet.to_list(visited)
+  defp collect_ancestors(_graph, [], visited), do: visited
 
   defp collect_ancestors(graph, [current | rest], visited) do
     preds = Yog.Model.predecessor_ids(graph, current)

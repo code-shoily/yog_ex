@@ -24,8 +24,12 @@ defmodule Yog.DAG.Model do
   Creates a new, empty DAG.
   """
   @spec new(Yog.Model.graph_type()) :: t()
-  def new(_type) do
+  def new(:directed) do
     %DAG{graph: Yog.Graph.new(:directed)}
+  end
+
+  def new(:undirected) do
+    raise ArgumentError, "DAG must be directed; received :undirected"
   end
 
   @doc """
@@ -115,12 +119,14 @@ defmodule Yog.DAG.Model do
   @spec add_edge(t(), Yog.node_id(), Yog.node_id(), any()) ::
           {:ok, t()} | {:error, :cycle_detected}
   def add_edge(%DAG{graph: graph}, from, to, weight) do
-    new_graph = Yog.add_edge!(graph, from, to, weight)
-
-    if Cyclicity.acyclic?(new_graph) do
-      {:ok, %DAG{graph: new_graph}}
-    else
+    # An edge from A to B creates a cycle ONLY if there's already a path from B to A.
+    # We use a targeted BFS (reachable?) which terminates early to avoid full O(V+E)
+    # Kahn's topological sort checking per edge.
+    if Yog.Traversal.reachable?(graph, to, from) do
       {:error, :cycle_detected}
+    else
+      new_graph = Yog.Model.add_edge_ensure(graph, from, to, weight)
+      {:ok, %DAG{graph: new_graph}}
     end
   end
 end

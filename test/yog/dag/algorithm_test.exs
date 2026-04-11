@@ -127,7 +127,7 @@ defmodule Yog.DAG.AlgorithmTest do
 
     test "handles single node" do
       dag = Model.new(:directed) |> Model.add_node(:a, "A")
-      assert Algorithm.longest_path(dag) == []
+      assert Algorithm.longest_path(dag) == [:a]
     end
 
     test "handles disconnected components" do

@@ -20,7 +20,7 @@ defmodule Yog.DAG do
   - **Enumerable**: Iterates over nodes as `{id, data}` tuples via the underlying graph
   - **Inspect**: Compact representation showing node and edge counts
   """
-  alias Yog.Property.Cyclicity
+  alias Yog.DAG.Model
 
   @type t :: %__MODULE__{
           graph: Yog.Graph.t()
@@ -45,17 +45,7 @@ defmodule Yog.DAG do
   Validates that the graph is directed and contains no cycles.
   """
   @spec from_graph(Yog.Graph.t()) :: {:ok, t()} | {:error, :cycle_detected}
-  def from_graph(%Yog.Graph{kind: :undirected}) do
-    {:error, :cycle_detected}
-  end
-
-  def from_graph(%Yog.Graph{} = graph) do
-    if Cyclicity.acyclic?(graph) do
-      {:ok, %__MODULE__{graph: graph}}
-    else
-      {:error, :cycle_detected}
-    end
-  end
+  def from_graph(graph), do: Model.from_graph(graph)
 
   @doc """
   Unwraps a DAG back into a regular Graph.
