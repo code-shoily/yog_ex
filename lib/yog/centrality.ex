@@ -35,11 +35,23 @@ defmodule Yog.Centrality do
   """
   @type degree_mode :: :in_degree | :out_degree | :total_degree
 
+  # =============================================================================
+  # Degree Centrality
+  # =============================================================================
+
   @doc """
   Calculates the Degree Centrality for all nodes in the graph.
 
   For directed graphs, use `mode` to specify which edges to count.
   For undirected graphs, the `mode` is ignored.
+
+  ## Interpreting Degree Centrality
+
+  | Value | Meaning |
+  |-------|---------|
+  | `1.0` | The node is connected to every other node (hub) |
+  | `0.5` | The node is connected to half the other nodes |
+  | `0.0` | Isolated node — no connections |
 
   ## Example
 
@@ -99,6 +111,10 @@ defmodule Yog.Centrality do
     end)
   end
 
+  # =============================================================================
+  # Closeness Centrality
+  # =============================================================================
+
   @doc """
   Calculates Closeness Centrality for all nodes.
 
@@ -112,6 +128,14 @@ defmodule Yog.Centrality do
   will have a centrality of 0.0. Consider `harmonic/2` for disconnected graphs.
 
   **Time Complexity:** O(V * (V + E) log V) using Dijkstra from each node
+
+  ## Interpreting Closeness Centrality
+
+  | Value | Meaning |
+  |-------|---------|
+  | `1.0` | The node is one hop away from all others (e.g. center of a star) |
+  | `0.5` | The node is typically 2 hops away from others |
+  | `0.0` | The node cannot reach everyone (disconnected or isolated) |
 
   ## Options
 
@@ -186,6 +210,10 @@ defmodule Yog.Centrality do
     end
   end
 
+  # =============================================================================
+  # Harmonic Centrality
+  # =============================================================================
+
   @doc """
   Calculates Harmonic Centrality for all nodes.
 
@@ -196,6 +224,17 @@ defmodule Yog.Centrality do
   Formula: H(v) = Σ (1 / d(v, u)) / (n - 1) for all u ≠ v
 
   **Time Complexity:** O(V * (V + E) log V)
+
+  ## Interpreting Harmonic Centrality
+
+  | Value | Meaning |
+  |-------|---------|
+  | `1.0` | The node is directly connected to all others |
+  | `0.5` | The node is directly connected to half the others |
+  | `0.0` | Isolated node — cannot reach anyone else |
+
+  Unlike closeness, disconnected nodes still receive credit for the
+  neighbors they *can* reach rather than being penalized with `0.0`.
 
   ## Options
 
@@ -276,6 +315,10 @@ defmodule Yog.Centrality do
     end
   end
 
+  # =============================================================================
+  # Betweenness Centrality
+  # =============================================================================
+
   @doc """
   Calculates Betweenness Centrality for all nodes.
 
@@ -283,6 +326,17 @@ defmodule Yog.Centrality do
   all-pairs shortest paths that pass through v.
 
   **Time Complexity:** O(VE) for unweighted, O(VE + V²logV) for weighted.
+
+  ## Interpreting Betweenness Centrality
+
+  | Value | Meaning |
+  |-------|---------|
+  | **High** | The node is a bridge or gatekeeper — many shortest paths go through it |
+  | **Low** | The node is peripheral — most paths bypass it |
+  | `0.0` | The node lies on no shortest paths between any other pair |
+
+  A high betweenness node is critical for network connectivity:
+  removing it can fragment the graph or severely increase path lengths.
 
   ## Options
 
@@ -347,6 +401,10 @@ defmodule Yog.Centrality do
     apply_undirected_scaling(scores, graph)
   end
 
+  # =============================================================================
+  # PageRank
+  # =============================================================================
+
   @doc """
   Calculates PageRank centrality for all nodes.
 
@@ -364,6 +422,18 @@ defmodule Yog.Centrality do
   random node.
 
   **Time Complexity:** O(max_iterations × (V + E))
+
+  ## Interpreting PageRank
+
+  | Value | Meaning |
+  |-------|---------|
+  | **High** | The node is linked to by many other important nodes |
+  | **Low** | The node has few or low-quality incoming links |
+  | `1.0` | Single-node graph (trivial case) |
+
+  PageRank scores always sum to `1.0` across all nodes. A node with
+  rank `0.5` in a 2-node graph means it captures half the total
+  importance in the network.
 
   ## When to Use PageRank
 
@@ -441,6 +511,10 @@ defmodule Yog.Centrality do
     )
   end
 
+  # =============================================================================
+  # Eigenvector Centrality
+  # =============================================================================
+
   @doc """
   Calculates Eigenvector Centrality for all nodes.
 
@@ -449,6 +523,17 @@ defmodule Yog.Centrality do
   nodes. Uses power iteration to converge on the principal eigenvector.
 
   **Time Complexity:** O(max_iterations * (V + E))
+
+  ## Interpreting Eigenvector Centrality
+
+  | Value | Meaning |
+  |-------|---------|
+  | **High** | The node is connected to other highly central nodes |
+  | **Low** | The node is connected to peripheral or unimportant nodes |
+  | `0.0` | Isolated node with no connections |
+
+  Eigenvector scores are normalized (L2 norm = 1.0), so they represent
+  relative importance rather than absolute counts.
 
   ## Options
 
@@ -505,6 +590,10 @@ defmodule Yog.Centrality do
     end
   end
 
+  # =============================================================================
+  # Katz Centrality
+  # =============================================================================
+
   @doc """
   Calculates Katz Centrality for all nodes.
 
@@ -516,6 +605,17 @@ defmodule Yog.Centrality do
   Formula: C(v) = α * Σ C(u) + β for all neighbors u
 
   **Time Complexity:** O(max_iterations * (V + E))
+
+  ## Interpreting Katz Centrality
+
+  | Value | Meaning |
+  |-------|---------|
+  | **High** | The node has many short paths to other important nodes |
+  | **Low** | The node is distant from the network core |
+  | `≈ beta` | Isolated node — only receives the baseline score |
+
+  Because of the constant `beta` term, even isolated nodes receive a
+  non-zero score, making Katz more forgiving than eigenvector centrality.
 
   ## Options
 
@@ -545,6 +645,10 @@ defmodule Yog.Centrality do
     alpha(graph, Keyword.merge(opts, alpha: alpha, initial: beta))
   end
 
+  # =============================================================================
+  # Alpha Centrality
+  # =============================================================================
+
   @doc """
   Calculates Alpha Centrality for all nodes.
 
@@ -556,6 +660,17 @@ defmodule Yog.Centrality do
   and is particularly useful for analyzing influence in directed networks.
 
   **Time Complexity:** O(max_iterations * (V + E))
+
+  ## Interpreting Alpha Centrality
+
+  | Value | Meaning |
+  |-------|---------|
+  | **High** | The node has many paths from other central nodes |
+  | **Low** | The node is at the edge of the network with few incoming paths |
+  | `0.0` | Isolated node — no incoming paths to accumulate influence |
+
+  Unlike Katz, alpha centrality has no baseline `beta` term, so isolated
+  nodes converge to `0.0` rather than retaining a minimum score.
 
   ## Options
 
