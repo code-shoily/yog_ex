@@ -51,7 +51,17 @@ Benchee.run(
 IO.puts("\n== Memory Usage (1000 nodes, 3000 edges) ==\n")
 
 yog_size = :erts_debug.size(large_yog)
-lib_size = :erts_debug.size(large_yog)
+
+large_lib = Graph.new()
+large_lib = Enum.reduce(0..999, large_lib, fn i, acc -> Graph.add_vertex(acc, i) end)
+
+large_lib =
+  Enum.reduce(large_edges, large_lib, fn {u, v, w}, acc ->
+    Graph.add_edge(acc, u, v, weight: w)
+  end)
+
+lib_size = :erts_debug.size(large_lib)
+
 dg_test = :digraph.new()
 Enum.each(0..999, fn i -> :digraph.add_vertex(dg_test, i) end)
 Enum.each(large_edges, fn {u, v, _w} -> :digraph.add_edge(dg_test, u, v) end)
