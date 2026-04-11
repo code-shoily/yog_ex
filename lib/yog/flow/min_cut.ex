@@ -61,7 +61,6 @@ defmodule Yog.Flow.MinCut do
   """
 
   alias Yog.Flow.MinCutResult
-  alias Yog.Model
   alias Yog.PairingHeap
   alias Yog.Transform
 
@@ -104,19 +103,19 @@ defmodule Yog.Flow.MinCut do
         MinCutResult.new(0, 0, 0)
 
       n ->
-        graph = Transform.map_nodes(graph, fn _ -> 1 end)
-        do_min_cut(graph, nil, n)
+        sizes = Map.new(nodes, fn node -> {node, 1} end)
+        do_min_cut(graph, nil, n, sizes)
     end
   end
 
-  defp do_min_cut(graph, best_cut, total_nodes) do
+  defp do_min_cut(graph, best_cut, total_nodes, sizes) do
     if map_size(graph.nodes) <= 1 do
       best_cut
     else
       {s, t, cut_weight} = maximum_adjacency_search(graph)
 
-      t_size = Map.get(graph.nodes, t) || 1
-      s_size = Map.get(graph.nodes, s) || 1
+      t_size = Map.get(sizes, t, 1)
+      s_size = Map.get(sizes, s, 1)
 
       current_cut =
         if is_nil(best_cut) or cut_weight < best_cut.cut_value do
@@ -129,9 +128,13 @@ defmodule Yog.Flow.MinCut do
           best_cut
         end
 
+      new_sizes =
+        sizes
+        |> Map.put(s, s_size + t_size)
+        |> Map.delete(t)
+
       Transform.contract(graph, s, t, &+/2)
-      |> Model.add_node(s, s_size + t_size)
-      |> do_min_cut(current_cut, total_nodes)
+      |> do_min_cut(current_cut, total_nodes, new_sizes)
     end
   end
 

@@ -28,7 +28,16 @@ defmodule Yog.Flow.MaxFlowResult do
   """
 
   @enforce_keys [:max_flow, :residual_graph, :source, :sink]
-  defstruct [:max_flow, :residual_graph, :source, :sink, algorithm: :unknown, metadata: %{}]
+  defstruct [
+    :max_flow,
+    :residual_graph,
+    :source,
+    :sink,
+    algorithm: :unknown,
+    metadata: %{},
+    zero: 0,
+    compare: &Yog.Utils.compare/2
+  ]
 
   @type t :: %__MODULE__{
           max_flow: number(),
@@ -36,7 +45,9 @@ defmodule Yog.Flow.MaxFlowResult do
           source: Yog.Model.node_id(),
           sink: Yog.Model.node_id(),
           algorithm: atom(),
-          metadata: map()
+          metadata: map(),
+          zero: any(),
+          compare: (any(), any() -> :lt | :eq | :gt)
         }
 
   @doc """
@@ -67,6 +78,30 @@ defmodule Yog.Flow.MaxFlowResult do
   end
 
   @doc """
+  Creates a new max flow result with algorithm name, zero element, and comparison function.
+  """
+  @spec new(
+          number(),
+          Yog.graph(),
+          Yog.Model.node_id(),
+          Yog.Model.node_id(),
+          atom(),
+          any(),
+          (any(), any() -> :lt | :eq | :gt)
+        ) :: t()
+  def new(max_flow, residual_graph, source, sink, algorithm, zero, compare) do
+    %__MODULE__{
+      max_flow: max_flow,
+      residual_graph: residual_graph,
+      source: source,
+      sink: sink,
+      algorithm: algorithm,
+      zero: zero,
+      compare: compare
+    }
+  end
+
+  @doc """
   Get flow value on a specific edge in the residual graph.
   """
   @spec residual_capacity(t(), Yog.Model.node_id(), Yog.Model.node_id()) :: number()
@@ -86,6 +121,8 @@ defmodule Yog.Flow.MaxFlowResult do
   def from_map(%{max_flow: mf, residual_graph: rg, source: s, sink: t} = map) do
     algorithm = Map.get(map, :algorithm, :unknown)
     metadata = Map.get(map, :metadata, %{})
+    zero = Map.get(map, :zero, 0)
+    compare = Map.get(map, :compare, &Yog.Utils.compare/2)
 
     %__MODULE__{
       max_flow: mf,
@@ -93,7 +130,9 @@ defmodule Yog.Flow.MaxFlowResult do
       source: s,
       sink: t,
       algorithm: algorithm,
-      metadata: metadata
+      metadata: metadata,
+      zero: zero,
+      compare: compare
     }
   end
 

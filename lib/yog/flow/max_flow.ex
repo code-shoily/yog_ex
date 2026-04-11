@@ -174,15 +174,24 @@ defmodule Yog.Flow.MaxFlow do
           end)
         end)
 
-      MaxFlowResult.new(zero, return_graph, source, sink)
+      MaxFlowResult.new(zero, return_graph, source, sink, :edmonds_karp, zero, compare)
     else
       residual = build_residual_graph(graph, zero)
 
       {max_flow, final_residual} =
         do_edmonds_karp(residual, source, sink, zero, add, subtract, compare, min_fn, zero)
 
-      final_residual_graph = residual_to_graph(graph, final_residual)
-      MaxFlowResult.new(max_flow, final_residual_graph, source, sink)
+      final_residual_graph = residual_to_graph(graph, final_residual, zero, compare)
+
+      MaxFlowResult.new(
+        max_flow,
+        final_residual_graph,
+        source,
+        sink,
+        :edmonds_karp,
+        zero,
+        compare
+      )
     end
   end
 
@@ -213,7 +222,7 @@ defmodule Yog.Flow.MaxFlow do
   end
 
   # Convert internal residual map back to a Yog.Graph structure
-  defp residual_to_graph(original_graph, residual_map) do
+  defp residual_to_graph(original_graph, residual_map, zero, compare) do
     nodes = Map.keys(original_graph.nodes)
     original_nodes = original_graph.nodes
 
@@ -225,7 +234,7 @@ defmodule Yog.Flow.MaxFlow do
 
     List.foldl(Map.to_list(residual_map), graph, fn {u, edges}, acc ->
       List.foldl(Map.to_list(edges), acc, fn {v, cap}, inner_acc ->
-        if cap != 0 do
+        if compare.(cap, zero) != :eq do
           case Model.add_edge(inner_acc, u, v, cap) do
             {:ok, new_graph} -> new_graph
             {:error, _} -> inner_acc
@@ -371,21 +380,8 @@ defmodule Yog.Flow.MaxFlow do
       3
   """
   @spec extract_min_cut(max_flow_result()) :: min_cut()
-  def extract_min_cut(%MaxFlowResult{
-        residual_graph: residual,
-        source: source,
-        max_flow: max_flow
-      }) do
-    nodes = Map.keys(residual.nodes) |> MapSet.new()
-    source_side = bfs_reachable_with_compare(residual, source, nodes, 0, &Yog.Utils.compare/2)
-    sink_side = MapSet.difference(nodes, source_side)
-
-    %Yog.Flow.MinCutResult{
-      cut_value: max_flow,
-      source_side_size: MapSet.size(source_side),
-      sink_side_size: MapSet.size(sink_side),
-      algorithm: :edmonds_karp
-    }
+  def extract_min_cut(%MaxFlowResult{} = result) do
+    min_cut(result, result.zero, result.compare)
   end
 
   @doc """
