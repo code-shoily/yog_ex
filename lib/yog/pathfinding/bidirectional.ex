@@ -14,6 +14,39 @@ defmodule Yog.Pathfinding.Bidirectional do
 
   - Target node must be known in advance (unlike Dijkstra, which can route many at once).
   - Designed for point-to-point queries.
+
+  ## Examples
+
+  <div class="graphviz">
+  digraph G {
+    rankdir=LR;
+    bgcolor="transparent";
+    node [shape=circle, fontname="inherit"];
+    edge [fontname="inherit", fontsize=10];
+    S [label="S"]; A [label="A"]; B [label="B"];
+    M [label="M", color="#6366f1", penwidth=2];
+    C [label="C"]; D [label="D"]; T [label="T"];
+    S -> A [label="2", color="#6366f1", penwidth=2.5];
+    A -> M [label="2", color="#6366f1", penwidth=2.5];
+    S -> B [label="5"];
+    B -> M [label="1"];
+    M -> C [label="2", color="#6366f1", penwidth=2.5];
+    C -> T [label="2", color="#6366f1", penwidth=2.5];
+    M -> D [label="5"];
+    D -> T [label="1"];
+  }
+  </div>
+
+      iex> alias Yog.Pathfinding.Bidirectional
+      iex> graph = Yog.from_edges(:directed, [
+      ...>   {"S", "A", 2}, {"A", "M", 2}, {"S", "B", 5}, {"B", "M", 1},
+      ...>   {"M", "C", 2}, {"C", "T", 2}, {"M", "D", 5}, {"D", "T", 1}
+      ...> ])
+      iex> {:ok, path} = Bidirectional.shortest_path(graph, "S", "T")
+      iex> path.nodes
+      ["S", "A", "M", "C", "T"]
+      iex> path.weight
+      8
   """
 
   # credo:disable-for-this-file Credo.Check.Refactor.AppendSingleItem

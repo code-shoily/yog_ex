@@ -1,0 +1,62 @@
+<script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/viz.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/full.render.js"></script>
+<script>
+  (function() {
+    var vizInstance = null;
+
+    function renderGraphviz() {
+      var elements = document.querySelectorAll(".graphviz:not([data-rendered='true'])");
+      if (elements.length === 0) return;
+
+      if (typeof Viz === "undefined") {
+        elements.forEach(function(el) { el.style.display = "block"; });
+        return;
+      }
+
+      if (!vizInstance) vizInstance = new Viz();
+
+      elements.forEach(function(el) {
+        el.setAttribute("data-rendered", "true");
+        vizInstance.renderSVGElement(el.textContent)
+          .then(function(element) {
+            // Theme awareness: Replace default black with currentColor so it works in dark mode
+            // without overriding explicitly set colors.
+            element.querySelectorAll("[stroke='black'], [stroke='#000000']").forEach(function(node) {
+              node.setAttribute("stroke", "currentColor");
+            });
+            element.querySelectorAll("[fill='black'], [fill='#000000']").forEach(function(node) {
+              node.setAttribute("fill", "currentColor");
+            });
+
+            el.innerHTML = "";
+            el.appendChild(element);
+            el.style.display = "block";
+          })
+          .catch(function(error) {
+            console.error("GraphViz Render Error:", error);
+            el.style.display = "block";
+          });
+      });
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", renderGraphviz);
+    } else {
+      renderGraphviz();
+    }
+
+    var observer = new MutationObserver(function() { renderGraphviz(); });
+    observer.observe(document.body, { childList: true, subtree: true });
+  })();
+</script>
+<style>
+  .graphviz { display: none; }
+  .graphviz svg { 
+    max-width: 100%; 
+    height: auto; 
+    display: block; 
+    margin: 0 auto; 
+  }
+  /* Only override font-family, let SVG attributes handle the colors */
+  .graphviz svg text { font-family: inherit !important; fill: currentColor; }
+</style>

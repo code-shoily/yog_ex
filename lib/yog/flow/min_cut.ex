@@ -58,6 +58,42 @@ defmodule Yog.Flow.MinCut do
   - [Wikipedia: Minimum Cut](https://en.wikipedia.org/wiki/Minimum_cut)
   - [Wikipedia: Stoer-Wagner Algorithm](https://en.wikipedia.org/wiki/Stoer%E2%80%93Wagner_algorithm)
   - [CP-Algorithms: Stoer-Wagner](https://cp-algorithms.com/graph/stoer_wagner.html)
+
+  ## Example: Global Minimum Cut
+
+  <div class="graphviz">
+  graph G {
+    bgcolor="transparent";
+    node [shape=circle, fontname="inherit"];
+    edge [fontname="inherit", fontsize=10];
+
+    subgraph cluster_side1 {
+      label="Side A"; color="#6366f1"; style=rounded;
+      node1 [label="1"]; node2 [label="2"];
+    }
+
+    subgraph cluster_side2 {
+      label="Side B"; color="#f43f5e"; style=rounded;
+      node3 [label="3"];
+    }
+
+    node1 -- node2 [label="5"];
+
+    // Cut edges (bridging the global partition)
+    node1 -- node3 [label="2", color="#ef4444", penwidth=2.5, fontcolor="#ef4444"];
+    node2 -- node3 [label="3", color="#ef4444", penwidth=2.5, fontcolor="#ef4444"];
+  }
+  </div>
+
+      iex> alias Yog.Flow.MinCut
+      iex> graph = Yog.from_edges(:undirected, [{1, 2, 5}, {2, 3, 3}, {1, 3, 2}])
+      iex> result = MinCut.global_min_cut(graph)
+      iex> result.cut_value
+      5
+      iex> result.source_side_size
+      1
+      iex> result.sink_side_size
+      2
   """
 
   alias Yog.Flow.MinCutResult

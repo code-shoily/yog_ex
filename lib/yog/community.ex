@@ -31,8 +31,42 @@ defmodule Yog.Community do
   For frequent community-level queries, use `to_dict/1` to convert the
   assignments map to a community-centric structure (community_id -> nodes).
   Functions like `sizes/1`, `nodes_in/2`, and `largest/1` perform O(V) scans;
-  `to_dict/1` performs a single O(V) conversion that enables O(1) lookups
-  for all subsequent community operations.
+  `to_dict/1` performs a single  O(V) conversion that enables O(1) lookups for all subsequent community operations.
+
+  ## Community Structure Visualization
+
+  Communities are groups of nodes with dense internal connections and sparse connections to other groups.
+
+  <div class="graphviz">
+  graph G {
+    bgcolor="transparent";
+    node [shape=circle, fontname="inherit"];
+    edge [fontname="inherit", fontsize=10];
+
+    subgraph cluster_c1 {
+      label="Community 1"; color="#6366f1"; style=rounded;
+      1 -- 2; 2 -- 3; 3 -- 1;
+    }
+
+    subgraph cluster_c2 {
+      label="Community 2"; color="#f43f5e"; style=rounded;
+      4 -- 5; 5 -- 6; 6 -- 4;
+    }
+
+    // Bridge edge between communities
+    3 -- 4 [label="bridge", color="#94a3b8", style=dashed];
+  }
+  </div>
+
+      iex> alias Yog.Community
+      iex> graph = Yog.from_edges(:undirected, [
+      ...>   {1, 2, 1}, {2, 3, 1}, {3, 1, 1},
+      ...>   {4, 5, 1}, {5, 6, 1}, {6, 4, 1},
+      ...>   {3, 4, 1}
+      ...> ])
+      iex> communities = Community.Result.new(%{1 => 0, 2 => 0, 3 => 0, 4 => 1, 5 => 1, 6 => 1})
+      iex> Community.modularity(graph, communities) > 0.3
+      true
 
   ## Examples
 

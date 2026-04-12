@@ -170,48 +170,7 @@ defmodule YogEx.MixProject do
   end
 
   defp before_closing_body_tag(:html) do
-    """
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/viz.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/full.render.js"></script>
-    <script>
-      document.addEventListener("DOMContentLoaded", function() {
-        if (typeof Viz !== "undefined") {
-          const viz = new Viz();
-          document.querySelectorAll(".graphviz").forEach(function(el) {
-            viz.renderSVGElement(el.textContent)
-              .then(function(element) {
-                el.innerHTML = "";
-                el.appendChild(element);
-                el.style.display = "block";
-              })
-              .catch(function(error) {
-                console.error("GraphViz Render Error:", error);
-                el.style.display = "block";
-              });
-          });
-        } else {
-          console.error("Viz.js library failed to load");
-          document.querySelectorAll(".graphviz").forEach(function(el) {
-            el.style.display = "block";
-          });
-        }
-      });
-    </script>
-    <style>
-      .graphviz { display: none; }
-      .graphviz svg { 
-        max-width: 100%; 
-        height: auto; 
-        display: block; 
-        margin: 0 auto; 
-      }
-      /* Ensure SVG elements inherit theme colors */
-      .graphviz svg text { fill: currentColor !important; font-family: inherit !important; }
-      .graphviz svg path { stroke: currentColor !important; }
-      .graphviz svg polygon { fill: currentColor !important; stroke: currentColor !important; }
-      .graphviz svg ellipse, .graphviz svg circle { fill: none !important; stroke: currentColor !important; }
-    </style>
-    """
+    File.read!("priv/docs/graphviz.html")
   end
 
   defp before_closing_body_tag(_), do: ""

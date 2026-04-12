@@ -28,6 +28,43 @@ defmodule Yog.Graph do
 
   - **Enumerable**: Iterates over nodes as `{id, data}` tuples
   - **Inspect**: Compact representation showing graph type and statistics
+
+  ## Visual Showcase
+
+  <div class="graphviz">
+  digraph G {
+    rankdir=LR;
+    bgcolor="transparent";
+    node [fontname="inherit", shape=box, style=rounded, penwidth=1.5];
+    edge [fontname="inherit", fontsize=10, penwidth=1.2];
+
+    subsystem [label="Core System", shape=hexagon, color="#6366f1"];
+    node1 [label="Logic A", color="#10b981"];
+    node2 [label="Logic B", color="#10b981"];
+    node3 [label="Logic C", color="#10b981"];
+    storage [label="Storage", shape=cylinder, color="#f59e0b"];
+    user [label="User", shape=doublecircle, color="#ef4444"];
+
+    subsystem -> node1 [label="invokes", color="#6366f1"];
+    subsystem -> node2 [label="invokes", color="#6366f1"];
+    node1 -> node3 [label="calls", style=dashed, color="#10b981"];
+    node2 -> node3 [label="calls", style=dashed, color="#10b981"];
+    node3 -> storage [label="writes", color="#f59e0b"];
+    user -> subsystem [label="triggers", color="#ef4444", penwidth=2.5];
+  }
+  </div>
+
+      iex> graph = Yog.directed()
+      ...> |> Yog.add_edge_ensure("User", "Core System", "triggers")
+      ...> |> Yog.add_edge_ensure("Core System", "Logic A", "invokes")
+      ...> |> Yog.add_edge_ensure("Core System", "Logic B", "invokes")
+      ...> |> Yog.add_edge_ensure("Logic A", "Logic C", "calls")
+      ...> |> Yog.add_edge_ensure("Logic B", "Logic C", "calls")
+      ...> |> Yog.add_edge_ensure("Logic C", "Storage", "writes")
+      iex> Yog.node_count(graph)
+      6
+      iex> Yog.edge_count(graph)
+      6
   """
 
   @type node_id :: term()

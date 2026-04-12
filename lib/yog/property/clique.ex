@@ -52,6 +52,46 @@ defmodule Yog.Property.Clique do
   - **Recommendation**: Finding groups with similar preferences
   - **Compiler optimization**: Register allocation (interference graphs)
 
+  ## Maximum Clique Visualization
+
+  A clique is a fully connected subgraph where every node is adjacent to every other node in the set.
+
+  <div class="graphviz">
+  graph G {
+    bgcolor="transparent";
+    node [shape=circle, fontname="inherit"];
+    edge [fontname="inherit", fontsize=10];
+
+    subgraph cluster_clique {
+      label="Maximum Clique (K4)"; color="#6366f1"; style=rounded;
+      C1; C2; C3; C4;
+    }
+
+    // Clique edges (fully connected)
+    C1 -- C2 [color="#6366f1", penwidth=2.5];
+    C1 -- C3 [color="#6366f1", penwidth=2.5];
+    C1 -- C4 [color="#6366f1", penwidth=2.5];
+    C2 -- C3 [color="#6366f1", penwidth=2.5];
+    C2 -- C4 [color="#6366f1", penwidth=2.5];
+    C3 -- C4 [color="#6366f1", penwidth=2.5];
+
+    // Other nodes and edges
+    C1 -- O1 [style=dashed, color="#94a3b8"];
+    C2 -- O2 [style=dashed, color="#94a3b8"];
+    O1 -- O2 [style=dashed, color="#94a3b8"];
+  }
+  </div>
+
+      iex> alias Yog.Property.Clique
+      iex> graph = Yog.from_edges(:undirected, [
+      ...>   {"C1", "C2", 1}, {"C1", "C3", 1}, {"C1", "C4", 1},
+      ...>   {"C2", "C3", 1}, {"C2", "C4", 1}, {"C3", "C4", 1},
+      ...>   {"C1", "O1", 1}, {"C2", "O2", 1}, {"O1", "O2", 1}
+      ...> ])
+      iex> clique = Clique.max_clique(graph)
+      iex> MapSet.member?(clique, "C1") and MapSet.size(clique) == 4
+      true
+
   ## Examples
 
       # Create a complete graph K4

@@ -31,6 +31,38 @@ defmodule Yog.Traversal.Sort do
   - Ordering of formula calculations in spreadsheets
   - Determining instruction sequences in dataflow programming
 
+  ## Topological Order Visualization
+
+  A topological sort flattens a DAG into a linear sequence where all directed edges point from left to right.
+
+  <div class="graphviz">
+  digraph G {
+    rankdir=LR;
+    bgcolor="transparent";
+    node [shape=circle, fontname="inherit"];
+    edge [fontname="inherit", fontsize=10];
+
+    subgraph cluster_dag {
+      label="Directed Acyclic Graph (DAG)"; color="#6366f1"; style=rounded;
+      A -> B; A -> C;
+      B -> D;
+      C -> D;
+      D -> E;
+    }
+  }
+  </div>
+
+      iex> alias Yog.Traversal.Sort
+      iex> graph = Yog.from_edges(:directed, [
+      ...>   {"A", "B", 1}, {"A", "C", 1},
+      ...>   {"B", "D", 1}, {"C", "D", 1},
+      ...>   {"D", "E", 1}
+      ...> ])
+      iex> {:ok, order} = Sort.topological_sort(graph)
+      iex> # Check if order is valid (A before B,C; B,C before D; D before E)
+      ...> Enum.find_index(order, &(&1 == "A")) < Enum.find_index(order, &(&1 == "B"))
+      true
+
   ## Examples
 
       # Standard topological sort

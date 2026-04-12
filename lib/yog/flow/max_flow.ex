@@ -46,6 +46,33 @@ defmodule Yog.Flow.MaxFlow do
           {3, 4, 10}
         ])
 
+  ## Example: Maximum Flow
+
+  <div class="graphviz">
+  digraph G {
+    rankdir=LR;
+    bgcolor="transparent";
+    node [shape=circle, fontname="inherit"];
+    edge [fontname="inherit", fontsize=10];
+    S [label="S"]; A [label="A"]; B [label="B"]; T [label="T"];
+
+    S -> A [label="10", color="#6366f1", penwidth=2];
+    S -> B [label="10", color="#6366f1", penwidth=2];
+    A -> B [label="2", color="#6366f1", penwidth=2];
+    A -> T [label="4", color="#6366f1", penwidth=2];
+    B -> T [label="10", color="#6366f1", penwidth=2];
+  }
+  </div>
+
+      iex> alias Yog.Flow.MaxFlow
+      iex> graph = Yog.from_edges(:directed, [
+      ...>   {"S", "A", 10}, {"S", "B", 10}, {"A", "B", 2},
+      ...>   {"A", "T", 4}, {"B", "T", 10}
+      ...> ])
+      iex> result = MaxFlow.calculate(graph, "S", "T")
+      iex> result.max_flow
+      14
+
       result = Yog.Flow.MaxFlow.calculate(graph, 1, 4)
       # => %MaxFlowResult{max_flow: 15, residual_graph: ..., source: 1, sink: 4}
 

@@ -43,6 +43,81 @@ defmodule Yog.Property.Bipartite do
   - **Chemistry**: Matching molecules for reactions
   - **Stable marriage**: Matching medical residents to hospitals
 
+  ## Bipartite Visualization
+
+  <div class="graphviz">
+  graph G {
+    rankdir=LR;
+    bgcolor="transparent";
+    node [shape=circle, fontname="inherit"];
+    edge [fontname="inherit", fontsize=10];
+
+    subgraph cluster_left {
+      label="LeftSet"; color="#6366f1"; style=rounded;
+      L1; L2; L3;
+    }
+
+    subgraph cluster_right {
+      label="RightSet"; color="#f43f5e"; style=rounded;
+      R1; R2; R3;
+    }
+
+    L1 -- R1; L1 -- R2;
+    L2 -- R2; L2 -- R3;
+    L3 -- R1;
+  }
+  </div>
+
+      iex> alias Yog.Property.Bipartite
+      iex> graph = Yog.from_edges(:undirected, [
+      ...>   {"L1", "R1", 1}, {"L1", "R2", 1},
+      ...>   {"L2", "R2", 1}, {"L2", "R3", 1},
+      ...>   {"L3", "R1", 1}
+      ...> ])
+      iex> Bipartite.bipartite?(graph)
+      true
+
+  ## Maximum Matching
+
+  <div class="graphviz">
+  graph G {
+    rankdir=LR;
+    bgcolor="transparent";
+    node [shape=circle, fontname="inherit"];
+    edge [fontname="inherit", fontsize=10];
+
+    subgraph cluster_workers {
+      label="Workers"; color="#6366f1"; style=rounded;
+      w1; w2; w3;
+    }
+
+    subgraph cluster_tasks {
+      label="Tasks"; color="#f43f5e"; style=rounded;
+      t1; t2; t3;
+    }
+
+    // Matching edges (Job Assignments)
+    w1 -- t1 [color="#6366f1", penwidth=2.5];
+    w2 -- t3 [color="#6366f1", penwidth=2.5];
+    w3 -- t2 [color="#6366f1", penwidth=2.5];
+
+    // Other potential matches
+    w1 -- t2 [style=dashed, color="#94a3b8"];
+    w2 -- t1 [style=dashed, color="#94a3b8"];
+  }
+  </div>
+
+      iex> alias Yog.Property.Bipartite
+      iex> graph = Yog.from_edges(:undirected, [
+      ...>   {"w1", "t1", 1}, {"w1", "t2", 1},
+      ...>   {"w2", "t1", 1}, {"w2", "t3", 1},
+      ...>   {"w3", "t2", 1}
+      ...> ])
+      iex> {:ok, p} = Bipartite.partition(graph)
+      iex> matching = Bipartite.maximum_matching(graph, p)
+      iex> length(matching)
+      3
+
   ## Examples
 
       # Check if a graph is bipartite

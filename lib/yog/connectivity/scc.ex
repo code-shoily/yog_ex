@@ -26,6 +26,40 @@ defmodule Yog.Connectivity.SCC do
   - Condensing graphs for easier analysis
   - Detecting bottlenecks in flow networks
 
+  ## SCC Partition Visualization
+
+  In a strongly connected component, every node can reach every other node.
+
+  <div class="graphviz">
+  digraph G {
+    bgcolor="transparent";
+    node [shape=circle, fontname="inherit"];
+    edge [fontname="inherit", fontsize=10];
+
+    subgraph cluster_scc1 {
+      label="SCC 1 (Cycle)"; color="#6366f1"; style=rounded;
+      A -> B; B -> C; C -> A;
+    }
+
+    subgraph cluster_scc2 {
+      label="SCC 2 (Cycle)"; color="#f43f5e"; style=rounded;
+      D -> E; E -> D;
+    }
+
+    // Bridge edge between SCCs
+    B -> D [label="bridge", color="#94a3b8", style=dashed];
+  }
+  </div>
+
+      iex> alias Yog.Connectivity.SCC
+      iex> graph = Yog.from_edges(:directed, [
+      ...>   {"A", "B", 1}, {"B", "C", 1}, {"C", "A", 1},
+      ...>   {"D", "E", 1}, {"E", "D", 1}, {"B", "D", 1}
+      ...> ])
+      iex> sccs = SCC.strongly_connected_components(graph)
+      iex> length(sccs)
+      2
+
   ## Examples
 
       # Find SCCs in a graph with a cycle

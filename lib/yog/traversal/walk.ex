@@ -5,6 +5,44 @@ defmodule Yog.Traversal.Walk do
   This module provides a unified API for exploring graphs starting from a given node.
   It supports both standard discovery (BFS, DFS) and informed discovery where the
   next nodes are prioritized based on weights, heuristics, or randomness.
+
+  ## Discovery Visualization
+
+  Traversals like BFS explore a graph in layers, prioritizing nodes based on their distance from the source.
+
+  <div class="graphviz">
+  digraph G {
+    bgcolor="transparent";
+    node [shape=circle, fontname="inherit"];
+    edge [fontname="inherit", fontsize=10];
+
+    Root [label="Root", color="#6366f1", penwidth=2.5, style=bold];
+    
+    // Discovery steps
+    Root -> A [label="1"]; Root -> B [label="2"];
+    A -> C [label="3"]; A -> D [label="4"];
+    B -> E [label="5"];
+    
+    // BFS Layers
+    subgraph cluster_l1 {
+      label="Layer 1 (dist=1)"; color="#6366f1"; style=rounded;
+      A; B;
+    }
+
+    subgraph cluster_l2 {
+      label="Layer 2 (dist=2)"; color="#f43f5e"; style=rounded;
+      C; D; E;
+    }
+  }
+  </div>
+
+      iex> alias Yog.Traversal.Walk
+      iex> graph = Yog.from_edges(:directed, [
+      ...>   {"Root", "A", 1}, {"Root", "B", 1},
+      ...>   {"A", "C", 1}, {"A", "D", 1}, {"B", "E", 1}
+      ...> ])
+      iex> Walk.walk(in: graph, from: "Root", using: :breadth_first)
+      ["Root", "A", "B", "C", "D", "E"]
   """
 
   @type order :: :breadth_first | :depth_first | :best_first | :random

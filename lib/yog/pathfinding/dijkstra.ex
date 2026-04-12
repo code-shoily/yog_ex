@@ -50,21 +50,21 @@ defmodule Yog.Pathfinding.Dijkstra do
   }
   </div>
 
-      # Complex graph with multiple paths
-      graph = Yog.directed()
-      |> Yog.add_edges([
-        {:a, :b, 4}, {:a, :c, 2}, {:b, :d, 5},
-        {:c, :b, 1}, {:c, :d, 8}, {:c, :e, 10},
-        {:d, :e, 2}, {:d, :f, 6}, {:e, :f, 2}
-      ])
 
-      compare = &Yog.Utils.compare/2
-      Dijkstra.shortest_path(graph, :a, :f, 0, &(&1 + &2), compare)
-      #=> {:ok, %Yog.Pathfinding.Path{nodes: [:a, :c, :b, :d, :e, :f], weight: 12}}
-
-      # Find all distances from a source
-      Dijkstra.single_source_distances(graph, :a, 0, &(&1 + &2), compare)
-      #=> %{a: 0, c: 2, b: 3, d: 8, e: 10, f: 12}
+      iex> alias Yog.Pathfinding.Dijkstra
+      iex> graph = Yog.from_edges(:directed, [
+      ...>   {"A", "B", 4}, {"A", "C", 2}, {"B", "D", 5},
+      ...>   {"C", "B", 1}, {"C", "D", 8}, {"C", "E", 10},
+      ...>   {"D", "E", 2}, {"D", "F", 6}, {"E", "F", 2}
+      ...> ])
+      iex> compare = &Yog.Utils.compare/2
+      iex> {:ok, path} = Dijkstra.shortest_path(graph, "A", "F", 0, &(&1 + &2), compare)
+      iex> path.nodes
+      ["A", "C", "B", "D", "E", "F"]
+      iex> path.weight
+      12
+      iex> Dijkstra.single_source_distances(graph, "A", 0, &(&1 + &2), compare)
+      %{"A" => 0, "C" => 2, "B" => 3, "D" => 8, "E" => 10, "F" => 12}
   """
 
   alias Yog.PairingHeap, as: PQ

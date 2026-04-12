@@ -28,6 +28,62 @@ defmodule Yog.Property.Structure do
   - **Complete Graph (Kn)**: Every pair of distinct vertices is connected by an edge.
   - **Regular Graph**: Every vertex has the same degree k.
 
+  ## Structural Visualizations
+
+  Comparison of an undirected tree and a complete graph.
+
+  <div class="graphviz">
+  graph G {
+    rankdir=LR;
+    bgcolor="transparent";
+    node [shape=circle, fontname="inherit"];
+    edge [fontname="inherit", fontsize=10];
+
+    subgraph cluster_tree {
+      label="Undirected Tree"; color="#6366f1"; style=rounded;
+      T1 -- T2; T1 -- T3; T2 -- T4; T2 -- T5;
+    }
+
+    subgraph cluster_complete {
+      label="Complete (K3)"; color="#f43f5e"; style=rounded;
+      K1 -- K2; K2 -- K3; K3 -- K1;
+    }
+  }
+  </div>
+
+      iex> alias Yog.Property.Structure
+      iex> tree = Yog.from_edges(:undirected, [{"T1", "T2", 1}, {"T1", "T3", 1}, {"T2", "T4", 1}, {"T2", "T5", 1}])
+      iex> Structure.tree?(tree)
+      true
+      iex> complete = Yog.from_edges(:undirected, [{"K1", "K2", 1}, {"K2", "K3", 1}, {"K3", "K1", 1}])
+      iex> Structure.complete?(complete)
+      true
+
+  ## Arborescence Visualization
+
+  A directed tree with a unique root node.
+
+  <div class="graphviz">
+  digraph G {
+    rankdir=TB;
+    bgcolor="transparent";
+    node [shape=circle, fontname="inherit"];
+    edge [fontname="inherit", fontsize=10];
+    
+    subgraph cluster_arb {
+      label="Arborescence"; color="#10b981"; style=rounded;
+      R -> A; R -> B; A -> C; A -> D;
+    }
+  }
+  </div>
+
+      iex> alias Yog.Property.Structure
+      iex> arb = Yog.from_edges(:directed, [{"R", "A", 1}, {"R", "B", 1}, {"A", "C", 1}, {"A", "D", 1}])
+      iex> Structure.arborescence?(arb)
+      true
+      iex> Structure.arborescence_root(arb)
+      "R"
+
   ## Examples
 
       # Simple tree

@@ -38,6 +38,39 @@ defmodule Yog.PairingHeap do
       |> Yog.PairingHeap.push({0, :start})
       |> Yog.PairingHeap.push({5, :a})
       |> Yog.PairingHeap.push({3, :b})
+
+  ## Visual Representation
+
+  <div class="graphviz">
+  graph G {
+    bgcolor="transparent";
+    node [shape=circle, fontname="inherit", color="#6366f1", fontcolor="#6366f1", penwidth=2];
+    edge [color="#94a3b8", penwidth=1.5];
+
+    node3 [label="3", color="#6366f1", penwidth=2, style=bold];
+    node4 [label="4"];
+    node5 [label="5"];
+    node6 [label="6"];
+    node7 [label="7"];
+
+    node3 -- node5;
+    node3 -- node4;
+    node3 -- node6;
+    node5 -- node7;
+  }
+  </div>
+
+      iex> alias Yog.PairingHeap
+      iex> pq = PairingHeap.new()
+      ...> |> PairingHeap.push(3)
+      ...> |> PairingHeap.push(4)
+      ...> |> PairingHeap.push(5)
+      ...> |> PairingHeap.push(6)
+      ...> |> PairingHeap.push(7)
+      iex> PairingHeap.peek(pq)
+      {:ok, 3}
+      iex> PairingHeap.size(pq)
+      5
   """
 
   defmodule Node do

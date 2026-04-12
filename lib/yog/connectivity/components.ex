@@ -27,6 +27,37 @@ defmodule Yog.Connectivity.Components do
   - Analyzing graph structure and connectivity
   - Preprocessing for other graph algorithms
 
+  ## Disjoint Components Visualization
+
+  A graph is partitioned into disjoint components if no path exists between nodes across the partition.
+
+  <div class="graphviz">
+  graph G {
+    bgcolor="transparent";
+    node [shape=circle, fontname="inherit"];
+    edge [fontname="inherit", fontsize=10];
+
+    subgraph cluster_comp1 {
+      label="Component 1"; color="#6366f1"; style=rounded;
+      A1 -- A2; A2 -- A3; A3 -- A1;
+    }
+
+    subgraph cluster_comp2 {
+      label="Component 2"; color="#f43f5e"; style=rounded;
+      B1 -- B2;
+    }
+  }
+  </div>
+
+      iex> alias Yog.Connectivity.Components
+      iex> graph = Yog.from_edges(:undirected, [
+      ...>   {"A1", "A2", 1}, {"A2", "A3", 1}, {"A3", "A1", 1},
+      ...>   {"B1", "B2", 1}
+      ...> ])
+      iex> components = Components.connected_components(graph)
+      iex> length(components)
+      2
+
   ## Examples
 
       # Find connected components in an undirected graph

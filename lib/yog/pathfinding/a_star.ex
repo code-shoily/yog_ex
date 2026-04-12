@@ -49,20 +49,19 @@ defmodule Yog.Pathfinding.AStar do
   }
   </div>
 
-      # Heuristic search on a weighted graph
-      graph = Yog.directed()
-      |> Yog.add_edges([
-        {:a, :b, 2}, {:a, :c, 2}, {:b, :d, 2},
-        {:c, :d, 3}, {:b, :e, 5}, {:d, :e, 2},
-        {:d, :f, 2}, {:e, :g, 2}, {:f, :g, 4}
-      ])
-
-      # Heuristic values (h) to goal node :g
-      h = %{a: 6, b: 4, c: 6, d: 4, e: 2, f: 4, g: 0}
-      heuristic = fn n, _goal -> Map.get(h, n) end
-
-      Yog.Pathfinding.AStar.a_star(graph, :a, :g, heuristic)
-      #=> {:ok, %Yog.Pathfinding.Path{nodes: [:a, :b, :d, :e, :g], weight: 8}}
+      iex> alias Yog.Pathfinding.AStar
+      iex> graph = Yog.from_edges(:directed, [
+      ...>   {"A", "B", 2}, {"A", "C", 2}, {"B", "D", 2},
+      ...>   {"C", "D", 3}, {"B", "E", 5}, {"D", "E", 2},
+      ...>   {"D", "F", 2}, {"E", "G", 2}, {"F", "G", 4}
+      ...> ])
+      iex> h = %{"A" => 6, "B" => 4, "C" => 6, "D" => 4, "E" => 2, "F" => 4, "G" => 0}
+      iex> heuristic = fn n, _goal -> Map.get(h, n) end
+      iex> {:ok, path} = AStar.a_star(graph, "A", "G", heuristic)
+      iex> path.nodes
+      ["A", "B", "D", "E", "G"]
+      iex> path.weight
+      8
   """
 
   alias Yog.PairingHeap, as: PQ

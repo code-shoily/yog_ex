@@ -18,6 +18,41 @@ defmodule Yog.Centrality do
   | Katz | `katz/2` | Attenuated influence with base score |
   | Alpha | `alpha/2` | Directed graph influence |
 
+  ## Centrality Visualization (Betweenness)
+
+  Betweenness centrality identifies "bridge" nodes that act as gatekeepers between different parts of a network.
+
+  <div class="graphviz">
+  graph G {
+    bgcolor="transparent";
+    node [shape=circle, fontname="inherit"];
+    edge [fontname="inherit", fontsize=10];
+
+    // High betweenness node (Bridge/Broker)
+    Broker [label="Broker", color="#6366f1", penwidth=2.5, style=bold];
+    
+    // Community A
+    Broker -- A1; Broker -- A2; Broker -- A3;
+    A1 -- A2; A2 -- A3; A3 -- A1;
+    
+    // Community B
+    Broker -- B1; Broker -- B2; Broker -- B3;
+    B1 -- B2; B2 -- B3; B3 -- B1;
+  }
+  </div>
+
+      iex> alias Yog.Centrality
+      iex> graph = Yog.from_edges(:undirected, [
+      ...>   {"Broker", "A1", 1}, {"Broker", "A2", 1}, {"Broker", "A3", 1},
+      ...>   {"A1", "A2", 1}, {"A2", "A3", 1}, {"A3", "A1", 1},
+      ...>   {"Broker", "B1", 1}, {"Broker", "B2", 1}, {"Broker", "B3", 1},
+      ...>   {"B1", "B2", 1}, {"B2", "B3", 1}, {"B3", "B1", 1}
+      ...> ])
+      iex> scores = Centrality.betweenness(graph)
+      iex> # Broker should have the highest score
+      ...> scores["Broker"] > scores["A1"]
+      true
+
   """
 
   alias Yog.Pathfinding.{Brandes, Dijkstra}

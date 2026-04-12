@@ -49,6 +49,35 @@ defmodule Yog.Property.Cyclicity do
   - **Topological sort**: Only possible on DAGs (acyclic directed graphs)
   - **Eulerian paths**: Require specific degree conditions related to cycles
 
+  ## Cyclicity Comparison
+
+  <div class="graphviz">
+  digraph G {
+    rankdir=LR;
+    bgcolor="transparent";
+    node [shape=circle, fontname="inherit"];
+    edge [fontname="inherit", fontsize=10];
+
+    subgraph cluster_acyclic {
+      label="Acyclic (DAG)"; color="#10b981"; style=rounded;
+      A1 -> A2; A2 -> A3; A1 -> A3;
+    }
+
+    subgraph cluster_cyclic {
+      label="Cyclic"; color="#ef4444"; style=rounded;
+      C1 -> C2; C2 -> C3; C3 -> C1 [color="#ef4444", penwidth=2.5];
+    }
+  }
+  </div>
+
+      iex> alias Yog.Property.Cyclicity
+      iex> dag = Yog.from_edges(:directed, [{"A1", "A2", 1}, {"A2", "A3", 1}, {"A1", "A3", 1}])
+      iex> Cyclicity.acyclic?(dag)
+      true
+      iex> cycle = Yog.from_edges(:directed, [{"C1", "C2", 1}, {"C2", "C3", 1}, {"C3", "C1", 1}])
+      iex> Cyclicity.cyclic?(cycle)
+      true
+
   ## Examples
 
       # DAG is acyclic

@@ -32,6 +32,40 @@ defmodule Yog.MST do
 
   - [Wikipedia: Minimum Spanning Tree](https://en.wikipedia.org/wiki/Minimum_spanning_tree)
   - [CP-Algorithms: MST](https://cp-algorithms.com/graph/mst_kruskal.html)
+
+  ## Example: Visualizing an MST
+
+  <div class="graphviz">
+  graph G {
+    rankdir=LR;
+    bgcolor="transparent";
+    node [shape=circle, fontname="inherit"];
+    edge [fontname="inherit", fontsize=10];
+    A [label="A"]; B [label="B"]; C [label="C"]; D [label="D"]; E [label="E"];
+
+    // MST edges (solid, colored)
+    A -- B [label="2", color="#6366f1", penwidth=2.5];
+    B -- D [label="2", color="#6366f1", penwidth=2.5];
+    D -- C [label="1", color="#6366f1", penwidth=2.5];
+    E -- A [label="4", color="#6366f1", penwidth=2.5];
+
+    // Non-MST edges (dashed, muted)
+    B -- C [label="3", style=dashed, color="#94a3b8"];
+    A -- C [label="6", style=dashed, color="#94a3b8"];
+    D -- E [label="5", style=dashed, color="#94a3b8"];
+  }
+  </div>
+
+      iex> alias Yog.MST
+      iex> graph = Yog.from_edges(:undirected, [
+      ...>   {"A", "B", 2}, {"B", "D", 2}, {"D", "C", 1}, {"E", "A", 4},
+      ...>   {"B", "C", 3}, {"A", "C", 6}, {"D", "E", 5}
+      ...> ])
+      iex> {:ok, result} = MST.kruskal(in: graph)
+      iex> result.total_weight
+      9
+      iex> result.edge_count
+      4
   """
 
   alias Yog.MST.{Boruvka, Edmonds, Kruskal, Prim, Result, Wilson}

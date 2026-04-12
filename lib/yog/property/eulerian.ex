@@ -52,11 +52,41 @@ defmodule Yog.Property.Eulerian do
 
   ## Use Cases
 
-  - **Route planning**: Garbage collection, snow plowing, mail delivery
-  - **DNA sequencing**: Constructing genomes from overlapping fragments
-  - **Circuit board drilling**: Optimizing drill paths for PCB manufacturing
-  - **Layout printing**: Efficient pen plotting without lifting
-  - **Museum guard tours**: Covering all corridors efficiently
+  - **Route optimization**: Minimizing distance in postal delivery or snow plowing
+
+  ## Eulerian Visualization
+
+  An **Eulerian Circuit** exists if every vertex has an even degree. An **Eulerian Path** exists if exactly zero or two vertices have an odd degree.
+
+  <div class="graphviz">
+  graph G {
+    rankdir=LR;
+    bgcolor="transparent";
+    node [shape=circle, fontname="inherit"];
+    edge [fontname="inherit", fontsize=10];
+
+    subgraph cluster_circuit {
+      label="Eulerian Circuit (All Even)"; color="#10b981"; style=rounded;
+      A -- B; B -- C; C -- A;
+      C -- D; D -- E; E -- C;
+    }
+
+    subgraph cluster_path {
+      label="Eulerian Path (2 Odd)"; color="#f59e0b"; style=rounded;
+      1 -- 2; 2 -- 3; 3 -- 4; 4 -- 1; 1 -- 3;
+    }
+  }
+  </div>
+
+      iex> alias Yog.Property.Eulerian
+      iex> circuit = Yog.from_edges(:undirected, [{"A", "B", 1}, {"B", "C", 1}, {"C", "A", 1}, {"C", "D", 1}, {"D", "E", 1}, {"E", "C", 1}])
+      iex> Eulerian.has_eulerian_circuit?(circuit)
+      true
+      iex> path = Yog.from_edges(:undirected, [{"1", "2", 1}, {"2", "3", 1}, {"3", "4", 1}, {"4", "1", 1}, {"1", "3", 1}])
+      iex> Eulerian.has_eulerian_path?(path)
+      true
+      iex> Eulerian.has_eulerian_circuit?(path)
+      false
 
   ## History
 
