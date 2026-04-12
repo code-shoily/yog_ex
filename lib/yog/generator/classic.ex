@@ -848,6 +848,160 @@ defmodule Yog.Generator.Classic do
     end)
   end
 
+  @doc """
+  Generates the Sedgewick maze graph.
+
+  A small maze with a cycle used in Sedgewick's *Algorithms*, 3rd Edition,
+  Part 5, Graph Algorithms, Chapter 18 (Figure 18.2). It has 8 nodes and
+  10 edges.
+
+  ## Examples
+
+      iex> maze = Yog.Generator.Classic.sedgewick_maze()
+      iex> Yog.Model.order(maze)
+      8
+      iex> Yog.Model.edge_count(maze)
+      10
+
+  ## References
+
+  - Figure 18.2, Chapter 18, Graph Algorithms (3rd Ed), Sedgewick
+  """
+  @spec sedgewick_maze() :: Yog.graph()
+  def sedgewick_maze, do: sedgewick_maze_with_type(:undirected)
+
+  @doc """
+  Generates the Sedgewick maze graph with specified graph type.
+  """
+  @spec sedgewick_maze_with_type(Yog.graph_type()) :: Yog.graph()
+  def sedgewick_maze_with_type(graph_type) do
+    base = Yog.new(graph_type)
+
+    graph =
+      Enum.reduce(0..7, base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    edges = [
+      {0, 2, 1},
+      {0, 7, 1},
+      {0, 5, 1},
+      {1, 7, 1},
+      {2, 6, 1},
+      {3, 4, 1},
+      {3, 5, 1},
+      {4, 5, 1},
+      {4, 7, 1},
+      {4, 6, 1}
+    ]
+
+    Enum.reduce(edges, graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
+
+  @doc """
+  Generates the Tutte graph.
+
+  The Tutte graph is a 3-regular (cubic) polyhedral graph with 46 vertices
+  and 69 edges. It is non-Hamiltonian and serves as a counterexample to
+  Tait's conjecture that every 3-regular polyhedron has a Hamiltonian cycle.
+
+  ## Examples
+
+      iex> tutte = Yog.Generator.Classic.tutte()
+      iex> Yog.Model.order(tutte)
+      46
+      iex> Yog.Model.edge_count(tutte)
+      69
+
+  ## Properties
+
+  - Vertices: 46
+  - Edges: 69
+  - Degree: 3 (cubic)
+  - Non-Hamiltonian
+  - Planar
+
+  ## References
+
+  - [Wikipedia: Tutte Graph](https://en.wikipedia.org/wiki/Tutte_graph)
+  """
+  @spec tutte() :: Yog.graph()
+  def tutte, do: tutte_with_type(:undirected)
+
+  @doc """
+  Generates the Tutte graph with specified graph type.
+  """
+  @spec tutte_with_type(Yog.graph_type()) :: Yog.graph()
+  def tutte_with_type(graph_type) do
+    base = Yog.new(graph_type)
+
+    graph =
+      Enum.reduce(0..45, base, fn i, g ->
+        Yog.add_node(g, i, nil)
+      end)
+
+    adjacency = [
+      [1, 2, 3],
+      [4, 26],
+      [10, 11],
+      [18, 19],
+      [5, 33],
+      [6, 29],
+      [7, 27],
+      [8, 14],
+      [9, 38],
+      [10, 37],
+      [39],
+      [12, 39],
+      [13, 35],
+      [14, 15],
+      [34],
+      [16, 22],
+      [17, 44],
+      [18, 43],
+      [45],
+      [20, 45],
+      [21, 41],
+      [22, 23],
+      [40],
+      [24, 27],
+      [25, 32],
+      [26, 31],
+      [33],
+      [28],
+      [29, 32],
+      [30],
+      [31, 33],
+      [32],
+      [],
+      [],
+      [35, 38],
+      [36],
+      [37, 39],
+      [38],
+      [],
+      [],
+      [41, 44],
+      [42],
+      [43, 45],
+      [44],
+      [],
+      []
+    ]
+
+    edges =
+      Enum.with_index(adjacency, fn neighbors, u ->
+        for v <- neighbors, do: {u, v, 1}
+      end)
+      |> List.flatten()
+
+    Enum.reduce(edges, graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
+
   # ============= Empty Graph =============
 
   @doc """
@@ -1493,6 +1647,179 @@ defmodule Yog.Generator.Classic do
       Yog.add_edge!(g, from, to, weight)
     end)
   end
+
+  # ============= Lollipop Graph =============
+
+  @doc """
+  Generates the lollipop graph L(m, n).
+
+  The lollipop graph consists of a complete graph K_m connected to a path P_n
+  by a single bridge edge. This is an extremal example in the study of random
+  walks on graphs.
+
+  ## Examples
+
+      iex> lol = Yog.Generator.Classic.lollipop(4, 3)
+      iex> Yog.Model.order(lol)
+      7
+      iex> Yog.Model.edge_count(lol)
+      9
+
+  ## Properties
+
+  - Vertices: m + n
+  - Edges: m(m-1)/2 + n
+  - Diameter: n + 1 (for m > 1 and n > 0)
+
+  ## References
+
+  - [Wikipedia: Lollipop Graph](https://en.wikipedia.org/wiki/Lollipop_graph)
+  """
+  @spec lollipop(integer(), integer()) :: Yog.graph()
+  def lollipop(m, n), do: lollipop_with_type(m, n, :undirected)
+
+  @doc """
+  Generates the lollipop graph with specified graph type.
+  """
+  @spec lollipop_with_type(integer(), integer(), Yog.graph_type()) :: Yog.graph()
+  def lollipop_with_type(m, _n, _graph_type) when not is_integer(m) or m < 1,
+    do: Yog.new(:undirected)
+
+  def lollipop_with_type(m, n, graph_type) when is_integer(n) and n >= 0 do
+    base = Yog.new(graph_type)
+
+    total = m + n
+
+    graph =
+      if total > 0 do
+        Enum.reduce(0..(total - 1), base, fn i, g ->
+          Yog.add_node(g, i, nil)
+        end)
+      else
+        base
+      end
+
+    # Clique edges for K_m
+    clique_edges =
+      if m >= 2 do
+        for i <- 0..(m - 2)//1, j <- (i + 1)..(m - 1)//1, do: {i, j, 1}
+      else
+        []
+      end
+
+    # Path edges for P_n
+    path_edges =
+      if n >= 2 do
+        for i <- 0..(n - 2)//1, do: {m + i, m + i + 1, 1}
+      else
+        []
+      end
+
+    # Bridge edge connecting K_m to P_n
+    bridge_edges =
+      if n > 0, do: [{m - 1, m, 1}], else: []
+
+    Enum.reduce(clique_edges ++ path_edges ++ bridge_edges, graph, fn {from, to, weight}, g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
+
+  def lollipop_with_type(_m, _n, _graph_type), do: Yog.new(:undirected)
+
+  # ============= Barbell Graph =============
+
+  @doc """
+  Generates the barbell graph B(m1, m2).
+
+  The barbell graph consists of two complete graphs K_{m1} connected by a path
+  of m2 nodes. If m2 = 0, the two cliques are joined by a single edge.
+
+  ## Examples
+
+      iex> bar = Yog.Generator.Classic.barbell(4, 2)
+      iex> Yog.Model.order(bar)
+      10
+      iex> Yog.Model.edge_count(bar)
+      15
+
+  ## Properties
+
+  - Vertices: 2*m1 + m2
+  - Edges: m1*(m1-1) + m2 + 1
+  - Diameter: m2 + 2 (for m2 > 0)
+
+  ## References
+
+  - [Wikipedia: Barbell Graph](https://en.wikipedia.org/wiki/Barbell_graph)
+  """
+  @spec barbell(integer(), integer()) :: Yog.graph()
+  def barbell(m1, m2), do: barbell_with_type(m1, m2, :undirected)
+
+  @doc """
+  Generates the barbell graph with specified graph type.
+  """
+  @spec barbell_with_type(integer(), integer(), Yog.graph_type()) :: Yog.graph()
+  def barbell_with_type(m1, _m2, _graph_type) when not is_integer(m1) or m1 < 1,
+    do: Yog.new(:undirected)
+
+  def barbell_with_type(m1, m2, graph_type) when is_integer(m2) and m2 >= 0 do
+    base = Yog.new(graph_type)
+
+    total = 2 * m1 + m2
+
+    graph =
+      if total > 0 do
+        Enum.reduce(0..(total - 1), base, fn i, g ->
+          Yog.add_node(g, i, nil)
+        end)
+      else
+        base
+      end
+
+    # First clique edges (nodes 0..m1-1)
+    clique1_edges =
+      if m1 >= 2 do
+        for i <- 0..(m1 - 2)//1, j <- (i + 1)..(m1 - 1)//1, do: {i, j, 1}
+      else
+        []
+      end
+
+    # Second clique edges (nodes m1+m2..2*m1+m2-1)
+    clique2_start = m1 + m2
+
+    clique2_edges =
+      if m1 >= 2 do
+        for i <- 0..(m1 - 2)//1,
+            j <- (i + 1)..(m1 - 1)//1,
+            do: {clique2_start + i, clique2_start + j, 1}
+      else
+        []
+      end
+
+    # Path edges (nodes m1..m1+m2-1)
+    path_edges =
+      if m2 >= 2 do
+        for i <- 0..(m2 - 2)//1, do: {m1 + i, m1 + i + 1, 1}
+      else
+        []
+      end
+
+    # Bridge edges connecting cliques to path
+    bridge_edges =
+      if m2 > 0 do
+        [{m1 - 1, m1, 1}, {m1 + m2 - 1, m1 + m2, 1}]
+      else
+        [{m1 - 1, m1, 1}]
+      end
+
+    Enum.reduce(clique1_edges ++ clique2_edges ++ path_edges ++ bridge_edges, graph, fn {from, to,
+                                                                                         weight},
+                                                                                        g ->
+      Yog.add_edge!(g, from, to, weight)
+    end)
+  end
+
+  def barbell_with_type(_m1, _m2, _graph_type), do: Yog.new(:undirected)
 
   # ============= Turan Graph =============
 

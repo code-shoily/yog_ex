@@ -8,7 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Added
+#### Network Flow
 * `Yog.Flow.MaxFlow.dinic/3` - Dinic's algorithm for maximum flow.
+#### Classic Graph Generators
+- **Lollipop Graph** (`Yog.Generator.Classic.lollipop/2`): $K_m$ connected to $P_n$ — extremal example for random walks.
+- **Barbell Graph** (`Yog.Generator.Classic.barbell/2`): Two $K_{m1}$ cliques joined by a path of $m2$ nodes.
+- **Sedgewick Maze** (`Yog.Generator.Classic.sedgewick_maze/0`): Small 8-node maze with a cycle from Sedgewick's *Algorithms*.
+- **Tutte Graph** (`Yog.Generator.Classic.tutte/0`): 46-vertex cubic non-Hamiltonian polyhedral graph.
 
 ## 0.96.0 - 2026-04-12
 

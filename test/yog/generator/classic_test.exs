@@ -1092,4 +1092,113 @@ defmodule Yog.Generator.ClassicTest do
       assert length(Yog.neighbors(crown, v)) == 9
     end
   end
+
+  # ============= Lollipop Graph Tests =============
+
+  test "lollipop/2 creates L(m, n)" do
+    lol = Classic.lollipop(4, 3)
+    assert Yog.Model.order(lol) == 7
+    # K4 has 6 edges, path has 2 edges, bridge has 1 edge
+    assert Yog.Model.edge_count(lol) == 9
+
+    # Clique nodes 0..3 should have clique degrees plus possible bridge
+    for v <- 0..2 do
+      assert length(Yog.neighbors(lol, v)) == 3
+    end
+
+    # Node 3 is in clique and bridge
+    assert length(Yog.neighbors(lol, 3)) == 4
+
+    # Path end node
+    assert length(Yog.neighbors(lol, 6)) == 1
+  end
+
+  test "lollipop/2 edge cases" do
+    # n=0 is just K_m
+    k3 = Classic.lollipop(3, 0)
+    assert Yog.Model.order(k3) == 3
+    assert Yog.Model.edge_count(k3) == 3
+
+    # m=1, n=3 is a path of 4 nodes
+    path = Classic.lollipop(1, 3)
+    assert Yog.Model.order(path) == 4
+    assert Yog.Model.edge_count(path) == 3
+
+    # Invalid m
+    assert Yog.Model.order(Classic.lollipop(0, 3)) == 0
+  end
+
+  test "lollipop_with_type/3 directed" do
+    lol = Classic.lollipop_with_type(3, 2, :directed)
+    assert Yog.Model.type(lol) == :directed
+    assert Yog.Model.order(lol) == 5
+  end
+
+  # ============= Barbell Graph Tests =============
+
+  test "barbell/2 creates B(m1, m2)" do
+    bar = Classic.barbell(4, 2)
+    assert Yog.Model.order(bar) == 10
+    # 2*K4 (12 edges) + path (1 edge) + 2 bridges (2 edges) = 15
+    assert Yog.Model.edge_count(bar) == 15
+  end
+
+  test "barbell/2 m2=0" do
+    bar = Classic.barbell(3, 0)
+    assert Yog.Model.order(bar) == 6
+    # 2*K3 (6 edges) + 1 bridge = 7
+    assert Yog.Model.edge_count(bar) == 7
+  end
+
+  test "barbell/2 edge cases" do
+    # m1=1, m2=0: two nodes connected by an edge
+    bar = Classic.barbell(1, 0)
+    assert Yog.Model.order(bar) == 2
+    assert Yog.Model.edge_count(bar) == 1
+
+    # Invalid m1
+    assert Yog.Model.order(Classic.barbell(0, 2)) == 0
+  end
+
+  test "barbell_with_type/3 directed" do
+    bar = Classic.barbell_with_type(3, 1, :directed)
+    assert Yog.Model.type(bar) == :directed
+    assert Yog.Model.order(bar) == 7
+  end
+
+  # ============= Sedgewick Maze Tests =============
+
+  test "sedgewick_maze/0 creates the correct small graph" do
+    maze = Classic.sedgewick_maze()
+    assert Yog.Model.order(maze) == 8
+    assert Yog.Model.edge_count(maze) == 10
+
+    # Node 4 has degree 4
+    assert length(Yog.neighbors(maze, 4)) == 4
+  end
+
+  test "sedgewick_maze_with_type/1 directed" do
+    maze = Classic.sedgewick_maze_with_type(:directed)
+    assert Yog.Model.type(maze) == :directed
+    assert Yog.Model.order(maze) == 8
+  end
+
+  # ============= Tutte Graph Tests =============
+
+  test "tutte/0 creates the correct graph" do
+    tutte = Classic.tutte()
+    assert Yog.Model.order(tutte) == 46
+    assert Yog.Model.edge_count(tutte) == 69
+
+    # Cubic: every vertex has degree 3
+    for v <- 0..45 do
+      assert length(Yog.neighbors(tutte, v)) == 3
+    end
+  end
+
+  test "tutte_with_type/1 directed" do
+    tutte = Classic.tutte_with_type(:directed)
+    assert Yog.Model.type(tutte) == :directed
+    assert Yog.Model.order(tutte) == 46
+  end
 end
