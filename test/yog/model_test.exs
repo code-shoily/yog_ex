@@ -336,6 +336,64 @@ defmodule Yog.ModelTest do
     assert Model.successor_ids(graph, 1) == [1]
   end
 
+  # ============= Add Nodes From Tests =============
+
+  test "add_nodes_from_list_of_ids_test" do
+    graph =
+      Yog.directed()
+      |> Model.add_nodes_from([1, 2, 3])
+
+    assert Model.order(graph) == 3
+    assert Model.node(graph, 1) == nil
+    assert Model.node(graph, 2) == nil
+  end
+
+  test "add_nodes_from_tuples_test" do
+    graph =
+      Yog.directed()
+      |> Model.add_nodes_from([{1, "A"}, {2, "B"}])
+
+    assert Model.order(graph) == 2
+    assert Model.node(graph, 1) == "A"
+    assert Model.node(graph, 2) == "B"
+  end
+
+  test "add_nodes_from_map_test" do
+    graph =
+      Yog.directed()
+      |> Model.add_nodes_from(%{1 => "A", 2 => "B"})
+
+    assert Model.order(graph) == 2
+    assert Model.node(graph, 1) == "A"
+    assert Model.node(graph, 2) == "B"
+  end
+
+  test "add_nodes_from_graph_test" do
+    h =
+      Yog.undirected()
+      |> Model.add_node(1, "A")
+      |> Model.add_node(2, "B")
+
+    graph =
+      Yog.directed()
+      |> Model.add_nodes_from(h)
+
+    assert Model.order(graph) == 2
+    assert Model.node(graph, 1) == "A"
+    assert Model.node(graph, 2) == "B"
+    # Only nodes copied, not edges
+    assert Model.edge_count(graph) == 0
+  end
+
+  test "add_nodes_from_replaces_existing_test" do
+    graph =
+      Yog.directed()
+      |> Model.add_node(1, "Old")
+      |> Model.add_nodes_from([{1, "New"}])
+
+    assert Model.node(graph, 1) == "New"
+  end
+
   # ============= Coverage Test for All Delegates =============
 
   test "all_model_delegates_test" do
@@ -343,11 +401,12 @@ defmodule Yog.ModelTest do
     graph = Model.new(:directed)
     graph = Model.add_node(graph, 1, "A")
     graph = Model.add_node(graph, 2, "B")
+    graph = Model.add_nodes_from(graph, [3, 4])
     graph = Model.add_edge!(graph, 1, 2, 10)
     graph = Model.add_edge_ensure(graph, 2, 3, 5, "C")
 
-    assert Model.order(graph) == 3
-    assert length(Model.all_nodes(graph)) == 3
+    assert Model.order(graph) == 4
+    assert length(Model.all_nodes(graph)) == 4
     assert Model.successors(graph, 1) == [{2, 10}]
     assert Model.successor_ids(graph, 1) == [2]
     assert Model.predecessors(graph, 2) == [{1, 10}]
@@ -357,7 +416,7 @@ defmodule Yog.ModelTest do
     assert Model.successors(graph, 1) == [{2, 15}]
 
     graph = Model.remove_node(graph, 2)
-    assert Model.order(graph) == 2
+    assert Model.order(graph) == 3
 
     assert Model.type(graph) == :directed
     assert is_map(Model.nodes(graph))

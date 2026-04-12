@@ -94,6 +94,36 @@ defmodule Yog.Model do
   end
 
   @doc """
+  Adds multiple nodes to the graph from an iterable.
+
+  Accepts:
+  - A list of node IDs: `[1, 2, 3]`
+  - A list of `{id, data}` tuples: `[{1, "A"}, {2, "B"}]`
+  - A map: `%{1 => "A", 2 => "B"}`
+  - Another `Yog.Graph`: copies all nodes (but not edges)
+
+  Existing nodes with the same ID will have their data replaced.
+
+  ## Example
+
+      iex> graph =
+      ...>   Yog.Model.new(:directed)
+      ...>   |> Yog.Model.add_nodes_from([1, {2, "B"}])
+      iex> Yog.Model.order(graph)
+      2
+      iex> Yog.Model.node(graph, 2)
+      "B"
+  """
+  @spec add_nodes_from(graph(), Enumerable.t()) :: graph()
+  def add_nodes_from(%Graph{} = graph, nodes) do
+    Enum.reduce(nodes, graph, fn
+      {id, data}, g -> add_node(g, id, data)
+      [id, data], g -> add_node(g, id, data)
+      id, g -> add_node(g, id, nil)
+    end)
+  end
+
+  @doc """
   Removes a node and all its connected edges (incoming and outgoing).
 
   **Time Complexity:** O(deg(v)) - proportional to the number of edges

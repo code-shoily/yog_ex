@@ -74,7 +74,7 @@ defmodule YogEx.MixProject do
     [
       name: "yog_ex",
       files:
-        ~w(lib .formatter.exs mix.exs README.md GLEAM_ELIXIR_COMPARISON.md ALGORITHMS.md PROPERTIES.md LICENSE CHANGELOG.md),
+        ~w(lib .formatter.exs mix.exs README.md GLEAM_ELIXIR_COMPARISON.md ALGORITHMS.md PROPERTIES.md LICENSE CHANGELOG.md livebooks),
       licenses: ["Apache-2.0"],
       links: %{
         "GitHub" => @source_url,
@@ -92,6 +92,8 @@ defmodule YogEx.MixProject do
         {"examples/README.md", [filename: "examples_readme", title: "Examples README"]},
         {"lib/yog/functional/README.md",
          [filename: "functional_readme", title: "Functional API README"]},
+        {"livebooks/networkx_inspired_tutorial.livemd",
+         [filename: "networkx_tutorial", title: "NetworkX Tutorial"]},
         "ALGORITHMS.md",
         "PROPERTIES.md",
         "GLEAM_ELIXIR_COMPARISON.md",
@@ -157,6 +159,9 @@ defmodule YogEx.MixProject do
           "examples_readme",
           "functional_readme",
           "GLEAM_ELIXIR_COMPARISON.md"
+        ],
+        Livebooks: [
+          "networkx_tutorial"
         ],
         Reference: [
           "ALGORITHMS.md",

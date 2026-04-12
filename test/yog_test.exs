@@ -60,6 +60,31 @@ defmodule YogTest do
       assert Map.get(nodes, 1) == "Updated"
     end
 
+    # Test creating a graph from a list of node IDs
+    test "from_nodes_ids_test" do
+      graph = Yog.from_nodes(:directed, [1, 2, 3])
+      assert graph.kind == :directed
+      assert Yog.Model.order(graph) == 3
+      assert Yog.Model.node(graph, 1) == nil
+      assert Yog.Model.node(graph, 2) == nil
+    end
+
+    # Test creating a graph from {id, data} tuples
+    test "from_nodes_tuples_test" do
+      graph = Yog.from_nodes(:undirected, [{1, "A"}, {2, "B"}])
+      assert graph.kind == :undirected
+      assert Yog.Model.order(graph) == 2
+      assert Yog.Model.node(graph, 1) == "A"
+      assert Yog.Model.node(graph, 2) == "B"
+    end
+
+    # Test creating a graph from a map
+    test "from_nodes_map_test" do
+      graph = Yog.from_nodes(:directed, %{1 => "A", 2 => "B"})
+      assert Yog.Model.order(graph) == 2
+      assert Yog.Model.node(graph, 1) == "A"
+    end
+
     # Test adding a directed edge
     test "add_directed_edge_test" do
       graph =

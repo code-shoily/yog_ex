@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Added
+
+#### Core API
+- `Yog.Model.add_nodes_from/2` and `Yog.add_nodes_from/2` - Add multiple nodes from an iterable (list of IDs, `{id, data}` tuples, a map, or another `Yog.Graph`).
+- `Yog.from_nodes/2` - Create a new graph from a list of nodes, symmetric to `Yog.from_edges/2`.
+
 #### Network Flow
 * `Yog.Flow.MaxFlow.dinic/3` - Dinic's algorithm for maximum flow.
 #### Classic Graph Generators

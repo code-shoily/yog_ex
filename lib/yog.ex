@@ -131,6 +131,27 @@ defmodule Yog do
   end
 
   @doc """
+  Creates a graph from a list of nodes.
+
+  Accepts:
+  - A list of node IDs: `[1, 2, 3]`
+  - A list of `{id, data}` tuples: `[{1, "A"}, {2, "B"}]`
+  - A map: `%{1 => "A", 2 => "B"}`
+
+  ## Example
+
+      iex> graph = Yog.from_nodes(:directed, [1, {2, "B"}])
+      iex> Yog.Model.order(graph)
+      2
+      iex> Yog.Model.node(graph, 2)
+      "B"
+  """
+  @spec from_nodes(:directed | :undirected, Enumerable.t()) :: graph()
+  def from_nodes(type, nodes) do
+    add_nodes_from(new(type), nodes)
+  end
+
+  @doc """
   Creates a graph from a list of unweighted edges (weight will be nil).
 
   ## Example
@@ -247,6 +268,14 @@ defmodule Yog do
   """
   @spec add_node(graph(), node_id(), any()) :: graph()
   defdelegate add_node(graph, id, data), to: Model
+
+  @doc """
+  Adds multiple nodes to the graph from an iterable.
+
+  See `Yog.Model.add_nodes_from/2` for details.
+  """
+  @spec add_nodes_from(graph(), Enumerable.t()) :: graph()
+  defdelegate add_nodes_from(graph, nodes), to: Model
 
   @doc """
   Adds an edge to the graph.
