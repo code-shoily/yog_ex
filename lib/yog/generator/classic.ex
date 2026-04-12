@@ -991,14 +991,12 @@ defmodule Yog.Generator.Classic do
       []
     ]
 
-    edges =
-      Enum.with_index(adjacency, fn neighbors, u ->
-        for v <- neighbors, do: {u, v, 1}
+    adjacency
+    |> Enum.with_index()
+    |> Enum.reduce(graph, fn {neighbors, u}, acc_graph ->
+      Enum.reduce(neighbors, acc_graph, fn v, g ->
+        Yog.add_edge!(g, u, v, 1)
       end)
-      |> List.flatten()
-
-    Enum.reduce(edges, graph, fn {from, to, weight}, g ->
-      Yog.add_edge!(g, from, to, weight)
     end)
   end
 
@@ -1682,8 +1680,8 @@ defmodule Yog.Generator.Classic do
   Generates the lollipop graph with specified graph type.
   """
   @spec lollipop_with_type(integer(), integer(), Yog.graph_type()) :: Yog.graph()
-  def lollipop_with_type(m, _n, _graph_type) when not is_integer(m) or m < 1,
-    do: Yog.new(:undirected)
+  def lollipop_with_type(m, _n, graph_type) when not is_integer(m) or m < 1,
+    do: Yog.new(graph_type)
 
   def lollipop_with_type(m, n, graph_type) when is_integer(n) and n >= 0 do
     base = Yog.new(graph_type)
@@ -1724,7 +1722,7 @@ defmodule Yog.Generator.Classic do
     end)
   end
 
-  def lollipop_with_type(_m, _n, _graph_type), do: Yog.new(:undirected)
+  def lollipop_with_type(_m, _n, graph_type), do: Yog.new(graph_type)
 
   # ============= Barbell Graph =============
 
@@ -1759,8 +1757,8 @@ defmodule Yog.Generator.Classic do
   Generates the barbell graph with specified graph type.
   """
   @spec barbell_with_type(integer(), integer(), Yog.graph_type()) :: Yog.graph()
-  def barbell_with_type(m1, _m2, _graph_type) when not is_integer(m1) or m1 < 1,
-    do: Yog.new(:undirected)
+  def barbell_with_type(m1, _m2, graph_type) when not is_integer(m1) or m1 < 1,
+    do: Yog.new(graph_type)
 
   def barbell_with_type(m1, m2, graph_type) when is_integer(m2) and m2 >= 0 do
     base = Yog.new(graph_type)
@@ -1819,7 +1817,7 @@ defmodule Yog.Generator.Classic do
     end)
   end
 
-  def barbell_with_type(_m1, _m2, _graph_type), do: Yog.new(:undirected)
+  def barbell_with_type(_m1, _m2, graph_type), do: Yog.new(graph_type)
 
   # ============= Turan Graph =============
 
