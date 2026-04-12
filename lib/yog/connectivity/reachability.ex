@@ -8,6 +8,42 @@ defmodule Yog.Connectivity.Reachability do
   memory in the worst case (dense graphs). For large graphs (>10,000 nodes),
   consider using `counts_estimate/2` which uses HyperLogLog for approximate
   counting with O(V) memory.
+
+  ## Reachability Visualization
+
+  Reachability analysis identifies the set of all nodes that can be visited starting from a specific source node (descendants) or that can visit a specific node (ancestors).
+
+  <div class="graphviz">
+  digraph G {
+    bgcolor="transparent";
+    node [shape=circle, fontname="inherit"];
+    edge [fontname="inherit", fontsize=10];
+
+    Source [label="Source", color="#6366f1", penwidth=2.5, style=bold];
+    
+    // Reachable set
+    Source -> A [color="#6366f1"];
+    A -> B [color="#6366f1"];
+    Source -> C [color="#6366f1"];
+    
+    // Unreachable from Source
+    X -> Y;
+    X -> Source [style=dashed, label="ancestor"];
+    
+    subgraph cluster_reachable {
+      label="Reachability Set (Descendants)"; color="#6366f1"; style=rounded;
+      A; B; C;
+    }
+  }
+  </div>
+
+      iex> alias Yog.Connectivity.Reachability
+      iex> graph = Yog.from_edges(:directed, [
+      ...>   {"Source", "A", 1}, {"A", "B", 1}, {"Source", "C", 1},
+      ...>   {"X", "Y", 1}, {"X", "Source", 1}
+      ...> ])
+      iex> Reachability.counts(graph, :descendants)["Source"]
+      3
   """
 
   import Bitwise, only: [band: 2, bsr: 2, bsl: 2]

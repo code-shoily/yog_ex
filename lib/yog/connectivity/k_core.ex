@@ -5,6 +5,36 @@ defmodule Yog.Connectivity.KCore do
   A [k-core](https://en.wikipedia.org/wiki/Degeneracy_(graph_theory)) is a maximal subgraph
   in which every node has at least degree `k`.
 
+  ## K-Core Decomposition Visualization
+
+  A graph can be decomposed into nested "cores" where higher values of `k` represent denser, more central subgraphs.
+
+  <div class="graphviz">
+  graph G {
+    bgcolor="transparent";
+    node [shape=circle, fontname="inherit"];
+    edge [fontname="inherit", fontsize=10];
+
+    // 2-Core (Square + internal connections)
+    subgraph cluster_c2 {
+      label="2-Core (min_deg=2)"; color="#6366f1"; style=rounded;
+      A -- B; B -- C; C -- D; D -- A;
+    }
+
+    // 1-Core additions (Peripheral nodes)
+    A -- P1; C -- P2;
+  }
+  </div>
+
+      iex> alias Yog.Connectivity.KCore
+      iex> graph = Yog.from_edges(:undirected, [
+      ...>   {"A", "B", 1}, {"B", "C", 1}, {"C", "D", 1}, {"D", "A", 1},
+      ...>   {"A", "P1", 1}, {"C", "P2", 1}
+      ...> ])
+      iex> core_2 = KCore.detect(graph, 2)
+      iex> Yog.node_ids(core_2) |> Enum.sort()
+      ["A", "B", "C", "D"]
+
   ## Algorithms
 
   | Problem | Function | Complexity |

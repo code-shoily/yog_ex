@@ -66,7 +66,55 @@ defmodule Yog.Community do
       ...> ])
       iex> communities = Community.Result.new(%{1 => 0, 2 => 0, 3 => 0, 4 => 1, 5 => 1, 6 => 1})
       iex> Community.modularity(graph, communities) > 0.3
+      iex> Community.modularity(graph, communities) > 0.3
       true
+
+  ## Overlapping Communities
+
+  In overlapping community detection, nodes can be members of multiple groups.
+
+  <div class="graphviz">
+  graph G {
+    bgcolor="transparent";
+    node [shape=circle, fontname="inherit"];
+    edge [fontname="inherit", fontsize=10];
+
+    subgraph cluster_c1 {
+      label="Community A"; color="#6366f1"; style=rounded;
+      1; 2; 4;
+    }
+
+    subgraph cluster_c2 {
+      label="Community B"; color="#f43f5e"; style=rounded;
+      3; 5; 4;
+    }
+
+    1 -- 2; 2 -- 4; 4 -- 1;
+    3 -- 5; 5 -- 4; 4 -- 3;
+  }
+  </div>
+
+  ## Hierarchical Structure (Dendrogram)
+
+  Algorithms like Louvain and Girvan-Newman produce hierarchical results showing how nodes merge into larger functional units.
+
+  <div class="graphviz">
+  graph G {
+    rankdir=BT;
+    bgcolor="transparent";
+    node [shape=circle, fontname="inherit"];
+
+    Root [label="Full Graph", color="#10b981", penwidth=2.5, style=bold];
+    
+    C1 [label="Comm 1", color="#6366f1", penwidth=2];
+    C2 [label="Comm 2", color="#f43f5e", penwidth=2];
+    
+    Root -- C1; Root -- C2;
+    
+    C1 -- 1; C1 -- 2; C1 -- 3;
+    C2 -- 4; C2 -- 5; C2 -- 6;
+  }
+  </div>
 
   ## Examples
 

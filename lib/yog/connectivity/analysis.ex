@@ -1,6 +1,43 @@
 defmodule Yog.Connectivity.Analysis do
   @moduledoc """
   Algorithms for analyzing graph connectivity (bridges, articulation points).
+
+  ## Connectivity Analysis Visualization
+
+  **Articulation Points** (nodes) and **Bridges** (edges) are critical structural elements whose removal increases the number of connected components in the graph.
+
+  <div class="graphviz">
+  graph G {
+    bgcolor="transparent";
+    node [shape=circle, fontname="inherit"];
+    edge [fontname="inherit", fontsize=10];
+
+    // Articulation Points highlighted in rose
+    3 [label="3", color="#f43f5e", penwidth=2.5, style=bold];
+    4 [label="4", color="#f43f5e", penwidth=2.5, style=bold];
+    
+    // Group A
+    1 -- 2; 2 -- 3; 3 -- 1;
+    
+    // Bridge (3 -- 4) highlighted in rose
+    3 -- 4 [label="bridge", color="#f43f5e", penwidth=2.5, style=bold];
+    
+    // Group B
+    4 -- 5; 5 -- 6; 6 -- 4;
+  }
+  </div>
+
+      iex> alias Yog.Connectivity.Analysis
+      iex> graph = Yog.from_edges(:undirected, [
+      ...>   {1, 2, 1}, {2, 3, 1}, {3, 1, 1},
+      ...>   {3, 4, 1},
+      ...>   {4, 5, 1}, {5, 6, 1}, {6, 4, 1}
+      ...> ])
+      iex> result = Analysis.analyze(graph)
+      iex> result.articulation_points
+      [3, 4]
+      iex> result.bridges
+      [{3, 4}]
   """
 
   alias Yog.Model
