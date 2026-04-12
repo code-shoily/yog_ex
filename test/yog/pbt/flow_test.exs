@@ -5,7 +5,7 @@ defmodule Yog.PBT.FlowTest do
   import Yog.Generators
 
   describe "Flow Properties" do
-    property "Max-Flow Min-Cut Theorem: max_flow value equals cut capacity" do
+    property "Max-Flow Min-Cut Theorem: max_flow value equals cut capacity (Edmonds-Karp)" do
       check all({graph, s, t} <- flow_problem_gen()) do
         result = Yog.Flow.MaxFlow.edmonds_karp(graph, s, t)
         cut = Yog.Flow.MaxFlow.extract_min_cut(result)
@@ -15,7 +15,16 @@ defmodule Yog.PBT.FlowTest do
       end
     end
 
-    property "Flow Conservation and Capacity Constraints" do
+    property "Max-Flow Min-Cut Theorem: max_flow value equals cut capacity (Dinic)" do
+      check all({graph, s, t} <- flow_problem_gen()) do
+        result = Yog.Flow.MaxFlow.dinic(graph, s, t)
+        cut = Yog.Flow.MaxFlow.extract_min_cut(result)
+
+        assert result.max_flow == cut.cut_value
+      end
+    end
+
+    property "Flow Conservation and Capacity Constraints (Edmonds-Karp)" do
       check all({graph, s, t} <- flow_problem_gen()) do
         result = Yog.Flow.MaxFlow.edmonds_karp(graph, s, t)
         res_graph = result.residual_graph
@@ -23,6 +32,39 @@ defmodule Yog.PBT.FlowTest do
         all_node_ids = Yog.all_nodes(graph)
 
         # Calculate net flow out for each node
+        net_flows =
+          Enum.reduce(all_node_ids, %{}, fn u, acc ->
+            out_orig = Yog.successors(graph, u) |> Enum.into(%{})
+            out_res = Yog.successors(res_graph, u) |> Enum.into(%{})
+
+            sum_orig = out_orig |> Map.values() |> Enum.sum()
+            sum_res = out_res |> Map.values() |> Enum.sum()
+
+            Map.put(acc, u, sum_orig - sum_res)
+          end)
+
+        for u <- all_node_ids do
+          cond do
+            u == s ->
+              assert net_flows[u] == result.max_flow
+
+            u == t ->
+              assert net_flows[u] == -result.max_flow
+
+            true ->
+              assert net_flows[u] == 0
+          end
+        end
+      end
+    end
+
+    property "Flow Conservation and Capacity Constraints (Dinic)" do
+      check all({graph, s, t} <- flow_problem_gen()) do
+        result = Yog.Flow.MaxFlow.dinic(graph, s, t)
+        res_graph = result.residual_graph
+
+        all_node_ids = Yog.all_nodes(graph)
+
         net_flows =
           Enum.reduce(all_node_ids, %{}, fn u, acc ->
             out_orig = Yog.successors(graph, u) |> Enum.into(%{})
@@ -63,7 +105,7 @@ defmodule Yog.PBT.FlowTest do
       end
     end
 
-    property "Residual graph has no path from source to sink" do
+    property "Residual graph has no path from source to sink (Edmonds-Karp)" do
       check all({graph, s, t} <- flow_problem_gen()) do
         result = Yog.Flow.MaxFlow.edmonds_karp(graph, s, t)
         res_graph = result.residual_graph
@@ -74,6 +116,18 @@ defmodule Yog.PBT.FlowTest do
 
         # Either t is not reachable, or the only paths have zero capacity
         # Or no flow was possible
+        assert t not in reachable or
+                 result.max_flow == 0
+      end
+    end
+
+    property "Residual graph has no path from source to sink (Dinic)" do
+      check all({graph, s, t} <- flow_problem_gen()) do
+        result = Yog.Flow.MaxFlow.dinic(graph, s, t)
+        res_graph = result.residual_graph
+
+        reachable = Yog.Traversal.walk(res_graph, s, :breadth_first)
+
         assert t not in reachable or
                  result.max_flow == 0
       end
@@ -102,17 +156,28 @@ defmodule Yog.PBT.FlowTest do
         s = hd(nodes1)
         t = hd(g2_nodes)
 
-        result = Yog.Flow.MaxFlow.edmonds_karp(graph, s, t)
+        ek_result = Yog.Flow.MaxFlow.edmonds_karp(graph, s, t)
+        dinic_result = Yog.Flow.MaxFlow.dinic(graph, s, t)
 
         # No path between disconnected components
-        assert result.max_flow == 0
+        assert ek_result.max_flow == 0
+        assert dinic_result.max_flow == 0
+      end
+    end
+
+    property "Dinic and Edmonds-Karp produce identical max flow values" do
+      check all({graph, s, t} <- flow_problem_gen()) do
+        ek_result = Yog.Flow.MaxFlow.edmonds_karp(graph, s, t)
+        dinic_result = Yog.Flow.MaxFlow.dinic(graph, s, t)
+
+        assert ek_result.max_flow == dinic_result.max_flow
       end
     end
   end
 
   describe "Performance Tests" do
     @tag timeout: 30000
-    test "handles larger flow networks efficiently" do
+    test "Edmonds-Karp handles larger flow networks efficiently" do
       # Create a larger flow network: grid-like structure
       # 50x50 grid = 2500 nodes
       n = 50
@@ -142,6 +207,37 @@ defmodule Yog.PBT.FlowTest do
       assert result.max_flow > 0
 
       # Verify min-cut equals max-flow
+      cut = Yog.Flow.MaxFlow.extract_min_cut(result)
+      assert cut.cut_value == result.max_flow
+    end
+
+    @tag timeout: 30000
+    test "Dinic handles larger flow networks efficiently" do
+      n = 50
+
+      graph =
+        Enum.reduce(0..(n - 1), Yog.directed(), fn i, g ->
+          Enum.reduce(0..(n - 1), g, fn j, acc ->
+            node_id = i * n + j
+            Yog.add_node(acc, node_id, nil)
+          end)
+        end)
+        |> add_grid_edges(n)
+
+      source = 0
+      sink = n * n - 1
+
+      {time_ms, result} =
+        :timer.tc(
+          fn ->
+            Yog.Flow.MaxFlow.dinic(graph, source, sink)
+          end,
+          :millisecond
+        )
+
+      assert time_ms < 10000
+      assert result.max_flow > 0
+
       cut = Yog.Flow.MaxFlow.extract_min_cut(result)
       assert cut.cut_value == result.max_flow
     end
@@ -178,7 +274,7 @@ defmodule Yog.PBT.FlowTest do
   end
 
   describe "Algorithm Comparison Properties" do
-    property "Multiple max flow paths yield same result" do
+    property "Multiple max flow paths yield same result (Edmonds-Karp)" do
       check all(
               # Complete bipartite graph - multiple equivalent paths
               m <- StreamData.integer(2..5),
@@ -198,6 +294,22 @@ defmodule Yog.PBT.FlowTest do
 
         # In K_{m,n}, max flow from any left to any right node 
         # is at least 1 (direct edge) + possibly more through other nodes
+        assert result.max_flow >= 1
+      end
+    end
+
+    property "Multiple max flow paths yield same result (Dinic)" do
+      check all(
+              m <- StreamData.integer(2..5),
+              n <- StreamData.integer(2..5)
+            ) do
+        graph = Yog.Generator.Classic.complete_bipartite(m, n)
+        graph = Yog.map_edges(graph, fn _ -> 1 end)
+
+        s = 0
+        t = m
+
+        result = Yog.Flow.MaxFlow.dinic(graph, s, t)
         assert result.max_flow >= 1
       end
     end

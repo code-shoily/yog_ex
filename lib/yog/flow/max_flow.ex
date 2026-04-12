@@ -12,6 +12,7 @@ defmodule Yog.Flow.MaxFlow do
   | Algorithm | Function | Complexity | Best For |
   |-----------|----------|------------|----------|
   | [Edmonds-Karp](https://en.wikipedia.org/wiki/Edmonds%E2%80%93Karp_algorithm) | `edmonds_karp/8` | O(VE²) | General networks, guaranteed polynomial time |
+  | [Dinic](https://en.wikipedia.org/wiki/Dinic%27s_algorithm) | `dinic/8` | O(V²E) | Dense networks, unit capacities O(E√V) |
 
   ## Key Concepts
 
@@ -21,6 +22,7 @@ defmodule Yog.Flow.MaxFlow do
   - **Residual Graph**: Shows remaining capacity after current flow assignment
   - **Augmenting Path**: Path from source to sink with available capacity
   - **Minimum Cut**: Partition separating source from sink with minimum total capacity
+  - **Level Graph**: BFS layering of nodes used by Dinic's algorithm
 
   ## Use Cases
 
@@ -76,10 +78,45 @@ defmodule Yog.Flow.MaxFlow do
       result = Yog.Flow.MaxFlow.calculate(graph, 1, 4)
       # => %MaxFlowResult{max_flow: 15, residual_graph: ..., source: 1, sink: 4}
 
+  ## Example: Dinic's Algorithm
+
+  Dinic's algorithm builds a level graph via BFS and pushes blocking flows
+  via DFS, making it efficient for dense networks.
+
+  <div class="graphviz">
+  digraph G {
+    rankdir=LR;
+    bgcolor="transparent";
+    node [shape=circle, fontname="inherit"];
+    edge [fontname="inherit", fontsize=10];
+    S [label="S"]; A [label="A"]; B [label="B"]; C [label="C"]; T [label="T"];
+
+    { rank=same; S; }
+    { rank=same; A; B; }
+    { rank=same; C; }
+    { rank=same; T; }
+
+    S -> A [label="10", color="#6366f1", penwidth=2];
+    S -> B [label="5", color="#6366f1", penwidth=2];
+    A -> C [label="8", color="#6366f1", penwidth=2];
+    B -> C [label="3", color="#6366f1", penwidth=2];
+    C -> T [label="7", color="#6366f1", penwidth=2];
+  }
+  </div>
+
+      iex> graph = Yog.from_edges(:directed, [
+      ...>   {"S", "A", 10}, {"S", "B", 5}, {"A", "C", 8},
+      ...>   {"B", "C", 3}, {"C", "T", 7}
+      ...> ])
+      iex> result = Yog.Flow.MaxFlow.dinic(graph, "S", "T")
+      iex> result.max_flow
+      7
+
   ## References
 
   - [Wikipedia: Maximum Flow Problem](https://en.wikipedia.org/wiki/Maximum_flow_problem)
   - [Wikipedia: Edmonds-Karp Algorithm](https://en.wikipedia.org/wiki/Edmonds%E2%80%93Karp_algorithm)
+  - [Wikipedia: Dinic's Algorithm](https://en.wikipedia.org/wiki/Dinic%27s_algorithm)
   - [Wikipedia: Max-Flow Min-Cut Theorem](https://en.wikipedia.org/wiki/Max-flow_min-cut_theorem)
   """
 
@@ -222,6 +259,94 @@ defmodule Yog.Flow.MaxFlow do
     end
   end
 
+  @doc """
+  Finds the maximum flow using Dinic's algorithm with custom numeric type.
+
+  Dinic's algorithm builds a level graph using BFS, then finds blocking flows
+  via DFS. For unit capacities it runs in O(E√V). It is generally faster than
+  Edmonds-Karp for dense networks.
+
+  ## Parameters
+
+  - `graph` - The flow network with edge capacities
+  - `source` - Source node ID where flow originates
+  - `sink` - Sink node ID where flow terminates
+  - `zero` - Zero value for the capacity type
+  - `add` - Addition function for capacities
+  - `subtract` - Subtraction function for capacities
+  - `compare` - Comparison function for capacities
+  - `min` - Minimum function for capacities
+
+  ## Examples
+
+  Simple example with bottleneck:
+
+      iex> {:ok, graph} = Yog.directed()
+      ...>   |> Yog.add_node(1, "s")
+      ...>   |> Yog.add_node(2, "a")
+      ...>   |> Yog.add_node(3, "t")
+      ...>   |> Yog.add_edges([{1, 2, 10}, {2, 3, 5}])
+      iex> result = Yog.Flow.MaxFlow.dinic(graph, 1, 3)
+      iex> result.max_flow
+      5
+  """
+  @spec dinic(
+          Yog.graph(),
+          Yog.node_id(),
+          Yog.node_id(),
+          any(),
+          (any(), any() -> any()),
+          (any(), any() -> any()),
+          (any(), any() -> :lt | :eq | :gt),
+          (any(), any() -> any())
+        ) :: max_flow_result()
+  def dinic(
+        graph,
+        source,
+        sink,
+        zero \\ 0,
+        add \\ &Kernel.+/2,
+        subtract \\ &Kernel.-/2,
+        compare \\ &Yog.Utils.compare/2,
+        min_fn \\ &min/2
+      ) do
+    if source == sink do
+      return_graph =
+        List.foldl(Map.keys(graph.nodes), Model.new(graph.kind), fn node, acc ->
+          Model.add_node(acc, node, Map.get(graph.nodes, node))
+        end)
+
+      return_graph =
+        List.foldl(Map.to_list(graph.out_edges), return_graph, fn {src, inner}, acc ->
+          List.foldl(Map.to_list(inner), acc, fn {dst, weight}, inner_acc ->
+            case Model.add_edge(inner_acc, src, dst, weight) do
+              {:ok, g} -> g
+              {:error, _} -> inner_acc
+            end
+          end)
+        end)
+
+      MaxFlowResult.new(zero, return_graph, source, sink, :dinic, zero, compare)
+    else
+      residual = build_residual_graph(graph, zero)
+
+      {max_flow, final_residual} =
+        do_dinic(residual, source, sink, zero, add, subtract, compare, min_fn, zero)
+
+      final_residual_graph = residual_to_graph(graph, final_residual, zero, compare)
+
+      MaxFlowResult.new(
+        max_flow,
+        final_residual_graph,
+        source,
+        sink,
+        :dinic,
+        zero,
+        compare
+      )
+    end
+  end
+
   # Extract all edges and their capacities from the graph
   # Uses direct out_edges access for performance
   defp build_residual_graph(graph, _zero) do
@@ -281,29 +406,8 @@ defmodule Yog.Flow.MaxFlow do
       {path, bottleneck} ->
         new_residual =
           List.foldl(path, residual, fn {from, to}, acc ->
-            # Update forward edge
-            from_edges = Map.get(acc, from, %{}) |> Map.put_new(to, zero)
-            old_cap = Map.fetch!(from_edges, to)
-            new_cap = subtract.(old_cap, bottleneck)
-
-            acc =
-              if compare.(new_cap, zero) == :eq do
-                new_from_edges = Map.delete(from_edges, to)
-
-                if map_size(new_from_edges) == 0 do
-                  Map.delete(acc, from)
-                else
-                  Map.put(acc, from, new_from_edges)
-                end
-              else
-                Map.put(acc, from, Map.put(from_edges, to, new_cap))
-              end
-
-            # Update backward edge
-            to_edges = Map.get(acc, to, %{}) |> Map.put_new(from, zero)
-            old_back = Map.fetch!(to_edges, from)
-            new_back = add.(old_back, bottleneck)
-            Map.put(acc, to, Map.put(to_edges, from, new_back))
+            acc = update_forward_residual(acc, from, to, bottleneck, zero, subtract, compare)
+            update_backward_residual(acc, to, from, bottleneck, zero, add)
           end)
 
         do_edmonds_karp(
@@ -318,6 +422,308 @@ defmodule Yog.Flow.MaxFlow do
           add.(acc_flow, bottleneck)
         )
     end
+  end
+
+  # Dinic's algorithm implementation
+  defp do_dinic(residual, source, sink, zero, add, subtract, compare, min_fn, flow) do
+    case bfs_level(residual, source, sink, zero, compare) do
+      nil ->
+        {flow, residual}
+
+      level ->
+        adj = build_adjacency(residual)
+        ptr = Map.new(Map.keys(adj), fn u -> {u, Map.get(adj, u, [])} end)
+
+        {new_flow, new_residual, _} =
+          dfs_blocking_flow(
+            residual,
+            source,
+            sink,
+            level,
+            ptr,
+            zero,
+            add,
+            subtract,
+            compare,
+            min_fn,
+            zero
+          )
+
+        if compare.(new_flow, zero) == :eq do
+          {flow, new_residual}
+        else
+          do_dinic(
+            new_residual,
+            source,
+            sink,
+            zero,
+            add,
+            subtract,
+            compare,
+            min_fn,
+            add.(flow, new_flow)
+          )
+        end
+    end
+  end
+
+  defp bfs_level(residual, source, sink, zero, compare) do
+    level =
+      do_bfs_level(
+        :queue.in(source, :queue.new()),
+        residual,
+        zero,
+        compare,
+        %{source => 0}
+      )
+
+    if Map.has_key?(level, sink) do
+      level
+    else
+      nil
+    end
+  end
+
+  defp do_bfs_level(queue, residual, zero, compare, level) do
+    case :queue.out(queue) do
+      {:empty, _} ->
+        level
+
+      {{:value, u}, rest_q} ->
+        u_level = Map.fetch!(level, u)
+
+        {next_q, next_level} =
+          residual
+          |> Map.get(u, %{})
+          |> Map.to_list()
+          |> List.foldl({rest_q, level}, fn {v, cap}, {q_acc, lvl_acc} ->
+            if compare.(cap, zero) != :eq and not Map.has_key?(lvl_acc, v) do
+              {:queue.in(v, q_acc), Map.put(lvl_acc, v, u_level + 1)}
+            else
+              {q_acc, lvl_acc}
+            end
+          end)
+
+        do_bfs_level(next_q, residual, zero, compare, next_level)
+    end
+  end
+
+  defp build_adjacency(residual) do
+    Map.new(residual, fn {u, edges} -> {u, Map.keys(edges)} end)
+  end
+
+  defp dfs_blocking_flow(
+         residual,
+         source,
+         sink,
+         level,
+         ptr,
+         zero,
+         add,
+         subtract,
+         compare,
+         min_fn,
+         total_flow
+       ) do
+    {pushed, new_residual, new_ptr} =
+      dfs_send(
+        residual,
+        source,
+        sink,
+        level,
+        ptr,
+        zero,
+        add,
+        subtract,
+        compare,
+        min_fn,
+        :infinity
+      )
+
+    if compare.(pushed, zero) == :eq do
+      {total_flow, new_residual, new_ptr}
+    else
+      dfs_blocking_flow(
+        new_residual,
+        source,
+        sink,
+        level,
+        new_ptr,
+        zero,
+        add,
+        subtract,
+        compare,
+        min_fn,
+        add.(total_flow, pushed)
+      )
+    end
+  end
+
+  defp dfs_send(residual, u, sink, level, ptr, zero, add, subtract, compare, min_fn, budget) do
+    if u == sink do
+      {budget, residual, ptr}
+    else
+      remaining = Map.get(ptr, u, [])
+
+      dfs_send_from_list(
+        residual,
+        u,
+        sink,
+        level,
+        ptr,
+        zero,
+        add,
+        subtract,
+        compare,
+        min_fn,
+        budget,
+        remaining,
+        zero
+      )
+    end
+  end
+
+  defp dfs_send_from_list(
+         residual,
+         u,
+         sink,
+         level,
+         ptr,
+         zero,
+         add,
+         subtract,
+         compare,
+         min_fn,
+         budget,
+         remaining,
+         total_pushed
+       ) do
+    if (budget != :infinity and compare.(budget, zero) == :eq) or remaining == [] do
+      {total_pushed, residual, ptr}
+    else
+      [v | rest] = remaining
+      u_level = Map.fetch!(level, u)
+      v_level = Map.get(level, v, -1)
+      cap = get_residual_cap(residual, u, v, zero)
+
+      if v_level == u_level + 1 and compare.(cap, zero) != :eq do
+        child_budget = if budget == :infinity, do: cap, else: min_fn.(budget, cap)
+
+        {pushed, new_residual, new_ptr} =
+          dfs_send(
+            residual,
+            v,
+            sink,
+            level,
+            ptr,
+            zero,
+            add,
+            subtract,
+            compare,
+            min_fn,
+            child_budget
+          )
+
+        if compare.(pushed, zero) != :eq do
+          new_residual =
+            update_forward_residual(new_residual, u, v, pushed, zero, subtract, compare)
+
+          new_residual = update_backward_residual(new_residual, v, u, pushed, zero, add)
+
+          new_budget = if budget == :infinity, do: :infinity, else: subtract.(budget, pushed)
+          new_total = add.(total_pushed, pushed)
+
+          # If edge was saturated, advance pointer past v; otherwise keep v
+          {next_remaining, next_ptr} =
+            if compare.(pushed, cap) == :eq do
+              {rest, Map.put(new_ptr, u, rest)}
+            else
+              {remaining, new_ptr}
+            end
+
+          dfs_send_from_list(
+            new_residual,
+            u,
+            sink,
+            level,
+            next_ptr,
+            zero,
+            add,
+            subtract,
+            compare,
+            min_fn,
+            new_budget,
+            next_remaining,
+            new_total
+          )
+        else
+          next_ptr = Map.put(new_ptr, u, rest)
+
+          dfs_send_from_list(
+            residual,
+            u,
+            sink,
+            level,
+            next_ptr,
+            zero,
+            add,
+            subtract,
+            compare,
+            min_fn,
+            budget,
+            rest,
+            total_pushed
+          )
+        end
+      else
+        next_ptr = Map.put(ptr, u, rest)
+
+        dfs_send_from_list(
+          residual,
+          u,
+          sink,
+          level,
+          next_ptr,
+          zero,
+          add,
+          subtract,
+          compare,
+          min_fn,
+          budget,
+          rest,
+          total_pushed
+        )
+      end
+    end
+  end
+
+  defp get_residual_cap(residual, u, v, zero) do
+    Map.get(residual, u, %{}) |> Map.get(v, zero)
+  end
+
+  defp update_forward_residual(residual, u, v, flow, zero, subtract, compare) do
+    from_edges = Map.get(residual, u, %{}) |> Map.put_new(v, zero)
+    old_cap = Map.fetch!(from_edges, v)
+    new_cap = subtract.(old_cap, flow)
+
+    if compare.(new_cap, zero) == :eq do
+      new_from_edges = Map.delete(from_edges, v)
+
+      if map_size(new_from_edges) == 0 do
+        Map.delete(residual, u)
+      else
+        Map.put(residual, u, new_from_edges)
+      end
+    else
+      Map.put(residual, u, Map.put(from_edges, v, new_cap))
+    end
+  end
+
+  defp update_backward_residual(residual, u, v, flow, zero, add) do
+    to_edges = Map.get(residual, u, %{}) |> Map.put_new(v, zero)
+    old_back = Map.fetch!(to_edges, v)
+    new_back = add.(old_back, flow)
+    Map.put(residual, u, Map.put(to_edges, v, new_back))
   end
 
   # Find augmenting path using BFS with bottleneck tracking
@@ -419,7 +825,7 @@ defmodule Yog.Flow.MaxFlow do
 
   ## Parameters
 
-  - `result` - The max flow result from `edmonds_karp/8`
+  - `result` - The max flow result from `edmonds_karp/8` or `dinic/8`
   - `zero` - Zero value for the capacity type
   - `compare` - Comparison function for capacities (returns `:lt`, `:eq`, or `:gt`)
 
@@ -437,7 +843,12 @@ defmodule Yog.Flow.MaxFlow do
   """
   @spec min_cut(max_flow_result(), any(), (any(), any() -> :lt | :eq | :gt)) :: min_cut()
   def min_cut(
-        %MaxFlowResult{residual_graph: residual, source: source, max_flow: max_flow},
+        %MaxFlowResult{
+          residual_graph: residual,
+          source: source,
+          max_flow: max_flow,
+          algorithm: algorithm
+        },
         zero \\ 0,
         compare \\ &Yog.Utils.compare/2
       ) do
@@ -449,7 +860,7 @@ defmodule Yog.Flow.MaxFlow do
       cut_value: max_flow,
       source_side_size: MapSet.size(source_side),
       sink_side_size: MapSet.size(sink_side),
-      algorithm: :edmonds_karp
+      algorithm: algorithm
     }
   end
 
