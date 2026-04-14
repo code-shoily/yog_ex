@@ -69,6 +69,29 @@ defmodule PathfindingBenchmark do
       "  #{match_grid} 20×20 grid: Dijkstra=#{d_grid.weight}, Bidirectional=#{b_grid.weight}, A*=#{a_grid.weight}"
     )
 
+    # Yen's k-shortest paths correctness check
+    yen_graph =
+      Yog.directed()
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_node(3, nil)
+      |> Yog.add_node(4, nil)
+      |> Yog.add_node(5, nil)
+      |> Yog.add_edges!([
+        {1, 2, 1},
+        {1, 3, 2},
+        {2, 3, 1},
+        {2, 4, 3},
+        {3, 4, 1},
+        {3, 5, 4},
+        {4, 5, 1}
+      ])
+
+    {:ok, yen_paths} = Pathfinding.k_shortest_paths(yen_graph, 1, 5, 3)
+    yen_weights = Enum.map(yen_paths, & &1.weight)
+    match_yen = if yen_weights == [4, 4, 5], do: "✓", else: "✗"
+    IO.puts("  #{match_yen} Yen k=3: weights=#{inspect(yen_weights)}")
+
     # Memory summary
     IO.puts("\n== Memory Usage Summary ==")
     IO.puts("(Measured using :erts_debug.size/1 on path result in words)")

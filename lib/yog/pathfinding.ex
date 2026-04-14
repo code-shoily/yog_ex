@@ -26,6 +26,7 @@ defmodule Yog.Pathfinding do
   ## Special Path Types
 
   - `widest_path/3` — Maximum capacity path (bottleneck routing)
+  - `k_shortest_paths/5` — Yen's algorithm for k shortest loopless paths
 
   ## Algorithm Selection Guide
 
@@ -48,6 +49,7 @@ defmodule Yog.Pathfinding do
   alias Yog.Pathfinding.FloydWarshall
   alias Yog.Pathfinding.Johnson
   alias Yog.Pathfinding.Matrix
+  alias Yog.Pathfinding.Yen
 
   # =============================================================================
   # Dijkstra
@@ -149,6 +151,27 @@ defmodule Yog.Pathfinding do
   def widest_path(graph, source, target) do
     Dijkstra.widest_path(graph, source, target)
   end
+
+  @doc """
+  Finds the k shortest loopless paths from `source` to `target` using Yen's algorithm.
+
+  ## Options
+
+  - `:with` - Function to extract/transform edge weight
+  - `:zero` - Zero value for weights (default: `0`)
+  - `:add` - Addition function for weights (default: `&Kernel.+/2`)
+  - `:compare` - Comparison function for weights (default: `&Yog.Utils.compare/2`)
+
+  ## Example
+
+      iex> graph = Yog.directed() |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_node(3, nil) |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}, {1, 3, 2}])
+      iex> {:ok, paths} = Yog.Pathfinding.k_shortest_paths(graph, 1, 3, 2)
+      iex> length(paths)
+      2
+  """
+  @spec k_shortest_paths(Yog.Graph.t(), Yog.node_id(), Yog.node_id(), pos_integer(), keyword()) ::
+          {:ok, [Path.t()]} | :error
+  defdelegate k_shortest_paths(graph, source, target, k, opts \\ []), to: Yen
 
   # =============================================================================
   # A*
