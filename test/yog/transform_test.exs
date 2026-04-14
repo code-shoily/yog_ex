@@ -1053,6 +1053,85 @@ defmodule Yog.TransformTest do
     assert map_size(contracted.nodes) == 2
   end
 
+  # ============= Quotient Graph Tests =============
+
+  test "quotient_graph_simple_directed_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_node(4, "D")
+      |> Yog.add_edge_ensure(1, 3, 1)
+      |> Yog.add_edge_ensure(2, 3, 1)
+      |> Yog.add_edge_ensure(3, 4, 1)
+
+    partition = %{1 => :ab, 2 => :ab, 3 => :cd, 4 => :cd}
+    q = Yog.Transform.quotient_graph(graph, partition, &Kernel.+/2)
+
+    assert Yog.Model.node_count(q) == 2
+    assert Yog.Model.has_edge?(q, :ab, :cd)
+    assert Yog.successors(q, :ab) == [{:cd, 2}]
+    assert Yog.successors(q, :cd) == []
+  end
+
+  test "quotient_graph_drops_self_loops_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_edge_ensure(1, 2, 1)
+      |> Yog.add_edge_ensure(2, 1, 1)
+
+    # Contract 1 and 2 into the same block
+    partition = %{1 => :block, 2 => :block}
+    q = Yog.Transform.quotient_graph(graph, partition, &Kernel.+/2)
+
+    assert Yog.Model.node_count(q) == 1
+    assert Yog.Model.edge_count(q) == 0
+  end
+
+  test "quotient_graph_undirected_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_edges!([{1, 2, 5}, {2, 3, 10}])
+
+    partition = %{1 => :left, 2 => :left, 3 => :right}
+    q = Yog.Transform.quotient_graph(graph, partition, &Kernel.+/2)
+
+    assert Yog.Model.node_count(q) == 2
+    # One logical undirected edge between :left and :right with weight 10
+    assert length(Yog.Model.all_edges(q)) == 1
+    assert Yog.Model.has_edge?(q, :left, :right)
+  end
+
+  test "quotient_graph_unmapped_nodes_as_singletons_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_edge_ensure(1, 3, 1)
+      |> Yog.add_edge_ensure(2, 3, 1)
+
+    # Only map 1 and 2 into a block; 3 stays as a singleton
+    partition = %{1 => :ab, 2 => :ab}
+    q = Yog.Transform.quotient_graph(graph, partition)
+
+    assert Yog.Model.node_count(q) == 2
+    assert Yog.Model.has_edge?(q, :ab, 3)
+    assert Yog.successors(q, :ab) == [{3, 2}]
+  end
+
+  test "quotient_graph_empty_test" do
+    q = Yog.Transform.quotient_graph(Yog.directed(), %{})
+    assert Yog.Model.node_count(q) == 0
+    assert Yog.Model.edge_count(q) == 0
+  end
+
   # ============= Transitive Closure Tests =============
 
   # Helper to add multiple nodes

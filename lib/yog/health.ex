@@ -510,4 +510,199 @@ defmodule Yog.Health do
       end
     end
   end
+
+  # =============================================================================
+  # Efficiency Metrics
+  # =============================================================================
+
+  @doc """
+  Efficiency between two nodes.
+
+  The efficiency is the inverse of the shortest path distance.
+  If no path exists, returns 0.0. A node's efficiency to itself is 0.0.
+
+  **Time Complexity:** O((V+E) log V)
+
+  ## Example
+
+      iex> graph = Yog.undirected() |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_node(3, nil) |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}])
+      iex> opts = [with_zero: 0, with_add: &Kernel.+/2, with_compare: &Yog.Utils.compare/2, with: &Function.identity/1, with_to_float: fn x -> x * 1.0 end]
+      iex> Yog.Health.efficiency(graph, 1, 3, opts)
+      0.5
+      iex> Yog.Health.efficiency(graph, 1, 1, opts)
+      0.0
+  """
+  @spec efficiency(Yog.graph(), Yog.node_id(), Yog.node_id(), metric_opts()) :: float()
+  def efficiency(graph, u, v, opts \\ []) do
+    %{zero: zero, add: add, compare: compare, weight_fn: weight_fn, to_float: to_float} =
+      parse_metric_opts(opts)
+
+    reweighted_graph =
+      if Keyword.has_key?(opts, :with),
+        do: Transform.map_edges(graph, weight_fn),
+        else: graph
+
+    if u == v do
+      0.0
+    else
+      distances = Dijkstra.single_source_distances(reweighted_graph, u, zero, add, compare)
+
+      case Map.fetch(distances, v) do
+        {:ok, dist} -> safe_inverse(dist, to_float)
+        :error -> 0.0
+      end
+    end
+  end
+
+  @doc """
+  Global efficiency of the graph.
+
+  The average efficiency over all ordered pairs of distinct nodes.
+  Unlike average path length, this is well-defined for disconnected graphs:
+  unreachable pairs simply contribute 0.0.
+
+  **Time Complexity:** O(V × (V+E) log V)
+
+  ## Example
+
+      iex> graph = Yog.undirected() |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_node(3, nil) |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}, {3, 1, 1}])
+      iex> opts = [with_zero: 0, with_add: &Kernel.+/2, with_compare: &Yog.Utils.compare/2, with: &Function.identity/1, with_to_float: fn x -> x * 1.0 end]
+      iex> Yog.Health.global_efficiency(graph, opts)
+      1.0
+  """
+  @spec global_efficiency(Yog.graph(), metric_opts()) :: float()
+  def global_efficiency(graph, opts \\ []) do
+    %{zero: zero, add: add, compare: compare, weight_fn: weight_fn, to_float: to_float} =
+      parse_metric_opts(opts)
+
+    reweighted_graph =
+      if Keyword.has_key?(opts, :with),
+        do: Transform.map_edges(graph, weight_fn),
+        else: graph
+
+    nodes = Map.keys(reweighted_graph.nodes)
+    n = length(nodes)
+
+    if n <= 1 do
+      0.0
+    else
+      parallel_opts = [
+        max_concurrency: System.schedulers_online(),
+        timeout: :infinity
+      ]
+
+      total =
+        nodes
+        |> Task.async_stream(
+          fn source ->
+            distances =
+              Dijkstra.single_source_distances(reweighted_graph, source, zero, add, compare)
+
+            distances
+            |> Map.delete(source)
+            |> Enum.reduce(0.0, fn {_node, dist}, sum ->
+              sum + safe_inverse(dist, to_float)
+            end)
+          end,
+          parallel_opts
+        )
+        |> Enum.reduce(0.0, fn {:ok, source_sum}, acc -> acc + source_sum end)
+
+      total / (n * (n - 1) * 1.0)
+    end
+  end
+
+  @doc """
+  Local efficiency of a single node.
+
+  Computes the global efficiency of the subgraph induced by the node's neighbors.
+  For directed graphs, the neighborhood includes both successors and predecessors.
+
+  Returns 0.0 if the node has fewer than 2 neighbors.
+
+  **Time Complexity:** O(d² × (d+E') log d) where d is the node degree
+  and E' is the number of edges in the neighborhood subgraph.
+
+  ## Example
+
+      iex> graph = Yog.undirected() |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_node(3, nil) |> Yog.add_edges!([{1, 2, 1}, {1, 3, 1}, {2, 3, 1}])
+      iex> opts = [with_zero: 0, with_add: &Kernel.+/2, with_compare: &Yog.Utils.compare/2, with: &Function.identity/1, with_to_float: fn x -> x * 1.0 end]
+      iex> Yog.Health.local_efficiency(graph, 1, opts)
+      1.0
+  """
+  @spec local_efficiency(Yog.graph(), Yog.node_id(), metric_opts()) :: float()
+  def local_efficiency(graph, node, opts \\ []) do
+    neighbors = Yog.neighbor_ids(graph, node)
+
+    if length(neighbors) <= 1 do
+      0.0
+    else
+      graph
+      |> Transform.subgraph(neighbors)
+      |> global_efficiency(opts)
+    end
+  end
+
+  @doc """
+  Average local efficiency over all nodes.
+
+  This is the mean of `local_efficiency/3` for every node in the graph.
+
+  **Time Complexity:** O(V × d² × (d+E') log d)
+
+  ## Example
+
+      iex> graph = Yog.undirected() |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_node(3, nil) |> Yog.add_edges!([{1, 2, 1}, {1, 3, 1}, {2, 3, 1}])
+      iex> opts = [with_zero: 0, with_add: &Kernel.+/2, with_compare: &Yog.Utils.compare/2, with: &Function.identity/1, with_to_float: fn x -> x * 1.0 end]
+      iex> Yog.Health.average_local_efficiency(graph, opts)
+      1.0
+  """
+  @spec average_local_efficiency(Yog.graph(), metric_opts()) :: float()
+  def average_local_efficiency(graph, opts \\ []) do
+    nodes = Map.keys(graph.nodes)
+    n = length(nodes)
+
+    if n == 0 do
+      0.0
+    else
+      weight_fn = opts[:with] || (&Function.identity/1)
+
+      reweighted_graph =
+        if Keyword.has_key?(opts, :with),
+          do: Transform.map_edges(graph, weight_fn),
+          else: graph
+
+      opts_without_weight = Keyword.delete(opts, :with)
+
+      parallel_opts = [
+        max_concurrency: System.schedulers_online(),
+        timeout: :infinity
+      ]
+
+      total =
+        nodes
+        |> Task.async_stream(
+          fn node -> local_efficiency(reweighted_graph, node, opts_without_weight) end,
+          parallel_opts
+        )
+        |> Enum.reduce(0.0, fn {:ok, eff}, acc -> acc + eff end)
+
+      total / n
+    end
+  end
+
+  defp parse_metric_opts(opts) do
+    %{
+      zero: opts[:with_zero] || 0,
+      add: opts[:with_add] || (&Kernel.+/2),
+      compare: opts[:with_compare] || (&Yog.Utils.compare/2),
+      weight_fn: opts[:with] || (&Function.identity/1),
+      to_float: opts[:with_to_float] || fn x -> x * 1.0 end
+    }
+  end
+
+  defp safe_inverse(dist, to_float) do
+    val = to_float.(dist)
+    if val == 0.0, do: 0.0, else: 1.0 / val
+  end
 end

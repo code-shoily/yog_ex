@@ -99,6 +99,69 @@ defmodule Yog.DAG.AlgorithmTest do
   end
 
   # ============================================================
+  # Topological Generations Tests
+  # ============================================================
+
+  describe "topological_generations/1" do
+    test "generations for simple linear DAG" do
+      {:ok, dag} = build_dag([{:a, :b, 1}, {:b, :c, 2}])
+
+      assert Algorithm.topological_generations(dag) == [[:a], [:b], [:c]]
+    end
+
+    test "generations for diamond DAG" do
+      {:ok, dag} =
+        build_dag([
+          {:a, :b, 1},
+          {:a, :c, 2},
+          {:b, :d, 3},
+          {:c, :d, 4}
+        ])
+
+      assert Algorithm.topological_generations(dag) == [[:a], [:b, :c], [:d]]
+    end
+
+    test "generations for disconnected DAG" do
+      {:ok, dag} =
+        build_dag([
+          {:a, :b, 1},
+          {:c, :d, 1}
+        ])
+
+      gens = Algorithm.topological_generations(dag)
+      assert length(gens) == 2
+      assert hd(gens) == [:a, :c]
+      assert List.last(gens) == [:b, :d]
+    end
+
+    test "generations for single node DAG" do
+      dag = Model.new(:directed) |> Model.add_node(:a, "A")
+      assert Algorithm.topological_generations(dag) == [[:a]]
+    end
+
+    test "generations for empty DAG" do
+      dag = Model.new(:directed)
+      assert Algorithm.topological_generations(dag) == []
+    end
+
+    test "generations respect longest-path distance" do
+      # a -> b -> d
+      # a -> c -> d
+      #      c -> e
+      {:ok, dag} =
+        build_dag([
+          {:a, :b, 1},
+          {:a, :c, 1},
+          {:b, :d, 1},
+          {:c, :d, 1},
+          {:c, :e, 1}
+        ])
+
+      assert Algorithm.topological_generations(dag) == [[:a], [:b, :c], [:d, :e]]
+    end
+  end
+
+  # ============================================================
   # Longest Path Tests
   # ============================================================
 

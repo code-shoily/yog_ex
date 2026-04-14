@@ -255,4 +255,82 @@ defmodule Yog.HealthTest do
     g = Classic.path(1)
     assert Health.average_path_length(g, opts()) == nil
   end
+
+  # ============= Efficiency Tests =============
+
+  test "efficiency of adjacent nodes is 1.0" do
+    g = Classic.path(3)
+    assert_in_delta Health.efficiency(g, 0, 1, opts()), 1.0, 0.0001
+  end
+
+  test "efficiency of distant nodes is inverse of distance" do
+    g = Classic.path(4)
+    assert_in_delta Health.efficiency(g, 0, 3, opts()), 1.0 / 3.0, 0.0001
+  end
+
+  test "efficiency of unreachable nodes is 0.0" do
+    g = Yog.Operation.disjoint_union(Classic.path(3), Classic.path(3))
+    assert Health.efficiency(g, 0, 3, opts()) == 0.0
+  end
+
+  test "efficiency of node to itself is 0.0" do
+    g = Classic.path(3)
+    assert Health.efficiency(g, 1, 1, opts()) == 0.0
+  end
+
+  test "global_efficiency of complete graph K_n is 1.0" do
+    for n <- 2..10 do
+      g = Classic.complete(n)
+      assert_in_delta Health.global_efficiency(g, opts()), 1.0, 0.0001
+    end
+  end
+
+  test "global_efficiency of disconnected graph is well-defined" do
+    g = Yog.Operation.disjoint_union(Classic.path(3), Classic.path(3))
+    ge = Health.global_efficiency(g, opts())
+    assert ge > 0.0
+    assert ge < 1.0
+  end
+
+  test "global_efficiency of empty graph is 0.0" do
+    g = Classic.empty(0)
+    assert Health.global_efficiency(g, opts()) == 0.0
+  end
+
+  test "global_efficiency of single node is 0.0" do
+    g = Classic.empty(1)
+    assert Health.global_efficiency(g, opts()) == 0.0
+  end
+
+  test "local_efficiency of node with 0 neighbors is 0.0" do
+    g = Classic.empty(1)
+    assert Health.local_efficiency(g, 0, opts()) == 0.0
+  end
+
+  test "local_efficiency of leaf node is 0.0" do
+    g = Classic.star(4)
+    assert Health.local_efficiency(g, 1, opts()) == 0.0
+  end
+
+  test "local_efficiency of center in star is 0.0" do
+    g = Classic.star(4)
+    assert Health.local_efficiency(g, 0, opts()) == 0.0
+  end
+
+  test "average_local_efficiency of complete graph K_n is 1.0 for n >= 3" do
+    for n <- 3..10 do
+      g = Classic.complete(n)
+      assert_in_delta Health.average_local_efficiency(g, opts()), 1.0, 0.0001
+    end
+  end
+
+  test "average_local_efficiency of K_2 is 0.0" do
+    g = Classic.complete(2)
+    assert Health.average_local_efficiency(g, opts()) == 0.0
+  end
+
+  test "average_local_efficiency of empty graph is 0.0" do
+    g = Classic.empty(0)
+    assert Health.average_local_efficiency(g, opts()) == 0.0
+  end
 end

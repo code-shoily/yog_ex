@@ -37,7 +37,7 @@ defmodule Yog.Property do
       3
   """
 
-  alias Yog.Property.{Bipartite, Clique, Cyclicity, Eulerian, Structure}
+  alias Yog.Property.{Bipartite, Clique, Cyclicity, Eulerian, Structure, WeisfeilerLehman}
 
   # ============= Structure =============
 
@@ -71,6 +71,33 @@ defmodule Yog.Property do
   Finds the root of an arborescence. Returns nil if none exists.
   """
   defdelegate arborescence_root(graph), to: Structure
+
+  @doc """
+  Checks if the graph is a forest (disjoint collection of trees).
+
+  ## Examples
+
+      iex> forest = Yog.undirected()
+      ...> |> Yog.add_edge_ensure(1, 2, 1, nil)
+      ...> |> Yog.add_edge_ensure(3, 4, 1, nil)
+      iex> Yog.Property.forest?(forest)
+      true
+  """
+  defdelegate forest?(graph), to: Structure
+
+  @doc """
+  Checks if a directed graph is a branching (directed forest).
+
+  ## Examples
+
+      iex> branch = Yog.directed()
+      ...> |> Yog.add_edge_ensure(1, 2, 1, nil)
+      ...> |> Yog.add_edge_ensure(1, 3, 1, nil)
+      ...> |> Yog.add_edge_ensure(4, 5, 1, nil)
+      iex> Yog.Property.branching?(branch)
+      true
+  """
+  defdelegate branching?(graph), to: Structure
 
   @doc """
   Checks if the graph is complete (every pair of distinct nodes is connected).
@@ -225,4 +252,35 @@ defmodule Yog.Property do
 
   @doc "Checks if the graph contains at least one cycle."
   defdelegate cyclic?(graph), to: Cyclicity
+
+  # ============= Isomorphism & Hashing =============
+
+  @doc """
+  Returns a deterministic structural hash of the graph.
+  Uses the Weisfeiler-Lehman topological graph hashing algorithm.
+
+  Graphs with identical structural arrangements return the same hash.
+
+  ## Examples
+
+      iex> g1 = Yog.undirected()
+      ...> |> Yog.add_edge_ensure(1, 2, 1, nil)
+      ...> |> Yog.add_edge_ensure(2, 3, 1, nil)
+      iex> g2 = Yog.undirected()
+      ...> |> Yog.add_edge_ensure(:a, :b, 1, nil)
+      ...> |> Yog.add_edge_ensure(:b, :c, 1, nil)
+      iex> Yog.Property.hash(g1) == Yog.Property.hash(g2)
+      true
+  """
+  defdelegate hash(graph), to: WeisfeilerLehman, as: :graph_hash
+
+  @doc """
+  Returns a deterministic structural hash of the graph with custom options.
+  """
+  defdelegate hash(graph, opts), to: WeisfeilerLehman, as: :graph_hash
+
+  @doc "Checks if two graphs are structurally isomorphic."
+  def isomorphic?(g1, g2) do
+    hash(g1) == hash(g2)
+  end
 end

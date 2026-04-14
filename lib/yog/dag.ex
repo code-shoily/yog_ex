@@ -155,6 +155,17 @@ defmodule Yog.DAG do
   defdelegate longest_path(dag), to: Yog.DAG.Algorithm
 
   @doc """
+  Returns the topological generations of a DAG.
+
+  ## Example
+
+      iex> {:ok, dag} = Yog.from_unweighted_edges(:directed, [{1, 2}, {1, 3}, {2, 4}, {3, 4}]) |> Yog.DAG.from_graph()
+      iex> Yog.DAG.topological_generations(dag)
+      [[1], [2, 3], [4]]
+  """
+  defdelegate topological_generations(dag), to: Yog.DAG.Algorithm
+
+  @doc """
   Finds the shortest path between two nodes in a weighted DAG.
 
   ## Example

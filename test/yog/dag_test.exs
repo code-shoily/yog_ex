@@ -357,6 +357,24 @@ defmodule Yog.DAGTest do
     end
   end
 
+  describe "topological_generations/1 delegation" do
+    test "delegates to Algorithm.topological_generations/1" do
+      {:ok, dag} =
+        Yog.directed()
+        |> Yog.add_node(:a, nil)
+        |> Yog.add_node(:b, nil)
+        |> Yog.add_node(:c, nil)
+        |> Yog.add_node(:d, nil)
+        |> Yog.add_edge_ensure(:a, :b, 1)
+        |> Yog.add_edge_ensure(:a, :c, 1)
+        |> Yog.add_edge_ensure(:b, :d, 1)
+        |> Yog.add_edge_ensure(:c, :d, 1)
+        |> DAG.from_graph()
+
+      assert DAG.topological_generations(dag) == [[:a], [:b, :c], [:d]]
+    end
+  end
+
   describe "lowest_common_ancestors/3 delegation" do
     test "delegates to Algorithm.lowest_common_ancestors/3" do
       {:ok, dag} =

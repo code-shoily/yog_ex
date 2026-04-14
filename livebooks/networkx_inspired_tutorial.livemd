@@ -1,0 +1,264 @@
+# Yog Tutorial
+
+```elixir
+Mix.install([
+  {:yog_ex, path: "/home/mafinar/repos/elixir/yog_ex"},
+  {:kino_vizjs, "~> 0.5.0"}
+])
+```
+
+## Yog Graph - Nodes & Edges
+
+In `Yog`, a graph is represented as a struct with four fields:
+
+* `kind`: Either `:directed` or `:undirected`
+* `nodes`: Map of node_id => node_data
+* `out_edges`: Map of node_id => %{neighbor_id => weight}
+* `in_edges`: Map of node_id => %{neighbor_id => weight}
+
+**All Yog data structures are immutable.**
+
+## Graph Creation
+
+### Create an empty graph
+
+<!-- livebook:{"break_markdown":true} -->
+
+Following snippet shows how to create an empty graph with no nodes and no edges. A graph can be either `:directed` or `:undirected`.
+
+```elixir
+# Create an empty graph of a specific "kind"
+empty_directed_graph = Yog.new(:directed) # Or use Yog.directed()
+empty_undirected_graph = Yog.undirected() # Or use Yog.undirected()
+```
+
+By definition a [Graph](https://hexdocs.pm/yog_ex/Yog.Graph.html) is a collection of nodes (vertices), along with identified pairs of nodes (called edges, links, etc).
+
+In Yog, nodes are represented as a `Map` of `node_id`-s to `node_data` where both IDs and data can be any term. But for simplicity, performance, and predictability (i.e. during comparisons), it is recommended that `node_id`-s are of simple types, preferably numbers, and any associated information is stored as data.
+
+<!-- livebook:{"break_markdown":true} -->
+
+The empty graphs created above are immutable structures. We grow them by adding nodes and edges - but those will not mutate them instead return new graphs.
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Growing our Graph
+
+<!-- livebook:{"break_markdown":true} -->
+
+We can construct our graphs in several ways. Yog includes many graph generator functions ([classic](https://hexdocs.pm/yog_ex/Yog.Generator.Classic.html), [random](https://hexdocs.pm/yog_ex/Yog.Generator.Random.html) and [mazes](https://hexdocs.pm/yog_ex/Yog.Generator.Maze.html)) and facilities to read and write graphs [in](https://hexdocs.pm/yog_ex/Yog.IO.GraphML.html) [many](https://hexdocs.pm/yog_ex/Yog.IO.JSON.html) [formats](https://hexdocs.pm/yog_ex/Yog.IO.MatrixMarket.html).
+
+But in this section we will focus on growing our graphs from empty graphs to rich networks. We do so by adding nodes and edges that connect them.
+
+<!-- livebook:{"break_markdown":true} -->
+
+#### Nodes
+
+`Yog` allows any data to be added as a Node's `ID` or `Data`. Ghost edges (Edge connecting nodes that do no exist in `nodes` attribute) are not allowed and one must ensure that those nodes exist when creating edges. There are several helpers to add nodes and edges.
+
+```elixir
+# Add nodes to an empty graph
+g =
+  empty_directed_graph
+  |> Yog.add_node(1, nil)
+
+# We could add multiple nodes from iterator using `fold`
+g = empty_directed_graph |> Yog.add_nodes_from([2, 3])
+
+colored_nodes = [{4, %{color: "red"}}, {5, %{color: "green"}}]
+
+# Note to non-functional programmers: The following will not "update" graph
+g |> Yog.add_nodes_from(colored_nodes)
+
+# We need to rebind `graph`
+g = g |> Yog.add_nodes_from(colored_nodes)
+```
+
+Nodes from one graph can be incorporated into another:
+
+```elixir
+h = Yog.Generator.Classic.path_with_type(10, :directed)
+
+g = g |> Yog.add_nodes_from(h)
+```
+
+Elixir programmers would be keen to notice that I have not added `Yog.add_nodes_from(g, h.nodes)`. This is because `Graph` implements the `Enumerable` protocol and `node` is the enumerating element.
+
+<!-- livebook:{"break_markdown":true} -->
+
+`g` now contains the nodes from `h`. In contrast, you could use the graph `h` as a node in `g`. But it would be recommended that you use the graph content as node_data, and a `phash2` or any other unique representation of `h` as `node_id`. In real world application, if you find yourself having to use a graph as a node of another graph, you would be well aware of how you would want to best identify them.
+
+```elixir
+g = g |> Yog.add_node(:erlang.phash2(h), h)
+
+# This too is valid
+# g = g |> Yog.add_node(h, nil)
+```
+
+Let's remove the `h` node before proceeding to the next sections.
+
+```elixir
+g = g |> Yog.remove_node(:erlang.phash2(h))
+```
+
+#### Edges
+
+Once the nodes are added, we can link them by adding edges.
+
+Yog maintains records of "incoming" and "outgoing" edges. If a graph has an edge `A >-2-> B`, then  it would look like `%{in_edges: "B" => %{"A" => 2}}, out_edges: %{"A" => %{"B" => 2}}`.
+
+This structure makes graph transpose a very fast, `O(1)` operation.
+
+```elixir
+graph = Yog.from_edges(:directed, [{"A", "B", 2}, {"B", "C", 3}])
+
+# Let's see what's inside, no need for a pretty representation.
+IO.inspect(graph, structs: false)
+```
+
+Edge "weight" need not be numeric. It can be anything that describes the link.
+
+```elixir
+Yog.directed() 
+|> Yog.add_nodes_from(["A", "B"])
+|> Yog.add_edge!("A", "B", :follows)
+```
+
+In Yog, the default `add_edge(s?!?)` expects the corresponding nodes to be pre-existing, otherwise they'd return error tuples or raise exception (For functions ending with `!`).
+
+To add edge quickly, we can choose from `add_edge_ensure` which which adds the nodes if they don't exist by either a default value (or `nil`), or `add_edge_with` where absent node is filled based off a callback function.
+
+```elixir
+# Error tuple will be returned if the nodes don't exist. Uncomment and find out!
+# {:ok, graph} will be returned in successful cases
+
+# Add edge with explicit data
+Yog.add_edge(g, 1, 2, 3) # |> inspect
+
+# Add edge with weight of `1` (Simple  Edge)
+Yog.add_simple_edge(g, 1, 2) # |> inspect
+
+# Add edge with nil data (Unweighted Edge)
+Yog.add_unweighted_edge(g, 1, 2) # |> inspect
+
+# Exceptions will be raised if nodes don't exist. Uncomment and find out!
+# `graph` will be returned if the path is happy. Great for pipelines.
+
+# Add edge with explicit data
+Yog.add_edge!(g, 1, 2, 3) # |> inspect
+
+# Add edge with weight of `1` (Simple  Edge)
+Yog.add_simple_edge!(g, 1, 2) # |> inspect
+
+# Add edge with nil data (Unweighted Edge)
+Yog.add_unweighted_edge!(g, 1, 2) # |> inspect
+
+# Or we can add multiple edges in one go
+Yog.Model.add_edges(g, [{1, 2, 12}, {1, 3, 13}])
+```
+
+If we are feeling lazy and want to add nodes whilst adding edges. Here's how:
+
+```elixir
+g |> Yog.add_edge_ensure(1, 2, 10, "unknown")
+g |> Yog.add_edge_ensure(1, 2, 10) # `nil` is default
+g |> Yog.add_edge_with(1, 2, 3, fn node_id -> :erlang.phash2(node_id) end)
+```
+
+Our graph `g` contains all the nodes from `h` through `add_nodes_from` but not the edges. We can do this in a few ways:
+
+1. We are interested in adding `from_node => to_node` of `h`, not the data, so we can just fold through `all_edges` and add them.
+2. We want to add both `nodes` and `edges` of `h` - we use `Yog.Operation.union`
+
+```elixir
+# Option 1: We copy the edge of `h`. If node doesn't exist, it gets `nil` created.
+List.foldl(Yog.all_edges(h), g, fn {u, v, w}, g ->
+  Yog.add_edge_ensure(g, u, v, w)
+end)
+
+# Option 2 - We take both nodes and edges of `h`. `h` wins on collision.
+g = Yog.Operation.union(g, h)
+```
+
+`Yog` graphs are immutable. There's no "clear"-ing of the graphs. We can "reset" a graph by merely setting `g = Yog.new(g.kind)`
+
+## Graph Queries & Operations
+
+### Examining elements of a graph.
+
+We can examine the nodes and edges from several helper functions residing in [`Yog.Model`](https://hexdocs.pm/yog_ex/Yog.Model.html).
+
+[`Yog.Graph`](https://hexdocs.pm/yog_ex/Yog.Graph.html) implements `Enumerable` protocol based off of `nodes` so any `Enum` functions applied to a `Graph` would be applied to `nodes`.
+
+```elixir
+node_count = Yog.node_count(g) # Also: Enum.count(g), Yog.order(g)
+edge_count = Yog.edge_count(g)
+nodes = Yog.all_nodes(g)
+edges = Yog.all_edges(g)
+
+successors = Yog.successors(g, 1) # [{successor_id, edge_data}]
+predecessors = Yog.predecessors(g, 2) # [{predecessor_id, edge_data}]
+neighbours = Yog.neighbors(g, 3) # Incoming and outgoing nodes
+degree = Yog.degree(g, 3)
+```
+
+### Functional transformation
+
+[`Yog.Transform`](https://hexdocs.pm/yog_ex/Yog.Transform.html) contains functions that transform one graph into another by mapping, filtering or updating nodes or edges.
+
+```elixir
+# Replace `nil` with `%{}` 
+g |> Yog.Transform.map_nodes(fn data -> is_nil(data) && %{} || data end)
+
+# NodeID == NodeData
+g |> Yog.Transform.map_nodes_indexed(fn id, _ -> id end)
+
+# Take only odd numbered nodes. Note that edges are filtered too
+g |> Yog.Transform.filter_nodes_indexed(fn id, data -> is_nil(data) and rem(id, 2) == 1 end)
+
+# Add 1000 to all edge weights
+g |> Yog.Transform.map_edges(& &1 + 1000)
+
+# All edges are the sum of node values
+g |> Yog.Transform.map_edges_indexed(fn u, v, _ -> u + v end)
+
+# Filter edges having a node sum of >= 10
+g |> Yog.Transform.filter_edges(fn u, v, _ -> u + v >= 10 end)
+
+```
+
+We can use `map_nodes_async` and `map_edges_async` to perform asynchronous transformations on large graphs and multiple cores.
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Adding attributes to nodes, or edges
+
+We can build a graph with updated nodes or edges with `Yog.Transform.update_node` or `Yog.Transform.update_edge` command. This is similar to `Map` update, afterall, nodes and edges **are** maps.
+
+If a node or edge does not exist, then one will be created with the `default` value.
+
+```elixir
+# Update node value from nil to []
+Yog.Transform.update_node(g, 1, nil, fn _ -> [] end)
+
+# Adds a node if :n does not exist with value of %{}
+Yog.Transform.update_node(g, :n, %{}, fn _ -> [] end)
+
+# 1 -> 2 gets phash2(weight)
+Yog.Transform.update_edge(g, 1, 2, nil, &:erlang.phash2(&1))
+
+# New edge is added with :default as weight (unless you already created :a -> :b)
+Yog.Transform.update_edge(g, :a, :b, :default, & &1)
+```
+
+## Using Graph Builders
+
+## Directed Graphs
+
+## Multigraphs
+
+## Graph Generators
+
+## Analyzing Graphs
+
+## Rendering Graphs

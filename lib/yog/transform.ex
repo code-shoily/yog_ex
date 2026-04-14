@@ -1032,6 +1032,84 @@ defmodule Yog.Transform do
     end
   end
 
+  @doc """
+  Contracts nodes according to a partition map, producing a quotient graph.
+
+  Each block in the partition becomes a single super-node. All edges between
+  nodes in different blocks become edges between the corresponding super-nodes,
+  with weights combined using `combine_weight`. Edges within the same block
+  (self-loops) are dropped.
+
+  Nodes not present in `partition` are treated as singleton blocks (their block
+  ID is the node itself).
+
+  **Time Complexity:** O(V + E)
+
+  ## Example
+
+      iex> graph =
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(1, "A")
+      ...>   |> Yog.add_node(2, "B")
+      ...>   |> Yog.add_node(3, "C")
+      ...>   |> Yog.add_node(4, "D")
+      ...>   |> Yog.add_edge_ensure(1, 3, 1)
+      ...>   |> Yog.add_edge_ensure(2, 3, 1)
+      ...>   |> Yog.add_edge_ensure(3, 4, 1)
+      iex> partition = %{1 => :ab, 2 => :ab, 3 => :cd, 4 => :cd}
+      iex> q = Yog.Transform.quotient_graph(graph, partition, &Kernel.+/2)
+      iex> Yog.Model.node_count(q)
+      2
+      iex> Yog.successors(q, :ab)
+      [{:cd, 2}]
+
+  ## Use Cases
+
+  - **Multilevel community detection**: contract communities and re-run algorithms
+  - **Hierarchical aggregation**: summarize large graphs by role or cluster
+  - **SCC condensation**: collapse strongly connected components
+  """
+  @spec quotient_graph(
+          Graph.t(),
+          %{Yog.node_id() => Yog.node_id()},
+          (term(), term() -> term()),
+          (term(), term() -> term())
+        ) :: Graph.t()
+  def quotient_graph(
+        %Graph{} = graph,
+        partition,
+        combine_weight \\ &Kernel.+/2,
+        combine_data \\ fn exist, _new -> exist end
+      ) do
+    block_for = fn node -> Map.get(partition, node, node) end
+
+    block_nodes =
+      Yog.Utils.map_fold(graph.nodes, %{}, fn node, data, acc ->
+        block = block_for.(node)
+        Map.update(acc, block, data, fn existing -> combine_data.(existing, data) end)
+      end)
+
+    block_edges =
+      List.foldl(Model.all_edges(graph), %{}, fn {u, v, weight}, acc ->
+        bu = block_for.(u)
+        bv = block_for.(v)
+
+        if bu == bv do
+          acc
+        else
+          Map.update(acc, {bu, bv}, weight, fn existing ->
+            combine_weight.(existing, weight)
+          end)
+        end
+      end)
+
+    new_graph = %Graph{graph | nodes: block_nodes, out_edges: %{}, in_edges: %{}}
+
+    Yog.Utils.map_fold(block_edges, new_graph, fn {from, to}, weight, g ->
+      Yog.add_edge_ensure(g, from, to, weight)
+    end)
+  end
+
   # =============================================================================
   # REACHABILITY TRANSFORMATIONS
   # =============================================================================

@@ -55,6 +55,72 @@ defmodule Yog.DAG.Algorithm do
   end
 
   @doc """
+  Returns the topological generations of a DAG.
+
+  Each generation is a list of nodes with the same longest-path distance
+  from a source. Nodes within the same generation are independent and can
+  be processed in parallel. This is especially useful in Elixir for
+  batching `Task.async_stream` workloads over a dependency graph.
+
+  **Time Complexity:** O(V + E)
+
+  ## Example
+
+      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(:a, nil)
+      ...>   |> Yog.add_node(:b, nil)
+      ...>   |> Yog.add_node(:c, nil)
+      ...>   |> Yog.add_node(:d, nil)
+      ...>   |> Yog.add_edge_ensure(:a, :b, 1)
+      ...>   |> Yog.add_edge_ensure(:a, :c, 1)
+      ...>   |> Yog.add_edge_ensure(:b, :d, 1)
+      ...>   |> Yog.add_edge_ensure(:c, :d, 1)
+      ...> )
+      iex> Yog.DAG.Algorithm.topological_generations(dag)
+      [[:a], [:b, :c], [:d]]
+  """
+  @spec topological_generations(Yog.DAG.t()) :: [[Yog.node_id()]]
+  def topological_generations(dag) do
+    graph = Model.to_graph(dag)
+
+    {in_degrees, initial_zeros} =
+      Enum.reduce(Yog.Model.all_nodes(graph), {%{}, []}, fn node, {deg_acc, zero_acc} ->
+        deg = Yog.Model.in_degree(graph, node)
+
+        {
+          Map.put(deg_acc, node, deg),
+          if(deg == 0, do: [node | zero_acc], else: zero_acc)
+        }
+      end)
+
+    do_generations(graph, in_degrees, initial_zeros, [])
+  end
+
+  defp do_generations(_graph, _in_degrees, [], acc) do
+    acc
+    |> Enum.reverse()
+    |> Enum.map(&Enum.sort/1)
+  end
+
+  defp do_generations(graph, in_degrees, current_generation, acc) do
+    {next_in_degrees, next_generation} =
+      List.foldl(current_generation, {in_degrees, []}, fn node, {degrees_acc, next_gen_acc} ->
+        List.foldl(Yog.Model.successor_ids(graph, node), {degrees_acc, next_gen_acc}, fn succ,
+                                                                                         {d, gen} ->
+          new_deg = Map.fetch!(d, succ) - 1
+
+          # Queue successors dynamically the moment all their prerequisites finish
+          new_gen = if new_deg == 0, do: [succ | gen], else: gen
+
+          {Map.put(d, succ, new_deg), new_gen}
+        end)
+      end)
+
+    do_generations(graph, next_in_degrees, next_generation, [current_generation | acc])
+  end
+
+  @doc """
   Finds the longest path (critical path) in a weighted DAG.
 
   The longest path is the path with maximum total edge weight from any source
