@@ -7,19 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-### Added
+#### Added
 
 #### Core API
 - `Yog.Model.add_nodes_from/2` and `Yog.add_nodes_from/2` - Add multiple nodes from an iterable (list of IDs, `{id, data}` tuples, a map, or another `Yog.Graph`).
 - `Yog.from_nodes/2` - Create a new graph from a list of nodes, symmetric to `Yog.from_edges/2`.
 
+#### DAG Algorithms
+- `Yog.DAG.Algorithm.topological_generations/1` and `Yog.DAG.topological_generations/1` - Returns a list of topological generations (layers) of a DAG.
+  - Optimized to strict **O(V + E)** using a propagating waitlist to avoid $O(V^2)$ scanning overhead.
+  - Nodes within a generation are mutually independent, enabling parallel `Task.async_stream` batch execution.
+
+#### Transformations
+- `Yog.Transform.quotient_graph/4` - Constructs a quotient graph from a partition map.
+  - Now supports an optional `combine_data` parameter for deterministic node payload aggregation.
+  - Optimized memory footprint by avoiding $O(E)$ heap allocation spikes during edge projection.
+  - Uses `Yog.Utils.map_fold/3` for high-performance iteration.
+
+#### Property & Isomorphism
+- `Yog.Property.hash/2` - Structural graph hashing using the **Weisfeiler-Lehman (WL)** algorithm.
+- `Yog.Property.isomorphic?/2` - Fast topological equality checking.
+- `Yog.Property.forest?/1` - Predicate for undirected cycle-free disjoint trees.
+- `Yog.Property.branching?/1` - Predicate for directed forests (acyclic with in-degree ≤ 1).
+
 #### Network Flow
 * `Yog.Flow.MaxFlow.dinic/3` - Dinic's algorithm for maximum flow.
+
 #### Classic Graph Generators
 - **Lollipop Graph** (`Yog.Generator.Classic.lollipop/2`): $K_m$ connected to $P_n$ — extremal example for random walks.
 - **Barbell Graph** (`Yog.Generator.Classic.barbell/2`): Two $K_{m1}$ cliques joined by a path of $m2$ nodes.
 - **Sedgewick Maze** (`Yog.Generator.Classic.sedgewick_maze/0`): Small 8-node maze with a cycle from Sedgewick's *Algorithms*.
 - **Tutte Graph** (`Yog.Generator.Classic.tutte/0`): 46-vertex cubic non-Hamiltonian polyhedral graph.
+
+### Optimized
+
+#### Performance & Memory
+- **Yen's Algorithm**: 
+  - Reduced memory pressure by swapping `Enum.take/2` for `List.starts_with?/2` during path prefix validation.
+  - Optimized target node propagation and fixed `PairingHeap` comparator binding for custom weights.
+- **HITS Centrality**:
+  - Reduced iteration complexity from $O(V \log V)$ to $O(V)$ by utilizing pre-computed flat adjacency lists.
+  - Standardized convergence check to use L2 norm in line with metric documentation.
+- **Health Metrics**:
+  - Optimized `average_local_efficiency/2` by performing graph reweighting once ($O(V)$) instead of per-node ($O(V^2)$).
+  - Added `safe_inverse` handling to prevent division errors in disconnected topologies.
 
 ## 0.96.0 - 2026-04-12
 
@@ -69,6 +100,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `waxman/2` - Waxman model with distance-probabilistic edge formation
 
 #### Pathfinding
+- **Yen's K-Shortest Paths** (#88): Added `Yog.Pathfinding.Yen.k_shortest_paths/5` - finds the k shortest loopless paths between two nodes.
+  - Natural extension of Dijkstra for backup routing, logistics, and network design
+  - Time Complexity: O(k · N · (E + V log V))
+  - Supports weighted directed and undirected graphs with custom weight functions
+  - Returns `{:ok, [%Path{}, ...]}` sorted by total weight, or `:error` if no path exists
 - **Widest Path (Maximum Capacity Path)** (#95): Added `Yog.Pathfinding.widest_path/3` - finds the path with maximum bottleneck capacity between two nodes.
   - Maximizes the minimum edge weight along the path (the bottleneck)
   - Algorithm: Modified Dijkstra with `min` for capacity combination and `Yog.Utils.compare_desc/2` for priority
@@ -93,6 +129,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Range: [0.0, 1.0]; 1.0 means every connected triple is closed (graph is union of disjoint cliques)
   - Differs from average clustering coefficient - transitivity is weighted by node degree
   - Returns 0.0 for graphs with no connected triples (e.g., trees, paths)
+
+#### Centrality
+- **HITS Algorithm** (#94): Added `Yog.Centrality.hits/2` — Hyperlink-Induced Topic Search for hub and authority scores in directed graphs.
+  - Returns `%{hubs: %{...}, authorities: %{...}}` with L2-normalized scores
+  - Converges via iterative power method with configurable `max_iterations` and `tolerance`
+  - Supports both directed and undirected graphs
+
+#### Health Metrics
+- **Network Efficiency** (Latora-Marchiori): Added efficiency metrics to `Yog.Health`:
+  - `efficiency/4` - Pairwise efficiency between two nodes (1/distance, 0.0 if unreachable).
+  - `global_efficiency/2` - Average efficiency over all ordered pairs of distinct nodes.
+    - Well-defined for disconnected graphs (unreachable pairs contribute 0.0 instead of `nil`).
+    - Parallelized via `Task.async_stream`.
+  - `local_efficiency/3` - Global efficiency of the subgraph induced by a node's neighbors.
+  - `average_local_efficiency/2` - Mean local efficiency across all nodes.
 
 #### Other Changes
 - **Pathfinding**: Added `Johnson's algorithm` to Matrix auto-selection for non-negative weights on sparse graphs with many POIs. Previously Johnson's was only used with negative weights; now it's also selected for sparse graphs (E < V²/4) with many POIs (P > V/3) instead of Floyd-Warshall.
