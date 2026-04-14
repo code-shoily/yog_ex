@@ -14,6 +14,7 @@ defmodule Yog.Centrality do
   | Harmonic | `harmonic/2` | Disconnected graphs |
   | Betweenness | `betweenness/2` | Bridge/gatekeeper detection |
   | PageRank | `pagerank/2` | Link-quality importance |
+  | HITS | `hits/2` | Hub and authority scores |
   | Eigenvector | `eigenvector/2` | Influence based on neighbor importance |
   | Katz | `katz/2` | Attenuated influence with base score |
   | Alpha | `alpha/2` | Directed graph influence |
@@ -557,6 +558,185 @@ defmodule Yog.Centrality do
       out_degrees_map,
       sinks
     )
+  end
+
+  # =============================================================================
+  # HITS (Hyperlink-Induced Topic Search)
+  # =============================================================================
+
+  @doc """
+  Calculates HITS hub and authority scores for all nodes.
+
+  HITS identifies two types of important nodes in directed graphs:
+  - **Authorities** — nodes with good content (pointed to by good hubs)
+  - **Hubs** — nodes that point to good authorities
+
+  Unlike PageRank's single score, HITS provides dual scores using iterative
+  mutual reinforcement. Authority scores are the sum of hub scores of
+  predecessors; hub scores are the sum of authority scores of successors.
+
+  **Time Complexity:** O(max_iterations × (V + E))
+
+  ## Interpreting HITS
+
+  | Score | Meaning |
+  |-------|---------|
+  | **High authority** | Many high-quality incoming links |
+  | **High hub** | Points to many high-authority nodes |
+  | **Both low** | Peripheral node, neither cited nor curating |
+
+  ## Options
+
+  - `:max_iterations` - Maximum power iterations (default: 100)
+  - `:tolerance` - Convergence threshold for L2 norm (default: 1.0e-6)
+
+  ## Example
+
+      iex> graph =
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(:a, nil)
+      ...>   |> Yog.add_node(:b, nil)
+      ...>   |> Yog.add_node(:c, nil)
+      ...>   |> Yog.add_node(:d, nil)
+      ...>   |> Yog.add_edges!([
+      ...>     {:a, :b, 1}, {:a, :c, 1},
+      ...>     {:b, :c, 1},
+      ...>     {:d, :a, 1}, {:d, :b, 1}
+      ...>   ])
+      iex> %{hubs: hubs, authorities: auths} = Yog.Centrality.hits(graph)
+      iex> # a is a strong hub (points to top authorities b and c)
+      ...> hubs[:a] > hubs[:d]
+      true
+      iex> # b is the best authority (pointed to by multiple hubs)
+      ...> auths[:b] > auths[:a]
+      true
+  """
+  @spec hits(Yog.graph(), keyword()) :: %{
+          hubs: centrality_scores(),
+          authorities: centrality_scores()
+        }
+  def hits(graph, opts \\ []) do
+    max_iterations = Keyword.get(opts, :max_iterations, 100)
+    tolerance = Keyword.get(opts, :tolerance, 1.0e-6)
+
+    nodes = Map.keys(graph.nodes)
+    n = length(nodes)
+
+    if n == 0 do
+      %{hubs: %{}, authorities: %{}}
+    else
+      initial = 1.0 / :math.sqrt(n * 1.0)
+
+      auth = Map.new(nodes, fn node -> {node, initial} end)
+      hub = Map.new(nodes, fn node -> {node, initial} end)
+
+      in_list = Map.to_list(build_in_map(graph, nodes))
+      out_list = Map.to_list(build_out_map(graph, nodes))
+
+      {auth, hub} = iterate_hits(in_list, out_list, auth, hub, max_iterations, tolerance, 0)
+
+      %{hubs: hub, authorities: auth}
+    end
+  end
+
+  defp build_in_map(%Yog.Graph{kind: :undirected, out_edges: out_edges}, nodes) do
+    Map.new(nodes, fn node ->
+      neighbors =
+        case Map.fetch(out_edges, node) do
+          {:ok, inner} -> Map.keys(inner)
+          :error -> []
+        end
+
+      {node, neighbors}
+    end)
+  end
+
+  defp build_in_map(%Yog.Graph{kind: :directed, in_edges: in_edges}, nodes) do
+    Map.new(nodes, fn node ->
+      preds =
+        case Map.fetch(in_edges, node) do
+          {:ok, inner} -> Map.keys(inner)
+          :error -> []
+        end
+
+      {node, preds}
+    end)
+  end
+
+  defp build_out_map(%Yog.Graph{kind: :undirected, out_edges: out_edges}, nodes) do
+    # Same as in_map for undirected
+    Map.new(nodes, fn node ->
+      neighbors =
+        case Map.fetch(out_edges, node) do
+          {:ok, inner} -> Map.keys(inner)
+          :error -> []
+        end
+
+      {node, neighbors}
+    end)
+  end
+
+  defp build_out_map(%Yog.Graph{kind: :directed, out_edges: out_edges}, nodes) do
+    Map.new(nodes, fn node ->
+      succs =
+        case Map.fetch(out_edges, node) do
+          {:ok, inner} -> Map.keys(inner)
+          :error -> []
+        end
+
+      {node, succs}
+    end)
+  end
+
+  defp iterate_hits(in_list, out_list, auth, hub, max_iterations, tolerance, iter)
+       when iter < max_iterations do
+    new_auth =
+      List.foldl(in_list, %{}, fn {node, preds}, acc ->
+        score = List.foldl(preds, 0.0, fn pred, sum -> sum + Map.get(hub, pred, 0.0) end)
+        Map.put(acc, node, score)
+      end)
+
+    new_hub =
+      List.foldl(out_list, %{}, fn {node, succs}, acc ->
+        score = List.foldl(succs, 0.0, fn succ, sum -> sum + Map.get(new_auth, succ, 0.0) end)
+        Map.put(acc, node, score)
+      end)
+
+    norm_auth = l2_norm(new_auth)
+    norm_hub = l2_norm(new_hub)
+
+    normalized_auth =
+      if norm_auth > 0, do: Map.new(new_auth, fn {k, v} -> {k, v / norm_auth} end), else: new_auth
+
+    normalized_hub =
+      if norm_hub > 0, do: Map.new(new_hub, fn {k, v} -> {k, v / norm_hub} end), else: new_hub
+
+    auth_diff = Yog.Utils.norm_diff(auth, normalized_auth, :l2)
+    hub_diff = Yog.Utils.norm_diff(hub, normalized_hub, :l2)
+
+    if auth_diff < tolerance and hub_diff < tolerance do
+      {normalized_auth, normalized_hub}
+    else
+      iterate_hits(
+        in_list,
+        out_list,
+        normalized_auth,
+        normalized_hub,
+        max_iterations,
+        tolerance,
+        iter + 1
+      )
+    end
+  end
+
+  defp iterate_hits(_in_list, _out_list, auth, hub, _max_iterations, _tolerance, _iter) do
+    {auth, hub}
+  end
+
+  defp l2_norm(scores) do
+    sum_sq = Yog.Utils.map_fold(scores, 0.0, fn _k, v, acc -> acc + v * v end)
+
+    :math.sqrt(sum_sq)
   end
 
   # =============================================================================

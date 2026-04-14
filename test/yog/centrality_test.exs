@@ -233,6 +233,115 @@ defmodule Yog.CentralityTest do
     assert_in_delta scores[2], scores[3], 0.01
   end
 
+  # ============= HITS Tests =============
+
+  test "hits_simple_directed_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(:a, nil)
+      |> Yog.add_node(:b, nil)
+      |> Yog.add_node(:c, nil)
+      |> Yog.add_node(:d, nil)
+      |> Yog.add_edges!([
+        {:a, :b, 1},
+        {:a, :c, 1},
+        {:b, :c, 1},
+        {:d, :a, 1},
+        {:d, :b, 1}
+      ])
+
+    %{hubs: hubs, authorities: auths} = Yog.Centrality.hits(graph)
+
+    # a is best hub (points to authorities b and c)
+    assert hubs[:a] > hubs[:d]
+    assert hubs[:a] > hubs[:b]
+    assert hubs[:a] > hubs[:c]
+
+    # b and c are top authorities (pointed to by hubs)
+    assert auths[:b] > auths[:a]
+    assert auths[:c] > auths[:a]
+
+    # c has no outgoing edges, so hub score should be 0
+    assert_in_delta hubs[:c], 0.0, 0.001
+
+    # d has no incoming edges, so authority score should be 0
+    assert_in_delta auths[:d], 0.0, 0.001
+  end
+
+  test "hits_normalization_test" do
+    graph = simple_graph()
+    %{hubs: hubs, authorities: auths} = Yog.Centrality.hits(graph)
+
+    # L2 norm should be ~1.0
+    hub_norm = :math.sqrt(Enum.reduce(Map.values(hubs), 0.0, fn v, acc -> acc + v * v end))
+    auth_norm = :math.sqrt(Enum.reduce(Map.values(auths), 0.0, fn v, acc -> acc + v * v end))
+
+    assert_in_delta hub_norm, 1.0, 0.01
+    assert_in_delta auth_norm, 1.0, 0.01
+  end
+
+  test "hits_two_node_cycle_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_edges!([{1, 2, 1}, {2, 1, 1}])
+
+    %{hubs: hubs, authorities: auths} = Yog.Centrality.hits(graph)
+
+    # In a symmetric 2-cycle, scores should be equal
+    assert_in_delta hubs[1], hubs[2], 0.01
+    assert_in_delta auths[1], auths[2], 0.01
+  end
+
+  test "hits_star_test" do
+    # Directed star: center pointed to by all leaves
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_node(3, nil)
+      |> Yog.add_node(4, nil)
+      |> Yog.add_edges!([{2, 1, 1}, {3, 1, 1}, {4, 1, 1}])
+
+    %{hubs: _hubs, authorities: auths} = Yog.Centrality.hits(graph)
+
+    # Center has highest authority
+    assert auths[1] > auths[2]
+    assert auths[1] > auths[3]
+    assert auths[1] > auths[4]
+
+    # Leaves have no incoming edges, so authority is 0
+    assert_in_delta auths[2], 0.0, 0.001
+    assert_in_delta auths[3], 0.0, 0.001
+    assert_in_delta auths[4], 0.0, 0.001
+  end
+
+  test "hits_empty_graph_test" do
+    graph = Yog.directed()
+    %{hubs: hubs, authorities: auths} = Yog.Centrality.hits(graph)
+    assert hubs == %{}
+    assert auths == %{}
+  end
+
+  test "hits_single_node_test" do
+    graph = Yog.directed() |> Yog.add_node(1, nil)
+    %{hubs: hubs, authorities: auths} = Yog.Centrality.hits(graph)
+    assert map_size(hubs) == 1
+    assert map_size(auths) == 1
+    # Single isolated node has no incoming/outgoing links
+    assert_in_delta hubs[1], 0.0, 0.01
+    assert_in_delta auths[1], 0.0, 0.01
+  end
+
+  test "hits_converges_with_custom_tolerance_test" do
+    graph = triangle_graph()
+    %{hubs: hubs, authorities: auths} = Yog.Centrality.hits(graph, tolerance: 1.0e-8)
+
+    assert map_size(hubs) == 3
+    assert map_size(auths) == 3
+  end
+
   # ============= Eigenvector Centrality Tests =============
 
   test "eigenvector_triangle_test" do
