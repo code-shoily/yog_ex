@@ -10,6 +10,8 @@ defmodule Yog.Property.Structure do
   |---------|----------|------------|
   | Tree check | `tree?/1` | O(V + E) |
   | Arborescence check | `arborescence?/1` | O(V + E) |
+  | Forest check | `forest?/1` | O(V + E) |
+  | Branching check | `branching?/1` | O(V + E) |
   | Complete graph check | `complete?/1` | O(V) |
   | Regular graph check | `regular?/2` | O(V) |
   | Connected check | `connected?/1` | O(V + E) |
@@ -104,7 +106,7 @@ defmodule Yog.Property.Structure do
   alias Yog.Connectivity.Components
   alias Yog.Connectivity.SCC
   alias Yog.Model
-  alias Yog.Property.Bipartite
+  alias Yog.Property.{Bipartite, Cyclicity}
   alias Yog.Utils
 
   @doc """
@@ -181,6 +183,72 @@ defmodule Yog.Property.Structure do
       end)
     else
       nil
+    end
+  end
+
+  @doc """
+  Checks if the graph is a forest (a loopless undirected graph consisting
+  entirely of disjoint trees).
+
+  A disconnected graph with multiple trees evaluates to `true`.
+
+  ## Examples
+
+      iex> forest = Yog.undirected()
+      ...> |> Yog.add_edge_ensure(1, 2, 1, nil)
+      ...> |> Yog.add_edge_ensure(3, 4, 1, nil)
+      iex> Yog.Property.Structure.forest?(forest)
+      true
+  """
+  @spec forest?(Yog.graph()) :: boolean()
+  def forest?(graph) do
+    case Model.type(graph) do
+      :undirected ->
+        n = Model.node_count(graph)
+
+        if n == 0 do
+          true
+        else
+          e = Model.edge_count(graph)
+          c = length(Components.connected_components(graph))
+          e == n - c
+        end
+
+      :directed ->
+        false
+    end
+  end
+
+  @doc """
+  Checks if a directed graph is a branching (a directed forest).
+
+  Evaluates to `true` if every node has an in-degree of 1 or 0, and
+  the graph contains no directed cycles.
+
+  ## Examples
+
+      iex> branch = Yog.directed()
+      ...> |> Yog.add_edge_ensure(1, 2, 1, nil)
+      ...> |> Yog.add_edge_ensure(1, 3, 1, nil)
+      ...> |> Yog.add_edge_ensure(4, 5, 1, nil)
+      iex> Yog.Property.Structure.branching?(branch)
+      true
+  """
+  @spec branching?(Yog.graph()) :: boolean()
+  def branching?(graph) do
+    case Model.type(graph) do
+      :directed ->
+        # Condition 1: All nodes have in-degree <= 1
+        valid_in_degrees? =
+          graph
+          |> Model.all_nodes()
+          |> Enum.all?(fn node -> Model.in_degree(graph, node) <= 1 end)
+
+        # Condition 2: No directed cycles
+        valid_in_degrees? and Cyclicity.acyclic?(graph)
+
+      :undirected ->
+        false
     end
   end
 
