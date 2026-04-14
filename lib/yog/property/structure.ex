@@ -17,11 +17,7 @@ defmodule Yog.Property.Structure do
   | Connected check | `connected?/1` | O(V + E) |
   | Strongly connected check | `strongly_connected?/1` | O(V + E) |
   | Weakly connected check | `weakly_connected?/1` | O(V + E) |
-  | Planar check | `planar?/1` | O(V + E) |
   | Chordal check | `chordal?/1` | O(V + E) |
-  | Connected check | `connected?/1` | O(V + E) |
-  | Strongly connected check | `strongly_connected?/1` | O(V + E) |
-  | Weakly connected check | `weakly_connected?/1` | O(V + E) |
 
   ## Key Concepts
 
@@ -106,7 +102,7 @@ defmodule Yog.Property.Structure do
   alias Yog.Connectivity.Components
   alias Yog.Connectivity.SCC
   alias Yog.Model
-  alias Yog.Property.{Bipartite, Cyclicity}
+  alias Yog.Property.Cyclicity
   alias Yog.Utils
 
   @doc """
@@ -350,31 +346,6 @@ defmodule Yog.Property.Structure do
           [] -> true
           _ -> false
         end
-    end
-  end
-
-  @doc """
-  Checks if the graph is planar (necessary conditions only).
-
-  Implements necessary checks: $|E| \le 3|V| - 6$ and bipartite $|E| \le 2|V| - 4$.
-  """
-  @spec planar?(Yog.graph()) :: boolean()
-  def planar?(graph) do
-    n = Model.node_count(graph)
-    e = Model.edge_count(graph)
-
-    cond do
-      n <= 4 ->
-        true
-
-      e > 3 * n - 6 ->
-        false
-
-      Bipartite.bipartite?(graph) and e > 2 * n - 4 ->
-        false
-
-      true ->
-        true
     end
   end
 

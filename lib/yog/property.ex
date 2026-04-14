@@ -37,7 +37,15 @@ defmodule Yog.Property do
       3
   """
 
-  alias Yog.Property.{Bipartite, Clique, Cyclicity, Eulerian, Structure, WeisfeilerLehman}
+  alias Yog.Property.{
+    Bipartite,
+    Clique,
+    Cyclicity,
+    Eulerian,
+    Planarity,
+    Structure,
+    WeisfeilerLehman
+  }
 
   # ============= Structure =============
 
@@ -151,7 +159,17 @@ defmodule Yog.Property do
   For graphs with $V \ge 3$, validates $|E| \le 3|V| - 6$.
   If bipartite, validates $|E| \le 2|V| - 4$.
   """
-  defdelegate planar?(graph), to: Structure
+  defdelegate planar?(graph), to: Planarity
+
+  @doc """
+  Returns a combinatorial embedding if the graph is planar.
+  """
+  defdelegate planar_embedding(graph), to: Planarity
+
+  @doc """
+  Identifies a Kuratowski witness that proves the graph is non-planar.
+  """
+  defdelegate kuratowski_witness(graph), to: Planarity
 
   @doc """
   Checks if the graph is chordal (no induced cycles longer than 3).

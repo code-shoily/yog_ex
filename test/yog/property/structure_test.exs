@@ -154,43 +154,4 @@ defmodule Yog.Property.StructureTest do
     g3 = g2 |> Yog.add_edge_ensure(1, 3, 1)
     assert Structure.chordal?(g3)
   end
-
-  # ============= Planarity Tests =============
-
-  test "planar? basic checks" do
-    # K4 is planar
-    nodes = 1..4
-
-    k4 =
-      for u <- nodes, v <- nodes, u < v, reduce: Yog.undirected() do
-        acc -> Yog.add_edge_ensure(acc, u, v, 1, nil)
-      end
-
-    assert Structure.planar?(k4)
-
-    # K5 is NOT planar
-    nodes = 1..5
-
-    g_k5 =
-      for u <- nodes, v <- nodes, u < v, reduce: Yog.undirected() do
-        acc -> Yog.add_edge_ensure(acc, u, v, 1, nil)
-      end
-
-    assert not Structure.planar?(g_k5)
-
-    # K3,3 is NOT planar
-    k33 =
-      Yog.undirected()
-      |> Yog.add_edge_ensure(1, 4, 1, nil)
-      |> Yog.add_edge_ensure(1, 5, 1, nil)
-      |> Yog.add_edge_ensure(1, 6, 1, nil)
-      |> Yog.add_edge_ensure(2, 4, 1, nil)
-      |> Yog.add_edge_ensure(2, 5, 1, nil)
-      |> Yog.add_edge_ensure(2, 6, 1, nil)
-      |> Yog.add_edge_ensure(3, 4, 1, nil)
-      |> Yog.add_edge_ensure(3, 5, 1, nil)
-      |> Yog.add_edge_ensure(3, 6, 1, nil)
-
-    assert not Structure.planar?(k33)
-  end
 end

@@ -24,11 +24,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Optimized memory footprint by avoiding $O(E)$ heap allocation spikes during edge projection.
   - Uses `Yog.Utils.map_fold/3` for high-performance iteration.
 
-#### Property & Isomorphism
-- `Yog.Property.hash/2` - Structural graph hashing using the **Weisfeiler-Lehman (WL)** algorithm.
-- `Yog.Property.isomorphic?/2` - Fast topological equality checking.
+#### Pathfinding
+- `Yog.Pathfinding.LCA` - Efficient Lowest Common Ancestor (LCA) implementation using binary lifting.
+  - `preprocess/1` - Precomputes binary lifting tables and depths in $O(V \log V)$.
+  - `lca/3` - Queries the lowest common ancestor of two nodes in $O(\log V)$.
+
+#### Property & Structure
+- Exact Planarity Suite in `Yog.Property.Structure`:
+  - `planar?/1` - Robust, exact planarity testing using the LR-test algorithm (O(V²) implementation).
+  - `planar_embedding/1` - Extracts a combinatorial embedding (clockwise cyclic adjacency lists) for planar graphs.
+  - `kuratowski_witness/1` - Identifies a minimal non-planar subgraph witness (subdivision of $K_5$ or $K_{3,3}$).
 - `Yog.Property.forest?/1` - Predicate for undirected cycle-free disjoint trees.
 - `Yog.Property.branching?/1` - Predicate for directed forests (acyclic with in-degree ≤ 1).
+- `Yog.Property.isomorphic?/2` - Fast topological equality checking using Weisfeiler-Lehman.
+- `Yog.Property.hash/2` - Structural graph hashing.
 
 #### Network Flow
 * `Yog.Flow.MaxFlow.dinic/3` - Dinic's algorithm for maximum flow.
