@@ -48,6 +48,7 @@ defmodule Yog.Pathfinding do
   alias Yog.Pathfinding.Dijkstra
   alias Yog.Pathfinding.FloydWarshall
   alias Yog.Pathfinding.Johnson
+  alias Yog.Pathfinding.LCA
   alias Yog.Pathfinding.Matrix
   alias Yog.Pathfinding.Yen
 
@@ -614,5 +615,69 @@ defmodule Yog.Pathfinding do
 
         do_bfs_dist(graph, next_q, next_v)
     end
+  end
+
+  # =============================================================================
+  # LCA (Lowest Common Ancestor)
+  # =============================================================================
+
+  @doc """
+  Preprocesses a tree for LCA queries using binary lifting.
+
+  ## Parameters
+
+    * `graph` - The tree graph
+    * `root` - The root node for the tree
+
+  ## Returns
+
+    * `{:ok, LCA.State.t()}` - Preprocessed state for LCA queries
+    * `{:error, :root_not_found}` - Root node not in graph
+    * `{:error, :not_a_tree}` - Graph contains a cycle or is disconnected
+
+  ## Example
+
+      iex> tree =
+      ...>   Yog.undirected()
+      ...>   |> Yog.add_node(1, nil)
+      ...>   |> Yog.add_node(2, nil)
+      ...>   |> Yog.add_node(3, nil)
+      ...>   |> Yog.add_edges!([{1, 2, 1}, {1, 3, 1}])
+      iex> {:ok, state} = Yog.Pathfinding.lca_preprocess(tree, 1)
+      iex> Yog.Pathfinding.lca(state, 2, 3)
+      {:ok, 1}
+  """
+  @spec lca_preprocess(Yog.Graph.t(), Yog.node_id()) ::
+          {:ok, LCA.State.t()} | {:error, :root_not_found | :not_a_tree}
+  def lca_preprocess(graph, root) do
+    LCA.lca_preprocess(graph, root)
+  end
+
+  @doc """
+  Returns the lowest common ancestor of two nodes.
+
+  ## Returns
+
+    * `{:ok, node_id}` - The LCA node
+    * `{:error, :node_not_found}` - One or both nodes not in the tree
+  """
+  @spec lca(LCA.State.t(), Yog.node_id(), Yog.node_id()) ::
+          {:ok, Yog.node_id()} | {:error, :node_not_found}
+  def lca(state, a, b) do
+    LCA.lca(state, a, b)
+  end
+
+  @doc """
+  Calculates the tree distance (number of edges) between two nodes.
+
+  ## Returns
+
+    * `{:ok, distance}` - Number of edges between the nodes
+    * `{:error, :node_not_found}` - One or both nodes not in the tree
+  """
+  @spec tree_distance(LCA.State.t(), Yog.node_id(), Yog.node_id()) ::
+          {:ok, non_neg_integer()} | {:error, :node_not_found}
+  def tree_distance(state, a, b) do
+    LCA.tree_distance(state, a, b)
   end
 end
