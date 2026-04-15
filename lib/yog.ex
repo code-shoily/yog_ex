@@ -1115,6 +1115,28 @@ defmodule Yog do
   defdelegate subgraph(graph, ids), to: Transform
 
   @doc """
+  Returns the ego graph of a node — the subgraph induced by the node
+  and all nodes within `radius` hops.
+
+  For directed graphs, the `:mode` option controls traversal:
+  - `:successors` (default) - follows outgoing edges only
+  - `:neighbors` - follows both outgoing and incoming edges
+
+  ## Example
+
+      iex> graph =
+      ...>   Yog.undirected()
+      ...>   |> Yog.add_node(1, "A")
+      ...>   |> Yog.add_node(2, "B")
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+      iex> ego = Yog.ego_graph(graph, 1)
+      iex> Enum.sort(Yog.all_nodes(ego))
+      [1, 2]
+  """
+  @spec ego_graph(graph(), node_id(), non_neg_integer(), keyword()) :: graph()
+  defdelegate ego_graph(graph, node, radius \\ 1, opts \\ []), to: Transform
+
+  @doc """
   Converts an undirected graph to directed.
 
   ## Example

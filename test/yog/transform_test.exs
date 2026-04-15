@@ -800,6 +800,100 @@ defmodule Yog.TransformTest do
     assert Yog.successors(sub, 3) == []
   end
 
+  # ============= Ego Graph Tests =============
+
+  test "ego_graph_radius_0_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+
+    ego = Yog.Transform.ego_graph(graph, 1, 0)
+
+    assert Yog.all_nodes(ego) == [1]
+  end
+
+  test "ego_graph_undirected_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 20)
+
+    ego = Yog.Transform.ego_graph(graph, 2)
+
+    assert Enum.sort(Yog.all_nodes(ego)) == [1, 2, 3]
+    assert Yog.successors(ego, 1) == [{2, 10}]
+    assert Yog.successors(ego, 2) == [{1, 10}, {3, 20}] |> Enum.sort()
+  end
+
+  test "ego_graph_directed_successors_mode_default_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 20)
+
+    ego = Yog.Transform.ego_graph(graph, 2)
+
+    assert Enum.sort(Yog.all_nodes(ego)) == [2, 3]
+  end
+
+  test "ego_graph_directed_neighbors_mode_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+      |> Yog.add_edge_ensure(from: 3, to: 2, with: 20)
+
+    ego = Yog.Transform.ego_graph(graph, 2, 1, mode: :neighbors)
+
+    assert Enum.sort(Yog.all_nodes(ego)) == [1, 2, 3]
+  end
+
+  test "ego_graph_radius_2_directed_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_nodes_from([{1, nil}, {2, nil}, {3, nil}, {4, nil}])
+      |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}, {3, 4, 1}])
+
+    ego = Yog.Transform.ego_graph(graph, 1, 2)
+
+    assert Enum.sort(Yog.all_nodes(ego)) == [1, 2, 3]
+  end
+
+  test "ego_graph_preserves_edges_within_neighborhood_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_edges!([{1, 2, 10}, {2, 3, 20}, {1, 3, 30}])
+
+    ego = Yog.Transform.ego_graph(graph, 1)
+
+    assert Enum.sort(Yog.all_nodes(ego)) == [1, 2, 3]
+    assert Yog.successors(ego, 1) == [{2, 10}, {3, 30}]
+    assert Yog.successors(ego, 2) == [{3, 20}]
+  end
+
+  test "ego_graph_nonexistent_node_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+
+    ego = Yog.Transform.ego_graph(graph, 99)
+
+    assert Yog.all_nodes(ego) == []
+  end
+
   # ============= Filter Edges Tests =============
 
   test "filter_edges_by_weight_test" do

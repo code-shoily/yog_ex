@@ -17,6 +17,7 @@ defmodule Yog.Transform do
   | Map Edges Async | `map_edges_async/2` | O(E/cores) | Parallel edge transforms |
   | Filter Nodes | `filter_nodes/2` | O(V) | Subgraph extraction |
   | Filter Edges | `filter_edges/2` | O(E) | Remove unwanted edges |
+  | Ego Graph | `ego_graph/4` | O(V + E) | Extract k-hop neighborhood |
 
   ## Parallel Transformations
 
@@ -944,6 +945,111 @@ defmodule Yog.Transform do
         out_edges: prune_edges(graph.out_edges, id_set),
         in_edges: prune_edges(graph.in_edges, id_set)
     }
+  end
+
+  @doc """
+  Returns the ego graph of a node: the subgraph induced by the node
+  and all nodes within `radius` hops.
+
+  For undirected graphs, neighbors are traversed in both directions.
+  For directed graphs, the behavior is controlled by the `:mode` option:
+
+  - `:successors` (default) - Follow outgoing edges only. This aligns with
+    the English notion of "ego" (who the node points to / influences).
+  - `:neighbors` - Follow both outgoing and incoming edges (the union of
+    successors and predecessors).
+
+  ## Options
+
+    * `:mode` - `:successors` or `:neighbors`. Only affects directed graphs.
+
+  ## Examples
+
+  ### Radius 1 (default) on an undirected graph
+
+      iex> graph =
+      ...>   Yog.undirected()
+      ...>   |> Yog.add_node(1, "A")
+      ...>   |> Yog.add_node(2, "B")
+      ...>   |> Yog.add_node(3, "C")
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 20)
+      iex> ego = Yog.Transform.ego_graph(graph, 2)
+      iex> Enum.sort(Yog.all_nodes(ego))
+      [1, 2, 3]
+
+  ### Directed graph with :successors mode (default)
+
+      iex> graph =
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(1, "A")
+      ...>   |> Yog.add_node(2, "B")
+      ...>   |> Yog.add_node(3, "C")
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 20)
+      iex> ego = Yog.Transform.ego_graph(graph, 2)
+      iex> Enum.sort(Yog.all_nodes(ego))
+      [2, 3]
+
+  ### Directed graph with :neighbors mode
+
+      iex> graph =
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(1, "A")
+      ...>   |> Yog.add_node(2, "B")
+      ...>   |> Yog.add_node(3, "C")
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+      ...>   |> Yog.add_edge_ensure(from: 3, to: 2, with: 20)
+      iex> ego = Yog.Transform.ego_graph(graph, 2, 1, mode: :neighbors)
+      iex> Enum.sort(Yog.all_nodes(ego))
+      [1, 2, 3]
+
+  ### Radius 2
+
+      iex> graph =
+      ...>   Yog.directed()
+      ...>   |> Yog.add_nodes_from([{1, nil}, {2, nil}, {3, nil}, {4, nil}])
+      ...>   |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}, {3, 4, 1}])
+      iex> ego = Yog.Transform.ego_graph(graph, 1, 2)
+      iex> Enum.sort(Yog.all_nodes(ego))
+      [1, 2, 3]
+  """
+  @spec ego_graph(Graph.t(), Yog.node_id(), non_neg_integer(), keyword()) :: Graph.t()
+  def ego_graph(%Graph{} = graph, node, radius \\ 1, opts \\ []) when radius >= 0 do
+    mode = Keyword.get(opts, :mode, :successors)
+    id_set = ego_bfs(graph, node, radius, mode)
+    subgraph(graph, MapSet.to_list(id_set))
+  end
+
+  defp ego_bfs(graph, node, radius, mode) do
+    do_ego_bfs(graph, [node], 0, radius, MapSet.new([node]), mode)
+  end
+
+  defp do_ego_bfs(_graph, [], _dist, _max_dist, acc, _mode), do: acc
+
+  defp do_ego_bfs(_graph, _queue, dist, max_dist, acc, _mode) when dist >= max_dist,
+    do: acc
+
+  defp do_ego_bfs(graph, queue, dist, max_dist, acc, mode) do
+    {next_queue, next_acc} =
+      Enum.reduce(queue, {[], acc}, fn current, {q, a} ->
+        neighbors =
+          case {graph.kind, mode} do
+            {:undirected, _} -> Model.successor_ids(graph, current)
+            {:directed, :neighbors} -> Model.neighbor_ids(graph, current)
+            {:directed, _} -> Model.successor_ids(graph, current)
+          end
+
+        Enum.reduce(neighbors, {q, a}, fn n, {q2, a2} ->
+          if MapSet.member?(a2, n) do
+            {q2, a2}
+          else
+            {[n | q2], MapSet.put(a2, n)}
+          end
+        end)
+      end)
+
+    do_ego_bfs(graph, Enum.reverse(next_queue), dist + 1, max_dist, next_acc, mode)
   end
 
   @doc """
