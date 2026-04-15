@@ -241,6 +241,254 @@ defmodule Yog.Flow.MinCut do
     |> MaxFlow.extract_min_cut()
   end
 
+  @doc """
+  Finds the global minimum cut using the randomized Karger-Stein algorithm.
+
+  Karger-Stein uses repeated random edge contraction with recursive branching
+  to achieve high success probability. It is particularly effective on dense
+  graphs where the exact Stoer-Wagner algorithm may be slower.
+
+  ## Parameters
+
+  - `graph` - The undirected weighted graph
+  - `opts` - Options:
+    - `:iterations` - Number of independent runs of the recursive fast-cut
+      procedure (default: `max(1, trunc(n * log2(n + 1)))`)
+
+  ## Examples
+
+      iex> graph = Yog.from_edges(:undirected, [{1, 2, 5}, {2, 3, 3}, {1, 3, 2}])
+      iex> result = Yog.Flow.MinCut.karger_stein(graph)
+      iex> result.cut_value
+      5
+  """
+  @spec karger_stein(Yog.graph(), keyword()) :: MinCutResult.t()
+  def karger_stein(graph, opts \\ []) do
+    nodes = Map.keys(graph.nodes)
+    n = length(nodes)
+
+    if n <= 1 do
+      side = MapSet.new(nodes)
+      MinCutResult.new(0, 0, 0, side, MapSet.new())
+    else
+      {adj, vertices} = build_karger_adj(graph)
+
+      default_iterations = max(1, trunc(n * :math.log2(n + 1)))
+      iterations = Keyword.get(opts, :iterations, default_iterations)
+
+      {best_cut, {best_a, best_b}} =
+        Enum.reduce(1..iterations, {nil, nil}, fn _, {best_val, best_part} ->
+          {cut_val, {part_a, part_b}} = fast_cut(adj, vertices)
+
+          if is_nil(best_val) or cut_val < best_val do
+            {cut_val, {part_a, part_b}}
+          else
+            {best_val, best_part}
+          end
+        end)
+
+      MinCutResult.new(
+        best_cut,
+        MapSet.size(best_a),
+        MapSet.size(best_b),
+        best_a,
+        best_b
+      )
+    end
+  end
+
+  # ==========================================================================
+  # Karger-Stein Internals
+  # ==========================================================================
+
+  defp build_karger_adj(graph) do
+    edges = Yog.Model.all_edges(graph)
+
+    adj =
+      Enum.reduce(edges, %{}, fn {u, v, w}, acc ->
+        acc
+        |> Map.update(u, %{v => w}, &Map.put(&1, v, w))
+        |> Map.update(v, %{u => w}, &Map.put(&1, u, w))
+      end)
+
+    vertices = Map.new(Map.keys(graph.nodes), fn u -> {u, MapSet.new([u])} end)
+    {adj, vertices}
+  end
+
+  defp fast_cut(adj, vertices) when map_size(vertices) <= 6 do
+    brute_force_min_cut(adj, vertices)
+  end
+
+  defp fast_cut(adj, vertices) do
+    n = map_size(vertices)
+    t = trunc(Float.ceil(1 + n / :math.sqrt(2)))
+
+    {adj1, vertices1} = contract_until(adj, vertices, t)
+    {adj2, vertices2} = contract_until(adj, vertices, t)
+
+    {cut1, part1} = fast_cut(adj1, vertices1)
+    {cut2, part2} = fast_cut(adj2, vertices2)
+
+    if cut1 <= cut2 do
+      {cut1, part1}
+    else
+      {cut2, part2}
+    end
+  end
+
+  defp contract_until(adj, vertices, target_count) do
+    if map_size(vertices) <= target_count do
+      {adj, vertices}
+    else
+      case random_edge(adj, vertices) do
+        nil ->
+          {adj, vertices}
+
+        {u, v} ->
+          {new_adj, new_vertices} = contract_edge(adj, vertices, u, v)
+          contract_until(new_adj, new_vertices, target_count)
+      end
+    end
+  end
+
+  defp contract_edge(adj, vertices, u, v) do
+    u_set = Map.fetch!(vertices, u)
+    v_set = Map.fetch!(vertices, v)
+    merged_set = MapSet.union(u_set, v_set)
+
+    u_adj = Map.get(adj, u, %{})
+    v_adj = Map.get(adj, v, %{})
+
+    merged_adj =
+      v_adj
+      |> Enum.reduce(u_adj, fn {n, w}, acc ->
+        if n == u or n == v do
+          acc
+        else
+          Map.update(acc, n, w, &(&1 + w))
+        end
+      end)
+      |> Map.delete(u)
+      |> Map.delete(v)
+
+    adj =
+      v_adj
+      |> Enum.reduce(adj, fn {n, w}, acc ->
+        if n == u or n == v do
+          acc
+        else
+          n_adj =
+            acc
+            |> Map.fetch!(n)
+            |> Map.delete(v)
+            |> Map.update(u, w, &(&1 + w))
+
+          Map.put(acc, n, n_adj)
+        end
+      end)
+      |> Map.put(u, merged_adj)
+      |> Map.delete(v)
+
+    vertices = vertices |> Map.put(u, merged_set) |> Map.delete(v)
+
+    {adj, vertices}
+  end
+
+  defp random_edge(adj, vertices) do
+    {edges, _} =
+      vertices
+      |> Map.keys()
+      |> Enum.reduce({[], MapSet.new()}, fn u, {e_acc, seen} ->
+        adj
+        |> Map.get(u, %{})
+        |> Enum.reduce({e_acc, seen}, fn {v, w}, {edges, s} ->
+          key = {u, v}
+
+          if MapSet.member?(s, key) do
+            {edges, s}
+          else
+            {[{u, v, w} | edges], MapSet.put(s, {v, u})}
+          end
+        end)
+      end)
+
+    total = Enum.reduce(edges, 0, fn {_, _, w}, acc -> acc + w end)
+
+    if total == 0 do
+      nil
+    else
+      target = :rand.uniform() * total
+      pick_weighted_edge(edges, target, 0)
+    end
+  end
+
+  defp pick_weighted_edge([{u, v, w} | rest], target, acc) do
+    acc = acc + w
+
+    if acc >= target do
+      {u, v}
+    else
+      pick_weighted_edge(rest, target, acc)
+    end
+  end
+
+  defp brute_force_min_cut(adj, vertices) do
+    vertex_list = Map.keys(vertices)
+    n = length(vertex_list)
+
+    {best_cut, {side_a_supers, side_b_supers}} =
+      1..(trunc(:math.pow(2, n - 1)) - 1)
+      |> Enum.reduce({nil, nil}, fn mask, {best_val, best_part} ->
+        {side_a, side_b} = partition_from_mask(vertex_list, mask)
+        cut_val = cut_weight_between(adj, side_a, side_b)
+
+        if is_nil(best_val) or cut_val < best_val do
+          {cut_val, {side_a, side_b}}
+        else
+          {best_val, best_part}
+        end
+      end)
+
+    side_a_nodes = flatten_partition(vertices, side_a_supers)
+    side_b_nodes = flatten_partition(vertices, side_b_supers)
+
+    {best_cut, {side_a_nodes, side_b_nodes}}
+  end
+
+  defp partition_from_mask(vertex_list, mask) do
+    vertex_list
+    |> Enum.with_index()
+    |> Enum.reduce({MapSet.new(), MapSet.new()}, fn {v, i}, {a, b} ->
+      if Bitwise.band(Bitwise.bsr(mask, i), 1) == 1 do
+        {MapSet.put(a, v), b}
+      else
+        {a, MapSet.put(b, v)}
+      end
+    end)
+  end
+
+  defp cut_weight_between(adj, side_a, side_b) do
+    side_a
+    |> MapSet.to_list()
+    |> Enum.reduce(0, fn u, acc ->
+      u_adj = Map.get(adj, u, %{})
+
+      side_b
+      |> MapSet.to_list()
+      |> Enum.reduce(acc, fn v, inner_acc ->
+        inner_acc + Map.get(u_adj, v, 0)
+      end)
+    end)
+  end
+
+  defp flatten_partition(vertices, supernode_set) do
+    supernode_set
+    |> MapSet.to_list()
+    |> Enum.reduce(MapSet.new(), fn u, acc ->
+      MapSet.union(acc, Map.fetch!(vertices, u))
+    end)
+  end
+
   # Maximum Adjacency Search: finds the two most tightly connected nodes.
   # Returns {s, t, cut_weight} where:
   # - s: second-to-last node added

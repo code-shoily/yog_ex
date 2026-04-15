@@ -264,6 +264,95 @@ defmodule Yog.Flow.MinCutTest do
     end
   end
 
+  describe "karger_stein/2" do
+    test "simple triangle graph" do
+      {:ok, graph} =
+        Yog.undirected()
+        |> Yog.add_node(1, "A")
+        |> Yog.add_node(2, "B")
+        |> Yog.add_node(3, "C")
+        |> Yog.add_edges([
+          {1, 2, 1},
+          {2, 3, 1},
+          {1, 3, 1}
+        ])
+
+      result = MinCut.karger_stein(graph, iterations: 10)
+      assert result.cut_value == 2
+      assert result.source_side_size + result.sink_side_size == 3
+    end
+
+    test "single edge graph" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_node(1, "A")
+        |> Yog.add_node(2, "B")
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+
+      result = MinCut.karger_stein(graph)
+      assert result.cut_value == 5
+      assert result.source_side_size == 1
+      assert result.sink_side_size == 1
+    end
+
+    test "two connected cliques" do
+      {:ok, graph} =
+        Yog.undirected()
+        |> Yog.add_node(1, "a1")
+        |> Yog.add_node(2, "a2")
+        |> Yog.add_node(3, "b1")
+        |> Yog.add_node(4, "b2")
+        |> Yog.add_edges([
+          {1, 2, 10},
+          {3, 4, 10},
+          {2, 3, 1}
+        ])
+
+      result = MinCut.karger_stein(graph, iterations: 20)
+      assert result.cut_value == 1
+    end
+
+    test "complete graph K4" do
+      {:ok, graph} =
+        Yog.undirected()
+        |> Yog.add_node(1, "a")
+        |> Yog.add_node(2, "b")
+        |> Yog.add_node(3, "c")
+        |> Yog.add_node(4, "d")
+        |> Yog.add_edges([
+          {1, 2, 1},
+          {1, 3, 1},
+          {1, 4, 1},
+          {2, 3, 1},
+          {2, 4, 1},
+          {3, 4, 1}
+        ])
+
+      result = MinCut.karger_stein(graph, iterations: 20)
+      assert result.cut_value == 3
+    end
+
+    test "returns valid partitions" do
+      {:ok, graph} =
+        Yog.undirected()
+        |> Yog.add_node(1, "a")
+        |> Yog.add_node(2, "b")
+        |> Yog.add_node(3, "c")
+        |> Yog.add_edges([
+          {1, 2, 5},
+          {2, 3, 3},
+          {1, 3, 2}
+        ])
+
+      result = MinCut.karger_stein(graph, iterations: 20)
+      assert result.cut_value == 5
+      assert MapSet.disjoint?(result.source_side, result.sink_side)
+
+      all_nodes = MapSet.new([1, 2, 3])
+      assert MapSet.equal?(MapSet.union(result.source_side, result.sink_side), all_nodes)
+    end
+  end
+
   describe "MinCutResult struct" do
     test "partition_product helper" do
       result = Yog.Flow.MinCutResult.new(10, 3, 4)
