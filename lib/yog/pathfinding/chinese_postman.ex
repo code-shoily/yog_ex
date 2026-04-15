@@ -28,6 +28,7 @@ defmodule Yog.Pathfinding.ChinesePostman do
       4
   """
 
+  alias Yog.Connectivity.Components
   alias Yog.Graph
   alias Yog.Model
   alias Yog.Pathfinding.Dijkstra
@@ -78,8 +79,8 @@ defmodule Yog.Pathfinding.ChinesePostman do
           {:error, :no_solution}
       end
     else
-      # Compute shortest paths between all pairs of odd vertices
-      {distances, paths} = odd_vertex_distances(graph, odd_vertices)
+      # Compute shortest distances between all pairs of odd vertices
+      {distances, odd_indices} = odd_vertex_distances(graph, odd_vertices)
 
       # Find minimum-weight perfect matching
       n = length(odd_vertices)
@@ -90,10 +91,12 @@ defmodule Yog.Pathfinding.ChinesePostman do
 
       {augmented_multi, duplication_weight} =
         Enum.reduce(matching_pairs, {multi, 0}, fn {i, j}, {m, w} ->
-          u = Enum.at(odd_vertices, i)
-          v = Enum.at(odd_vertices, j)
-          path_nodes = Map.fetch!(paths, {u, v})
-          dist = distances[{i, j}]
+          u = odd_indices[i]
+          v = odd_indices[j]
+
+          # Compute the actual path only for the matched pairs
+          {:ok, %PathResult{nodes: path_nodes, weight: dist}} =
+            Dijkstra.shortest_path(graph, u, v)
 
           m2 = duplicate_path(m, path_nodes, graph)
           {m2, w + dist}
@@ -128,38 +131,19 @@ defmodule Yog.Pathfinding.ChinesePostman do
   end
 
   defp connected_ignoring_isolates?(graph) do
-    non_isolated =
-      Model.all_nodes(graph)
-      |> Enum.filter(fn u -> Model.degree(graph, u) > 0 end)
+    case Components.connected_components(graph) do
+      [] ->
+        true
 
-    if non_isolated == [] do
-      # Graph has only isolated vertices - treat as connected for CPP
-      true
-    else
-      source = hd(non_isolated)
-      visited = bfs_visited(graph, source)
-      Enum.all?(non_isolated, &(&1 in visited))
+      components ->
+        # Count components that contain at least one edge
+        edge_components =
+          Enum.count(components, fn comp ->
+            Enum.any?(comp, fn u -> Model.degree(graph, u) > 0 end)
+          end)
+
+        edge_components <= 1
     end
-  end
-
-  defp bfs_visited(graph, source) do
-    do_bfs([source], MapSet.new([source]), graph)
-  end
-
-  defp do_bfs([], visited, _graph), do: MapSet.to_list(visited)
-
-  defp do_bfs([current | queue], visited, graph) do
-    neighbors = Model.neighbor_ids(graph, current)
-
-    new_visited =
-      Enum.reduce(neighbors, visited, fn n, acc ->
-        if MapSet.member?(acc, n), do: acc, else: MapSet.put(acc, n)
-      end)
-
-    new_queue =
-      queue ++ Enum.filter(neighbors, fn n -> not MapSet.member?(visited, n) end)
-
-    do_bfs(new_queue, new_visited, graph)
   end
 
   # ==========================================================================
@@ -167,28 +151,26 @@ defmodule Yog.Pathfinding.ChinesePostman do
   # ==========================================================================
 
   defp odd_vertex_distances(graph, odd_vertices) do
-    odd_vertices
-    |> Enum.with_index()
-    |> Enum.reduce({%{}, %{}}, fn {u, i}, {dist_acc, path_acc} ->
-      # Run Dijkstra from u to all other odd vertices
-      odd_vertices
-      |> Enum.with_index()
-      |> Enum.filter(fn {v, _} -> v != u end)
-      |> Enum.reduce({dist_acc, path_acc}, fn {v, j}, {d_acc, p_acc} ->
-        case Dijkstra.shortest_path(graph, u, v) do
-          {:ok, %PathResult{nodes: nodes, weight: weight}} ->
-            d_acc = Map.put(d_acc, {i, j}, weight)
-            d_acc = Map.put(d_acc, {j, i}, weight)
-            p_acc = Map.put(p_acc, {u, v}, nodes)
-            p_acc = Map.put(p_acc, {v, u}, Enum.reverse(nodes))
-            {d_acc, p_acc}
+    indexed_odds = odd_vertices |> Enum.with_index() |> Map.new(fn {u, i} -> {i, u} end)
+    indices = Map.new(odd_vertices, fn u -> {u, Enum.find_index(odd_vertices, &(&1 == u))} end)
 
-          :error ->
-            # Should not happen in a connected graph
-            {d_acc, p_acc}
-        end
+    distances =
+      Enum.reduce(odd_vertices, %{}, fn u, acc ->
+        u_distances = Dijkstra.single_source_distances(graph, u)
+        u_idx = indices[u]
+
+        Enum.reduce(odd_vertices, acc, fn v, acc_inner ->
+          if u == v do
+            acc_inner
+          else
+            v_idx = indices[v]
+            dist = Map.get(u_distances, v)
+            Map.put(acc_inner, {u_idx, v_idx}, dist)
+          end
+        end)
       end)
-    end)
+
+    {distances, indexed_odds}
   end
 
   # ==========================================================================
@@ -236,8 +218,9 @@ defmodule Yog.Pathfinding.ChinesePostman do
     reconstruct_matching(prev, pairs, [{i, j} | acc])
   end
 
-  defp popcount(0), do: 0
-  defp popcount(x), do: 1 + popcount(band(x, x - 1))
+  defp popcount(x), do: popcount(x, 0)
+  defp popcount(0, acc), do: acc
+  defp popcount(x, acc), do: popcount(band(x, x - 1), acc + 1)
 
   defp first_set_bit(mask) do
     if band(mask, 1) == 1 do
@@ -278,9 +261,7 @@ defmodule Yog.Pathfinding.ChinesePostman do
   end
 
   defp edge_weight(graph, u, v) do
-    graph.out_edges
-    |> Map.get(u, %{})
-    |> Map.get(v, 1)
+    Model.edge_data(graph, u, v) || 1
   end
 
   # ==========================================================================

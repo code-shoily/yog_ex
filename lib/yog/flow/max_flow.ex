@@ -13,6 +13,7 @@ defmodule Yog.Flow.MaxFlow do
   |-----------|----------|------------|----------|
   | [Edmonds-Karp](https://en.wikipedia.org/wiki/Edmonds%E2%80%93Karp_algorithm) | `edmonds_karp/8` | O(VE²) | General networks, guaranteed polynomial time |
   | [Dinic](https://en.wikipedia.org/wiki/Dinic%27s_algorithm) | `dinic/8` | O(V²E) | Dense networks, unit capacities O(E√V) |
+  | [Push-Relabel](https://en.wikipedia.org/wiki/Push%E2%80%93relabel_maximum_flow_algorithm) | `push_relabel/8` | O(V²√E)–O(V³) | Large/dense networks |
 
   ## Key Concepts
 
@@ -140,18 +141,17 @@ defmodule Yog.Flow.MaxFlow do
   The capacity of the cut equals the max flow by the max-flow min-cut theorem.
   """
   @type min_cut :: MinCutResult.t()
+  @type algorithm :: :edmonds_karp | :dinic | :push_relabel
 
   @doc """
-  Calculates the maximum flow from source to sink using Edmonds-Karp with standard integers.
-
-  This is a convenience wrapper around `edmonds_karp/8` that uses default
-  integer arithmetic operations.
+  Calculates the maximum flow from source to sink using the selected algorithm.
 
   ## Parameters
 
   - `graph` - The flow network with edge capacities
   - `source` - Source node ID where flow originates
   - `sink` - Sink node ID where flow terminates
+  - `algorithm` - Algorithm to use: `:edmonds_karp` (default), `:dinic`, or `:push_relabel`
 
   ## Examples
 
@@ -160,9 +160,25 @@ defmodule Yog.Flow.MaxFlow do
       ...>   |> Yog.add_node(2, "a")
       ...>   |> Yog.add_node(3, "t")
       ...>   |> Yog.add_edges([{1, 2, 10}, {2, 3, 5}])
-      iex> result = Yog.Flow.MaxFlow.calculate(graph, 1, 3)
+      iex> result = Yog.Flow.MaxFlow.max_flow(graph, 1, 3, :push_relabel)
       iex> result.max_flow
       5
+  """
+  @spec max_flow(Yog.graph(), Yog.node_id(), Yog.node_id(), algorithm()) :: max_flow_result()
+  def max_flow(graph, source, sink, algorithm \\ :edmonds_karp) do
+    case algorithm do
+      :edmonds_karp -> edmonds_karp(graph, source, sink)
+      :dinic -> dinic(graph, source, sink)
+      :push_relabel -> push_relabel(graph, source, sink)
+      _ -> edmonds_karp(graph, source, sink)
+    end
+  end
+
+  @doc """
+  Calculates the maximum flow from source to sink using Edmonds-Karp with standard integers.
+
+  This is a convenience wrapper around `edmonds_karp/8` that uses default
+  integer arithmetic operations.
   """
   @spec calculate(Yog.graph(), Yog.node_id(), Yog.node_id()) :: max_flow_result()
   def calculate(graph, source, sink) do
@@ -220,25 +236,8 @@ defmodule Yog.Flow.MaxFlow do
         compare \\ &Yog.Utils.compare/2,
         min_fn \\ &min/2
       ) do
-    # Edge case: source equals sink - return 0 flow immediately
     if source == sink do
-      # Build a copy of the original graph as the residual
-      return_graph =
-        List.foldl(Map.keys(graph.nodes), Model.new(graph.kind), fn node, acc ->
-          Model.add_node(acc, node, Map.get(graph.nodes, node))
-        end)
-
-      return_graph =
-        List.foldl(Map.to_list(graph.out_edges), return_graph, fn {src, inner}, acc ->
-          List.foldl(Map.to_list(inner), acc, fn {dst, weight}, inner_acc ->
-            case Model.add_edge(inner_acc, src, dst, weight) do
-              {:ok, g} -> g
-              {:error, _} -> inner_acc
-            end
-          end)
-        end)
-
-      MaxFlowResult.new(zero, return_graph, source, sink, :edmonds_karp, zero, compare)
+      zero_flow_result(graph, source, sink, zero, compare, :edmonds_karp)
     else
       residual = build_residual_graph(graph, zero)
 
@@ -311,22 +310,7 @@ defmodule Yog.Flow.MaxFlow do
         min_fn \\ &min/2
       ) do
     if source == sink do
-      return_graph =
-        List.foldl(Map.keys(graph.nodes), Model.new(graph.kind), fn node, acc ->
-          Model.add_node(acc, node, Map.get(graph.nodes, node))
-        end)
-
-      return_graph =
-        List.foldl(Map.to_list(graph.out_edges), return_graph, fn {src, inner}, acc ->
-          List.foldl(Map.to_list(inner), acc, fn {dst, weight}, inner_acc ->
-            case Model.add_edge(inner_acc, src, dst, weight) do
-              {:ok, g} -> g
-              {:error, _} -> inner_acc
-            end
-          end)
-        end)
-
-      MaxFlowResult.new(zero, return_graph, source, sink, :dinic, zero, compare)
+      zero_flow_result(graph, source, sink, zero, compare, :dinic)
     else
       residual = build_residual_graph(graph, zero)
 
@@ -345,6 +329,26 @@ defmodule Yog.Flow.MaxFlow do
         compare
       )
     end
+  end
+
+  # Edge case: source equals sink - return 0 flow immediately
+  defp zero_flow_result(graph, source, sink, zero, compare, algorithm) do
+    return_graph =
+      List.foldl(Map.keys(graph.nodes), Model.new(graph.kind), fn node, acc ->
+        Model.add_node(acc, node, Map.get(graph.nodes, node))
+      end)
+      |> then(fn g ->
+        List.foldl(Map.to_list(graph.out_edges), g, fn {src, inner}, acc ->
+          List.foldl(Map.to_list(inner), acc, fn {dst, weight}, inner_acc ->
+            case Model.add_edge(inner_acc, src, dst, weight) do
+              {:ok, g} -> g
+              {:error, _} -> inner_acc
+            end
+          end)
+        end)
+      end)
+
+    MaxFlowResult.new(zero, return_graph, source, sink, algorithm, zero, compare)
   end
 
   # Extract all edges and their capacities from the graph
@@ -726,6 +730,418 @@ defmodule Yog.Flow.MaxFlow do
     Map.put(residual, u, Map.put(to_edges, v, new_back))
   end
 
+  # =============================================================================
+  # Push-Relabel Algorithm
+  # =============================================================================
+
+  @doc """
+  Finds the maximum flow using the Push-Relabel (Goldberg-Tarjan) algorithm.
+
+  Push-Relabel with highest-label selection and the gap heuristic is typically
+  2–5× faster than Edmonds-Karp on dense graphs.
+
+  ## Parameters
+
+  - `graph` - The flow network with edge capacities
+  - `source` - Source node ID where flow originates
+  - `sink` - Sink node ID where flow terminates
+  - `zero` - Zero value for the capacity type
+  - `add` - Addition function for capacities
+  - `subtract` - Subtraction function for capacities
+  - `compare` - Comparison function for capacities
+  - `min_fn` - Minimum function for capacities
+
+  ## Examples
+
+      iex> {:ok, graph} = Yog.directed()
+      ...>   |> Yog.add_node(1, "s")
+      ...>   |> Yog.add_node(2, "a")
+      ...>   |> Yog.add_node(3, "t")
+      ...>   |> Yog.add_edges([{1, 2, 10}, {2, 3, 5}])
+      iex> result = Yog.Flow.MaxFlow.push_relabel(graph, 1, 3)
+      iex> result.max_flow
+      5
+  """
+  @spec push_relabel(
+          Yog.graph(),
+          Yog.node_id(),
+          Yog.node_id(),
+          any(),
+          (any(), any() -> any()),
+          (any(), any() -> any()),
+          (any(), any() -> :lt | :eq | :gt),
+          (any(), any() -> any())
+        ) :: max_flow_result()
+  def push_relabel(
+        graph,
+        source,
+        sink,
+        zero \\ 0,
+        add \\ &Kernel.+/2,
+        subtract \\ &Kernel.-/2,
+        compare \\ &Yog.Utils.compare/2,
+        _min_fn \\ &min/2
+      ) do
+    if source == sink do
+      zero_flow_result(graph, source, sink, zero, compare, :push_relabel)
+    else
+      residual = build_residual_graph(graph, zero)
+      n = map_size(graph.nodes)
+      nodes = Map.keys(graph.nodes)
+
+      {max_flow, final_residual} =
+        do_push_relabel(residual, nodes, source, sink, n, zero, add, subtract, compare)
+
+      final_residual_graph = residual_to_graph(graph, final_residual, zero, compare)
+
+      MaxFlowResult.new(
+        max_flow,
+        final_residual_graph,
+        source,
+        sink,
+        :push_relabel,
+        zero,
+        compare
+      )
+    end
+  end
+
+  defp do_push_relabel(residual, nodes, source, sink, n, zero, add, subtract, compare) do
+    # Initialize heights and excess
+    height =
+      Map.new(nodes, fn u -> {u, 0} end)
+      |> Map.put(source, n)
+
+    excess_ = Map.new(nodes, fn u -> {u, zero} end)
+
+    # Count array for gap heuristic
+    count =
+      Map.new(0..(2 * n), fn h -> {h, 0} end)
+      |> Map.put(0, n - 1)
+      |> Map.put(n, 1)
+
+    # Current neighbor pointers
+    ptrs = Map.new(nodes, fn u -> {u, Map.keys(Map.get(residual, u, %{}))} end)
+
+    # Saturate edges from source
+    {residual, excess, buckets, max_h} =
+      case Map.fetch(residual, source) do
+        {:ok, out_edges} ->
+          Enum.reduce(out_edges, {residual, excess_, %{}, 0}, fn {v, cap}, {res, exc, bks, mh} ->
+            if v == source do
+              {res, exc, bks, mh}
+            else
+              {new_res, new_exc} =
+                push_flow(res, exc, source, v, cap, zero, add, subtract, compare)
+
+              if v != sink and compare.(Map.get(new_exc, v), zero) != :eq do
+                new_bks = Map.update(bks, 0, MapSet.new([v]), &MapSet.put(&1, v))
+                {new_res, new_exc, new_bks, max(mh, 0)}
+              else
+                {new_res, new_exc, bks, mh}
+              end
+            end
+          end)
+
+        :error ->
+          {residual, excess_, %{}, -1}
+      end
+
+    {final_residual, final_excess, _height, _count} =
+      push_relabel_loop(
+        residual,
+        excess,
+        height,
+        count,
+        buckets,
+        ptrs,
+        max_h,
+        source,
+        sink,
+        n,
+        zero,
+        add,
+        subtract,
+        compare
+      )
+
+    {Map.get(final_excess, sink, zero), final_residual}
+  end
+
+  defp push_relabel_loop(
+         residual,
+         excess,
+         height,
+         count,
+         buckets,
+         ptrs,
+         max_h,
+         source,
+         sink,
+         n,
+         zero,
+         add,
+         subtract,
+         compare
+       ) do
+    case find_active_node(buckets, max_h) do
+      nil ->
+        {residual, excess, height, count}
+
+      {u, new_max_h} ->
+        {new_residual, new_excess, new_height, new_count, new_buckets, new_ptrs, updated_max_h} =
+          discharge(
+            residual,
+            excess,
+            height,
+            count,
+            buckets,
+            ptrs,
+            new_max_h,
+            u,
+            sink,
+            n,
+            zero,
+            add,
+            subtract,
+            compare
+          )
+
+        push_relabel_loop(
+          new_residual,
+          new_excess,
+          new_height,
+          new_count,
+          new_buckets,
+          new_ptrs,
+          updated_max_h,
+          source,
+          sink,
+          n,
+          zero,
+          add,
+          subtract,
+          compare
+        )
+    end
+  end
+
+  defp find_active_node(_buckets, max_h) when max_h < 0, do: nil
+
+  defp find_active_node(buckets, max_h) do
+    case Map.get(buckets, max_h) do
+      nil ->
+        find_active_node(buckets, max_h - 1)
+
+      set ->
+        if MapSet.size(set) == 0 do
+          find_active_node(buckets, max_h - 1)
+        else
+          u = Enum.at(MapSet.to_list(set), 0)
+          {u, max_h}
+        end
+    end
+  end
+
+  defp discharge(
+         residual,
+         excess,
+         height,
+         count,
+         buckets,
+         ptrs,
+         max_h,
+         u,
+         sink,
+         n,
+         zero,
+         add,
+         subtract,
+         compare
+       ) do
+    u_excess = Map.get(excess, u)
+
+    if compare.(u_excess, zero) == :eq do
+      # Not active anymore, remove from buckets
+      h = Map.get(height, u)
+      new_buckets = Map.update(buckets, h, MapSet.new(), &MapSet.delete(&1, u))
+      {residual, excess, height, count, new_buckets, ptrs, max_h}
+    else
+      u_height = Map.get(height, u)
+      remaining_neighbors = Map.get(ptrs, u, [])
+
+      case find_admissible_neighbor_from_list(
+             remaining_neighbors,
+             residual,
+             height,
+             u_height,
+             u,
+             zero,
+             compare
+           ) do
+        {v, cap, updated_neighbors} ->
+          # Push
+          push_amount = if compare.(u_excess, cap) == :gt, do: cap, else: u_excess
+
+          {new_residual, new_excess} =
+            push_flow(residual, excess, u, v, push_amount, zero, add, subtract, compare)
+
+          # v might become active
+          new_buckets =
+            if v != sink and Map.get(height, v) < n and
+                 compare.(Map.get(new_excess, v), zero) != :eq do
+              h_v = Map.get(height, v)
+              Map.update(buckets, h_v, MapSet.new([v]), &MapSet.put(&1, v))
+            else
+              buckets
+            end
+
+          # Update pointers for u
+          new_ptrs = Map.put(ptrs, u, updated_neighbors)
+
+          # If u still has excess, keep it in buckets and continue
+          if compare.(Map.get(new_excess, u), zero) != :eq do
+            discharge(
+              new_residual,
+              new_excess,
+              height,
+              count,
+              new_buckets,
+              new_ptrs,
+              max_h,
+              u,
+              sink,
+              n,
+              zero,
+              add,
+              subtract,
+              compare
+            )
+          else
+            # u no longer has excess, remove from buckets
+            final_buckets = Map.update!(new_buckets, u_height, &MapSet.delete(&1, u))
+            {new_residual, new_excess, height, count, final_buckets, new_ptrs, max_h}
+          end
+
+        nil ->
+          # Relabel
+          old_height = u_height
+          neighbors = Map.get(residual, u, %{})
+
+          new_height_val =
+            neighbors
+            |> Enum.filter(fn {_v, cap} -> compare.(cap, zero) != :eq end)
+            |> case do
+              [] ->
+                n + 1
+
+              list ->
+                {v, _} = Enum.min_by(list, fn {v, _} -> Map.get(height, v, 0) end)
+                Map.get(height, v, 0) + 1
+            end
+
+          new_heights = Map.put(height, u, new_height_val)
+
+          # Update count and buckets
+          new_count = Map.update!(count, old_height, &(&1 - 1))
+          new_count = Map.update!(new_count, new_height_val, &(&1 + 1))
+
+          old_set = Map.get(buckets, old_height)
+          # u is still active if new_height < n
+          new_buckets = Map.put(buckets, old_height, MapSet.delete(old_set || MapSet.new(), u))
+
+          new_buckets =
+            if new_height_val < n do
+              Map.update(new_buckets, new_height_val, MapSet.new([u]), &MapSet.put(&1, u))
+            else
+              new_buckets
+            end
+
+          # Reset pointer on relabel
+          new_ptrs = Map.put(ptrs, u, Map.keys(neighbors))
+
+          # Gap heuristic
+          {final_heights, final_buckets, final_max_h} =
+            if Map.fetch!(new_count, old_height) == 0 and old_height < n do
+              apply_gap_heuristic(new_heights, new_buckets, old_height, n)
+            else
+              {new_heights, new_buckets, max(max_h, new_height_val)}
+            end
+
+          # If u still active, continue discharge; otherwise stop
+          if new_height_val < n and compare.(Map.get(excess, u), zero) != :eq do
+            discharge(
+              residual,
+              excess,
+              final_heights,
+              new_count,
+              final_buckets,
+              new_ptrs,
+              final_max_h,
+              u,
+              sink,
+              n,
+              zero,
+              add,
+              subtract,
+              compare
+            )
+          else
+            {residual, excess, final_heights, new_count, final_buckets, new_ptrs, final_max_h}
+          end
+      end
+    end
+  end
+
+  defp find_admissible_neighbor_from_list([], _res, _height, _u_h, _u, _zero, _comp), do: nil
+
+  defp find_admissible_neighbor_from_list(
+         [v | rest],
+         residual,
+         height,
+         u_height,
+         u,
+         zero,
+         compare
+       ) do
+    cap = Map.get(Map.get(residual, u, %{}), v, zero)
+
+    if compare.(cap, zero) != :eq and Map.get(height, v, 0) == u_height - 1 do
+      {v, cap, [v | rest]}
+    else
+      find_admissible_neighbor_from_list(rest, residual, height, u_height, u, zero, compare)
+    end
+  end
+
+  defp apply_gap_heuristic(height, buckets, gap_height, n) do
+    {new_height, new_buckets} =
+      Enum.reduce(height, {height, buckets}, fn {u, h}, {h_acc, b_acc} ->
+        if h > gap_height and h < n + 1 do
+          # Remove from old bucket
+          old_b = Map.get(b_acc, h)
+          new_b_acc = if old_b, do: Map.put(b_acc, h, MapSet.delete(old_b, u)), else: b_acc
+          {Map.put(h_acc, u, n + 1), new_b_acc}
+        else
+          {h_acc, b_acc}
+        end
+      end)
+
+    {new_height, new_buckets, gap_height - 1}
+  end
+
+  defp push_flow(residual, excess, u, v, amount, zero, add, subtract, compare) do
+    new_residual =
+      update_forward_residual(residual, u, v, amount, zero, subtract, compare)
+      |> update_backward_residual(v, u, amount, zero, add)
+
+    new_excess =
+      excess
+      |> Map.update!(u, &subtract.(&1, amount))
+      |> Map.update!(v, &add.(&1, amount))
+
+    {new_residual, new_excess}
+  end
+
   # Find augmenting path using BFS with bottleneck tracking
   defp find_augmenting_path(residual, source, sink, zero, compare, min_fn) do
     queue = :queue.in(source, :queue.new())
@@ -860,6 +1276,8 @@ defmodule Yog.Flow.MaxFlow do
       cut_value: max_flow,
       source_side_size: MapSet.size(source_side),
       sink_side_size: MapSet.size(sink_side),
+      source_side: source_side,
+      sink_side: sink_side,
       algorithm: algorithm
     }
   end

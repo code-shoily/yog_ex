@@ -173,4 +173,15 @@ defmodule Yog.Pathfinding.ChinesePostmanTest do
     assert weight == 3
     assert valid_closed_walk?(graph, walk)
   end
+
+  test "graph with isolated vertices is valid" do
+    graph =
+      Yog.from_edges(:undirected, [{1, 2, 1}, {2, 3, 1}, {3, 1, 1}])
+      |> Yog.add_node(99, "isolated")
+
+    assert {:ok, walk, weight} = ChinesePostman.chinese_postman(graph)
+    assert weight == 3
+    assert valid_closed_walk?(graph, walk)
+    assert all_edges_covered?(graph, walk)
+  end
 end
