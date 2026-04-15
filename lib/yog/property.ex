@@ -23,6 +23,9 @@ defmodule Yog.Property do
   ### Cyclicity
   Acyclicity (DAG) and general cycle detection.
 
+  ### Treewidth & Decompositions
+  Heuristic upper bounds and tree decomposition construction.
+
   ## Examples
 
       iex> graph = Yog.undirected()
@@ -282,6 +285,38 @@ defmodule Yog.Property do
 
   @doc "Exact graph coloring with default 5-second timeout."
   defdelegate coloring_exact(graph), to: Coloring
+
+  # ============= Treewidth =============
+
+  @doc """
+  Returns an upper bound on the treewidth using heuristic elimination ordering.
+
+  ## Options
+  - `:heuristic` - `:min_degree` (default) or `:min_fill`
+
+  ## Examples
+
+      iex> graph = Yog.Generator.Classic.cycle(5)
+      iex> Yog.Property.treewidth_upper_bound(graph) <= 2
+      true
+  """
+  defdelegate treewidth_upper_bound(graph, opts), to: Yog.Approximate
+
+  @doc "Returns an upper bound on the treewidth with default `:min_degree` heuristic."
+  defdelegate treewidth_upper_bound(graph), to: Yog.Approximate
+
+  @doc """
+  Returns a tree decomposition of the graph using heuristic elimination ordering.
+
+  Returns `{:ok, Yog.Property.TreeDecomposition.t()}` on success.
+  """
+  defdelegate tree_decomposition(graph, opts), to: Yog.Approximate
+
+  @doc "Returns a tree decomposition with default `:min_degree` heuristic."
+  defdelegate tree_decomposition(graph), to: Yog.Approximate
+
+  @doc "Returns the minimum degree of the graph."
+  defdelegate minimum_degree(graph), to: Structure
 
   # ============= Clique =============
 

@@ -17,6 +17,8 @@ defmodule Yog.Approximate do
   | Transitivity | `transitivity/2` | O(V³) or O(Δ²E) | O(k) |
   | Vertex Cover | `vertex_cover/1` | NP-hard | O(V+E) |
   | Max Clique | `max_clique/1` | O(3^(V/3)) | O(V²) |
+  | Treewidth | `treewidth_upper_bound/2` | NP-hard | O(V²) or O(V³) |
+  | Tree Decomposition | `tree_decomposition/2` | NP-hard | O(V²) or O(V³) |
 
   ## Approximation Quality
 
@@ -29,12 +31,16 @@ defmodule Yog.Approximate do
     subset of source nodes.
   - **Transitivity**: Wedge sampling estimates the global clustering coefficient
     by randomly sampling connected triples.
+  - **Treewidth**: Heuristic elimination orderings (`:min_degree`, `:min_fill`)
+    provide upper bounds. The resulting tree decomposition can be validated with
+    `Yog.Property.TreeDecomposition.valid?/2`.
   """
 
   alias Yog.Graph
   alias Yog.Model
   alias Yog.Pathfinding.Brandes
   alias Yog.Pathfinding.Dijkstra
+  alias Yog.Property.TreeDecomposition
   alias Yog.Transform
 
   @type metric_opts :: [
@@ -603,6 +609,283 @@ defmodule Yog.Approximate do
         end
       end)
     end
+  end
+
+  # =============================================================================
+  # Treewidth Approximation
+  # =============================================================================
+
+  @doc """
+  Returns an upper bound on the treewidth using heuristic elimination ordering.
+
+  ## Options
+
+  - `:heuristic` - `:min_degree` (default) or `:min_fill`
+
+  ## Examples
+
+      iex> graph = Yog.Generator.Classic.cycle(5)
+      iex> Yog.Approximate.treewidth_upper_bound(graph) <= 2
+      true
+
+      iex> graph = Yog.Generator.Classic.complete(4)
+      iex> Yog.Approximate.treewidth_upper_bound(graph) == 3
+      true
+  """
+  @spec treewidth_upper_bound(Graph.t(), keyword()) :: non_neg_integer()
+  def treewidth_upper_bound(%Graph{} = graph, opts \\ []) do
+    heuristic = Keyword.get(opts, :heuristic, :min_degree)
+    nodes = Model.all_nodes(graph)
+
+    if nodes == [] do
+      0
+    else
+      {full_adj, components} = weak_components(graph, nodes)
+      {tw, _bag_info} = eliminate_components(components, full_adj, heuristic)
+      tw
+    end
+  end
+
+  @doc """
+  Returns a tree decomposition of the graph using heuristic elimination ordering.
+
+  Returns `{:ok, Yog.Property.TreeDecomposition.t()}` on success.
+
+  ## Options
+
+  - `:heuristic` - `:min_degree` (default) or `:min_fill`
+
+  ## Examples
+
+      iex> graph = Yog.Generator.Classic.path(4)
+      iex> {:ok, td} = Yog.Approximate.tree_decomposition(graph)
+      iex> td.width <= 1
+      true
+  """
+  @spec tree_decomposition(Graph.t(), keyword()) ::
+          {:ok, TreeDecomposition.t()} | :error
+  def tree_decomposition(%Graph{} = graph, opts \\ []) do
+    heuristic = Keyword.get(opts, :heuristic, :min_degree)
+    nodes = Model.all_nodes(graph)
+
+    if nodes == [] do
+      tree = Yog.undirected()
+      {:ok, %TreeDecomposition{bags: %{}, tree: tree, width: 0}}
+    else
+      {full_adj, components} = weak_components(graph, nodes)
+      {tw, bag_info} = eliminate_components(components, full_adj, heuristic)
+      tree = build_bag_tree(bag_info)
+
+      bag_map =
+        bag_info
+        |> Enum.with_index()
+        |> Map.new(fn {{_v, bag}, idx} -> {idx, bag} end)
+
+      {:ok,
+       %TreeDecomposition{
+         bags: bag_map,
+         tree: tree,
+         width: tw
+       }}
+    end
+  end
+
+  # Build undirected adjacency and find weakly connected components
+  defp weak_components(graph, nodes) do
+    adj = Map.new(nodes, fn u -> {u, MapSet.new(Model.neighbor_ids(graph, u))} end)
+    components = find_components(nodes, adj, MapSet.new(), [])
+    {adj, Enum.reverse(components)}
+  end
+
+  defp find_components([], _adj, _visited, acc), do: acc
+
+  defp find_components([node | rest], adj, visited, acc) do
+    if MapSet.member?(visited, node) do
+      find_components(rest, adj, visited, acc)
+    else
+      {comp_nodes, new_visited} = dfs_component([node], adj, visited, [])
+      find_components(rest, adj, new_visited, [comp_nodes | acc])
+    end
+  end
+
+  defp dfs_component([], _adj, visited, acc), do: {acc, visited}
+
+  defp dfs_component([node | queue], adj, visited, acc) do
+    if MapSet.member?(visited, node) do
+      dfs_component(queue, adj, visited, acc)
+    else
+      new_visited = MapSet.put(visited, node)
+      neighbors = Map.get(adj, node, MapSet.new())
+      unvisited = Enum.reject(MapSet.to_list(neighbors), &MapSet.member?(new_visited, &1))
+      dfs_component(unvisited ++ queue, adj, new_visited, [node | acc])
+    end
+  end
+
+  defp eliminate_components(components, full_adj, heuristic) do
+    results =
+      Enum.map(components, fn comp_nodes ->
+        comp_set = MapSet.new(comp_nodes)
+
+        adj =
+          Map.new(comp_nodes, fn u ->
+            {u, MapSet.intersection(full_adj[u], comp_set)}
+          end)
+
+        elimination_ordering(comp_nodes, adj, heuristic)
+      end)
+
+    total_width =
+      results
+      |> Enum.map(fn {w, _bag_info} -> w end)
+      |> case do
+        [] -> 0
+        ws -> Enum.max(ws)
+      end
+
+    all_bag_info = Enum.flat_map(results, fn {_w, bag_info} -> bag_info end)
+    {total_width, all_bag_info}
+  end
+
+  defp elimination_ordering(nodes, adj, heuristic) do
+    do_elimination(MapSet.new(nodes), adj, heuristic, [], 0)
+  end
+
+  defp do_elimination(remaining, adj, heuristic, bags, width) do
+    if MapSet.size(remaining) == 0 do
+      {width, Enum.reverse(bags)}
+    else
+      v = select_vertex(remaining, adj, heuristic)
+      neighbors = Map.fetch!(adj, v)
+      bag = MapSet.put(neighbors, v)
+      new_width = max(width, MapSet.size(bag) - 1)
+
+      new_adj =
+        adj
+        |> Map.delete(v)
+        |> make_clique(neighbors)
+        |> remove_from_all(v)
+
+      do_elimination(
+        MapSet.delete(remaining, v),
+        new_adj,
+        heuristic,
+        [{v, bag} | bags],
+        new_width
+      )
+    end
+  end
+
+  defp make_clique(adj, nodes) do
+    list = MapSet.to_list(nodes)
+
+    Enum.reduce(list, adj, fn u, acc ->
+      current = Map.get(acc, u, MapSet.new())
+      to_add = MapSet.new(List.delete(list, u))
+      Map.put(acc, u, MapSet.union(current, to_add))
+    end)
+  end
+
+  defp remove_from_all(adj, v) do
+    Map.new(adj, fn {u, ns} -> {u, MapSet.delete(ns, v)} end)
+  end
+
+  defp select_vertex(remaining, adj, :min_degree) do
+    remaining
+    |> MapSet.to_list()
+    |> Enum.min_by(fn v -> MapSet.size(Map.fetch!(adj, v)) end)
+  end
+
+  defp select_vertex(remaining, adj, :min_fill) do
+    remaining
+    |> MapSet.to_list()
+    |> Enum.min_by(fn v ->
+      neighbors = Map.fetch!(adj, v)
+      count_missing_edges(adj, neighbors)
+    end)
+  end
+
+  defp count_missing_edges(adj, nodes) do
+    list = MapSet.to_list(nodes)
+
+    pairs = for i <- list, j <- list, i < j, do: {i, j}
+
+    Enum.count(pairs, fn {i, j} ->
+      not MapSet.member?(Map.get(adj, i, MapSet.new()), j)
+    end)
+  end
+
+  defp build_bag_tree([]), do: Yog.undirected()
+
+  defp build_bag_tree(bag_info) do
+    n = length(bag_info)
+    tree = Enum.reduce(0..(n - 1), Yog.undirected(), fn i, g -> Yog.add_node(g, i, nil) end)
+    bag_array = List.to_tuple(bag_info)
+
+    vertex_to_index =
+      bag_info
+      |> Enum.with_index()
+      |> Map.new(fn {{v, _bag}, i} -> {v, i} end)
+
+    edges = build_tree_edges(bag_array, vertex_to_index, 0, [], nil)
+
+    unique_edges =
+      Enum.uniq_by(edges, fn {a, b} ->
+        if a <= b, do: {a, b}, else: {b, a}
+      end)
+
+    Enum.reduce(unique_edges, tree, fn {from, to}, g ->
+      Yog.add_edge_ensure(g, from, to, 1, nil)
+    end)
+  end
+
+  defp build_tree_edges(bags, _v2i, i, acc, _prev_root) when i >= tuple_size(bags) do
+    Enum.reverse(acc)
+  end
+
+  defp build_tree_edges(bags, v2i, i, acc, prev_root) do
+    {v_i, bag} = elem(bags, i)
+    other_vertices = MapSet.delete(bag, v_i)
+
+    standard_parent =
+      if MapSet.size(other_vertices) == 0 do
+        nil
+      else
+        other_vertices
+        |> MapSet.to_list()
+        |> Enum.map(&Map.fetch!(v2i, &1))
+        |> Enum.filter(&(&1 > i))
+        |> case do
+          [] -> nil
+          list -> Enum.min(list)
+        end
+      end
+
+    case standard_parent do
+      nil ->
+        fallback_parent =
+          Enum.find_value((i - 1)..0//-1, fn j ->
+            {_v_j, bj} = elem(bags, j)
+            if shares_vertex?(bag, bj), do: j, else: nil
+          end)
+
+        case fallback_parent do
+          nil ->
+            new_acc =
+              if prev_root != nil and prev_root != i, do: [{i, prev_root} | acc], else: acc
+
+            build_tree_edges(bags, v2i, i + 1, new_acc, i)
+
+          p ->
+            build_tree_edges(bags, v2i, i + 1, [{i, p} | acc], prev_root)
+        end
+
+      p ->
+        build_tree_edges(bags, v2i, i + 1, [{i, p} | acc], prev_root)
+    end
+  end
+
+  defp shares_vertex?(a, b) do
+    MapSet.size(MapSet.intersection(a, b)) > 0
   end
 
   defp greedy_clique([], _adj, clique), do: clique

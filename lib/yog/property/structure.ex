@@ -293,6 +293,34 @@ defmodule Yog.Property.Structure do
   end
 
   @doc """
+  Returns the minimum degree of the graph.
+
+  Isolated vertices have degree 0. Returns 0 for an empty graph.
+
+  ## Examples
+
+      iex> graph = Yog.from_edges(:undirected, [{1, 2, 1}, {2, 3, 1}])
+      iex> Yog.Property.Structure.minimum_degree(graph)
+      1
+
+      iex> empty = Yog.undirected()
+      iex> Yog.Property.Structure.minimum_degree(empty)
+      0
+  """
+  @spec minimum_degree(Yog.graph()) :: non_neg_integer()
+  def minimum_degree(graph) do
+    nodes = Model.all_nodes(graph)
+
+    if nodes == [] do
+      0
+    else
+      nodes
+      |> Enum.map(&Model.degree(graph, &1))
+      |> Enum.min()
+    end
+  end
+
+  @doc """
   Checks if the graph is connected.
 
   For undirected graphs, every node is reachable from every other node.

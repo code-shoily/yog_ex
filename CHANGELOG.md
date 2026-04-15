@@ -55,6 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Raises `ArgumentError` if the graph is not bipartite.
 
 #### Approximation Algorithms
+* `Yog.Approximate.treewidth_upper_bound/2` — Min-degree and min-fill heuristic upper bounds for treewidth.
+* `Yog.Approximate.tree_decomposition/2` — Builds a valid tree decomposition from an elimination ordering.
 * `Yog.Approximate` - New module providing fast approximation algorithms for expensive graph properties:
   - `diameter/2` - Multi-sweep BFS/Dijkstra lower-bound estimation.
   - `betweenness/2` - Sampled Brandes algorithm for approximate betweenness centrality.
