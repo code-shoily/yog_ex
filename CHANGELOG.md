@@ -50,6 +50,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Returns a bidirectional map for easy partner lookup.
   - Raises `ArgumentError` if the graph is not bipartite.
 
+#### Approximation Algorithms
+* `Yog.Approximate` - New module providing fast approximation algorithms for expensive graph properties:
+  - `diameter/2` - Multi-sweep BFS/Dijkstra lower-bound estimation.
+  - `betweenness/2` - Sampled Brandes algorithm for approximate betweenness centrality.
+  - `average_path_length/2` - Pivot sampling for approximate mean shortest-path distance.
+  - `global_efficiency/2` - Pivot sampling for approximate global efficiency.
+  - `transitivity/2` - Wedge sampling for approximate clustering coefficient.
+  - `vertex_cover/1` - Greedy 2-approximation for minimum vertex cover.
+  - `max_clique/1` - Greedy degree-ordering heuristic for large cliques.
+
 #### Classic Graph Generators
 - **Lollipop Graph** (`Yog.Generator.Classic.lollipop/2`): $K_m$ connected to $P_n$ — extremal example for random walks.
 - **Barbell Graph** (`Yog.Generator.Classic.barbell/2`): Two $K_{m1}$ cliques joined by a path of $m2$ nodes.

@@ -206,7 +206,9 @@ defmodule Yog.MatchingTest do
 
           u when u != current ->
             # v is matched to u, continue the alternating path
-            if find_augmenting_path(u, adj, matching, new_visited) do
+            visited_with_u = MapSet.put(new_visited, u)
+
+            if find_augmenting_path(u, adj, matching, visited_with_u) do
               {:halt, true}
             else
               {:cont, false}
