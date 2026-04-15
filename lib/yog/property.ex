@@ -40,6 +40,7 @@ defmodule Yog.Property do
   alias Yog.Property.{
     Bipartite,
     Clique,
+    Coloring,
     Cyclicity,
     Eulerian,
     Planarity,
@@ -232,6 +233,55 @@ defmodule Yog.Property do
 
   @doc "Finds a stable matching given preference lists for two groups."
   defdelegate stable_marriage(left_prefs, right_prefs), to: Bipartite
+
+  # ============= Coloring =============
+
+  @doc """
+  Greedy graph coloring using Welsh-Powell ordering.
+
+  Returns a tuple `{upper_bound, color_map}` where `upper_bound` is the number
+  of colors used and `color_map` maps each node to its assigned color.
+
+  ## Examples
+
+      iex> graph = Yog.Generator.Classic.complete(3)
+      iex> {upper, _colors} = Yog.Property.coloring_greedy(graph)
+      iex> upper == 3
+      true
+  """
+  defdelegate coloring_greedy(graph), to: Coloring
+
+  @doc """
+  DSatur heuristic for graph coloring.
+
+  Usually produces better colorings than simple greedy ordering.
+
+  ## Examples
+
+      iex> graph = Yog.Generator.Classic.cycle(5)
+      iex> {upper, _colors} = Yog.Property.coloring_dsatur(graph)
+      iex> upper == 3
+      true
+  """
+  defdelegate coloring_dsatur(graph), to: Coloring
+
+  @doc """
+  Exact graph coloring using backtracking with pruning and an optional timeout.
+
+  Returns `{:ok, chromatic_number, coloring}` on success, or `{:timeout, best_result}`
+  if the timeout is reached.
+
+  ## Examples
+
+      iex> graph = Yog.Generator.Classic.complete(4)
+      iex> {:ok, chi, _colors} = Yog.Property.coloring_exact(graph)
+      iex> chi == 4
+      true
+  """
+  defdelegate coloring_exact(graph, timeout_ms), to: Coloring
+
+  @doc "Exact graph coloring with default 5-second timeout."
+  defdelegate coloring_exact(graph), to: Coloring
 
   # ============= Clique =============
 

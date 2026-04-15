@@ -32,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `lca/3` - Queries the lowest common ancestor of two nodes in $O(\log V)$.
 
 #### Property & Structure
+- Graph Coloring Suite in `Yog.Property.Coloring`:
+  - `coloring_greedy/1` — Welsh-Powell greedy coloring (O(V²)).
+  - `coloring_dsatur/1` — DSatur heuristic, usually better than greedy.
+  - `coloring_exact/2` — Backtracking exact coloring with optional timeout, finding the chromatic number for small graphs.
 - Exact Planarity Suite in `Yog.Property.Structure`:
   - `planar?/1` - Robust, exact planarity testing using the LR-test algorithm (O(V²) implementation).
   - `planar_embedding/1` - Extracts a combinatorial embedding (clockwise cyclic adjacency lists) for planar graphs.
