@@ -45,6 +45,7 @@ defmodule Yog.Pathfinding do
   alias Yog.Pathfinding.AStar
   alias Yog.Pathfinding.BellmanFord
   alias Yog.Pathfinding.Bidirectional
+  alias Yog.Pathfinding.ChinesePostman
   alias Yog.Pathfinding.Dijkstra
   alias Yog.Pathfinding.FloydWarshall
   alias Yog.Pathfinding.Johnson
@@ -152,6 +153,24 @@ defmodule Yog.Pathfinding do
   def widest_path(graph, source, target) do
     Dijkstra.widest_path(graph, source, target)
   end
+
+  # =============================================================================
+  # Chinese Postman Problem
+  # =============================================================================
+
+  @doc """
+  Solves the Chinese Postman Problem (Route Inspection) for undirected graphs.
+
+  Finds the shortest closed walk that traverses every edge at least once.
+
+  ## Example
+
+      iex> graph = Yog.from_edges(:undirected, [{1, 2, 1}, {2, 3, 1}, {3, 4, 1}, {4, 1, 1}])
+      iex> {:ok, _path, weight} = Yog.Pathfinding.chinese_postman(graph)
+      iex> weight
+      4
+  """
+  defdelegate chinese_postman(graph), to: ChinesePostman
 
   @doc """
   Finds the k shortest loopless paths from `source` to `target` using Yen's algorithm.

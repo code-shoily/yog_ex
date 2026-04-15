@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Supports configurable `:mode` option for directed graphs: `:successors` (default, follows outgoing edges) and `:neighbors` (follows both directions).
 
 #### Pathfinding
+- `Yog.Pathfinding.chinese_postman/1` — Solves the Chinese Postman Problem (Route Inspection) for undirected graphs. Finds the shortest closed walk covering every edge at least once via odd-vertex matching and Eulerian circuit extraction.
 - `Yog.Pathfinding.LCA` - Efficient Lowest Common Ancestor (LCA) implementation using binary lifting.
   - `preprocess/1` - Precomputes binary lifting tables and depths in $O(V \log V)$.
   - `lca/3` - Queries the lowest common ancestor of two nodes in $O(\log V)$.
