@@ -96,6 +96,7 @@ defmodule Yog.Flow.MinCut do
       2
   """
 
+  alias Yog.Flow.MaxFlow
   alias Yog.Flow.MinCutResult
   alias Yog.PairingHeap
   alias Yog.Transform
@@ -130,21 +131,34 @@ defmodule Yog.Flow.MinCut do
   - Edge weights must be integers
   - Returns a `Yog.Flow.MinCutResult` struct with partition sizes
   """
-  @spec global_min_cut(Yog.graph()) :: MinCutResult.t()
-  def global_min_cut(graph) do
+  @spec global_min_cut(Yog.graph(), keyword()) :: MinCutResult.t()
+  def global_min_cut(graph, opts \\ []) do
+    track_partitions = Keyword.get(opts, :track_partitions, false)
     nodes = Map.keys(graph.nodes)
 
     case length(nodes) do
       n when n <= 1 ->
-        MinCutResult.new(0, 0, 0)
+        if track_partitions do
+          side = MapSet.new(nodes)
+          MinCutResult.new(0, 0, 0, side, MapSet.new())
+        else
+          MinCutResult.new(0, 0, 0)
+        end
 
       n ->
         sizes = Map.new(nodes, fn node -> {node, 1} end)
-        do_min_cut(graph, nil, n, sizes)
+        all_nodes = MapSet.new(nodes)
+
+        if track_partitions do
+          partitions = Map.new(nodes, fn node -> {node, MapSet.new([node])} end)
+          do_min_cut(graph, nil, n, sizes, partitions, all_nodes)
+        else
+          do_min_cut(graph, nil, n, sizes, nil, nil)
+        end
     end
   end
 
-  defp do_min_cut(graph, best_cut, total_nodes, sizes) do
+  defp do_min_cut(graph, best_cut, total_nodes, sizes, partitions, all_nodes) do
     if map_size(graph.nodes) <= 1 do
       best_cut
     else
@@ -155,11 +169,24 @@ defmodule Yog.Flow.MinCut do
 
       current_cut =
         if is_nil(best_cut) or cut_weight < best_cut.cut_value do
-          MinCutResult.new(
-            cut_weight,
-            t_size,
-            total_nodes - t_size
-          )
+          if is_nil(partitions) do
+            MinCutResult.new(
+              cut_weight,
+              t_size,
+              total_nodes - t_size
+            )
+          else
+            t_partition = Map.fetch!(partitions, t)
+            rest_partition = MapSet.difference(all_nodes, t_partition)
+
+            MinCutResult.new(
+              cut_weight,
+              t_size,
+              total_nodes - t_size,
+              t_partition,
+              rest_partition
+            )
+          end
         else
           best_cut
         end
@@ -169,9 +196,49 @@ defmodule Yog.Flow.MinCut do
         |> Map.put(s, s_size + t_size)
         |> Map.delete(t)
 
+      new_partitions =
+        if is_nil(partitions) do
+          nil
+        else
+          partitions
+          |> Map.update!(s, &MapSet.union(&1, Map.fetch!(partitions, t)))
+          |> Map.delete(t)
+        end
+
       Transform.contract(graph, s, t, &+/2)
-      |> do_min_cut(current_cut, total_nodes, new_sizes)
+      |> do_min_cut(current_cut, total_nodes, new_sizes, new_partitions, all_nodes)
     end
+  end
+
+  @doc """
+  Computes the minimum s-t cut using a max-flow algorithm.
+
+  This is a convenience wrapper that delegates to `Yog.Flow.MaxFlow.max_flow/4`
+  and extracts the corresponding min-cut from the residual graph.
+
+  ## Parameters
+
+  - `graph` - The flow network
+  - `source` - Source node ID
+  - `sink` - Sink node ID
+  - `algorithm` - Algorithm to use: `:edmonds_karp` (default), `:dinic`, or `:push_relabel`
+
+  ## Examples
+
+      iex> {:ok, graph} = Yog.directed()
+      ...>   |> Yog.add_node(1, "s")
+      ...>   |> Yog.add_node(2, "a")
+      ...>   |> Yog.add_node(3, "t")
+      ...>   |> Yog.add_edges([{1, 2, 10}, {2, 3, 5}])
+      iex> result = Yog.Flow.MinCut.s_t_min_cut(graph, 1, 3)
+      iex> result.cut_value
+      5
+  """
+  @spec s_t_min_cut(Yog.graph(), Yog.node_id(), Yog.node_id(), atom()) :: MinCutResult.t()
+  def s_t_min_cut(graph, source, sink, algorithm \\ :edmonds_karp) do
+    graph
+    |> MaxFlow.max_flow(source, sink, algorithm)
+    |> MaxFlow.extract_min_cut()
   end
 
   # Maximum Adjacency Search: finds the two most tightly connected nodes.

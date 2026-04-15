@@ -280,6 +280,117 @@ defmodule Yog.Flow.MinCutTest do
     end
   end
 
+  describe "global_min_cut/2 with track_partitions" do
+    test "returns actual node partitions for triangle" do
+      {:ok, graph} =
+        Yog.undirected()
+        |> Yog.add_node(1, "A")
+        |> Yog.add_node(2, "B")
+        |> Yog.add_node(3, "C")
+        |> Yog.add_edges([
+          {1, 2, 1},
+          {2, 3, 1},
+          {1, 3, 1}
+        ])
+
+      result = MinCut.global_min_cut(graph, track_partitions: true)
+
+      assert result.cut_value == 2
+      assert result.source_side_size == MapSet.size(result.source_side)
+      assert result.sink_side_size == MapSet.size(result.sink_side)
+      assert MapSet.disjoint?(result.source_side, result.sink_side)
+
+      all_nodes = MapSet.new([1, 2, 3])
+      assert MapSet.equal?(MapSet.union(result.source_side, result.sink_side), all_nodes)
+    end
+
+    test "partitions are valid cuts for two cliques" do
+      {:ok, graph} =
+        Yog.undirected()
+        |> Yog.add_node(1, "a1")
+        |> Yog.add_node(2, "a2")
+        |> Yog.add_node(3, "b1")
+        |> Yog.add_node(4, "b2")
+        |> Yog.add_edges([
+          {1, 2, 10},
+          {3, 4, 10},
+          {2, 3, 1}
+        ])
+
+      result = MinCut.global_min_cut(graph, track_partitions: true)
+
+      assert result.cut_value == 1
+
+      # Verify cut value matches edges crossing the partition
+      crossing_weight =
+        Yog.Model.all_edges(graph)
+        |> Enum.filter(fn {u, v, _} ->
+          u_in_a = MapSet.member?(result.source_side, u)
+          v_in_a = MapSet.member?(result.source_side, v)
+          u_in_a != v_in_a
+        end)
+        |> Enum.reduce(0, fn {_, _, w}, acc -> acc + w end)
+
+      assert crossing_weight == result.cut_value
+    end
+
+    test "empty graph with track_partitions" do
+      graph = Yog.undirected()
+      result = MinCut.global_min_cut(graph, track_partitions: true)
+
+      assert result.cut_value == 0
+      assert result.source_side == MapSet.new()
+      assert result.sink_side == MapSet.new()
+    end
+
+    test "single node with track_partitions" do
+      graph = Yog.undirected() |> Yog.add_node(1, "A")
+      result = MinCut.global_min_cut(graph, track_partitions: true)
+
+      assert result.cut_value == 0
+      assert result.source_side == MapSet.new([1])
+      assert result.sink_side == MapSet.new()
+    end
+  end
+
+  describe "s_t_min_cut/3" do
+    test "simple s-t cut using default algorithm" do
+      {:ok, graph} =
+        Yog.directed()
+        |> Yog.add_node(1, "s")
+        |> Yog.add_node(2, "a")
+        |> Yog.add_node(3, "t")
+        |> Yog.add_edges([{1, 2, 10}, {2, 3, 5}])
+
+      result = MinCut.s_t_min_cut(graph, 1, 3)
+      assert result.cut_value == 5
+      assert result.source_side_size >= 1
+      assert result.sink_side_size >= 1
+      assert result.algorithm == :edmonds_karp
+    end
+
+    test "s-t cut with dinic" do
+      {:ok, graph} =
+        Yog.directed()
+        |> Yog.add_node(1, "s")
+        |> Yog.add_node(2, "a")
+        |> Yog.add_node(3, "b")
+        |> Yog.add_node(4, "t")
+        |> Yog.add_edges([
+          {1, 2, 10},
+          {1, 3, 10},
+          {2, 4, 10},
+          {3, 4, 10}
+        ])
+
+      result = MinCut.s_t_min_cut(graph, 1, 4, :dinic)
+      assert result.cut_value == 20
+      assert result.algorithm == :dinic
+      assert MapSet.member?(result.source_side, 1)
+      assert MapSet.member?(result.sink_side, 4)
+    end
+  end
+
   describe "edge cases" do
     test "two nodes with multiple edges" do
       # Note: Adding multiple edges between same nodes creates separate entries

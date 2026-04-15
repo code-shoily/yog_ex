@@ -48,6 +48,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Network Flow
 * `Yog.Flow.MaxFlow.dinic/3` - Dinic's algorithm for maximum flow.
+* `Yog.Flow.MinCut.global_min_cut/2` - Added `track_partitions: true` option to Stoer-Wagner global min-cut, returning the actual `source_side` and `sink_side` node sets in `MinCutResult`.
+* `Yog.Flow.MinCut.s_t_min_cut/3` - Convenience wrapper for computing minimum s-t cuts via max-flow algorithms (`:edmonds_karp`, `:dinic`, `:push_relabel`).
+* `Yog.Flow.MinCutResult` - Extended with optional `source_side` and `sink_side` fields for explicit partition access.
+* `Yog.Flow.MaxFlow.min_cut/3` - Now populates `source_side` and `sink_side` node sets in the returned result.
 
 #### Matching
 * `Yog.Matching.hopcroft_karp/1` - Hopcroft-Karp algorithm for maximum cardinality matching in bipartite graphs.

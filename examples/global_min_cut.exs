@@ -34,11 +34,11 @@ defmodule GlobalMinCut do
     IO.puts("--- Global Minimum Cut ---")
     result = Yog.Flow.MinCut.global_min_cut(graph)
 
-    IO.puts("Min cut weight: #{result.weight}")
-    IO.puts("Group A size: #{result.group_a_size}")
-    IO.puts("Group B size: #{result.group_b_size}")
+    IO.puts("Min cut weight: #{result.cut_value}")
+    IO.puts("Group A size: #{result.source_side_size}")
+    IO.puts("Group B size: #{result.sink_side_size}")
 
-    answer = result.group_a_size * result.group_b_size
+    answer = result.source_side_size * result.sink_side_size
     IO.puts("Multiplied sizes (AoC style): #{answer}")
   end
 end
