@@ -145,44 +145,72 @@ defmodule Yog.Property.Coloring do
     else
       adj = Map.new(nodes, fn node -> {node, MapSet.new(Model.neighbor_ids(graph, node))} end)
       degrees = Map.new(nodes, fn node -> {node, Model.degree(graph, node)} end)
+      uncolored = MapSet.new(nodes)
 
-      do_dsatur(nodes, adj, degrees, %{}, 0)
+      # forbidden_colors[node] = Set of colors used by neighbors
+      forbidden_colors = Map.new(nodes, fn node -> {node, MapSet.new()} end)
+      # saturation[node] = number of distinct colors used by neighbors
+      saturations = Map.new(nodes, fn node -> {node, 0} end)
+
+      do_dsatur(uncolored, adj, degrees, %{}, forbidden_colors, saturations, 0)
     end
   end
 
-  defp do_dsatur([], _adj, _degrees, coloring, max_color), do: {max_color, coloring}
+  defp do_dsatur(uncolored, adj, degrees, coloring, forbidden_colors, saturations, max_color) do
+    if MapSet.size(uncolored) == 0 do
+      {max_color, coloring}
+    else
+      node = select_dsatur_node(uncolored, saturations, degrees)
 
-  defp do_dsatur(uncolored, adj, degrees, coloring, max_color) do
-    node = select_dsatur_node(uncolored, adj, coloring, degrees)
-    rest = List.delete(uncolored, node)
+      neighbor_colors = Map.fetch!(forbidden_colors, node)
+      color = smallest_available_color(neighbor_colors, 1)
 
-    neighbor_colors =
-      adj[node]
-      |> Enum.map(&Map.get(coloring, &1))
-      |> Enum.reject(&is_nil/1)
-      |> MapSet.new()
+      new_uncolored = MapSet.delete(uncolored, node)
+      new_coloring = Map.put(coloring, node, color)
 
-    color = smallest_available_color(neighbor_colors, 1)
+      # Update neighbors
+      {new_forbidden, new_saturations} =
+        update_neighbors_saturation(
+          adj[node],
+          color,
+          new_uncolored,
+          forbidden_colors,
+          saturations
+        )
 
-    do_dsatur(
-      rest,
-      adj,
-      degrees,
-      Map.put(coloring, node, color),
-      max(max_color, color)
-    )
+      do_dsatur(
+        new_uncolored,
+        adj,
+        degrees,
+        new_coloring,
+        new_forbidden,
+        new_saturations,
+        max(max_color, color)
+      )
+    end
   end
 
-  defp select_dsatur_node(uncolored, adj, coloring, degrees) do
+  defp select_dsatur_node(uncolored, saturations, degrees) do
     Enum.max_by(uncolored, fn node ->
-      saturation =
-        adj[node]
-        |> Enum.map(&Map.get(coloring, &1))
-        |> Enum.reject(&is_nil/1)
-        |> Enum.uniq()
-        |> length()
+      {Map.fetch!(saturations, node), Map.fetch!(degrees, node)}
+    end)
+  end
 
-      {saturation, degrees[node]}
+  defp update_neighbors_saturation(neighbors, color, uncolored, forbidden, saturations) do
+    Enum.reduce(neighbors, {forbidden, saturations}, fn neighbor, {f_acc, s_acc} ->
+      if MapSet.member?(uncolored, neighbor) do
+        old_forbidden = Map.fetch!(f_acc, neighbor)
+
+        if MapSet.member?(old_forbidden, color) do
+          {f_acc, s_acc}
+        else
+          new_forbidden = MapSet.put(old_forbidden, color)
+          new_saturations = Map.update!(s_acc, neighbor, &(&1 + 1))
+          {Map.put(f_acc, neighbor, new_forbidden), new_saturations}
+        end
+      else
+        {f_acc, s_acc}
+      end
     end)
   end
 
