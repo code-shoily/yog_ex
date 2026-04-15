@@ -1,31 +1,59 @@
 # This file contains the configuration for Credo.
 #
 # For more information, see: https://hexdocs.pm/credo/config_file.html
+
+jump_tests = [
+  {Jump.CredoChecks.AssertElementSelectorCanNeverFail, []},
+  {Jump.CredoChecks.AvoidFunctionLevelElse, []},
+  {Jump.CredoChecks.AvoidLoggerConfigureInTest, []},
+  {Jump.CredoChecks.AvoidSocketAssignsInTest, excluded: ["test/app_web/plugs/"]},
+  {Jump.CredoChecks.DoctestIExExamples,
+   [
+     derive_test_path: fn filename ->
+       filename
+       |> String.replace_leading("lib/", "test/")
+       |> String.replace_trailing(".ex", "_test.exs")
+     end
+   ]},
+  # {Jump.CredoChecks.ForbiddenFunction,
+  #  functions: [
+  #    {:erlang, :binary_to_term, "Use Plug.Crypto.non_executable_binary_to_term/2 instead."}
+  #  ]},
+  {Jump.CredoChecks.LiveViewFormCanBeRehydrated, excluded: []},
+  {Jump.CredoChecks.PreferTextColumns, start_after: "20240101000000"},
+  {Jump.CredoChecks.TestHasNoAssertions,
+   custom_assertion_functions: [:await_has, :await_with_timeout]},
+  {Jump.CredoChecks.TooManyAssertions, [max_assertions: 20]},
+  {Jump.CredoChecks.TopLevelAliasImportRequire, []},
+  {Jump.CredoChecks.UseObanProWorker, []},
+  {Jump.CredoChecks.VacuousTest, []},
+  {Jump.CredoChecks.WeakAssertion, []}
+]
+
 %{
   configs: [
     %{
       name: "default",
       files: %{
-        included: ["lib/", "src/", "web/", "apps/"],
-        excluded: [~r"/_build/", ~r"/deps/", ~r"/node_modules/"]
+        included: ["lib/", "src/"],
+        excluded: [~r"/_build/", ~r"/deps/"]
       },
       plugins: [],
       requires: [],
       strict: false,
       parse_timeout: 5000,
       color: true,
-      checks: [
+      checks: jump_tests ++ [
         # Disable cyclomatic complexity check - graph algorithms are naturally complex
         {Credo.Check.Refactor.CyclomaticComplexity, false},
-
-        # Other checks we want to keep
         {Credo.Check.Consistency.ExceptionNames, []},
         {Credo.Check.Consistency.LineEndings, []},
         {Credo.Check.Consistency.ParameterPatternMatching, []},
         {Credo.Check.Consistency.SpaceAroundOperators, []},
         {Credo.Check.Consistency.SpaceInParentheses, []},
         {Credo.Check.Consistency.TabsOrSpaces, []},
-        {Credo.Check.Design.AliasUsage, [priority: :low, if_nested_deeper_than: 2, if_called_more_often_than: 0]},
+        {Credo.Check.Design.AliasUsage,
+         [priority: :low, if_nested_deeper_than: 2, if_called_more_often_than: 0]},
         {Credo.Check.Design.DuplicatedCode, [nodes_threshold: 3]},
         {Credo.Check.Design.SkipTestWithoutComment, []},
         {Credo.Check.Readability.AliasOrder, []},

@@ -66,7 +66,8 @@ defmodule YogEx.MixProject do
       {:stream_data, "~> 1.1", only: [:dev, :test]},
       {:benchee, "~> 1.3", only: :dev},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
-      {:excoveralls, "~> 0.18", only: :test}
+      {:excoveralls, "~> 0.18", only: :test},
+      {:jump_credo_checks, "~> 0.1", only: [:dev], runtime: false}
     ]
   end
 
