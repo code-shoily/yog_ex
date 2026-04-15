@@ -2,6 +2,7 @@ defmodule Yog.IO.MatrixMarketTest do
   use ExUnit.Case
 
   alias Yog.IO.MatrixMarket
+  doctest MatrixMarket
 
   @tmp_file "/tmp/test_yog_matrix_market.mtx"
 
