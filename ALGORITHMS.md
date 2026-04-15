@@ -13,6 +13,10 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | Johnson's | `Yog.Pathfinding.Johnson` | All-pairs shortest paths in sparse graphs | O(V² log V + VE) | O(V²) |
 | Bidirectional Dijkstra | `Yog.Pathfinding.Bidirectional` | Faster single-pair shortest path | O((V+E) log V) | O(V) |
 | Bidirectional BFS | `Yog.Pathfinding.Bidirectional` | Unweighted shortest path | O(V+E) | O(V) |
+| Yen's K-Shortest | `Yog.Pathfinding.Yen` | k shortest loopless paths | O(k·N·(E+V log V)) | O(kV) |
+| Widest Path | `Yog.Pathfinding` | Maximum bottleneck capacity path | O((V+E) log V) | O(V) |
+| Unweighted SSSP | `Yog.Pathfinding` | BFS shortest path (no heap) | O(V+E) | O(V) |
+| LCA (Binary Lifting) | `Yog.Pathfinding.LCA` | Lowest common ancestor in trees | O(V log V) preprocess, O(log V) query | O(V log V) |
 
 ## Flow & Cuts
 
@@ -21,8 +25,8 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | Edmonds-Karp | `Yog.Flow.MaxFlow` | Maximum flow (BFS augmenting paths) | O(VE²) | O(V+E) |
 | Dinic's | `Yog.Flow.MaxFlow` | Maximum flow (blocking flow) | O(V²E) | O(V+E) |
 | Capacity Scaling | `Yog.Flow.MaxFlow` | Maximum flow (scaling) | O(E² log U) | O(V+E) |
+| Dinic's | `Yog.Flow.MaxFlow` | Maximum flow (blocking flow) | O(V²E) | O(V+E) |
 | Successive Shortest Path | `Yog.Flow.SuccessiveShortestPath` | Min-cost max-flow | O(F · E log V) | O(V+E) |
-| Network Simplex | `Yog.Flow.NetworkSimplex` | Global min-cost flow optimization | O(E) pivots | O(V+E) |
 | Stoer-Wagner | `Yog.Flow.MinCut` | Global minimum cut | O(V³) | O(V²) |
 
 ## Spanning Tree
@@ -35,6 +39,12 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | Edmonds' | `Yog.MST` | Minimum Spanning Arborescence (Directed) | O(VE) | O(V) |
 | Wilson's | `Yog.MST` | Uniform Spanning Tree (Probabilistic) | O(V) hit time | O(V) |
 | **Max Spanning Tree** | `Yog.MST` | Maximum weight tree | O(E log E) | O(V) |
+
+## Matching
+
+| Algorithm | Module | Purpose | Time Complexity | Space Complexity |
+|-----------|--------|---------|-----------------|------------------|
+| Hopcroft-Karp | `Yog.Matching` | Maximum bipartite matching | O(E√V) | O(V) |
 
 ## Connectivity & Components
 
@@ -76,6 +86,12 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | Fluid Communities | `Yog.Community.FluidCommunities` | Exact k partitions | O(kE) | O(V) |
 | Local Community | `Yog.Community.LocalCommunity` | Seed expansion | O(S × E_S) | O(S) |
 
+## Community Metrics
+
+| Algorithm | Module | Purpose | Time Complexity | Space Complexity |
+|-----------|--------|---------|-----------------|------------------|
+| Transitivity | `Yog.Community.Metrics` | Global clustering coefficient | O(Δ²E) | O(V) |
+
 ## Traversal & Search
 
 | Algorithm | Module | Purpose | Time Complexity | Space Complexity |
@@ -86,6 +102,20 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | Find Path | `Yog.Traversal` | Any path between nodes | O(V+E) | O(V) |
 | Implicit Search | `Yog.Traversal.Implicit` | On-demand graph traversal | O((V+E) log V) | O(V) |
 
+## Graph Transformations
+
+| Algorithm | Module | Purpose | Time Complexity | Space Complexity |
+|-----------|--------|---------|-----------------|------------------|
+| Transpose | `Yog.Transform` | Reverse edge directions | O(1) | O(1) |
+| Subgraph | `Yog.Transform` | Induced subgraph by node IDs | O(V+E) | O(V+E) |
+| Ego Graph | `Yog.Transform` | k-hop neighborhood subgraph | O(V+E) | O(V+E) |
+| Transitive Closure | `Yog.Transform` | Reachability matrix | O(V³) | O(V²) |
+| Transitive Reduction | `Yog.Transform` | Minimal equivalent DAG | O(V³) | O(V²) |
+| Quotient Graph | `Yog.Transform` | Partition-based contraction | O(V+E) | O(V+E) |
+| Contract | `Yog.Transform` | Merge two nodes | O(deg(u)+deg(v)) | O(V+E) |
+| Filter Nodes | `Yog.Transform` | Predicate-based subgraph | O(V+E) | O(V+E) |
+| Filter Edges | `Yog.Transform` | Predicate-based edge removal | O(E) | O(E) |
+
 ## Graph Properties
 
 | Algorithm | Module | Purpose | Time Complexity | Space Complexity |
@@ -93,6 +123,7 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | Bipartite Check | `Yog.Property.Bipartite` | 2-colorability test | O(V+E) | O(V) |
 | Bipartite Partition | `Yog.Property.Bipartite` | Two-color assignment | O(V+E) | O(V) |
 | Max Bipartite Matching | `Yog.Property.Bipartite` | Maximum matching | O(VE) | O(V) |
+| Stable Marriage | `Yog.Property.Bipartite` | Gale-Shapley stable matching | O(V²) | O(V) |
 | Acyclicity Test | `Yog.Property.Cyclicity` | Cycle detection | O(V+E) | O(V) |
 | Eulerian Circuit | `Yog.Property.Eulerian` | Eulerian cycle existence | O(V+E) | O(V) |
 | Eulerian Path | `Yog.Property.Eulerian` | Eulerian path existence | O(V+E) | O(V) |
@@ -100,7 +131,14 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | Max Clique | `Yog.Property.Clique` | Largest clique | O(3^(V/3)) | O(V) |
 | Complete Graph | `Yog.Property.Structure` | Kₙ detection | O(V²) | O(1) |
 | Tree Check | `Yog.Property.Structure` | Tree verification | O(V+E) | O(V) |
-| Arborescence | `Yog.Property.Structure` | Directed tree check | O(V+E) | O(V) |
+| Forest Check | `Yog.Property.Structure` | Disjoint trees | O(V+E) | O(V) |
+| Branching Check | `Yog.Property.Structure` | Directed forest | O(V+E) | O(V) |
+| Planarity Test | `Yog.Property.Structure` | Exact LR-test planarity | O(V²) | O(V) |
+| Planar Embedding | `Yog.Property.Structure` | Combinatorial embedding | O(V²) | O(V) |
+| Kuratowski Witness | `Yog.Property.Structure` | Non-planar subgraph | O(V²) | O(V) |
+| Chordality Test | `Yog.Property.Structure` | Chordal graph verification | O(V+E) | O(V) |
+| Isomorphism | `Yog.Property` | Weisfeiler-Lehman equality | O(k(V+E)) | O(V) |
+| Graph Hash | `Yog.Property` | Structural fingerprint | O(k(V+E)) | O(V) |
 
 ## DAG Algorithms
 
@@ -110,7 +148,7 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | Shortest Path | `Yog.DAG.Algorithm` | Shortest path in DAG | O(V+E) | O(V) |
 | Transitive Closure | `Yog.Transform` | Reachability matrix | O(V³) | O(V²) |
 | Transitive Reduction | `Yog.Transform` | Minimal equivalent DAG | O(V³) | O(V²) |
-| LCA | `Yog.DAG.Algorithm` | Lowest common ancestors | O(V(V+E)) | O(V) |
+| LCA | `Yog.Pathfinding.LCA` | Lowest common ancestors | O(V log V) preprocess, O(log V) query | O(V log V) |
 
 ## Graph Operations
 
@@ -126,6 +164,7 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | Transpose | `Yog.Operation` | Reverse all edges | O(V+E) | O(V+E) |
 | Isomorphism | `Yog.Operation` | Graph equality | O(V!) worst | O(V) |
 | Subgraph | `Yog.Operation` | Induced subgraph | O(V+E) | O(V+E) |
+| Subgraph Check | `Yog.Operation` | Subgraph relationship | O(V+E) | O(V+E) |
 
 ## Multigraph
 
@@ -146,6 +185,8 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | Eccentricity | `Yog.Health` | Max distance from node | O(V+E) | O(V) |
 | Assortativity | `Yog.Health` | Degree correlation | O(E) | O(1) |
 | APL | `Yog.Health` | Average path length | O(V(V+E)) | O(V) |
+| Global Efficiency | `Yog.Health` | Inverse mean distance | O(V(V+E)) | O(V) |
+| Local Efficiency | `Yog.Health` | Neighborhood efficiency | O(V(V+E)) | O(V) |
 
 ## Data Structures
 
@@ -160,12 +201,28 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 
 | Algorithm | Module | Purpose | Time Complexity | Space Complexity |
 |-----------|--------|---------|-----------------|------------------|
+| Lollipop | `Yog.Generator.Classic` | Kₘ connected to Pₙ | O(m+n) | O(m+n) |
+| Barbell | `Yog.Generator.Classic` | Two cliques + path | O(m+n) | O(m+n) |
+| Tutte Graph | `Yog.Generator.Classic` | Non-Hamiltonian polyhedral | O(1) | O(1) |
+| Sedgewick Maze | `Yog.Generator.Classic` | Classic 8-node maze | O(1) | O(1) |
 | Binary Tree | `Yog.Generator.Maze` | Simplest, fastest | O(N) | O(1) |
 | Sidewinder | `Yog.Generator.Maze` | Vertical corridors | O(N) | O(cols) |
 | Recursive Backtracker | `Yog.Generator.Maze` | Classic "roguelike" passages | O(N) | O(N) |
 | Hunt-and-Kill | `Yog.Generator.Maze` | Organic, winding | O(N²) | O(1) |
 | Aldous-Broder | `Yog.Generator.Maze` | Uniform spanning tree | O(N²) | O(N) |
 | Wilson's | `Yog.Generator.Maze` | Efficient uniform tree | O(N) avg | O(N) |
+
+## Approximation Algorithms
+
+| Algorithm | Module | Purpose | Time Complexity | Space Complexity |
+|-----------|--------|---------|-----------------|------------------|
+| Diameter | `Yog.Approximate` | Multi-sweep lower bound | O(k(V+E)) | O(V) |
+| Betweenness | `Yog.Approximate` | Sampled Brandes | O(k(V+E)) | O(V) |
+| Avg Path Length | `Yog.Approximate` | Pivot sampling | O(k(V+E)) | O(V) |
+| Global Efficiency | `Yog.Approximate` | Pivot sampling | O(k(V+E)) | O(V) |
+| Transitivity | `Yog.Approximate` | Wedge sampling | O(k) | O(V) |
+| Vertex Cover | `Yog.Approximate` | Greedy 2-approximation | O(V+E) | O(V) |
+| Max Clique | `Yog.Approximate` | Greedy heuristic | O(V²) | O(V) |
 | Kruskal's | `Yog.Generator.Maze` | Balanced, randomized | O(N log N) | O(N) |
 | Prim's | `Yog.Generator.Maze` | Radial, many dead ends | O(N log N) | O(N) |
 | Eller's | `Yog.Generator.Maze` | Infinite height potential | O(N) | O(cols) |
