@@ -75,7 +75,7 @@ defmodule YogEx.MixProject do
     [
       name: "yog_ex",
       files:
-        ~w(lib .formatter.exs mix.exs README.md GLEAM_ELIXIR_COMPARISON.md ALGORITHMS.md PROPERTIES.md LICENSE CHANGELOG.md livebooks),
+        ~w(lib .formatter.exs mix.exs README.md ALGORITHMS.md PROPERTIES.md LICENSE CHANGELOG.md livebooks),
       licenses: ["Apache-2.0"],
       links: %{
         "GitHub" => @source_url,
@@ -97,7 +97,6 @@ defmodule YogEx.MixProject do
          [filename: "networkx_tutorial", title: "NetworkX Tutorial"]},
         "ALGORITHMS.md",
         "PROPERTIES.md",
-        "GLEAM_ELIXIR_COMPARISON.md",
         "CHANGELOG.md"
       ],
       source_ref: "v#{@version}",

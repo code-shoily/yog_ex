@@ -27,10 +27,8 @@
 
 Yog is a set of Graph and Network algorithms and data structures implemented in Elixir and packaged as a common API.
 
-It started off as a wrapper around the Gleam [Yog](https://hex.pm/packages/yog) library, but now YogEx is now fully implemented in Elixir and a superset of the original Gleam version.
+It started off as a wrapper around the Gleam [Yog](https://hex.pm/packages/yog) library, but now YogEx is fully implemented in Elixir and a superset of the original Gleam version.
 
-See the [Gleam vs Elixir Comparison](GLEAM_ELIXIR_COMPARISON.md) for feature comparison between the two implementations.
- 
 > [!WARNING]
 > **API Stability**: Until the version reaches 0.98.0 ~~1.0.0~~, there may be ~~breaking changes. While I'll try my best to keep the API stable, there's no guarantee~~ some hiccups in performance, and documentation quality maybe less than optimal. Before version 0.99.0 is released in **12-12-2026**, the primary focus is on **performance**, **documentation**, and **bugfixes**. From v0.96.0 onwards, there will be no breaking changes until v2.0 (No plans for that).
 
