@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Now supports an optional `combine_data` parameter for deterministic node payload aggregation.
   - Optimized memory footprint by avoiding $O(E)$ heap allocation spikes during edge projection.
   - Uses `Yog.Utils.map_fold/3` for high-performance iteration.
+- `Yog.Transform.ego_graph/4` - Returns the ego graph of a node (the subgraph induced by the node and all nodes within `radius` hops).
+  - Supports configurable `:mode` option for directed graphs: `:successors` (default, follows outgoing edges) and `:neighbors` (follows both directions).
 
 #### Pathfinding
 - `Yog.Pathfinding.LCA` - Efficient Lowest Common Ancestor (LCA) implementation using binary lifting.
@@ -42,11 +44,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Network Flow
 * `Yog.Flow.MaxFlow.dinic/3` - Dinic's algorithm for maximum flow.
 
+#### Matching
+* `Yog.Matching.hopcroft_karp/1` - Hopcroft-Karp algorithm for maximum cardinality matching in bipartite graphs.
+  - O(E√V) time complexity via BFS layering and DFS augmentation.
+  - Returns a bidirectional map for easy partner lookup.
+  - Raises `ArgumentError` if the graph is not bipartite.
+
 #### Classic Graph Generators
 - **Lollipop Graph** (`Yog.Generator.Classic.lollipop/2`): $K_m$ connected to $P_n$ — extremal example for random walks.
 - **Barbell Graph** (`Yog.Generator.Classic.barbell/2`): Two $K_{m1}$ cliques joined by a path of $m2$ nodes.
 - **Sedgewick Maze** (`Yog.Generator.Classic.sedgewick_maze/0`): Small 8-node maze with a cycle from Sedgewick's *Algorithms*.
 - **Tutte Graph** (`Yog.Generator.Classic.tutte/0`): 46-vertex cubic non-Hamiltonian polyhedral graph.
+
+#### I/O
+- **`Yog.IO.Graph6`**: Read and write graphs in the compact graph6 format.
+  - `parse/1` - Parse a graph6 string into a `Yog.Graph`.
+  - `read/1` - Read a graph6 file.
+  - `write/2` - Write one or more graphs to a graph6 file.
+- **`Yog.IO.Sparse6`**: Read and write graphs in the sparse6 format for space-efficient storage of sparse graphs.
+  - `parse/1` - Parse a sparse6 string into a `Yog.Graph`.
+  - `read/1` - Read a sparse6 file.
+  - `write/2` - Write one or more graphs to a sparse6 file.
 
 ### Optimized
 

@@ -947,6 +947,25 @@ defmodule Yog do
   @spec acyclic?(graph()) :: boolean()
   defdelegate acyclic?(graph), to: Cyclicity
 
+  # ============= Matching =============
+
+  @doc """
+  Finds a maximum cardinality matching in a bipartite graph using the
+  Hopcroft-Karp algorithm.
+
+  Returns a bidirectional map of matched pairs.
+  Raises `ArgumentError` if the graph is not bipartite.
+
+  ## Example
+
+      iex> graph = Yog.from_edges(:undirected, [{:a1, :b1, 1}, {:a1, :b2, 1}, {:a2, :b2, 1}])
+      iex> matching = Yog.hopcroft_karp(graph)
+      iex> map_size(matching)
+      4
+  """
+  @spec hopcroft_karp(graph()) :: %{node_id() => node_id()}
+  defdelegate hopcroft_karp(graph), to: Yog.Matching
+
   # ============= Transform =============
 
   @doc """
