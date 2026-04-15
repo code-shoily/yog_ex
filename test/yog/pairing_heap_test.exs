@@ -9,7 +9,7 @@ defmodule Yog.PairingHeapTest do
 
   alias Yog.PairingHeap, as: PQ
 
-  doctest PQ
+  doctest Yog.PairingHeap
 
   # ============================================================
   # Construction Tests

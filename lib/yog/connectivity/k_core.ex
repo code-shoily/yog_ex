@@ -85,9 +85,8 @@ defmodule Yog.Connectivity.KCore do
   ## Examples
 
       iex> graph = Yog.undirected() |> Yog.add_node(1, nil) |> Yog.add_node(2, nil)
-      iex> Yog.Connectivity.KCore.detect(graph, 1)
-      # Empty graph (no nodes with degree 1)
-      iex> Yog.node_count(Yog.Connectivity.KCore.detect(graph, 1))
+      iex> core = Yog.Connectivity.KCore.detect(graph, 1)
+      iex> Yog.node_count(core)
       0
 
   ## Time Complexity

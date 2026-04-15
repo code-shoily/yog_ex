@@ -20,9 +20,7 @@ defmodule Yog.Pathfinding.LCA do
 
   ## Example
 
-      iex> tree =
-      ...>   Yog.undirected()
-      ...>   |> Yog.add_edges!([{1, 2, 1}, {1, 3, 1}, {2, 4, 1}, {2, 5, 1}])
+      iex> tree = Yog.from_edges(:undirected, [{1, 2, 1}, {1, 3, 1}, {2, 4, 1}, {2, 5, 1}])
       iex> {:ok, state} = Yog.Pathfinding.LCA.lca_preprocess(tree, 1)
       iex> Yog.Pathfinding.LCA.lca(state, 4, 5)
       {:ok, 2}

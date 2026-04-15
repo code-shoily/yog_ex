@@ -209,44 +209,41 @@ defmodule Yog.Property.Planarity do
     neighbors = Model.neighbor_ids(graph, u) |> Enum.reject(&(&1 == p))
 
     {parents_acc, times_acc, lowpoints_acc, finish_acc, edges_acc, visited_acc, final_time} =
-      Enum.reduce(neighbors, {parents, times, lowpoints, finish, edges, visited, time}, fn v,
-                                                                                           {p_acc,
-                                                                                            t_acc,
-                                                                                            l_acc,
-                                                                                            f_acc,
-                                                                                            e_acc,
-                                                                                            v_acc,
-                                                                                            curr_time} ->
-        if MapSet.member?(v_acc, v) do
-          new_edges =
-            if Map.get(t_acc, v) < Map.get(t_acc, u) do
-              [{:back, u, v} | e_acc]
-            else
-              e_acc
-            end
+      Enum.reduce(
+        neighbors,
+        {parents, times, lowpoints, finish, edges, visited, time},
+        fn v, {p_acc, t_acc, l_acc, f_acc, e_acc, v_acc, curr_time} ->
+          if MapSet.member?(v_acc, v) do
+            new_edges =
+              if Map.get(t_acc, v) < Map.get(t_acc, u) do
+                [{:back, u, v} | e_acc]
+              else
+                e_acc
+              end
 
-          new_low = min(Map.get(l_acc, u), Map.get(t_acc, v))
-          {p_acc, t_acc, Map.put(l_acc, u, new_low), f_acc, new_edges, v_acc, curr_time}
-        else
-          {sp, st, sl, sf, se, sv, nt} =
-            do_dfs(
-              graph,
-              v,
-              u,
-              curr_time + 1,
-              p_acc,
-              t_acc,
-              l_acc,
-              f_acc,
-              [{:tree, u, v} | e_acc],
-              MapSet.put(v_acc, v)
-            )
+            new_low = min(Map.get(l_acc, u), Map.get(t_acc, v))
+            {p_acc, t_acc, Map.put(l_acc, u, new_low), f_acc, new_edges, v_acc, curr_time}
+          else
+            {sp, st, sl, sf, se, sv, nt} =
+              do_dfs(
+                graph,
+                v,
+                u,
+                curr_time + 1,
+                p_acc,
+                t_acc,
+                l_acc,
+                f_acc,
+                [{:tree, u, v} | e_acc],
+                MapSet.put(v_acc, v)
+              )
 
-          child_low = Map.get(sl, v)
-          new_low = min(Map.get(sl, u), child_low)
-          {sp, st, Map.put(sl, u, new_low), sf, se, sv, nt}
+            child_low = Map.get(sl, v)
+            new_low = min(Map.get(sl, u), child_low)
+            {sp, st, Map.put(sl, u, new_low), sf, se, sv, nt}
+          end
         end
-      end)
+      )
 
     {
       parents_acc,

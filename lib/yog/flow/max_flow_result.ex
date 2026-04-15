@@ -16,6 +16,7 @@ defmodule Yog.Flow.MaxFlowResult do
 
   ## Examples
 
+      iex> graph = Yog.directed() |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
       iex> result = %Yog.Flow.MaxFlowResult{
       ...>   max_flow: 15,
       ...>   residual_graph: graph,

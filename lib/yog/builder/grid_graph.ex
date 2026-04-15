@@ -22,6 +22,7 @@ defmodule Yog.Builder.GridGraph do
 
   ## Examples
 
+      iex> graph = Yog.undirected() |> Yog.add_node(0, "data")
       iex> grid = %Yog.Builder.GridGraph{
       ...>   graph: graph,
       ...>   rows: 3,
@@ -93,9 +94,10 @@ defmodule Yog.Builder.GridGraph do
 
   ## Examples
 
+      iex> graph = Yog.undirected()
       iex> grid = %Yog.Builder.GridGraph{graph: graph, rows: 2, cols: 2}
-      iex> Yog.Builder.GridGraph.to_graph(grid)
-      graph
+      iex> Yog.Builder.GridGraph.to_graph(grid) == graph
+      true
   """
   @spec to_graph(t()) :: Yog.graph()
   def to_graph(%__MODULE__{graph: graph}), do: graph
@@ -107,9 +109,10 @@ defmodule Yog.Builder.GridGraph do
 
   ## Examples
 
+      iex> graph = Yog.undirected() |> Yog.add_node(4, "some_data")
       iex> grid = %Yog.Builder.GridGraph{graph: graph, rows: 3, cols: 3}
       iex> Yog.Builder.GridGraph.get_cell(grid, 1, 1)
-      {:ok, some_data}
+      {:ok, "some_data"}
       iex> Yog.Builder.GridGraph.get_cell(grid, 10, 10)
       {:error, nil}
   """
@@ -134,6 +137,7 @@ defmodule Yog.Builder.GridGraph do
 
   ## Examples
 
+      iex> graph = Yog.undirected()
       iex> grid = %Yog.Builder.GridGraph{graph: graph, rows: 3, cols: 4}
       iex> Yog.Builder.GridGraph.coord_to_id(grid, 0, 0)
       0
@@ -154,6 +158,7 @@ defmodule Yog.Builder.GridGraph do
 
   ## Examples
 
+      iex> graph = Yog.undirected()
       iex> grid = %Yog.Builder.GridGraph{graph: graph, rows: 3, cols: 4}
       iex> Yog.Builder.GridGraph.id_to_coord(grid, 0)
       {0, 0}
@@ -174,6 +179,7 @@ defmodule Yog.Builder.GridGraph do
 
   ## Examples
 
+      iex> graph = Yog.undirected()
       iex> grid = %Yog.Builder.GridGraph{graph: graph, rows: 3, cols: 4}
       iex> Yog.Builder.GridGraph.valid_coord?(grid, 1, 2)
       true

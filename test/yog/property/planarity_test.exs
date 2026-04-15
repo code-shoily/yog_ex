@@ -2,6 +2,7 @@ defmodule Yog.Property.PlanarityTest do
   use ExUnit.Case
 
   alias Yog.Property.Planarity
+  doctest Planarity
   alias Yog.Generator.Classic
 
   test "planar? basic checks" do

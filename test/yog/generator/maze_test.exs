@@ -2,6 +2,7 @@ defmodule Yog.Generator.MazeTest do
   use ExUnit.Case
 
   alias Yog.Generator.Maze
+  doctest Maze
   alias Yog.Builder.GridGraph
   alias Yog.Graph
 

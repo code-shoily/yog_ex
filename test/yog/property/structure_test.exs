@@ -2,6 +2,7 @@ defmodule Yog.Property.StructureTest do
   use ExUnit.Case
 
   alias Yog.Property.Structure
+  doctest Structure
 
   # ============= Tree Tests =============
 

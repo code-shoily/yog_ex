@@ -48,6 +48,8 @@ defmodule Yog.Generator.Maze do
       # Get the underlying graph for pathfinding
       iex> maze = Yog.Generator.Maze.recursive_backtracker(5, 5)
       iex> graph = Yog.Builder.GridGraph.to_graph(maze)
+      iex> Yog.graph?(graph)
+      true
 
   ## References
 

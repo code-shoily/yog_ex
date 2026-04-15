@@ -41,7 +41,7 @@ defmodule Yog.Flow.MaxFlowTest do
       assert result.max_flow == 15
       assert result.source == 1
       assert result.sink == 4
-      assert result.residual_graph != nil
+      assert %Yog.Graph{} = result.residual_graph
     end
 
     test "single edge path" do
@@ -329,7 +329,7 @@ defmodule Yog.Flow.MaxFlowTest do
       assert result.max_flow == 15
       assert result.source == 1
       assert result.sink == 4
-      assert result.residual_graph != nil
+      assert %Yog.Graph{} = result.residual_graph
       assert result.algorithm == :dinic
     end
 

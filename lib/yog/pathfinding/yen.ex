@@ -20,9 +20,7 @@ defmodule Yog.Pathfinding.Yen do
 
   ## Example
 
-      iex> graph =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_edges!([
+      iex> graph = Yog.from_edges(:directed, [
       ...>     {1, 2, 1}, {1, 3, 2}, {2, 3, 1}, {2, 4, 3},
       ...>     {3, 4, 1}, {3, 5, 4}, {4, 5, 1}
       ...>   ])

@@ -2,6 +2,7 @@ defmodule Yog.Pathfinding.LCATest do
   use ExUnit.Case
 
   alias Yog.Pathfinding.LCA
+  doctest LCA
 
   # =============================================================================
   # Basic functionality

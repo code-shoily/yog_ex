@@ -186,8 +186,8 @@ defmodule Yog.Connectivity.Reachability do
       ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
       ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
       iex> counts = Yog.Connectivity.Reachability.counts_estimate(graph, :descendants)
-      iex> counts[1]  # Approximate count (likely 1 or 2, may vary slightly)
-      _
+      iex> counts[1] > 0
+      true
   """
   @spec counts_estimate(Yog.graph(), direction()) :: %{Yog.node_id() => integer()}
   def counts_estimate(graph, direction) do

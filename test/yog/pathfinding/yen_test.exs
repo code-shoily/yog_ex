@@ -2,6 +2,7 @@ defmodule Yog.Pathfinding.YenTest do
   use ExUnit.Case
 
   alias Yog.Pathfinding.Yen
+  doctest Yen
 
   # =============================================================================
   # Basic functionality

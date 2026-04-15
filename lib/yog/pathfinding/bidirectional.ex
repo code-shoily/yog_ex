@@ -367,8 +367,6 @@ defmodule Yog.Pathfinding.Bidirectional do
   # and stops when they meet. This is significantly faster than single-direction Dijkstra
   # for point-to-point queries.
   defp do_bidirectional_dijkstra(graph, from, to, zero, add, compare) do
-    alias Yog.PairingHeap, as: PQ
-
     # Forward search (from source)
     queue_fwd =
       PQ.new(fn {d1, _}, {d2, _} -> compare.(d1, d2) != :gt end)
