@@ -275,11 +275,10 @@ defmodule Yog.Flow.MinCut do
             p = par[v]
             result = s_t_min_cut(graph, v, p, :dinic)
             cut_val = result.cut_value
-            s_side = result.source_side || MapSet.new()
 
             new_par =
               Enum.reduce(rest, par, fn w, acc ->
-                if w > v and acc[w] == p and MapSet.member?(s_side, w) do
+                if w > v and acc[w] == p and MapSet.member?(result.source_side, w) do
                   Map.put(acc, w, v)
                 else
                   acc
