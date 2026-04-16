@@ -7,7 +7,7 @@ defmodule Yog.PBT.CyclicityTest do
   describe "Property Properties: Cyclicity" do
     property "DAG generated using numeric order edges is acyclic" do
       check all(
-              nodes <- node_list_gen(2, 20, 50),
+              nodes <- node_list_gen(2, 20, 500),
               weights <- weight_list_gen(length(nodes))
             ) do
         sorted_nodes = Enum.sort(nodes) |> Enum.uniq()
