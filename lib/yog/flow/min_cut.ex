@@ -6,94 +6,82 @@ defmodule Yog.Flow.MinCut do
   in an undirected weighted graph - the partition of nodes into two non-empty sets
   that minimizes the total weight of edges crossing between the sets.
 
-  ## Algorithm
+  ## Algorithm Summary
 
   | Algorithm | Function | Complexity | Best For |
   |-----------|----------|------------|----------|
-  | [Stoer-Wagner](https://en.wikipedia.org/wiki/Stoer%E2%80%93Wagner_algorithm) | `global_min_cut/1` | O(V³) | Dense undirected graphs |
-
-  The implementation uses the Stoer-Wagner algorithm with Maximum Adjacency Search.
+  | [Stoer-Wagner](https://en.wikipedia.org/wiki/Stoer%E2%80%93Wagner_algorithm) | `global_min_cut/2` | O(V³) | Dense undirected graphs, exact result |
+  | [Karger-Stein](https://en.wikipedia.org/wiki/Karger%27s_algorithm) | `karger_stein/2` | O(V² log³ V) | Large graphs, randomized approach |
+  | [Gomory-Hu Tree](https://en.wikipedia.org/wiki/Gomory%E2%80%93Hu_tree) | `gomory_hu_tree/1` | O(V · MaxFlow) | All-pairs min-cut analysis |
 
   ## Key Concepts
 
-  - **Global Min-Cut**: The minimum cut over all possible partitions of the graph
-  - **s-t Cut**: A cut that separates specific nodes s and t
-  - **Maximum Adjacency Search**: Orders vertices by strength of connection to current set
-  - **Node Contraction**: Merging two nodes while preserving edge weights
+  - **Global Min-Cut**: The minimum cut over all possible partitions of the graph.
+  - **s-t Cut**: A cut that separates specific nodes `s` and `t`.
+  - **Maximum Adjacency Search**: Orders vertices by strength of connection to the current set (used by Stoer-Wagner).
+  - **Edge Contraction**: Merging two nodes while preserving total edge weight to other nodes (used by Karger-Stein).
 
-  ## Comparison with s-t Min-Cut
+  ## Gomory-Hu Trees
 
-  For finding a cut between specific source and sink nodes, use `Yog.Flow.MaxFlow` instead:
-  - `Yog.Flow.MaxFlow.edmonds_karp/8` + `extract_min_cut/1`: O(VE²), for directed graphs
-  - `Yog.Flow.MinCut.global_min_cut/1`: O(V³), for undirected graphs, finds best cut globally
+  The Gomory-Hu tree is a powerful structure that encodes all-pairs min-cuts using only `V-1` max-flow
+  computations. In the tree, the min-cut value between any two nodes `u` and `v` is the minimum
+  weight on the unique tree path between them.
 
-  ## Use Cases
-
-  - **Network reliability**: Identify weakest points in communication networks
-  - **Image segmentation**: Separate foreground from background in computer vision
-  - **Clustering**: Graph partitioning for community detection
-  - **VLSI design**: Circuit partitioning to minimize wire crossings
-
-  ## Example
-
-      graph =
-        Yog.undirected()
-        |> Yog.add_node(1, "A")
-        |> Yog.add_node(2, "B")
-        |> Yog.add_node(3, "C")
-        |> Yog.add_node(4, "D")
-        |> Yog.add_edges([
-          {1, 2, 3},
-          {1, 3, 4},
-          {2, 3, 2},
-          {2, 4, 5},
-          {3, 4, 1}
-        ])
-
-      result = Yog.Flow.MinCut.global_min_cut(graph)
-      # => %Yog.Flow.MinCutResult{cut_value: 6, source_side_size: 1, sink_side_size: 3}
-
-  ## References
-
-  - [Wikipedia: Minimum Cut](https://en.wikipedia.org/wiki/Minimum_cut)
-  - [Wikipedia: Stoer-Wagner Algorithm](https://en.wikipedia.org/wiki/Stoer%E2%80%93Wagner_algorithm)
-  - [CP-Algorithms: Stoer-Wagner](https://cp-algorithms.com/graph/stoer_wagner.html)
-
-  ## Example: Global Minimum Cut
+  Use `gomory_hu_tree/1` to build the tree and `min_cut_query/3` to extract values and partitions.
 
   <div class="graphviz">
   graph G {
     bgcolor="transparent";
     node [shape=circle, fontname="inherit"];
     edge [fontname="inherit", fontsize=10];
+    rankdir=LR;
 
-    subgraph cluster_side1 {
-      label="Side A"; color="#6366f1"; style=rounded;
-      node1 [label="1"]; node2 [label="2"];
-    }
-
-    subgraph cluster_side2 {
-      label="Side B"; color="#f43f5e"; style=rounded;
-      node3 [label="3"];
-    }
-
-    node1 -- node2 [label="5"];
-
-    // Cut edges (bridging the global partition)
-    node1 -- node3 [label="2", color="#ef4444", penwidth=2.5, fontcolor="#ef4444"];
-    node2 -- node3 [label="3", color="#ef4444", penwidth=2.5, fontcolor="#ef4444"];
+    1 -- 2 [label="7"];
+    2 -- 3 [label="5"];
+    2 -- 4 [label="6"];
+    
+    label="Example Gomory-Hu Tree";
+    fontsize=12;
   }
   </div>
 
-      iex> alias Yog.Flow.MinCut
+  ## Randomized Algorithms
+
+  For very large graphs where exact algorithms (O(V³)) might be slow, `karger_stein/2` 
+  provides a randomized approach based on edge contraction. It uses recursive branching 
+  to achieve a high probability of success.
+
+  ## Comparison with s-t Min-Cut
+
+  For finding a cut between specific source and sink nodes, use `Yog.Flow.MaxFlow` or the convenience `s_t_min_cut/4`:
+  - `s_t_min_cut(graph, s, t, :dinic)`: Efficiently finds the cut separating `s` and `t`.
+  - `global_min_cut(graph)`: Finds the minimum weight cut across *any* possible partition.
+
+  ## Examples
+
+  ### Global Minimum Cut (Stoer-Wagner)
+
       iex> graph = Yog.from_edges(:undirected, [{1, 2, 5}, {2, 3, 3}, {1, 3, 2}])
-      iex> result = MinCut.global_min_cut(graph)
+      iex> result = Yog.Flow.MinCut.global_min_cut(graph)
       iex> result.cut_value
       5
-      iex> result.source_side_size
-      1
-      iex> result.sink_side_size
-      2
+
+  ### All-Pairs Analysis (Gomory-Hu)
+
+      iex> graph = Yog.from_edges(:undirected, [{1, 2, 3}, {1, 3, 4}, {2, 3, 2}, {2, 4, 5}, {3, 4, 1}])
+      iex> tree = Yog.Flow.MinCut.gomory_hu_tree(graph)
+      iex> {cut_value, _s, _t} = Yog.Flow.MinCut.min_cut_query(tree, 1, 4)
+      iex> cut_value
+      6
+
+  ## References
+
+  - [Wikipedia: Minimum Cut](https://en.wikipedia.org/wiki/Minimum_cut)
+  - [Wikipedia: Stoer-Wagner Algorithm](https://en.wikipedia.org/wiki/Stoer%E2%80%93Wagner_algorithm)
+  - [Wikipedia: Karger's Algorithm](https://en.wikipedia.org/wiki/Karger%27s_algorithm)
+  - [Wikipedia: Gomory-Hu Tree](https://en.wikipedia.org/wiki/Gomory%E2%80%93Hu_tree)
+  - [CP-Algorithms: Stoer-Wagner](https://cp-algorithms.com/graph/stoer_wagner.html)
+
   """
 
   alias Yog.Flow.MaxFlow
@@ -126,11 +114,18 @@ defmodule Yog.Flow.MinCut do
       iex> result.source_side_size + result.sink_side_size
       3
 
+  ## Parameters
+
+  - `graph` - The undirected weighted graph
+  - `opts` - Options:
+    - `:track_partitions` - If `true`, populates the `source_side` and `sink_side`
+      fields in the result. (default: `false`)
+
   ## Notes
 
   - The graph must be undirected
   - Edge weights must be integers
-  - Returns a `Yog.Flow.MinCutResult` struct with partition sizes
+  - Returns a `Yog.Flow.MinCutResult` struct
   """
   @spec global_min_cut(Yog.graph(), keyword()) :: MinCutResult.t()
   def global_min_cut(graph, opts \\ []) do
@@ -247,7 +242,8 @@ defmodule Yog.Flow.MinCut do
 
   The Gomory-Hu tree is a weighted tree on the same vertex set where the
   minimum edge weight on the path between any two nodes equals their min-cut
-  value in the original graph. It requires only V-1 max-flow computations.
+  value in the original graph. This implementation uses Gusfield's algorithm,
+  requiring only `V-1` max-flow computations.
 
   ## Examples
 
@@ -421,15 +417,17 @@ defmodule Yog.Flow.MinCut do
   Finds the global minimum cut using the randomized Karger-Stein algorithm.
 
   Karger-Stein uses repeated random edge contraction with recursive branching
-  to achieve high success probability. It is particularly effective on dense
-  graphs where the exact Stoer-Wagner algorithm may be slower.
+  to achieve high success probability. It is particularly effective on large
+  graphs where the exact Stoer-Wagner algorithm may be slower, as the randomized
+  approach can often find the global minimum cut with very few iterations.
 
   ## Parameters
 
   - `graph` - The undirected weighted graph
   - `opts` - Options:
     - `:iterations` - Number of independent runs of the recursive fast-cut
-      procedure (default: `max(1, trunc(n * log2(n + 1)))`)
+      procedure (default: `max(1, trunc(n * log2(n + 1)))`). Increasing the
+      number of iterations improves the success probability.
 
   ## Examples
 
