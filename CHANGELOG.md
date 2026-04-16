@@ -61,6 +61,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - O(E√V) time complexity via BFS layering and DFS augmentation.
   - Returns a bidirectional map for easy partner lookup.
   - Raises `ArgumentError` if the graph is not bipartite.
+* `Yog.Matching.hungarian/2` - Hungarian (Kuhn-Munkres) algorithm for weighted bipartite matching.
+  - O(V³) optimal assignment using potentials (dual variables) and BFS augmentation.
+  - Supports both `:min` (default) and `:max` weight optimization.
+  - Handles rectangular partitions (unequal partition sizes) via zero-cost dummy node padding.
+  - Requires a complete bipartite graph between the two partitions.
+  - Returns `{total_cost, matching_map}` with bidirectional matching.
+
+#### Rendering
+* `Yog.Render.DOT.theme/1` - Pre-configured theme presets for DOT rendering:
+  - `:dark` — Dark navy background, muted edges, neon highlights.
+  - `:minimal` — Clean wireframe look with no fills and thin lines.
+  - `:presentation` — Large fonts and bold colors for slides and demos.
+* `Yog.Render.DOT` rank constraints via new `ranks` option:
+  - Supports `:same`, `:min`, `:max`, `:source`, and `:sink` rank types.
+  - Generates `{rank=same; node1; node2;}` blocks in DOT output.
+* `Yog.Render.DOT.mst_to_options/2` - Highlights MST edges from a `Yog.MST.Result`.
+* `Yog.Render.DOT.community_to_options/2` - Colors nodes by community from a `Yog.Community.Result` using a generated HSL palette.
+* `Yog.Render.DOT.cut_to_options/2` - Colors source/sink sides of a `Yog.Flow.MinCutResult`.
+* `Yog.Render.DOT.matching_to_options/2` - Highlights matched edges from Hopcroft-Karp or Hungarian results.
 
 #### Approximation Algorithms
 * `Yog.Approximate.treewidth_upper_bound/2` — Min-degree and min-fill heuristic upper bounds for treewidth.
