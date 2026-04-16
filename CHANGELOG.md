@@ -48,6 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Network Flow
 * `Yog.Flow.MaxFlow.dinic/3` - Dinic's algorithm for maximum flow.
+* `Yog.Flow.MinCut.gomory_hu_tree/1` - Builds a Gomory-Hu tree representing all-pairs min-cuts using only V-1 max-flow computations. Returns a weighted tree where the minimum edge on the path between any two nodes equals their min-cut value.
+* `Yog.Flow.MinCut.min_cut_query/3` - Queries the min-cut value and partitions between any two nodes using a Gomory-Hu tree.
 * `Yog.Flow.MinCut.karger_stein/2` - Randomized Karger-Stein fast-cut algorithm for global minimum cut. Recursive edge contraction with configurable iterations; returns full node partitions.
 * `Yog.Flow.MinCut.global_min_cut/2` - Added `track_partitions: true` option to Stoer-Wagner global min-cut, returning the actual `source_side` and `sink_side` node sets in `MinCutResult`.
 * `Yog.Flow.MinCut.s_t_min_cut/3` - Convenience wrapper for computing minimum s-t cuts via max-flow algorithms (`:edmonds_karp`, `:dinic`, `:push_relabel`).

@@ -98,6 +98,7 @@ defmodule Yog.Flow.MinCut do
 
   alias Yog.Flow.MaxFlow
   alias Yog.Flow.MinCutResult
+  alias Yog.Model
   alias Yog.PairingHeap
   alias Yog.Transform
 
@@ -239,6 +240,182 @@ defmodule Yog.Flow.MinCut do
     graph
     |> MaxFlow.max_flow(source, sink, algorithm)
     |> MaxFlow.extract_min_cut()
+  end
+
+  @doc """
+  Builds a Gomory-Hu tree representing all-pairs min-cuts in the graph.
+
+  The Gomory-Hu tree is a weighted tree on the same vertex set where the
+  minimum edge weight on the path between any two nodes equals their min-cut
+  value in the original graph. It requires only V-1 max-flow computations.
+
+  ## Examples
+
+      iex> graph = Yog.from_edges(:undirected, [{1, 2, 3}, {1, 3, 4}, {2, 3, 2}, {2, 4, 5}, {3, 4, 1}])
+      iex> tree = Yog.Flow.MinCut.gomory_hu_tree(graph)
+      iex> length(Yog.Model.all_edges(tree))
+      3
+  """
+  @spec gomory_hu_tree(Yog.graph()) :: Yog.graph()
+  def gomory_hu_tree(graph) do
+    nodes = Model.all_nodes(graph) |> Enum.sort()
+
+    case nodes do
+      [] ->
+        Yog.undirected()
+
+      [root] ->
+        Yog.undirected() |> Yog.add_node(root, Model.node(graph, root))
+
+      [root | rest] ->
+        parent = Map.new(nodes, fn n -> {n, root} end)
+
+        {final_parent, cuts} =
+          Enum.reduce(rest, {parent, %{}}, fn v, {par, cuts} ->
+            p = par[v]
+            result = s_t_min_cut(graph, v, p, :dinic)
+            cut_val = result.cut_value
+            s_side = result.source_side || MapSet.new()
+
+            new_par =
+              Enum.reduce(rest, par, fn w, acc ->
+                if w > v and acc[w] == p and MapSet.member?(s_side, w) do
+                  Map.put(acc, w, v)
+                else
+                  acc
+                end
+              end)
+
+            new_cuts = Map.put(cuts, {min(v, p), max(v, p)}, cut_val)
+            {new_par, new_cuts}
+          end)
+
+        tree =
+          Enum.reduce(nodes, Yog.undirected(), fn u, acc ->
+            Model.add_node(acc, u, Model.node(graph, u))
+          end)
+
+        Enum.reduce(Map.to_list(final_parent), {tree, MapSet.new()}, fn {v, p},
+                                                                        {tree_acc, seen} ->
+          edge = {min(v, p), max(v, p)}
+
+          if v == p or MapSet.member?(seen, edge) do
+            {tree_acc, seen}
+          else
+            weight = cuts[edge] || 0
+            {:ok, new_tree} = Model.add_edge(tree_acc, v, p, weight)
+            {new_tree, MapSet.put(seen, edge)}
+          end
+        end)
+        |> elem(0)
+    end
+  end
+
+  @doc """
+  Queries the min-cut value and partitions between two nodes using a Gomory-Hu tree.
+
+  Returns `{cut_value, partition_s, partition_t}` where `cut_value` is the min-cut
+  between `node_a` and `node_b` in the original graph, and the partitions are the
+  two sides of that cut.
+
+  ## Examples
+
+      iex> graph = Yog.from_edges(:undirected, [{1, 2, 3}, {1, 3, 4}, {2, 3, 2}, {2, 4, 5}, {3, 4, 1}])
+      iex> tree = Yog.Flow.MinCut.gomory_hu_tree(graph)
+      iex> {cut_value, _s, _t} = Yog.Flow.MinCut.min_cut_query(tree, 1, 4)
+      iex> cut_value
+      6
+  """
+  @spec min_cut_query(Yog.graph(), Yog.node_id(), Yog.node_id()) ::
+          {number(), MapSet.t(Yog.node_id()), MapSet.t(Yog.node_id())}
+  def min_cut_query(tree, node_a, node_b) do
+    nodes = Model.all_nodes(tree)
+
+    if node_a == node_b do
+      {0, MapSet.new([node_a]), MapSet.difference(MapSet.new(nodes), MapSet.new([node_a]))}
+    else
+      path = tree_path(tree, node_a, node_b)
+      {{u, v}, min_weight} = min_edge_on_path(tree, path)
+
+      comp_a = component_without_edge(tree, node_a, u, v)
+      comp_b = MapSet.difference(MapSet.new(nodes), comp_a)
+
+      {min_weight, comp_a, comp_b}
+    end
+  end
+
+  # Finds the unique path between two nodes in a tree using BFS.
+  defp tree_path(tree, start, target) do
+    queue = :queue.in({start, [start]}, :queue.new())
+    visited = MapSet.new([start])
+    bfs_path(tree, queue, visited, target)
+  end
+
+  defp bfs_path(tree, queue, visited, target) do
+    case :queue.out(queue) do
+      {:empty, _} ->
+        []
+
+      {{:value, {node, path}}, rest} ->
+        if node == target do
+          Enum.reverse(path)
+        else
+          neighbors = Model.neighbor_ids(tree, node)
+
+          {next_q, next_v} =
+            Enum.reduce(neighbors, {rest, visited}, fn n, {q, v} ->
+              if MapSet.member?(v, n) do
+                {q, v}
+              else
+                {:queue.in({n, [n | path]}, q), MapSet.put(v, n)}
+              end
+            end)
+
+          bfs_path(tree, next_q, next_v, target)
+        end
+    end
+  end
+
+  # Finds the minimum weight edge on a given tree path.
+  defp min_edge_on_path(tree, path) do
+    path
+    |> Enum.chunk_every(2, 1, :discard)
+    |> Enum.reduce(nil, fn [u, v], acc ->
+      w = Model.edge_data(tree, u, v) || Model.edge_data(tree, v, u) || 0
+
+      case acc do
+        nil -> {{u, v}, w}
+        {_, w_acc} when w < w_acc -> {{u, v}, w}
+        _ -> acc
+      end
+    end)
+  end
+
+  # Returns all nodes in the component containing `start` after removing edge {u, v}.
+  defp component_without_edge(tree, start, u, v) do
+    do_component(MapSet.new([start]), [start], tree, u, v)
+  end
+
+  defp do_component(visited, [], _tree, _u, _v), do: visited
+
+  defp do_component(visited, [node | rest], tree, u, v) do
+    neighbors = Model.neighbor_ids(tree, node)
+
+    {new_visited, new_stack} =
+      Enum.reduce(neighbors, {visited, rest}, fn n, {vis, stack} ->
+        skip =
+          MapSet.member?(vis, n) or
+            (node == u and n == v) or
+            (node == v and n == u)
+
+        if skip do
+          {vis, stack}
+        else
+          {MapSet.put(vis, n), [n | stack]}
+        end
+      end)
+
+    do_component(new_visited, new_stack, tree, u, v)
   end
 
   @doc """

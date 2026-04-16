@@ -264,6 +264,147 @@ defmodule Yog.Flow.MinCutTest do
     end
   end
 
+  describe "gomory_hu_tree/1" do
+    test "tree graph is identical to original" do
+      {:ok, graph} =
+        Yog.undirected()
+        |> Yog.add_node(1, "a")
+        |> Yog.add_node(2, "b")
+        |> Yog.add_node(3, "c")
+        |> Yog.add_node(4, "d")
+        |> Yog.add_edges([
+          {1, 2, 5},
+          {2, 3, 3},
+          {3, 4, 7}
+        ])
+
+      tree = MinCut.gomory_hu_tree(graph)
+
+      # Tree has V-1 edges and is connected
+      assert length(Yog.Model.all_edges(tree)) == 3
+      assert Yog.Property.connected?(tree)
+    end
+
+    test "complete graph K4" do
+      {:ok, graph} =
+        Yog.undirected()
+        |> Yog.add_node(1, "a")
+        |> Yog.add_node(2, "b")
+        |> Yog.add_node(3, "c")
+        |> Yog.add_node(4, "d")
+        |> Yog.add_edges([
+          {1, 2, 1},
+          {1, 3, 1},
+          {1, 4, 1},
+          {2, 3, 1},
+          {2, 4, 1},
+          {3, 4, 1}
+        ])
+
+      tree = MinCut.gomory_hu_tree(graph)
+
+      assert length(Yog.Model.all_edges(tree)) == 3
+      assert Yog.Property.connected?(tree)
+    end
+
+    test "single node graph" do
+      graph = Yog.undirected() |> Yog.add_node(1, "a")
+      tree = MinCut.gomory_hu_tree(graph)
+
+      assert Yog.Model.all_nodes(tree) == [1]
+      assert Yog.Model.all_edges(tree) == []
+    end
+
+    test "empty graph" do
+      tree = MinCut.gomory_hu_tree(Yog.undirected())
+      assert Yog.Model.all_nodes(tree) == []
+    end
+  end
+
+  describe "min_cut_query/3" do
+    test "query matches actual min-cut for path graph" do
+      {:ok, graph} =
+        Yog.undirected()
+        |> Yog.add_node(1, "a")
+        |> Yog.add_node(2, "b")
+        |> Yog.add_node(3, "c")
+        |> Yog.add_node(4, "d")
+        |> Yog.add_edges([
+          {1, 2, 5},
+          {2, 3, 3},
+          {3, 4, 7}
+        ])
+
+      tree = MinCut.gomory_hu_tree(graph)
+      {cut_value, _s, _t} = MinCut.min_cut_query(tree, 1, 4)
+
+      # Actual min-cut in path 1-2-3-4 is the weakest edge = 3
+      assert cut_value == 3
+    end
+
+    test "query partitions are valid" do
+      {:ok, graph} =
+        Yog.undirected()
+        |> Yog.add_node(1, "a")
+        |> Yog.add_node(2, "b")
+        |> Yog.add_node(3, "c")
+        |> Yog.add_node(4, "d")
+        |> Yog.add_edges([
+          {1, 2, 5},
+          {2, 3, 3},
+          {3, 4, 7}
+        ])
+
+      tree = MinCut.gomory_hu_tree(graph)
+      {cut_value, s, t} = MinCut.min_cut_query(tree, 1, 4)
+
+      all_nodes = MapSet.new([1, 2, 3, 4])
+      assert MapSet.disjoint?(s, t)
+      assert MapSet.equal?(MapSet.union(s, t), all_nodes)
+      assert MapSet.member?(s, 1)
+      assert MapSet.member?(t, 4)
+      assert cut_value == 3
+    end
+
+    test "query for same node returns zero" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_node(1, "a")
+        |> Yog.add_node(2, "b")
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+
+      tree = MinCut.gomory_hu_tree(graph)
+      {cut_value, s, t} = MinCut.min_cut_query(tree, 1, 1)
+
+      assert cut_value == 0
+      assert MapSet.member?(s, 1)
+      assert MapSet.member?(t, 2)
+    end
+
+    test "query matches s-t min-cut on original graph" do
+      {:ok, graph} =
+        Yog.undirected()
+        |> Yog.add_node(1, "a")
+        |> Yog.add_node(2, "b")
+        |> Yog.add_node(3, "c")
+        |> Yog.add_node(4, "d")
+        |> Yog.add_edges([
+          {1, 2, 3},
+          {1, 3, 4},
+          {2, 3, 2},
+          {2, 4, 5},
+          {3, 4, 1}
+        ])
+
+      tree = MinCut.gomory_hu_tree(graph)
+      {gh_cut, _s, _t} = MinCut.min_cut_query(tree, 1, 4)
+
+      # Compare against direct s-t min-cut
+      st_result = MinCut.s_t_min_cut(graph, 1, 4, :dinic)
+      assert gh_cut == st_result.cut_value
+    end
+  end
+
   describe "karger_stein/2" do
     test "simple triangle graph" do
       {:ok, graph} =
