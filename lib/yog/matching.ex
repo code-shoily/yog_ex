@@ -251,9 +251,9 @@ defmodule Yog.Matching do
       ...> ])
       iex> {cost, matching} = Yog.Matching.hungarian(graph, :min)
       iex> cost
-      35
+      33
       iex> matching[:a]
-      :x
+      :z
   """
   @spec hungarian(Graph.t(), optimization()) ::
           {number(), %{Yog.node_id() => Yog.node_id()}}
@@ -277,115 +277,154 @@ defmodule Yog.Matching do
     if k == 0 do
       {0, %{}}
     else
-      cost_map = build_cost_map(graph, left_nodes, right_nodes, optimization)
+      padded_left =
+        if k > n, do: left_nodes ++ Enum.map(1..(k - n), &{:__dummy_left__, &1}), else: left_nodes
 
-      padded_left = left_nodes ++ Enum.map(1..(k - n), &:"__dummy_left_#{&1}__")
-      padded_right = right_nodes ++ Enum.map(1..(k - m), &:"__dummy_right_#{&1}__")
+      padded_right =
+        if k > m,
+          do: right_nodes ++ Enum.map(1..(k - m), &{:__dummy_right__, &1}),
+          else: right_nodes
 
-      {total_cost, raw_matching} = hungarian_impl(cost_map, padded_left, padded_right, k)
+      cost_matrix = build_cost_matrix(graph, padded_left, padded_right, optimization)
 
-      # Filter out dummy nodes and build bidirectional map
+      {total_cost, matching_indices} = hungarian_impl(cost_matrix, k)
+
+      # Build result matching map
       real_left = MapSet.new(left_nodes)
       real_right = MapSet.new(right_nodes)
 
-      matching =
-        raw_matching
-        |> Enum.reduce(%{}, fn {l, r}, acc ->
-          l_real = MapSet.member?(real_left, l)
-          r_real = MapSet.member?(real_right, r)
+      left_tuple = List.to_tuple(padded_left)
+      right_tuple = List.to_tuple(padded_right)
 
-          if l_real and r_real do
-            acc |> Map.put(l, r) |> Map.put(r, l)
+      matching =
+        Enum.reduce(matching_indices, %{}, fn {j, i}, acc ->
+          u = elem(left_tuple, i - 1)
+          v = elem(right_tuple, j - 1)
+
+          if MapSet.member?(real_left, u) and MapSet.member?(real_right, v) do
+            acc |> Map.put(u, v) |> Map.put(v, u)
           else
             acc
           end
         end)
 
-      {total_cost, matching}
+      cost =
+        if optimization == :max do
+          -total_cost
+        else
+          total_cost
+        end
+
+      {cost, matching}
     end
   end
 
-  defp build_cost_map(graph, left_nodes, right_nodes, optimization) do
-    base_cost =
-      Enum.reduce(left_nodes, %{}, fn u, acc ->
-        neighbors = Model.neighbor_ids(graph, u)
-        neighbor_set = MapSet.new(neighbors)
+  defp build_cost_matrix(graph, left, right, optimization) do
+    left_indexed = Enum.with_index(left, 1)
+    right_indexed = Enum.with_index(right, 1)
 
-        if not MapSet.equal?(MapSet.new(right_nodes), neighbor_set) do
-          raise ArgumentError,
-                "hungarian/2 requires a complete bipartite graph between the two partitions"
+    for {u, i} <- left_indexed, {v, j} <- right_indexed, into: %{} do
+      weight =
+        case {u, v} do
+          {{:__dummy_left__, _}, _} ->
+            0
+
+          {_, {:__dummy_right__, _}} ->
+            0
+
+          _ ->
+            weight = Model.edge_data(graph, u, v) || Model.edge_data(graph, v, u)
+
+            if is_nil(weight) do
+              raise ArgumentError, "hungarian/2 requires a complete bipartite graph"
+            end
+
+            weight
         end
 
-        row =
-          Enum.reduce(right_nodes, %{}, fn v, row_acc ->
-            weight =
-              Model.edge_data(graph, u, v) || Model.edge_data(graph, v, u) || 0
-
-            cost = if optimization == :max, do: -weight, else: weight
-            Map.put(row_acc, v, cost)
-          end)
-
-        Map.put(acc, u, row)
-      end)
-
-    # Add dummy columns with zero cost
-    Enum.reduce(left_nodes, base_cost, fn u, acc ->
-      row = Map.get(acc, u, %{})
-      new_row = Enum.reduce(1..100, row, fn i, r -> Map.put(r, :"__dummy_right_#{i}__", 0) end)
-      Map.put(acc, u, new_row)
-    end)
-    |> then(fn cm ->
-      # Add dummy rows with zero cost
-      Enum.reduce(1..100, cm, fn i, acc ->
-        row = Enum.reduce(right_nodes, %{}, fn v, r -> Map.put(r, v, 0) end)
-
-        row_with_dummies =
-          Enum.reduce(1..100, row, fn j, r -> Map.put(r, :"__dummy_right_#{j}__", 0) end)
-
-        Map.put(acc, :"__dummy_left_#{i}__", row_with_dummies)
-      end)
-    end)
+      cost = if optimization == :max, do: -weight, else: weight
+      {{i, j}, cost}
+    end
   end
 
-  # Classic O(n³) Hungarian algorithm using potentials.
-  defp hungarian_impl(cost_map, left_nodes, right_nodes, n) do
+  defp hungarian_impl(matrix, n) do
     u = Map.new(0..n, fn i -> {i, 0} end)
     v = Map.new(0..n, fn j -> {j, 0} end)
     p = Map.new(0..n, fn j -> {j, 0} end)
     way = Map.new(0..n, fn j -> {j, 0} end)
 
-    {final_u, final_v, final_p} =
-      Enum.reduce(1..n, {u, v, p, way}, fn i, {u_acc, v_acc, p_acc, way_acc} ->
-        p_acc = Map.put(p_acc, 0, i)
-        j0 = 0
+    {_u, final_v, final_p} =
+      Enum.reduce(1..n, {u, v, p}, fn i, {u_acc, v_acc, p_acc} ->
         minv = Map.new(0..n, fn j -> {j, :infinity} end)
         used = Map.new(0..n, fn j -> {j, false} end)
+        p_acc = Map.put(p_acc, 0, i)
 
-        {j0_res, p_res, way_res, minv_res, used_res, u_res, v_res} =
-          hungarian_augment(
-            cost_map,
-            left_nodes,
-            right_nodes,
-            i,
-            j0,
-            p_acc,
-            way_acc,
-            minv,
-            used,
-            u_acc,
-            v_acc,
-            n
-          )
+        {p_res, u_res, v_res} =
+          perform_augmentation(matrix, p_acc, u_acc, v_acc, way, minv, used, 0, n)
 
-        # Augmenting: update matching along the found path
-        {final_p, final_j0} =
-          augment_path(way_res, j0_res, p_res)
-
-        {u_res, v_acc, final_p, way_res}
+        {u_res, v_res, p_res}
       end)
-      |> then(fn {u_r, _v_r, p_r, _way_r} -> {u_r, v_r, p_r} end)
 
-    # Wait, we lost v_r in the pipe. Let me restructure.
-    # Actually, let me fix this by keeping all 4 values.
+    matching =
+      Enum.reduce(1..n, %{}, fn j, acc ->
+        i = Map.get(final_p, j)
+        if i != 0, do: Map.put(acc, j, i), else: acc
+      end)
+
+    total_cost = -Map.get(final_v, 0)
+    {total_cost, matching}
+  end
+
+  defp perform_augmentation(matrix, p, u, v, way, minv, used, j0, n) do
+    used = Map.put(used, j0, true)
+    i0 = Map.get(p, j0)
+
+    {minv, way, j1} =
+      Enum.reduce(1..n, {minv, way, 0}, fn j, {mv_acc, w_acc, best_j} ->
+        if Map.get(used, j) do
+          {mv_acc, w_acc, best_j}
+        else
+          cur = Map.get(matrix, {i0, j}) - Map.get(u, i0) - Map.get(v, j)
+
+          {mv_acc, w_acc} =
+            if cur < Map.get(mv_acc, j) do
+              {Map.put(mv_acc, j, cur), Map.put(w_acc, j, j0)}
+            else
+              {mv_acc, w_acc}
+            end
+
+          best_j =
+            if best_j == 0 or Map.get(mv_acc, j) < Map.get(mv_acc, best_j), do: j, else: best_j
+
+          {mv_acc, w_acc, best_j}
+        end
+      end)
+
+    delta = Map.get(minv, j1)
+
+    {u, v, minv2} =
+      Enum.reduce(0..n, {u, v, minv}, fn j, {u_ptr, v_ptr, mv_ptr} ->
+        if Map.get(used, j) do
+          u_ptr = Map.update!(u_ptr, Map.get(p, j), &(&1 + delta))
+          v_ptr = Map.update!(v_ptr, j, &(&1 - delta))
+          {u_ptr, v_ptr, mv_ptr}
+        else
+          mv_ptr = Map.update!(mv_ptr, j, &(&1 - delta))
+          {u_ptr, v_ptr, mv_ptr}
+        end
+      end)
+
+    if Map.get(p, j1) == 0 do
+      p = backtrack_matching(p, way, j1)
+      {p, u, v}
+    else
+      perform_augmentation(matrix, p, u, v, way, minv2, used, j1, n)
+    end
+  end
+
+  defp backtrack_matching(p, way, j) do
+    prev_j = Map.get(way, j)
+    p = Map.put(p, j, Map.get(p, prev_j))
+    if prev_j != 0, do: backtrack_matching(p, way, prev_j), else: p
   end
 end

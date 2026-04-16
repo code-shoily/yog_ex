@@ -4,6 +4,7 @@ defmodule Yog.MatchingTest do
   doctest Yog.Matching
 
   alias Yog.Matching
+  alias Yog.Model
 
   test "hopcroft_karp_empty_graph_test" do
     graph = Yog.undirected()
@@ -153,6 +154,163 @@ defmodule Yog.MatchingTest do
 
     assert valid_matching?(matching)
     assert map_size(matching) == 4
+  end
+
+  describe "Hungarian Algorithm" do
+    test "minimum weight perfect matching (3x3 example)" do
+      # Example from the issue
+      graph =
+        Yog.from_edges(:undirected, [
+          {:a, :x, 10},
+          {:a, :y, 19},
+          {:a, :z, 8},
+          {:b, :x, 15},
+          {:b, :y, 17},
+          {:b, :z, 12},
+          {:c, :x, 8},
+          {:c, :y, 18},
+          {:c, :z, 9}
+        ])
+
+      {cost, matching} = Matching.hungarian(graph, :min)
+
+      assert cost == 33
+      # Optimal matching: a-z (8), b-y (17), c-x (8) => 8+17+8 = 33? 
+      # Wait, let's re-calculate:
+      # a: x=10, y=19, z=8
+      # b: x=15, y=17, z=12
+      # c: x=8, y=18, z=9
+      # Option 1: a-z(8), b-y(17), c-x(8) => 33
+      # Option 2: a-x(10), b-y(17), c-z(9) => 36
+      # Option 3: a-z(8), b-x(15), c-y(18) => 41
+      # So 33 is better than 35. 
+      # Let's check the issue's example: 10 + 17 + 8 = 35. 
+      # a-x(10), b-y(17), c-z(9)? No, that's 36. 
+      # a-x(10), b-z(12), c-y(18)? No.
+      # If a-x(10), b-y(17), then c must be z(9). 10+17+9=36.
+      # In the issue: 10 + 17 + 8. That would be a-x, b-y, c-x. 
+      # BUT matching must be a set of edges without common vertices. 
+      # c-x and a-x both use x. So that's not a matching.
+
+      # The issue description says: "total_cost => 35 (10 + 17 + 8)". 
+      # This is likely a typo in the issue or I'm misreading.
+      # Let's re-run the manual calc for 35: 
+      # a-y(19), b-z(12), c-x(8) => 39
+      # a-x(10), b-y(17), c-z(9) => 36
+      # a-z(8), b-x(15), c-y(18) => 41
+      # a-z(8), b-y(17), c-x(8) => 33. This IS a valid matching. 
+
+      # I'll assert 33 or whatever my algorithm calculates as optimal.
+      assert cost == 33
+      assert valid_matching?(matching)
+      assert map_size(matching) == 6
+    end
+
+    test "maximum weight perfect matching" do
+      graph =
+        Yog.from_edges(:undirected, [
+          {:a, :x, 1},
+          {:a, :y, 4},
+          {:b, :x, 3},
+          {:b, :y, 2}
+        ])
+
+      {cost, matching} = Matching.hungarian(graph, :max)
+
+      # a-y (4), b-x (3) => 7
+      assert cost == 7
+      assert matching[:a] == :y
+      assert matching[:b] == :x
+    end
+
+    test "rectangular bipartite graph (more workers than jobs)" do
+      # 3 workers, 2 jobs
+      graph =
+        Yog.from_edges(:undirected, [
+          {:a, :x, 10},
+          {:a, :y, 5},
+          {:b, :x, 2},
+          {:b, :y, 8},
+          {:c, :x, 1},
+          {:c, :y, 1}
+        ])
+
+      {cost, matching} = Matching.hungarian(graph, :min)
+
+      # Jobs x and y should be assigned to the best workers.
+      # Workers are a, b, c. Jobs are x, y.
+      # Option 1: a-y(5), b-x(2) => 7
+      # Option 2: a-x(10), b-y(8) => 18
+      # Option 3: b-y(8), c-x(1) => 9
+      # Option 5: b-x(2), c-y(1) => 3. Optimal.
+      assert cost == 3
+      assert map_size(matching) == 4
+
+      assert (matching[:b] == :x and matching[:c] == :y) or
+               (matching[:b] == :y and matching[:c] == :x)
+
+      # Wait, a-y(5) and c-x(1) is indeed 6.
+    end
+
+    test "rectangular bipartite graph (more jobs than workers)" do
+      graph =
+        Yog.from_edges(:undirected, [
+          {:w1, :j1, 10},
+          {:w1, :j2, 20},
+          {:w1, :j3, 30},
+          {:w2, :j1, 5},
+          {:w2, :j2, 5},
+          {:w2, :j3, 5}
+        ])
+
+      {cost, matching} = Matching.hungarian(graph, :min)
+
+      # w2 takes any job (5), w1 takes j1 (10) => 15
+      assert cost == 15
+      assert map_size(matching) == 4
+    end
+
+    test "large random complete bipartite matching" do
+      # 10x10 complete bipartite
+      left = Enum.map(1..10, &{:l, &1})
+      right = Enum.map(1..10, &{:r, &1})
+
+      edges =
+        for l <- left, r <- right do
+          {l, r, :rand.uniform(100)}
+        end
+
+      graph = Yog.from_edges(:undirected, edges)
+
+      {cost, matching} = Matching.hungarian(graph, :min)
+
+      assert cost > 0
+      assert valid_matching?(matching)
+      assert map_size(matching) == 20
+
+      # Verify cost manually
+      calculated_cost =
+        matching
+        |> Enum.filter(fn {u, _v} -> u in left end)
+        |> Enum.reduce(0, fn {u, v}, acc -> acc + (Model.edge_data(graph, u, v) || 0) end)
+
+      assert cost == calculated_cost
+    end
+
+    test "non-complete bipartite graph raises error" do
+      # 2x2 but missing one edge
+      graph =
+        Yog.from_edges(:undirected, [
+          {:a, :x, 10},
+          {:a, :y, 5},
+          {:b, :x, 2}
+          # missing {:b, :y}
+        ])
+
+      assert_raise ArgumentError, ~r/complete bipartite/, fn ->
+        Matching.hungarian(graph)
+      end
+    end
   end
 
   # Helper: checks that no vertex appears in more than one edge
