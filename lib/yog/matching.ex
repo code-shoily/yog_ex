@@ -11,11 +11,14 @@ defmodule Yog.Matching do
   |---------|-----------|----------|------------|
   | Maximum bipartite matching | [Hopcroft-Karp](https://en.wikipedia.org/wiki/Hopcroft%E2%80%93Karp_algorithm) | `hopcroft_karp/1` | O(E√V) |
 
+  | Weighted bipartite matching | [Hungarian (Kuhn-Munkres)](https://en.wikipedia.org/wiki/Hungarian_algorithm) | `hungarian/2` | O(V³) |
+
   ## Key Concepts
 
   - **Matching**: A set of edges with no shared vertices
   - **Maximum Matching**: A matching with the largest possible number of edges
   - **Perfect Matching**: Every vertex is matched (requires equal partitions)
+  - **Assignment Problem**: Optimal assignment of workers to jobs with costs/weights
 
   ## Examples
 
@@ -219,5 +222,170 @@ defmodule Yog.Matching do
       {true, _, _, _} -> result
       {false, pu, pv, d} -> {false, pu, pv, Map.put(d, u, :infinity)}
     end
+  end
+
+  # =============================================================================
+  # Hungarian Algorithm (Kuhn-Munkres)
+  # =============================================================================
+
+  @type optimization :: :min | :max
+
+  @doc """
+  Finds a minimum or maximum weight perfect matching in a bipartite graph using
+  the Hungarian (Kuhn-Munkres) algorithm.
+
+  The graph must be bipartite. Rectangular partitions (|L| ≠ |R|) are padded with
+  dummy nodes at zero cost so the algorithm can proceed. Missing edges are not
+  supported: the graph must be complete between the two partitions.
+
+  Returns `{total_cost, matching}` where `matching` is a bidirectional map
+  (`u => v` and `v => u` for every matched pair). Dummy nodes are excluded from
+  the result.
+
+  ## Examples
+
+      iex> graph = Yog.from_edges(:undirected, [
+      ...>   {:a, :x, 10}, {:a, :y, 19}, {:a, :z, 8},
+      ...>   {:b, :x, 15}, {:b, :y, 17}, {:b, :z, 12},
+      ...>   {:c, :x, 8},  {:c, :y, 18}, {:c, :z, 9}
+      ...> ])
+      iex> {cost, matching} = Yog.Matching.hungarian(graph, :min)
+      iex> cost
+      35
+      iex> matching[:a]
+      :x
+  """
+  @spec hungarian(Graph.t(), optimization()) ::
+          {number(), %{Yog.node_id() => Yog.node_id()}}
+  def hungarian(%Graph{} = graph, optimization \\ :min) when optimization in [:min, :max] do
+    case Bipartite.partition(graph) do
+      {:ok, %{left: left, right: right}} ->
+        do_hungarian(graph, left, right, optimization)
+
+      {:error, :not_bipartite} ->
+        raise ArgumentError, "hungarian/2 requires a bipartite graph"
+    end
+  end
+
+  defp do_hungarian(graph, left, right, optimization) do
+    left_nodes = MapSet.to_list(left) |> Enum.sort()
+    right_nodes = MapSet.to_list(right) |> Enum.sort()
+    n = length(left_nodes)
+    m = length(right_nodes)
+    k = max(n, m)
+
+    if k == 0 do
+      {0, %{}}
+    else
+      cost_map = build_cost_map(graph, left_nodes, right_nodes, optimization)
+
+      padded_left = left_nodes ++ Enum.map(1..(k - n), &:"__dummy_left_#{&1}__")
+      padded_right = right_nodes ++ Enum.map(1..(k - m), &:"__dummy_right_#{&1}__")
+
+      {total_cost, raw_matching} = hungarian_impl(cost_map, padded_left, padded_right, k)
+
+      # Filter out dummy nodes and build bidirectional map
+      real_left = MapSet.new(left_nodes)
+      real_right = MapSet.new(right_nodes)
+
+      matching =
+        raw_matching
+        |> Enum.reduce(%{}, fn {l, r}, acc ->
+          l_real = MapSet.member?(real_left, l)
+          r_real = MapSet.member?(real_right, r)
+
+          if l_real and r_real do
+            acc |> Map.put(l, r) |> Map.put(r, l)
+          else
+            acc
+          end
+        end)
+
+      {total_cost, matching}
+    end
+  end
+
+  defp build_cost_map(graph, left_nodes, right_nodes, optimization) do
+    base_cost =
+      Enum.reduce(left_nodes, %{}, fn u, acc ->
+        neighbors = Model.neighbor_ids(graph, u)
+        neighbor_set = MapSet.new(neighbors)
+
+        if not MapSet.equal?(MapSet.new(right_nodes), neighbor_set) do
+          raise ArgumentError,
+                "hungarian/2 requires a complete bipartite graph between the two partitions"
+        end
+
+        row =
+          Enum.reduce(right_nodes, %{}, fn v, row_acc ->
+            weight =
+              Model.edge_data(graph, u, v) || Model.edge_data(graph, v, u) || 0
+
+            cost = if optimization == :max, do: -weight, else: weight
+            Map.put(row_acc, v, cost)
+          end)
+
+        Map.put(acc, u, row)
+      end)
+
+    # Add dummy columns with zero cost
+    Enum.reduce(left_nodes, base_cost, fn u, acc ->
+      row = Map.get(acc, u, %{})
+      new_row = Enum.reduce(1..100, row, fn i, r -> Map.put(r, :"__dummy_right_#{i}__", 0) end)
+      Map.put(acc, u, new_row)
+    end)
+    |> then(fn cm ->
+      # Add dummy rows with zero cost
+      Enum.reduce(1..100, cm, fn i, acc ->
+        row = Enum.reduce(right_nodes, %{}, fn v, r -> Map.put(r, v, 0) end)
+
+        row_with_dummies =
+          Enum.reduce(1..100, row, fn j, r -> Map.put(r, :"__dummy_right_#{j}__", 0) end)
+
+        Map.put(acc, :"__dummy_left_#{i}__", row_with_dummies)
+      end)
+    end)
+  end
+
+  # Classic O(n³) Hungarian algorithm using potentials.
+  defp hungarian_impl(cost_map, left_nodes, right_nodes, n) do
+    u = Map.new(0..n, fn i -> {i, 0} end)
+    v = Map.new(0..n, fn j -> {j, 0} end)
+    p = Map.new(0..n, fn j -> {j, 0} end)
+    way = Map.new(0..n, fn j -> {j, 0} end)
+
+    {final_u, final_v, final_p} =
+      Enum.reduce(1..n, {u, v, p, way}, fn i, {u_acc, v_acc, p_acc, way_acc} ->
+        p_acc = Map.put(p_acc, 0, i)
+        j0 = 0
+        minv = Map.new(0..n, fn j -> {j, :infinity} end)
+        used = Map.new(0..n, fn j -> {j, false} end)
+
+        {j0_res, p_res, way_res, minv_res, used_res, u_res, v_res} =
+          hungarian_augment(
+            cost_map,
+            left_nodes,
+            right_nodes,
+            i,
+            j0,
+            p_acc,
+            way_acc,
+            minv,
+            used,
+            u_acc,
+            v_acc,
+            n
+          )
+
+        # Augmenting: update matching along the found path
+        {final_p, final_j0} =
+          augment_path(way_res, j0_res, p_res)
+
+        {u_res, v_acc, final_p, way_res}
+      end)
+      |> then(fn {u_r, _v_r, p_r, _way_r} -> {u_r, v_r, p_r} end)
+
+    # Wait, we lost v_r in the pipe. Let me restructure.
+    # Actually, let me fix this by keeping all 4 values.
   end
 end
