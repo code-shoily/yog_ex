@@ -185,6 +185,8 @@ defmodule Yog.Render.DOT do
           edge_attributes: (Yog.node_id(), Yog.node_id(), any() -> [{atom(), String.t()}]),
           # Subgraphs
           subgraphs: [subgraph()] | nil,
+          # Rank constraints
+          ranks: [{:same | :min | :max | :source | :sink, [Yog.node_id()]}] | nil,
           # Graph-level attributes
           graph_name: String.t(),
           layout: layout() | nil,
@@ -244,8 +246,9 @@ defmodule Yog.Render.DOT do
       # Per-element styling defaults
       node_attributes: fn _, _ -> [] end,
       edge_attributes: fn _, _, _ -> [] end,
-      # Subgraphs default to none
+      # Subgraphs and rank constraints
       subgraphs: nil,
+      ranks: nil,
       # Graph-level
       graph_name: "G",
       layout: nil,
@@ -348,11 +351,19 @@ defmodule Yog.Render.DOT do
     node_defaults = build_node_defaults(options)
     edge_defaults = build_edge_defaults(options)
 
+    # Convert highlight lists to MapSets for O(1) membership checks
+    hl_nodes = to_mapset(options.highlighted_nodes)
+    hl_edges = to_edge_set(options.highlighted_edges)
+    options = %{options | highlighted_nodes: hl_nodes, highlighted_edges: hl_edges}
+
     # Generate nodes with per-element attributes
     nodes_str = build_node_lines(nodes, options)
 
     # Generate subgraphs
     subgraphs_str = build_subgraphs(options.subgraphs)
+
+    # Generate rank constraints
+    ranks_str = build_ranks(options.ranks)
 
     # Generate edges with per-element attributes
     edges_str = build_edge_lines(edges, options, arrow, kind)
@@ -367,6 +378,7 @@ defmodule Yog.Render.DOT do
       nodes_str,
       "\n",
       subgraphs_str,
+      ranks_str,
       edges_str,
       "\n}"
     ]
@@ -396,6 +408,189 @@ defmodule Yog.Render.DOT do
     edges = path_to_edges(nodes)
 
     %{base_options | highlighted_nodes: nodes, highlighted_edges: edges}
+  end
+
+  @doc """
+  Returns a pre-configured theme as DOT options.
+
+  Available themes:
+  - `:default` — Light blue nodes, black edges (same as `default_options/0`)
+  - `:dark` — Dark background with neon accent colors, ideal for dark UIs
+  - `:minimal` — Clean wireframe look with no fills and thin lines
+  - `:presentation` — Large fonts and bold colors for slides and demos
+
+  ## Examples
+
+      iex> opts = Yog.Render.DOT.theme(:dark)
+      iex> opts.bgcolor
+      "#1a1a2e"
+      iex> opts.node_color
+      "#16213e"
+
+      iex> opts = Yog.Render.DOT.theme(:minimal)
+      iex> opts.node_style
+      :solid
+
+      iex> opts = Yog.Render.DOT.theme(:presentation)
+      iex> opts.node_fontsize
+      18
+  """
+  @spec theme(atom()) :: options()
+  def theme(:default), do: default_options()
+
+  def theme(:dark) do
+    %{
+      default_options()
+      | bgcolor: "#1a1a2e",
+        node_color: "#16213e",
+        node_fontcolor: "#e0e0e0",
+        node_style: :filled,
+        node_shape: :box,
+        edge_color: "#4a4a6a",
+        edge_fontname: "Courier",
+        highlight_color: "#e94560",
+        highlight_penwidth: 2.5
+    }
+  end
+
+  def theme(:minimal) do
+    %{
+      default_options()
+      | node_color: "white",
+        node_style: :solid,
+        node_shape: :circle,
+        node_fontsize: 10,
+        edge_color: "#666666",
+        edge_penwidth: 0.5,
+        edge_fontsize: 8,
+        highlight_color: "#333333",
+        highlight_penwidth: 1.5
+    }
+  end
+
+  def theme(:presentation) do
+    %{
+      default_options()
+      | node_shape: :box,
+        node_style: :filled,
+        node_color: "#4361ee",
+        node_fontname: "Helvetica-Bold",
+        node_fontsize: 18,
+        node_fontcolor: "white",
+        edge_color: "#3a0ca3",
+        edge_fontsize: 14,
+        edge_penwidth: 2.0,
+        highlight_color: "#f72585",
+        highlight_penwidth: 3.5,
+        nodesep: 0.8,
+        ranksep: 1.0
+    }
+  end
+
+  @doc """
+  Creates DOT options that highlight an MST result.
+
+  MST edges are highlighted and non-MST edges use default styling.
+
+  ## Example
+
+      result = Yog.MST.kruskal(graph)
+      options = Yog.Render.DOT.mst_to_options(result)
+      dot_string = Yog.Render.DOT.to_dot(graph, options)
+  """
+  @spec mst_to_options(Yog.MST.Result.t(), options()) :: options()
+  def mst_to_options(%{edges: edges}, base_options \\ default_options()) do
+    mst_edges = Enum.map(edges, fn %{from: f, to: t} -> {f, t} end)
+    mst_nodes = Enum.flat_map(edges, fn %{from: f, to: t} -> [f, t] end) |> Enum.uniq()
+    %{base_options | highlighted_edges: mst_edges, highlighted_nodes: mst_nodes}
+  end
+
+  @doc """
+  Creates DOT options that color nodes by community assignment.
+
+  Each community gets a distinct color from a generated palette. The palette
+  cycles through visually distinct hues.
+
+  ## Example
+
+      result = Yog.Community.Louvain.detect(graph)
+      options = Yog.Render.DOT.community_to_options(result)
+      dot_string = Yog.Render.DOT.to_dot(graph, options)
+  """
+  @spec community_to_options(Yog.Community.Result.t(), options()) :: options()
+  def community_to_options(
+        %{assignments: assignments, num_communities: n},
+        base_options \\ default_options()
+      ) do
+    palette = generate_palette(n)
+
+    # Build community -> color mapping
+    community_ids = assignments |> Map.values() |> Enum.uniq() |> Enum.sort()
+    color_map = Enum.zip(community_ids, palette) |> Map.new()
+
+    node_attrs = fn id, _data ->
+      case Map.get(assignments, id) do
+        nil -> []
+        cid -> [{:fillcolor, Map.get(color_map, cid, "lightgrey")}, {:style, "filled"}]
+      end
+    end
+
+    %{base_options | node_attributes: node_attrs}
+  end
+
+  @doc """
+  Creates DOT options that color the source and sink sides of a min-cut.
+
+  Source-side nodes are colored with `source_color` (default: light blue),
+  sink-side nodes with `sink_color` (default: light coral).
+
+  Requires the `MinCutResult` to have `source_side` and `sink_side` populated
+  (use `track_partitions: true` or `extract_min_cut/1`).
+
+  ## Example
+
+      result = Yog.Flow.MinCut.global_min_cut(graph, track_partitions: true)
+      options = Yog.Render.DOT.cut_to_options(result)
+      dot_string = Yog.Render.DOT.to_dot(graph, options)
+  """
+  @spec cut_to_options(Yog.Flow.MinCutResult.t(), options()) :: options()
+  def cut_to_options(%{source_side: source, sink_side: sink}, base_options \\ default_options()) do
+    source_set = if source, do: MapSet.new(source), else: MapSet.new()
+    sink_set = if sink, do: MapSet.new(sink), else: MapSet.new()
+
+    node_attrs = fn id, _data ->
+      cond do
+        MapSet.member?(source_set, id) -> [{:fillcolor, "#a8d8ea"}, {:style, "filled"}]
+        MapSet.member?(sink_set, id) -> [{:fillcolor, "#f08080"}, {:style, "filled"}]
+        true -> []
+      end
+    end
+
+    %{base_options | node_attributes: node_attrs}
+  end
+
+  @doc """
+  Creates DOT options that highlight matched edges from a matching result.
+
+  Works with results from both `Yog.Matching.hopcroft_karp/1` and
+  `Yog.Matching.hungarian/2` (the matching map component).
+
+  ## Example
+
+      matching = Yog.Matching.hopcroft_karp(graph)
+      options = Yog.Render.DOT.matching_to_options(matching)
+      dot_string = Yog.Render.DOT.to_dot(graph, options)
+  """
+  @spec matching_to_options(%{Yog.node_id() => Yog.node_id()}, options()) :: options()
+  def matching_to_options(matching, base_options \\ default_options()) when is_map(matching) do
+    # Deduplicate bidirectional pairs
+    edges =
+      matching
+      |> Enum.map(fn {u, v} -> if u <= v, do: {u, v}, else: {v, u} end)
+      |> Enum.uniq()
+
+    nodes = Map.keys(matching)
+    %{base_options | highlighted_edges: edges, highlighted_nodes: nodes}
   end
 
   # =============================================================================
@@ -496,7 +691,7 @@ defmodule Yog.Render.DOT do
 
       # Add highlighting if applicable
       attrs =
-        if options.highlighted_nodes && id in options.highlighted_nodes do
+        if options.highlighted_nodes && MapSet.member?(options.highlighted_nodes, id) do
           [{:fillcolor, options.highlight_color} | attrs]
         else
           attrs
@@ -560,6 +755,16 @@ defmodule Yog.Render.DOT do
     end)
   end
 
+  defp build_ranks(nil), do: ""
+
+  defp build_ranks(rank_list) do
+    Enum.map_join(rank_list, "", fn {rank_type, node_ids} ->
+      rank_str = Atom.to_string(rank_type)
+      nodes = Enum.map_join(node_ids, "; ", &to_string/1)
+      "  {rank=#{rank_str}; #{nodes};}\n"
+    end)
+  end
+
   defp build_edge_lines(edges, options, arrow, kind) do
     edges
     |> Enum.flat_map(fn {from_id, targets} ->
@@ -579,8 +784,8 @@ defmodule Yog.Render.DOT do
         # Add highlighting if applicable
         is_highlighted =
           options.highlighted_edges &&
-            ({from_id, to_id} in options.highlighted_edges ||
-               {to_id, from_id} in options.highlighted_edges)
+            (MapSet.member?(options.highlighted_edges, {from_id, to_id}) ||
+               MapSet.member?(options.highlighted_edges, {to_id, from_id}))
 
         attrs =
           if is_highlighted do
@@ -605,12 +810,17 @@ defmodule Yog.Render.DOT do
     |> Enum.join("")
   end
 
-  # Merge two attribute lists, with override taking precedence
+  # Merge two attribute lists, with override taking precedence.
+  # Uses a Map for O(B + O) merge instead of O(B × O) list scanning.
+  defp merge_attributes_list(base, []), do: base
+
   defp merge_attributes_list(base, override) do
-    Enum.reduce(override, base, fn pair, acc ->
-      filtered = Enum.reject(acc, fn existing -> elem(existing, 0) == elem(pair, 0) end)
-      [pair | filtered]
-    end)
+    override_map = Map.new(override)
+
+    merged =
+      Enum.reject(base, fn {key, _} -> Map.has_key?(override_map, key) end)
+
+    override ++ merged
   end
 
   # Format a list of attributes as key="value", key2="value2"
@@ -623,10 +833,58 @@ defmodule Yog.Render.DOT do
   end
 
   defp escape_quotes(s) when is_binary(s) do
-    String.replace(s, "\"", "\\\"")
+    s
+    |> String.replace("\\", "\\\\")
+    |> String.replace("\"", "\\\"")
+    |> String.replace("\n", "\\n")
   end
 
   defp escape_quotes(v), do: v
+
+  defp to_mapset(nil), do: nil
+  defp to_mapset(list) when is_list(list), do: MapSet.new(list)
+  defp to_mapset(%MapSet{} = set), do: set
+
+  defp to_edge_set(nil), do: nil
+  defp to_edge_set(list) when is_list(list), do: MapSet.new(list)
+  defp to_edge_set(%MapSet{} = set), do: set
+
+  # Generate a palette of n visually distinct colors using HSL with fixed S=70%, L=60%
+  defp generate_palette(n) when n <= 0, do: []
+
+  defp generate_palette(n) do
+    Enum.map(0..(n - 1), fn i ->
+      hue = rem(i * 137, 360)
+      hsl_to_hex(hue, 70, 60)
+    end)
+  end
+
+  defp hsl_to_hex(h, s, l) do
+    s = s / 100
+    l = l / 100
+    c = (1 - abs(2 * l - 1)) * s
+    x = c * (1 - abs(Float.round(:math.fmod(h / 60, 2), 10) - 1))
+    m = l - c / 2
+
+    {r1, g1, b1} =
+      cond do
+        h < 60 -> {c, x, 0.0}
+        h < 120 -> {x, c, 0.0}
+        h < 180 -> {0.0, c, x}
+        h < 240 -> {0.0, x, c}
+        h < 300 -> {x, 0.0, c}
+        true -> {c, 0.0, x}
+      end
+
+    r = round((r1 + m) * 255)
+    g = round((g1 + m) * 255)
+    b = round((b1 + m) * 255)
+
+    "#" <>
+      String.pad_leading(Integer.to_string(r, 16), 2, "0") <>
+      String.pad_leading(Integer.to_string(g, 16), 2, "0") <>
+      String.pad_leading(Integer.to_string(b, 16), 2, "0")
+  end
 
   # Helper to convert a list of nodes to a list of edges
   defp path_to_edges(nodes), do: do_path_to_edges(nodes, [])
