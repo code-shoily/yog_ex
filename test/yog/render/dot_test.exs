@@ -20,6 +20,24 @@ defmodule Yog.Render.DOTTest do
     end
   end
 
+  describe "custom formatters" do
+    test "default_options_with_edge_formatter/1" do
+      opts = DOT.default_options_with_edge_formatter(fn w -> "w:#{w}" end)
+      assert opts.edge_label.(5) == "w:5"
+    end
+
+    test "default_options_with/1" do
+      opts =
+        DOT.default_options_with(
+          node_label: fn id, _ -> "n:#{id}" end,
+          edge_label: fn w -> "w:#{w}" end
+        )
+
+      assert opts.node_label.(1, nil) == "n:1"
+      assert opts.edge_label.(5) == "w:5"
+    end
+  end
+
   describe "to_dot/2" do
     test "renders directed graph" do
       graph =
@@ -205,6 +223,39 @@ defmodule Yog.Render.DOTTest do
       assert String.contains?(dot, "fillcolor=\"lightgrey\"")
     end
 
+    test "renders with empty/partial subgraphs" do
+      graph = Yog.directed()
+
+      opts =
+        Map.put(DOT.default_options(), :subgraphs, [
+          %{
+            name: "cluster_1",
+            label: nil,
+            node_ids: [],
+            style: nil,
+            fillcolor: nil,
+            color: "blue"
+          }
+        ])
+
+      dot = DOT.to_dot(graph, opts)
+
+      assert String.contains?(dot, "subgraph cluster_1")
+      assert String.contains?(dot, "color=\"blue\"")
+      refute String.contains?(dot, "    label=")
+      refute String.contains?(dot, "    style=")
+      refute String.contains?(dot, "    fillcolor=")
+    end
+
+    test "renders with invalid graph fallback" do
+      # Testing fallback behavior when graph is missing nodes, out_edges, or kind
+      dot = DOT.to_dot(%{}, DOT.default_options())
+      # default kind
+      assert String.contains?(dot, "digraph")
+      # no nodes/edges
+      assert String.contains?(dot, "}")
+    end
+
     test "renders with rank constraints" do
       graph =
         Yog.directed()
@@ -245,6 +296,27 @@ defmodule Yog.Render.DOTTest do
       assert opts.node_attributes.(99, nil) == []
     end
 
+    test "community_to_options handles zero communities" do
+      result = %Yog.Community.Result{assignments: %{}, num_communities: 0}
+      opts = DOT.community_to_options(result)
+      assert is_function(opts.node_attributes, 2)
+    end
+
+    test "community_to_options covers all palette hues" do
+      # Generating 7 communities produces hues that cover all branches in hsl_to_hex
+      result = %Yog.Community.Result{
+        assignments: Map.new(1..7, fn i -> {i, i} end),
+        num_communities: 7
+      }
+
+      opts = DOT.community_to_options(result)
+
+      # Just evaluate the function to ensure no crashes
+      for i <- 1..7 do
+        assert Keyword.has_key?(opts.node_attributes.(i, nil), :fillcolor)
+      end
+    end
+
     test "cut_to_options generates source/sink colors" do
       result = %Yog.Flow.MinCutResult{
         cut_value: 5,
@@ -277,6 +349,18 @@ defmodule Yog.Render.DOTTest do
       assert {3, 4} in opts.highlighted_edges
       # Should deduplicate reversed pairs
       assert length(opts.highlighted_edges) == 2
+
+      # Ensure rendering doesn't fail and uses the list
+      graph =
+        Yog.directed()
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_node(3, nil)
+        |> Yog.add_node(4, nil)
+        |> Yog.add_edges!([{1, 2, 1}, {3, 4, 1}, {2, 1, 1}])
+
+      dot = DOT.to_dot(graph, opts)
+      assert String.contains?(dot, "color=\"red\"")
     end
 
     test "mst_to_options highlights mst edges" do
@@ -296,6 +380,17 @@ defmodule Yog.Render.DOTTest do
       assert opts.highlighted_nodes == [1, 2, 3]
       assert {1, 2} in opts.highlighted_edges
       assert {2, 3} in opts.highlighted_edges
+
+      # Ensure rendering works
+      graph =
+        Yog.directed()
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_node(3, nil)
+        |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}])
+
+      dot = DOT.to_dot(graph, opts)
+      assert String.contains?(dot, "color=\"red\"")
     end
 
     test "renders with per-element node attributes" do
@@ -346,6 +441,16 @@ defmodule Yog.Render.DOTTest do
       dot = DOT.to_dot(graph, opts)
       assert String.contains?(dot, "arrowhead=diamond")
       assert String.contains?(dot, "arrowtail=dot")
+
+      opts_head_only = Map.put(DOT.default_options(), :arrowhead, :vee)
+      dot_head = DOT.to_dot(graph, opts_head_only)
+      assert String.contains?(dot_head, "arrowhead=vee")
+      refute String.contains?(dot_head, "arrowtail=")
+
+      opts_tail_only = Map.put(DOT.default_options(), :arrowtail, :inv)
+      dot_tail = DOT.to_dot(graph, opts_tail_only)
+      assert String.contains?(dot_tail, "arrowtail=inv")
+      refute String.contains?(dot_tail, "arrowhead=")
     end
 
     test "renders with custom layout and graph attributes" do
@@ -375,6 +480,19 @@ defmodule Yog.Render.DOTTest do
       assert String.contains?(dot, "nodesep=0.5")
       assert String.contains?(dot, "ranksep=1.0")
     end
+
+    test "handles MapSet in highlighted sets" do
+      graph = Yog.directed() |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+
+      opts =
+        Map.merge(DOT.default_options(), %{
+          highlighted_nodes: MapSet.new([1]),
+          highlighted_edges: MapSet.new([{1, 2}])
+        })
+
+      dot = DOT.to_dot(graph, opts)
+      assert String.contains?(dot, "color=\"red\"")
+    end
   end
 
   describe "path_to_options/2" do
@@ -386,6 +504,17 @@ defmodule Yog.Render.DOTTest do
 
       assert highlighted.highlighted_nodes == [1, 2, 3]
       assert highlighted.highlighted_edges == [{1, 2}, {2, 3}]
+
+      # Render the graph, also include a reverse edge to hit the other side of the lookup logic
+      graph =
+        Yog.directed()
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_node(3, nil)
+        |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}, {3, 2, 1}])
+
+      dot = DOT.to_dot(graph, highlighted)
+      assert String.contains?(dot, "color=\"red\"")
     end
 
     test "preserves other options" do
@@ -397,6 +526,119 @@ defmodule Yog.Render.DOTTest do
       assert highlighted.graph_name == "TestGraph"
       assert highlighted.highlighted_nodes == [1]
       assert highlighted.highlighted_edges == []
+    end
+
+    test "handles empty and single-node paths" do
+      base_opts = DOT.default_options()
+
+      empty_opts = DOT.path_to_options(%{nodes: []}, base_opts)
+      assert empty_opts.highlighted_edges == []
+
+      single_opts = DOT.path_to_options(%{nodes: [1]}, base_opts)
+      assert single_opts.highlighted_edges == []
+    end
+  end
+
+  describe "string conversions" do
+    test "covers all layout options" do
+      for layout <- [:dot, :neato, :circo, :fdp, :sfdp, :twopi, :osage, {:custom, "my_layout"}] do
+        opts = Map.put(DOT.default_options(), :layout, layout)
+        dot = DOT.to_dot(Yog.directed(), opts)
+        expected = if is_tuple(layout), do: elem(layout, 1), else: to_string(layout)
+        assert String.contains?(dot, "layout=#{expected}")
+      end
+    end
+
+    test "covers all rankdir options" do
+      for rankdir <- [:tb, :lr, :bt, :rl] do
+        opts = Map.put(DOT.default_options(), :rankdir, rankdir)
+        dot = DOT.to_dot(Yog.directed(), opts)
+        assert String.contains?(dot, "rankdir=#{String.upcase(to_string(rankdir))}")
+      end
+    end
+
+    test "covers all node_shape options" do
+      shapes = [
+        :box,
+        :circle,
+        :ellipse,
+        :diamond,
+        :hexagon,
+        :pentagon,
+        :octagon,
+        :triangle,
+        :rectangle,
+        :square,
+        :rect,
+        :invtriangle,
+        :house,
+        :invhouse,
+        :parallelogram,
+        :trapezoid,
+        {:custom, "my_shape"}
+      ]
+
+      for shape <- shapes do
+        opts = Map.put(DOT.default_options(), :node_shape, shape)
+        dot = DOT.to_dot(Yog.directed() |> Yog.add_node(1, "A"), opts)
+        expected = if is_tuple(shape), do: elem(shape, 1), else: to_string(shape)
+        assert String.contains?(dot, "shape=#{expected}")
+      end
+    end
+
+    test "covers all style options" do
+      styles = [:solid, :dashed, :dotted, :bold, :filled, :rounded, :diagonals, :striped, :wedged]
+
+      for style <- styles do
+        opts = Map.put(DOT.default_options(), :node_style, style)
+        dot = DOT.to_dot(Yog.directed() |> Yog.add_node(1, "A"), opts)
+        assert String.contains?(dot, "style=#{style}")
+      end
+    end
+
+    test "covers all splines options" do
+      splines = [:line, :polyline, :curved, :ortho, :spline, :none]
+
+      for spline <- splines do
+        opts = Map.put(DOT.default_options(), :splines, spline)
+        dot = DOT.to_dot(Yog.directed(), opts)
+        assert String.contains?(dot, "splines=#{spline}")
+      end
+    end
+
+    test "covers all arrow_style options" do
+      arrows = [
+        :normal,
+        :dot,
+        :diamond,
+        :odiamond,
+        :box,
+        :crow,
+        :vee,
+        :inv,
+        :tee,
+        :none,
+        {:custom, "my_arrow"}
+      ]
+
+      for arrow <- arrows do
+        opts = Map.merge(DOT.default_options(), %{arrowhead: arrow, arrowtail: arrow})
+        dot = DOT.to_dot(Yog.directed(), opts)
+        expected = if is_tuple(arrow), do: elem(arrow, 1), else: to_string(arrow)
+        assert String.contains?(dot, "arrowhead=#{expected}")
+        assert String.contains?(dot, "arrowtail=#{expected}")
+      end
+    end
+
+    test "covers all overlap options" do
+      overlaps = [true, false, :scale, :scalexy, :prism, {:custom, "my_overlap"}]
+
+      for overlap <- overlaps do
+        opts = Map.put(DOT.default_options(), :overlap, overlap)
+        dot = DOT.to_dot(Yog.directed(), opts)
+        expected = if is_tuple(overlap), do: elem(overlap, 1), else: to_string(overlap)
+        assert String.contains?(dot, "overlap=#{expected}")
+      end
     end
   end
 end
