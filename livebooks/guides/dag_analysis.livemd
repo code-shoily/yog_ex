@@ -1,0 +1,101 @@
+# Directed Acyclic Graphs (DAG)
+
+```elixir
+Mix.install([
+  {:yog_ex, path: "/home/mafinar/repos/elixir/yog_ex"},
+  {:kino_vizjs, "~> 0.5.0"}
+])
+```
+
+## Introduction
+
+A **Directed Acyclic Graph (DAG)** is a directed graph with no cycles. DAGs are the standard way to represent dependencies, workflows, and version history (like Git).
+
+Because they lack cycles, DAGs allow for specialized algorithms that are much faster or more robust than those for general graphs.
+
+## 🏗️ Topological Sorting
+
+Topological sorting orders nodes such that for every edge $u \to v$, node $u$ comes before $v$.
+
+```elixir
+# Create a DAG representing a build process
+{:ok, dag} = Yog.DAG.Model.from_graph(
+  Yog.directed()
+  |> Yog.add_edges!([
+    {"Compiler", "Linker", 1},
+    {"SourceCode", "Compiler", 1},
+    {"HeaderFiles", "Compiler", 1},
+    {"Linker", "Executable", 1},
+    {"Libraries", "Linker", 1}
+  ])
+)
+
+# 1. Linear Ordering
+sorted = Yog.DAG.Algorithm.topological_sort(dag)
+IO.inspect(sorted, label: "Build Sequence")
+
+# 2. Parallel Generations
+# Nodes in the same generation have no dependencies on each other
+generations = Yog.DAG.Algorithm.topological_generations(dag)
+IO.inspect(generations, label: "Parallel Stages")
+```
+
+## ⏱️ The Critical Path (Longest Path)
+
+In a general graph, the "Longest Path Problem" is NP-hard. However, in a DAG, it can be solved in linear time! This is the basis of the **Critical Path Method (CPM)** used in project management.
+
+```elixir
+# Edges represent (Task, dependency, duration)
+tasks = Yog.directed()
+  |> Yog.add_edges!([
+    {"Start", "Foundation", 5},
+    {"Foundation", "Walls", 10},
+    {"Walls", "Roof", 7},
+    {"Walls", "Plumbing", 12},
+    {"Roof", "Finish", 3},
+    {"Plumbing", "Finish", 5}
+  ])
+
+{:ok, dag} = Yog.DAG.Model.from_graph(tasks)
+
+# Find the critical path
+path = Yog.DAG.Algorithm.longest_path(dag)
+
+IO.inspect(path, label: "Critical Path")
+
+# Highlight it!
+dot = Yog.Render.DOT.to_dot(tasks, highlight_nodes: path)
+Kino.VizJS.render(dot)
+```
+
+## 🌳 Shared Dependencies (LCA)
+
+Finding the **Lowest Common Ancestor (LCA)** helps identify the most recent shared dependency between two nodes. This is how Git finds a "merge base."
+
+```elixir
+# A more complex dependency structure
+g = Yog.directed()
+  |> Yog.add_edges!([
+    {"Base", "FeatureA", 1}, {"Base", "FeatureB", 1},
+    {"FeatureA", "UserAuth", 1}, {"FeatureB", "UserAuth", 1},
+    {"UserAuth", "App", 1},
+    {"FeatureA", "Logging", 1}, {"Logging", "App", 1}
+  ])
+
+{:ok, dag} = Yog.DAG.Model.from_graph(g)
+
+# Find merge base for UserAuth and Logging
+lcas = Yog.DAG.Algorithm.lowest_common_ancestors(dag, "UserAuth", "Logging")
+
+IO.inspect(lcas, label: "Shared Ancestors")
+```
+
+## Summary
+
+`Yog`'s DAG toolkit provides:
+1.  **Topological Sort & Generations** for scheduling and parallel processing.
+2.  **Longest Path** for critical path analysis.
+3.  **LCA** for dependency resolution and merge operations.
+4.  **Guaranteed Safety**: The `DAG` type ensures you never accidentally introduce a circular dependency.
+
+Next, explore **Graph Properties** to see how to analyze the mathematical constraints of your network!

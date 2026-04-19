@@ -1,0 +1,138 @@
+# Traversals & Pathfinding
+
+```elixir
+Mix.install([
+  {:yog_ex, path: "/home/mafinar/repos/elixir/yog_ex"},
+  {:kino_vizjs, "~> 0.8.0"}
+])
+```
+
+## Introduction
+
+Graph traversal and pathfinding are at the heart of graph theory. Whether you are searching for a specific node, ordering tasks by priority, or finding the fastest route between two cities, `Yog` provides optimized, idiomatic tools for the job.
+
+## 🚶 Basic Traversals: BFS and DFS
+
+systematic exploration of a graph comes in two main flavors:
+
+* **Breadth-First Search (BFS)**: Explores neighbors level-by-level. Ideal for finding the shortest path in unweighted graphs.
+* **Depth-First Search (DFS)**: Goes as deep as possible before backtracking. Great for cycle detection and topological sorting.
+
+```elixir
+# Create a simple tree-like graph
+g = Yog.from_edges(:undirected, [
+    {1, 2, 1}, {1, 3, 1},
+    {2, 4, 1}, {2, 5, 1},
+    {3, 6, 1}, {3, 7, 1}
+  ])
+
+# BFS Order
+IO.inspect(Yog.Traversal.walk(g, 1, :breadth_first), label: "BFS Order")
+
+# DFS Order
+IO.inspect(Yog.Traversal.walk(g, 1, :depth_first), label: "DFS Order")
+```
+
+## 🏗️ Topological Sort (Task Ordering)
+
+Topological sort is used to order a Directed Acyclic Graph (DAG) such that for every directed edge $u \to v$, node $u$ comes before $v$. This is perfect for build systems or project management.
+
+```elixir
+tasks = Yog.from_edges(:directed, [
+    {"Design", "Code", 1},
+    {"Design", "Tests", 1},
+    {"Code", "Review", 1},
+    {"Tests", "Review", 1},
+    {"Review", "Deploy", 1}
+  ])
+
+case Yog.Traversal.topological_sort(tasks) do
+  {:ok, order} -> IO.inspect(order, label: "Execution Order")
+  {:error, :contains_cycle} -> IO.puts "Error: Circular dependency detected!"
+end
+```
+
+## 📍 Pathfinding: Dijkstra and A*
+
+When your edges have weights (like distance, time, or cost), you need more sophisticated algorithms.
+
+### Dijkstra's Algorithm
+
+The gold standard for single-source shortest paths with non-negative weights.
+
+```elixir
+map = Yog.from_edges(:undirected, [
+    {:london, :paris, 2},
+    {:paris, :berlin, 5},
+    {:london, :berlin, 10},
+    {:berlin, :rome, 6},
+    {:paris, :rome, 12}
+  ])
+
+{:ok, path} = Yog.Pathfinding.shortest_path(in: map, from: :london, to: :rome)
+
+IO.puts "Shortest distance from London to Rome: #{path.weight}"
+IO.inspect(path.nodes, label: "Route")
+```
+
+### A* (Heuristic Search)
+
+A* uses a heuristic to "guide" the search towards the goal, making it much faster for coordinate-based graphs.
+
+```elixir
+# On a grid, the heuristic could be the Manhattan distance
+heuristic = fn node, goal ->
+  {r1, c1} = node
+  {r2, c2} = goal
+  abs(r1 - r2) + abs(c1 - c2)
+end
+
+# (Pseudocode example - grid generation not shown for brevity)
+# {:ok, path} = Yog.Pathfinding.a_star(in: grid, from: {0,0}, to: {10,10}, heuristic: heuristic)
+```
+
+## 🗺️ All-Pairs Shortest Paths (Floyd-Warshall)
+
+Sometimes you need to know the distance between *every* possible pair of nodes. Floyd-Warshall is the classic solution for this.
+
+```elixir
+g = Yog.from_edges(:directed, [
+    {1, 2, 3}, {2, 3, 2}, {1, 3, 10}
+  ])
+
+# Returns a nested map %{from => %{to => distance}}
+{:ok, distances} = Yog.Pathfinding.floyd_warshall(in: g)
+
+IO.inspect(distances[{1,3}], label: "Distance from 1 to 3")
+```
+
+## 🎨 Visualizing the Result
+
+Let's combine everything: find a path and visualize it using `Kino.VizJS`.
+
+```elixir
+g = Yog.from_edges(:undirected, [
+    {:a, :b, 1}, {:b, :c, 2}, {:c, :d, 1},
+    {:a, :c, 5}, {:b, :d, 10}
+  ])
+
+{:ok, path} = Yog.Pathfinding.shortest_path(in: g, from: :a, to: :d)
+
+path_options = Yog.Render.DOT.path_to_options(path)
+
+# Highlight path nodes in the DOT output
+dot = Yog.Render.DOT.to_dot(g, path_options)
+
+Kino.VizJS.render(dot)
+```
+
+## Summary
+
+`Yog` covers all your traversal and pathfinding needs:
+
+1. **Linear traversals** (BFS/DFS) for structure exploration.
+2. **Structural sorting** (Topological Sort) for DAGs.
+3. **Weighted pathfinding** (Dijkstra, Bellman-Ford, A*).
+4. **All-pairs distance** (Floyd-Warshall, Johnson's).
+
+Next, try exploring **Community Detection** to see how nodes group together!

@@ -1,0 +1,167 @@
+# Getting Started with Yog
+
+```elixir
+Mix.install([
+  {:yog_ex, path: "/home/mafinar/repos/elixir/yog_ex"},
+  {:kino_vizjs, "~> 0.8.0"},
+])
+```
+
+## What is Yog?
+
+**যোগ** (*jōg*) means connection, link, or union.
+
+`Yog` is a comprehensive graph algorithm library for Elixir. It provides efficient, immutable data structures and a wide array of algorithms for network analysis, pathfinding, and community detection.
+
+## Creating your first Graph
+
+In `Yog`, graphs are immutable structures. You can create an empty graph of a specific kind:
+
+```elixir
+# Create a directed graph
+g = Yog.directed()
+
+# Create an undirected graph
+u = Yog.undirected()
+```
+
+By default, a graph consists of:
+
+* `kind`: `:directed` or `:undirected`
+* `nodes`: A map of `node_id => data`
+* `edges`: Adjacency maps for fast lookups and `O(1)` transpose.
+
+## Growing the Graph
+
+We build graphs by adding nodes and edges. Since `Yog` is functional and immutable, every operation returns a **new** graph.
+
+### Adding Nodes
+
+Nodes can have any term as an ID and any term as data.
+
+```elixir
+g = 
+  Yog.directed()
+  |> Yog.add_node(1, %{label: "Start"})
+  |> Yog.add_node(2, %{label: "End"})
+  |> Yog.add_nodes_from([3, 4, 5]) # Adding multiple nodes with nil data
+
+# Let's visualize it
+Kino.VizJS.render(Yog.Render.DOT.to_dot(g), height: "100px")
+```
+
+### Adding Edges
+
+Edges connect nodes. In `Yog`, we provide several ways to add edges, depending on whether you want to ensure the nodes exist or handle missing nodes.
+
+```elixir
+# 1. add_edge! - Raises if nodes don't exist
+g = g |> Yog.add_edge!(1, 2, 10)
+
+# 2. add_edge_ensure - Automatically creates nodes if they are missing
+g = g |> Yog.add_edge_ensure(2, 3, 5, %{label: "Auto-created"})
+
+# 3. add_simple_edge - Adds an edge with weight 1
+g = g |> Yog.add_simple_edge!(3, 1)
+
+# Visualize the resulting graph
+Kino.VizJS.render(Yog.Render.DOT.to_dot(g))
+```
+
+## Examining the Graph
+
+You can query the graph's structure using functions in the main `Yog` module or `Yog.Model`.
+
+```elixir
+IO.puts "Nodes: #{Yog.node_count(g)}"
+IO.puts "Edges: #{Yog.edge_count(g)}"
+
+# Get successors of node 2
+IO.inspect(Yog.successors(g, 2), label: "Successors of 2")
+
+# Get neighbors regardless of direction
+IO.inspect(Yog.neighbors(g, 3), label: "Neighbors of 3")
+```
+
+## Transformations
+
+`Yog` excels at functional transformations. You can map or filter nodes and edges to create new graph versions.
+
+```elixir
+# Double all edge weights
+high_weight_graph = Yog.Transform.map_edges(g, fn weight -> 
+  if is_number(weight), do: weight * 2, else: weight 
+end)
+
+# Filter for nodes with numeric IDs
+numeric_only = Yog.Transform.filter_nodes_indexed(g, fn id, _ -> is_integer(id) end)
+```
+
+## Comprehensive Algorithms
+
+`Yog` comes with 60+ algorithms out of the box.
+
+### Pathfinding
+
+```elixir
+# Find the shortest path from 1 to 3
+case Yog.Pathfinding.Dijkstra.shortest_path(g, 1, 3) do
+  {:ok, path} -> 
+    IO.puts "Found path with weight: #{path.weight}"
+    IO.inspect(path.nodes, label: "Path")
+  :error -> 
+    IO.puts "No path found"
+end
+```
+
+## Serialization
+
+You can easily import/export graphs in various formats like GraphML, JSON, or DOT.
+
+```elixir
+xml = """
+<?xml version="1.0" encoding="UTF-8"?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns"  
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns
+     http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
+  <graph id="G" edgedefault="undirected">
+    <node id="n0"/>
+    <node id="n1"/>
+    <node id="n2"/>
+    <node id="n3"/>
+    <node id="n4"/>
+    <node id="n5"/>
+    <node id="n6"/>
+    <node id="n7"/>
+    <node id="n8"/>
+    <node id="n9"/>
+    <node id="n10"/>
+    <edge source="n0" target="n2"/>
+    <edge source="n1" target="n2"/>
+    <edge source="n2" target="n3"/>
+    <edge source="n3" target="n5"/>
+    <edge source="n3" target="n4"/>
+    <edge source="n4" target="n6"/>
+    <edge source="n6" target="n5"/>
+    <edge source="n5" target="n7"/>
+    <edge source="n6" target="n8"/>
+    <edge source="n8" target="n7"/>
+    <edge source="n8" target="n9"/>
+    <edge source="n8" target="n10"/>
+  </graph>
+</graphml>
+"""
+
+# Let's load the graph
+{:ok, graph} = Yog.IO.GraphML.deserialize(xml)
+
+# Let's check out graph6 version
+gdf = Yog.IO.GDF.serialize(graph)
+
+IO.puts gdf
+```
+
+## Next Steps
+
+Explore the [Algorithm Catalog](https://github.com/code-shoily/yog_ex/blob/main/ALGORITHMS.md) to see everything `Yog` can do!

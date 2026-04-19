@@ -1,0 +1,81 @@
+# How-To: Importing & Exporting Graphs
+
+```elixir
+Mix.install([
+  {:yog_ex, path: "/home/mafinar/repos/elixir/yog_ex"},
+  {:jason, "~> 1.4"} # Needed for JSON
+])
+```
+
+## Introduction
+
+`Yog` is designed to be a "good citizen" in the data ecosystem. It supports several industry-standard formats for importing and exporting graphs, ensuring that you can easily integrate `Yog` with other tools like Gephi, Cytoscape, or NetworkX.
+
+## 📁 GraphML (The Standard)
+
+GraphML is an XML-based format that is the de-facto standard for graph interchange.
+
+```elixir
+g = Yog.Generator.Classic.petersen()
+
+# 1. Export to GraphML string
+{:ok, xml} = Yog.IO.GraphML.to_graphml(g)
+IO.puts String.slice(xml, 0, 200) <> "..."
+
+# 2. Import from GraphML string
+# {:ok, imported_g} = Yog.IO.GraphML.from_graphml(xml)
+```
+
+## 📄 JSON (For Web & Data)
+
+JSON is perfect for passing graph data to frontend libraries like Cytoscape.js or D3.js.
+
+```elixir
+g = Yog.undirected()
+  |> Yog.add_node(1, %{name: "Alice"})
+  |> Yog.add_node(2, %{name: "Bob"})
+  |> Yog.add_edge!(1, 2, %{type: "friend"})
+
+# 1. Export to JSON (uses Jason internally)
+{:ok, json} = Yog.IO.JSON.to_json(g)
+IO.puts json
+
+# 2. Import from JSON
+{:ok, imported_g} = Yog.IO.JSON.from_json(json)
+```
+
+## 🛠️ Interoperability with `libgraph`
+
+If you are migrating from `libgraph` or need to use an algorithm only available there, `Yog` makes the transition seamless.
+
+```elixir
+# Create a libgraph graph
+lg = Graph.new() |> Graph.add_edge(1, 2)
+
+# Convert to Yog
+yg = Yog.IO.Libgraph.from_libgraph(lg)
+
+# Convert back to libgraph
+lg_back = Yog.IO.Libgraph.to_libgraph(yg)
+```
+
+## 🖼️ DOT (For Visualization)
+
+While DOT is primarily for visualization, it is also a valid interchange format.
+
+```elixir
+g = Yog.Generator.Classic.cycle(5)
+
+dot = Yog.Render.DOT.to_dot(g)
+IO.puts dot
+```
+
+## Summary
+
+`Yog`'s I/O suite allows you to:
+1.  **Collaborate**: Use **GraphML** to share data with researchers using other languages.
+2.  **Build**: Use **JSON** to power interactive web visualizations.
+3.  **Migrate**: Use the **libgraph** bridge to leverage existing Elixir codebases.
+4.  **Publish**: Use **DOT** to generate high-quality diagrams.
+
+Next, explore the **Gallery** to see more exotic graph structures!

@@ -1,0 +1,120 @@
+# Graph Properties & Optimization
+
+```elixir
+Mix.install([
+  {:yog_ex, path: "/home/mafinar/repos/elixir/yog_ex"},
+  {:kino_vizjs, "~> 0.8.0"}
+])
+```
+
+## Introduction
+
+Graph properties help us understand the mathematical nature of a network. Can it be drawn on a flat surface without edges crossing? Does it have a path that visits every edge exactly once? How can we connect all points with the minimum amount of cable?
+
+`Yog` provides high-performance implementations for these classic graph theory problems.
+
+## 🌲 Minimum Spanning Tree (MST)
+
+An MST connects all nodes in a weighted graph with the minimum possible total edge weight and no cycles. This is the foundation of network design (e.g., laying fiber optic cables).
+
+```elixir
+# Create a weighted network
+g = Yog.from_edges(:undirected, [
+    {:a, :b, 4}, {:a, :h, 8},
+    {:b, :c, 8}, {:b, :h, 11},
+    {:c, :d, 7}, {:c, :i, 2}, {:c, :f, 4},
+    {:d, :e, 9}, {:d, :f, 14},
+    {:e, :f, 10},
+    {:f, :g, 2},
+    {:g, :h, 1}, {:g, :i, 6},
+    {:h, :i, 7}
+  ])
+
+# Find the MST using Kruskal's algorithm
+{:ok, result} = Yog.MST.kruskal(in: g)
+
+IO.puts "MST Total Weight: #{result.total_weight}"
+
+# # Visualize the MST (highlighting the edges)
+mst_options = Yog.Render.DOT.mst_to_options(result, Yog.Render.DOT.theme(:minimal))
+dot = Yog.Render.DOT.to_dot(g, mst_options)
+Kino.VizJS.render(dot, height: "400px")
+```
+
+## 🌉 Eulerian Paths (Seven Bridges of Königsberg)
+
+An **Eulerian Path** visits every edge exactly once. An **Eulerian Circuit** starts and ends at the same node.
+
+```elixir
+# The famous Seven Bridges of Königsberg graph
+# (This multigraph cannot have an Eulerian path because 4 nodes have odd degrees)
+konigsberg =
+  Yog.from_edges(:undirected, [
+    # Two bridges
+    {:north, :island, 1},
+    {:north, :island, 2},
+    # Two bridges
+    {:south, :island, 3},
+    {:south, :island, 4},
+    {:east, :island, 5},
+    {:north, :east, 6},
+    {:south, :east, 7}
+  ])
+
+case Yog.Property.Eulerian.eulerian_circuit(konigsberg) do
+  {:ok, _} ->
+    IO.puts("Eulerian circuit exists!")
+
+  {:error, _} ->
+    IO.puts("No Eulerian circuit possible. (Euler was right!)")
+end
+```
+
+## 🎨 Graph Coloring
+
+Graph coloring assigns a "color" to each node such that no two adjacent nodes share the same color. The goal is to use the minimum number of colors (**Chromatic Number**). This is often used for scheduling (nodes = tasks, edges = conflicts).
+
+```elixir
+g = Yog.Generator.Classic.petersen()
+
+# Calculate a greedy coloring
+{upper, colors} = Yog.Property.Coloring.coloring_greedy(g)
+
+IO.puts "Used #{upper} colors."
+
+# Visualize with colors!
+color_values = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]
+node_styles = Map.new(colors, fn {node, color_idx} -> 
+  color = Enum.at(color_values, color_idx)
+  {node, [color: color, style: "filled", fillcolor: color]}
+end)
+
+dot = Yog.Render.DOT.to_dot(g)
+Kino.VizJS.render(dot)
+```
+
+## 🗺️ Planarity
+
+A graph is **Planar** if it can be drawn in a plane without any edges crossing.
+
+```elixir
+# K5 (Complete graph with 5 nodes) is the smallest non-planar graph
+k5 = Yog.Generator.Classic.complete(5)
+
+if Yog.Property.Planarity.planar?(k5) do
+  IO.puts "K5 is planar"
+else
+  IO.puts "K5 is NOT planar (as expected)"
+end
+```
+
+## Summary
+
+Exploring graph properties allows you to:
+
+1. **Optimize**: Find the cheapest way to connect components (MST).
+2. **Verify**: Check if a solution exists for routing problems (Eulerian).
+3. **Schedule**: Resolve conflicts using Coloring.
+4. **Visualize**: Ensure layout feasibility with Planarity.
+
+Next, explore **DAGs** to see how to manage dependencies and workflows!

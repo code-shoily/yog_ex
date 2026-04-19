@@ -1,0 +1,98 @@
+# Network Analysis
+
+```elixir
+Mix.install([
+  {:yog_ex, path: "/home/mafinar/repos/elixir/yog_ex"},
+  {:kino_vizjs, "~> 0.5.0"}
+])
+```
+
+## Introduction
+
+Network analysis allows us to understand the underlying structure of a graph. Who are the most influential actors? Are there distinct communities? Where are the bottlenecks that could cause the network to fail?
+
+`Yog` provides professional-grade tools for these questions, used in everything from social network analysis to logistics.
+
+## 🌟 Centrality: Who is Important?
+
+Centrality measures tell us which nodes are the most "important," but "importance" can mean different things:
+
+*   **Degree Centrality**: Who has the most connections? (Popularity)
+*   **Betweenness Centrality**: Who acts as a bridge between groups? (Brokerage)
+*   **PageRank**: Who is connected to other important nodes? (Influence)
+
+```elixir
+# Create a "Bowtie" graph: two triangles connected by a bridge
+g = Yog.undirected()
+  |> Yog.add_edges!([
+    {:a, :b, 1}, {:b, :c, 1}, {:c, :a, 1}, # Triangle 1
+    {:c, :d, 1},                          # The Bridge
+    {:d, :e, 1}, {:e, :f, 1}, {:f, :d, 1}  # Triangle 2
+  ])
+
+# 1. PageRank (Influence)
+IO.inspect(Yog.Centrality.pagerank(g), label: "PageRank Scores")
+
+# 2. Betweenness (Brokerage)
+# Node :c and :d should have high scores as they bridge the two groups
+IO.inspect(Yog.Centrality.betweenness(g), label: "Betweenness Scores")
+```
+
+## 🏘️ Community Detection
+
+Community detection finds groups of nodes that are more densely connected to each other than to the rest of the network.
+
+```elixir
+# Generate a random graph with built-in communities
+# Using Stochastic Block Model (SBM)
+g = Yog.Generator.Random.sbm([10, 10, 10], [[0.8, 0.1, 0.1], [0.1, 0.8, 0.1], [0.1, 0.1, 0.8]])
+
+# Detect communities using the Louvain method
+communities = Yog.Community.Louvain.detect(g)
+
+IO.puts "Found #{length(communities.communities)} communities."
+
+# Visualize it! (We'll color nodes by community)
+colors = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]
+node_styles = 
+  communities.communities
+  |> Enum.with_index()
+  |> Enum.flat_map(fn {nodes, idx} -> 
+    color = Enum.at(colors, rem(idx, length(colors)))
+    Enum.map(nodes, fn node -> {node, [color: color, style: "filled", fillcolor: color]} end)
+  end)
+  |> Map.new()
+
+dot = Yog.Render.DOT.to_dot(g, node_attributes: node_styles)
+Kino.VizJS.render(dot)
+```
+
+## 🏗️ Connectivity & Robustness
+
+A network is only as strong as its weakest link. `Yog` can find **Articulation Points** (nodes whose removal increases the number of connected components) and **Bridges** (edges whose removal does the same).
+
+```elixir
+g = Yog.undirected()
+  |> Yog.add_edges!([
+    {1, 2, 1}, {2, 3, 1}, {3, 1, 1}, # Component 1
+    {3, 4, 1},                      # Bridge!
+    {4, 5, 1}, {5, 6, 1}, {6, 4, 1}  # Component 2
+  ])
+
+# Find Articulation Points
+# Nodes 3 and 4 are articulation points
+IO.inspect(Yog.Connectivity.Articulation.find(g), label: "Articulation Points")
+
+# Find Bridges
+# Edge {3, 4} is a bridge
+IO.inspect(Yog.Connectivity.Bridge.find(g), label: "Bridges")
+```
+
+## Summary
+
+`Yog`'s network analysis toolkit includes:
+1.  **9+ Centrality Measures** for identifying key actors.
+2.  **State-of-the-art Community Detection** (Louvain, Leiden, Infomap).
+3.  **Connectivity Analysis** to identify vulnerabilities and bottlenecks.
+
+Next, explore **Network Flow** to see how much "traffic" your network can handle!

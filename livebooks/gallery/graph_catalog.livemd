@@ -1,0 +1,104 @@
+# Gallery: Graph Catalog
+
+```elixir
+Mix.install([
+  {:yog_ex, path: "/home/mafinar/repos/elixir/yog_ex"},
+  {:kino_vizjs, "~> 0.5.0"}
+])
+```
+
+## Introduction
+
+This gallery showcases the wide variety of graph structures that `Yog` can generate out-of-the-box. Whether you need a standard deterministic structure for benchmarking or a complex random network for simulation, the `Yog.Generator` suite has you covered.
+
+## 🏛️ Classic Deterministic Graphs
+
+These graphs are the building blocks of graph theory. They have predictable properties and are essential for testing algorithms.
+
+### The Famous Petersen Graph
+A 3-regular graph with 10 nodes and 15 edges. It is a frequent counterexample in graph theory.
+
+```elixir
+petersen = Yog.Generator.Classic.petersen()
+Kino.VizJS.render(Yog.Render.DOT.to_dot(petersen))
+```
+
+### Complete Graphs ($K_n$)
+Every node is connected to every other node.
+
+```elixir
+k5 = Yog.Generator.Classic.complete(5)
+Kino.VizJS.render(Yog.Render.DOT.to_dot(k5))
+```
+
+### Grid Graphs (2D Lattice)
+Nodes arranged in a grid, connecting to their neighbors (up, down, left, right).
+
+```elixir
+grid = Yog.Generator.Classic.grid_2d(4, 4)
+Kino.VizJS.render(Yog.Render.DOT.to_dot(grid))
+```
+
+### Star and Wheel Graphs
+A **Star** has one central hub, while a **Wheel** adds a cycle around the rim.
+
+```elixir
+star = Yog.Generator.Classic.star(7)
+wheel = Yog.Generator.Classic.wheel(7)
+
+IO.puts "--- Star ---"
+Kino.VizJS.render(Yog.Render.DOT.to_dot(star))
+
+IO.puts "--- Wheel ---"
+Kino.VizJS.render(Yog.Render.DOT.to_dot(wheel))
+```
+
+## 🎲 Random Graph Models
+
+Random graphs are used to model real-world phenomena like social networks, the internet, or biological systems.
+
+### Erdos-Renyi ($G(n, p)$)
+Edges are created between any two nodes with a fixed probability $p$.
+
+```elixir
+# 20 nodes, each edge has 15% chance of existing
+er = Yog.Generator.Random.gnp(20, 0.15)
+Kino.VizJS.render(Yog.Render.DOT.to_dot(er))
+```
+
+### Watts-Strogatz (Small World)
+Starts with a regular ring lattice and then rewires edges to create "short cuts," resulting in low average path length and high clustering.
+
+```elixir
+# 20 nodes, each connected to 4 neighbors, 10% rewiring
+ws = Yog.Generator.Random.watts_strogatz(20, 4, 0.1)
+Kino.VizJS.render(Yog.Render.DOT.to_dot(ws))
+```
+
+### Barabási-Albert (Scale-Free)
+Uses "preferential attachment" (the rich get richer) to create networks with power-law degree distributions—hubs are common.
+
+```elixir
+# 30 nodes, each new node attaches to 2 existing ones
+ba = Yog.Generator.Random.barabasi_albert(30, 2)
+Kino.VizJS.render(Yog.Render.DOT.to_dot(ba))
+```
+
+### Stochastic Block Model (SBM)
+Generates graphs with predefined community structures.
+
+```elixir
+# 3 communities of 10 nodes each
+# High probability of edges within groups, low between them
+g = Yog.Generator.Random.sbm([10, 10, 10], [[0.8, 0.05, 0.05], [0.05, 0.8, 0.05], [0.05, 0.05, 0.8]])
+Kino.VizJS.render(Yog.Render.DOT.to_dot(g))
+```
+
+## Summary
+
+The `Yog.Generator` suite allows you to:
+1.  **Benchmarking**: Test how your algorithms scale from sparse paths to dense cliques.
+2.  **Simulation**: Model real-world networks using well-studied random models.
+3.  **Visualization**: Quickly create complex structures to verify your rendering pipelines.
+
+Check out the [Algorithm Catalog](ALGORITHMS.md) to see how to analyze these graphs!

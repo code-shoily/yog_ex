@@ -1,0 +1,105 @@
+# Maze Generation & Solving
+
+```elixir
+Mix.install([
+  {:yog_ex, path: "/home/mafinar/repos/elixir/yog_ex"},
+  {:kino_vizjs, "~> 0.5.0"}
+])
+```
+
+## Introduction
+
+A **perfect maze** is a spanning tree on a grid. Every cell is reachable from every other cell by exactly one path. This means there are no loops and no isolated sections.
+
+`Yog` provides a rich suite of maze generation algorithms, ranging from the extremely fast but biased (Binary Tree) to the perfectly uniform but slower (Wilson's).
+
+## 🎨 Comparing Textures
+
+Different algorithms produce mazes with different "textures." Some prefer long straight corridors, while others create twisty, winding passages.
+
+```elixir
+rows = 15
+cols = 15
+
+# 1. Binary Tree - Very fast, strong diagonal bias
+binary_tree = Yog.Generator.Maze.binary_tree(rows, cols)
+
+# 2. Sidewinder - Efficient, strong vertical/horizontal corridors
+sidewinder = Yog.Generator.Maze.sidewinder(rows, cols)
+
+# 3. Recursive Backtracker - Most popular for games, very twisty
+backtracker = Yog.Generator.Maze.recursive_backtracker(rows, cols)
+
+IO.puts "--- Binary Tree ---"
+IO.puts Yog.Render.ASCII.grid_to_string_unicode(binary_tree)
+
+IO.puts "\n--- Sidewinder ---"
+IO.puts Yog.Render.ASCII.grid_to_string_unicode(sidewinder)
+
+IO.puts "\n--- Recursive Backtracker ---"
+IO.puts Yog.Render.ASCII.grid_to_string_unicode(backtracker)
+```
+
+## 🧠 Solving the Maze
+
+Because a maze is just a graph, we can use `Yog`'s pathfinding algorithms to find the exit.
+
+Let's generate a complex maze and solve it from the top-left to the bottom-right.
+
+```elixir
+maze = Yog.Generator.Maze.recursive_backtracker(20, 20)
+graph = Yog.Builder.GridGraph.to_graph(maze)
+
+start_node = Yog.Builder.GridGraph.coord_to_id(maze, 0, 0)
+end_node = Yog.Builder.GridGraph.coord_to_id(maze, 19, 19)
+
+# Solve using Dijkstra
+case Yog.Pathfinding.Dijkstra.shortest_path(graph, from: start_node, to: end_node) do
+  {:ok, path} ->
+    # Create "occupants" to mark the path in ASCII
+    occupants = 
+      path.nodes 
+      |> Map.new(fn id -> {id, "•"} end)
+      |> Map.put(start_node, "S")
+      |> Map.put(end_node, "E")
+
+    IO.puts Yog.Render.ASCII.grid_to_string_unicode(maze, occupants)
+    IO.puts "\nPath length: #{path.total_weight} steps"
+
+  :error ->
+    IO.puts "No path found! (Wait, perfect mazes always have a path... check implementation)"
+end
+```
+
+## 🎥 Visualizing with DOT
+
+If you want a more "premium" look, you can render the maze using Graphviz.
+
+```elixir
+# We'll use a smaller maze for visualization
+small_maze = Yog.Generator.Maze.recursive_backtracker(10, 10)
+dot = Yog.Render.DOT.to_dot(Yog.Builder.GridGraph.to_graph(small_maze))
+
+Kino.VizJS.render(dot)
+```
+
+## 🎲 Randomness and Seeds
+
+All generators accept a `:seed` option for reproducibility.
+
+```elixir
+maze1 = Yog.Generator.Maze.recursive_backtracker(10, 10, seed: 123)
+maze2 = Yog.Generator.Maze.recursive_backtracker(10, 10, seed: 123)
+
+# These will be identical
+Yog.Render.ASCII.grid_to_string(maze1) == Yog.Render.ASCII.grid_to_string(maze2) |> IO.inspect(label: "Identical?")
+```
+
+## Summary
+
+`Yog` makes it easy to:
+1.  **Generate** mazes using 10+ different algorithms.
+2.  **Render** them to ASCII for debugging or DOT for presentation.
+3.  **Solve** them by treating them as standard graphs.
+
+Try changing the algorithm in the "Solving" section to `aldous_broder/3` or `wilson/3` to see how the path changes!
