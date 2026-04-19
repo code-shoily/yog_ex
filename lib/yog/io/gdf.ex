@@ -206,8 +206,8 @@ defmodule Yog.IO.GDF do
       true
   """
   def serialize(graph) do
-    node_attr = fn data -> %{"label" => Kernel.to_string(data)} end
-    edge_attr = fn data -> %{"label" => Kernel.to_string(data)} end
+    node_attr = fn data -> %{"label" => Yog.Utils.to_label("", data)} end
+    edge_attr = fn data -> %{"label" => Yog.Utils.to_weight_label(data)} end
     serialize_with(node_attr, edge_attr, default_options(), graph)
   end
 
@@ -232,8 +232,8 @@ defmodule Yog.IO.GDF do
       true
   """
   def serialize_weighted(graph) do
-    node_attr = fn data -> %{"label" => Kernel.to_string(data)} end
-    edge_attr = fn data -> %{"weight" => Kernel.to_string(data)} end
+    node_attr = fn data -> %{"label" => Yog.Utils.to_label("", data)} end
+    edge_attr = fn data -> %{"weight" => Yog.Utils.to_weight_label(data)} end
     serialize_with(node_attr, edge_attr, default_options(), graph)
   end
 

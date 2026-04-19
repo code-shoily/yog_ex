@@ -51,7 +51,7 @@ defmodule Yog.IO.TGF do
       :ok
   """
   def default_options do
-    {:tgf_options, &to_string/1, fn _ -> :none end}
+    {:tgf_options, fn data -> Yog.Utils.to_label("", data) end, fn _ -> :none end}
   end
 
   @doc """

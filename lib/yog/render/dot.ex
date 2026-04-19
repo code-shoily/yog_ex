@@ -239,8 +239,8 @@ defmodule Yog.Render.DOT do
   @spec default_options() :: options()
   def default_options do
     %{
-      node_label: fn id, _data -> to_string(id) end,
-      edge_label: fn weight -> to_string(weight) end,
+      node_label: &Yog.Utils.to_label/2,
+      edge_label: &Yog.Utils.to_weight_label/1,
       highlighted_nodes: nil,
       highlighted_edges: nil,
       # Per-element styling defaults

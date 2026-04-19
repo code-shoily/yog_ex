@@ -155,8 +155,8 @@ defmodule Yog.Render.Mermaid do
   @spec default_options() :: options()
   def default_options do
     %{
-      node_label: fn id, _data -> to_string(id) end,
-      edge_label: fn weight -> to_string(weight) end,
+      node_label: &Yog.Utils.to_label/2,
+      edge_label: &Yog.Utils.to_weight_label/1,
       highlighted_nodes: nil,
       highlighted_edges: nil,
       # Graph-level
@@ -335,7 +335,9 @@ defmodule Yog.Render.Mermaid do
             :undirected -> "---"
           end
 
-        edge_def = "  #{from_id} #{arrow}|#{options.edge_label.(weight)}| #{to_id}"
+        label = options.edge_label.(weight)
+        label_part = if label == "", do: "", else: "|#{label}|"
+        edge_def = "  #{from_id} #{arrow}#{label_part} #{to_id}"
 
         # Check if this edge should be highlighted
         is_highlighted =
