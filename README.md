@@ -24,6 +24,9 @@
 
 [![Hex Version](https://img.shields.io/hexpm/v/yog_ex.svg)](https://hex.pm/packages/yog_ex)
 [![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/yog_ex/)
+[![CI](https://github.com/code-shoily/yog_ex/actions/workflows/ci.yml/badge.svg)](https://github.com/code-shoily/yog_ex/actions)
+[![Coverage Status](https://coveralls.io/repos/github/code-shoily/yog_ex/badge.svg?branch=main)](https://coveralls.io/github/code-shoily/yog_ex?branch=main)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 Yog is a set of Graph and Network algorithms and data structures implemented in Elixir and packaged as a common API.
 
