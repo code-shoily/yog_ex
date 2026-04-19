@@ -51,5 +51,8 @@ jobs:
     - name: Run credo
       run: mix credo --strict
 
-    - name: Run tests
-      run: mix test
+    - name: Run tests with coverage
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+      run: mix coveralls.github
