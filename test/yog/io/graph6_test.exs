@@ -110,6 +110,78 @@ defmodule Yog.IO.Graph6Test do
     end
   end
 
+  describe "edge cases" do
+    test "rejects string node ids" do
+      graph = Yog.undirected() |> Yog.add_edge_ensure(:a, :b, 1)
+      assert Graph6.serialize(graph) == {:error, :invalid_node_ids}
+    end
+
+    test "rejects atom node ids" do
+      graph = Yog.undirected() |> Yog.add_edge_ensure("a", "b", 1)
+      assert Graph6.serialize(graph) == {:error, :invalid_node_ids}
+    end
+
+    test "rejects node ids not starting from 0" do
+      graph = Yog.undirected() |> Yog.add_edge_ensure(1, 2, 1)
+      assert Graph6.serialize(graph) == {:error, :invalid_node_ids}
+    end
+
+    test "rejects node ids with gaps" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_edge_ensure(0, 1, 1)
+        |> Yog.add_edge_ensure(0, 3, 1)
+
+      assert Graph6.serialize(graph) == {:error, :invalid_node_ids}
+    end
+
+    test "serializes empty graph" do
+      graph = Yog.undirected()
+      assert {:ok, "?"} = Graph6.serialize(graph)
+    end
+
+    test "serializes graph with isolated nodes" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_node(0, nil)
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+
+      assert {:ok, g6} = Graph6.serialize(graph)
+      assert {:ok, parsed} = Graph6.parse(g6)
+      assert Yog.Model.node_count(parsed) == 3
+      assert Yog.Model.edge_count(parsed) == 0
+    end
+
+    test "serializes graph with 63 nodes (extended header boundary)" do
+      graph =
+        Enum.reduce(0..62, Yog.undirected(), fn i, g ->
+          if i > 0 do
+            Yog.add_edge_ensure(g, 0, i, 1)
+          else
+            g
+          end
+        end)
+
+      assert {:ok, g6} = Graph6.serialize(graph)
+      assert {:ok, parsed} = Graph6.parse(g6)
+      assert Yog.Model.node_count(parsed) == 63
+    end
+
+    test "roundtrip with node data as empty map" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_node(0, %{})
+        |> Yog.add_node(1, %{})
+        |> Yog.add_edge_ensure(0, 1, 1)
+
+      assert {:ok, g6} = Graph6.serialize(graph)
+      assert {:ok, parsed} = Graph6.parse(g6)
+      assert Yog.Model.node_count(parsed) == 2
+      assert Yog.Model.edge_count(parsed) == 1
+    end
+  end
+
   describe "file I/O" do
     @tmp_file "/tmp/test_yog_graph6.g6"
     @fixture "test/fixtures/io/sample.g6"
@@ -148,6 +220,20 @@ defmodule Yog.IO.Graph6Test do
       {:ok, graphs} = Graph6.read(@tmp_file)
       assert length(graphs) == 2
 
+      File.rm(@tmp_file)
+    end
+
+    test "write rejects non-integer node ids" do
+      graph = Yog.undirected() |> Yog.add_edge_ensure("a", "b", 1)
+      assert {:error, :invalid_node_ids} = Graph6.write(@tmp_file, graph)
+    end
+
+    test "read ignores comment lines" do
+      content = "# This is a comment\nDqK\n# Another comment\n"
+      File.write!(@tmp_file, content)
+
+      {:ok, [graph]} = Graph6.read(@tmp_file)
+      assert Yog.Model.node_count(graph) == 5
       File.rm(@tmp_file)
     end
   end

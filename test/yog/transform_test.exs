@@ -1382,4 +1382,152 @@ defmodule Yog.TransformTest do
     updated = Yog.Transform.update_edge(graph, 1, 2, 10, fn w -> w + 5 end)
     assert Yog.successors(updated, 1) == [{2, 10}]
   end
+
+  # ============= Relabel Nodes Tests =============
+
+  test "relabel_nodes_with_custom_function_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node("A", 1)
+      |> Yog.add_node("B", 2)
+      |> Yog.add_edge_ensure(from: "A", to: "B", with: 10)
+
+    relabeled =
+      Yog.Transform.relabel_nodes(graph, fn
+        "A" -> 1
+        "B" -> 2
+      end)
+
+    assert Yog.Model.has_node?(relabeled, 1)
+    assert Yog.Model.has_node?(relabeled, 2)
+    assert Yog.successors(relabeled, 1) == [{2, 10}]
+  end
+
+  test "relabel_nodes_default_hashes_to_integers_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node("user_123", nil)
+      |> Yog.add_node("user_456", nil)
+
+    relabeled = Yog.Transform.relabel_nodes(graph)
+
+    # All IDs should be integers after hashing
+    assert Enum.all?(Map.keys(relabeled.nodes), &is_integer/1)
+    assert map_size(relabeled.nodes) == 2
+  end
+
+  test "relabel_nodes_preserves_node_data_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node("A", "data_a")
+      |> Yog.add_node("B", "data_b")
+
+    relabeled = Yog.Transform.relabel_nodes(graph, fn _ -> :x end)
+
+    # When two nodes map to the same ID, last one wins
+    assert Yog.Model.node(relabeled, :x) in ["data_a", "data_b"]
+  end
+
+  test "relabel_nodes_with_collisions_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node("A", 1)
+      |> Yog.add_node("B", 2)
+      |> Yog.add_edge_ensure(from: "A", to: "B", with: 10)
+
+    # Both map to same ID
+    relabeled = Yog.Transform.relabel_nodes(graph, fn _ -> :same end)
+
+    assert map_size(relabeled.nodes) == 1
+    assert Yog.Model.has_node?(relabeled, :same)
+  end
+
+  test "relabel_nodes_preserves_graph_type_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node("A", nil)
+      |> Yog.add_node("B", nil)
+      |> Yog.add_edge_ensure(from: "A", to: "B", with: 1)
+
+    relabeled = Yog.Transform.relabel_nodes(graph, fn _ -> 1 end)
+    assert relabeled.kind == :undirected
+  end
+
+  # ============= Normalize Node IDs Tests =============
+
+  test "normalize_node_ids_with_string_ids_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node("B", nil)
+      |> Yog.add_node("A", nil)
+      |> Yog.add_edge_ensure(from: "A", to: "B", with: 1)
+
+    normalized = Yog.Transform.normalize_node_ids(graph)
+
+    assert Map.keys(normalized.nodes) |> Enum.sort() == [0, 1]
+    assert Yog.has_edge?(normalized, 0, 1)
+  end
+
+  test "normalize_node_ids_with_gaps_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(0, nil)
+      |> Yog.add_node(5, nil)
+      |> Yog.add_node(10, nil)
+      |> Yog.add_edge_ensure(from: 0, to: 5, with: 1)
+      |> Yog.add_edge_ensure(from: 5, to: 10, with: 1)
+
+    normalized = Yog.Transform.normalize_node_ids(graph)
+
+    assert Map.keys(normalized.nodes) |> Enum.sort() == [0, 1, 2]
+    assert Yog.has_edge?(normalized, 0, 1)
+    assert Yog.has_edge?(normalized, 1, 2)
+  end
+
+  test "normalize_node_ids_already_normalized_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(0, nil)
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
+
+    normalized = Yog.Transform.normalize_node_ids(graph)
+
+    assert Map.keys(normalized.nodes) |> Enum.sort() == [0, 1, 2]
+    assert Yog.has_edge?(normalized, 0, 1)
+  end
+
+  test "normalize_node_ids_preserves_node_data_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node("A", "alice_data")
+      |> Yog.add_node("B", "bob_data")
+
+    normalized = Yog.Transform.normalize_node_ids(graph)
+
+    # A comes before B, so A -> 0, B -> 1
+    assert Yog.Model.node(normalized, 0) == "alice_data"
+    assert Yog.Model.node(normalized, 1) == "bob_data"
+  end
+
+  test "normalize_node_ids_preserves_edge_weights_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node("A", nil)
+      |> Yog.add_node("B", nil)
+      |> Yog.add_edge_ensure(from: "A", to: "B", with: 42)
+
+    normalized = Yog.Transform.normalize_node_ids(graph)
+
+    assert Yog.successors(normalized, 0) == [{1, 42}]
+  end
+
+  test "normalize_node_ids_on_empty_graph_test" do
+    graph = Yog.directed()
+    normalized = Yog.Transform.normalize_node_ids(graph)
+
+    assert normalized.nodes == %{}
+    assert normalized.out_edges == %{}
+  end
 end

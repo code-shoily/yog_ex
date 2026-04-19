@@ -156,6 +156,68 @@ defmodule Yog.IO.JSONImportTest do
     end
   end
 
+  describe "edge cases" do
+    test "handles empty map node data" do
+      json =
+        ~s|{"graph_type":"directed","nodes":[{"id":1,"data":{}},{"id":2,"data":{}}],"edges":[{"source":1,"target":2,"weight":{}}]}|
+
+      {:ok, graph} = JSON.from_json(json)
+      assert Yog.Model.order(graph) == 2
+      assert Yog.has_edge?(graph, 1, 2)
+      assert Yog.Model.node(graph, 1) == %{}
+    end
+
+    test "handles nil node data" do
+      json =
+        ~s|{"graph_type":"directed","nodes":[{"id":1,"data":null}],"edges":[]}|
+
+      {:ok, graph} = JSON.from_json(json)
+      assert Yog.Model.order(graph) == 1
+      assert Yog.Model.node(graph, 1) == nil
+    end
+
+    test "handles boolean string IDs" do
+      json =
+        ~s|{"nodes":[{"id":"true"},{"id":"false"}],"links":[{"source":"true","target":"false"}]}|
+
+      {:ok, graph} = JSON.from_json(json)
+      assert Yog.has_edge?(graph, "true", "false")
+    end
+
+    test "handles empty arrays in all formats" do
+      for format <- [
+            ~s|{"graph_type":"directed","nodes":[],"edges":[]}|,
+            ~s|{"directed":true,"multigraph":false,"graph":{},"nodes":[],"links":[]}|,
+            ~s|{"nodes":[],"links":[]}|,
+            ~s|{"elements":[]}|,
+            ~s|{"nodes":[],"edges":[]}|,
+            ~s|{"nodes":[],"links":[]}|,
+            ~s|{}|
+          ] do
+        {:ok, graph} = JSON.from_json(format)
+        assert Yog.Model.order(graph) == 0
+      end
+    end
+
+    test "from_json raises on invalid JSON" do
+      assert_raise ArgumentError, fn ->
+        JSON.from_json!("not valid json at all")
+      end
+    end
+
+    test "from_map handles empty map edge data" do
+      map = %{
+        "graph_type" => "directed",
+        "nodes" => [%{"id" => 1, "data" => %{}}, %{"id" => 2, "data" => %{}}],
+        "edges" => [%{"source" => 1, "target" => 2, "weight" => %{}}]
+      }
+
+      {:ok, graph} = JSON.from_map(map)
+      assert Yog.Model.order(graph) == 2
+      assert Yog.has_edge?(graph, 1, 2)
+    end
+  end
+
   describe "PostgreSQL JSONB workflow" do
     test "typical LiveView/JSONB round-trip" do
       # User creates graph in LiveView

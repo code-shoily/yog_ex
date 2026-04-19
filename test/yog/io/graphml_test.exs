@@ -432,6 +432,88 @@ defmodule Yog.IO.GraphMLTest do
     assert length(Yog.successors(graph, 2)) == 1
   end
 
+  # =============================================================================
+  # EDGE CASE TESTS
+  # =============================================================================
+
+  test "serialize graph with empty map node data" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, %{})
+      |> Yog.add_node(2, %{})
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: %{})
+
+    xml = GraphML.serialize(graph)
+
+    assert String.contains?(xml, "<node id=\"1\">")
+    assert String.contains?(xml, "<node id=\"2\">")
+    assert String.contains?(xml, "<edge source=\"1\" target=\"2\">")
+  end
+
+  test "serialize graph with nil node data" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+
+    xml = GraphML.serialize(graph)
+
+    assert String.contains?(xml, "<node id=\"1\">")
+    assert String.contains?(xml, "<node id=\"2\">")
+    # nil falls back to empty label, which creates empty data element
+    assert String.contains?(xml, "<data key=\"label\"></data>")
+  end
+
+  test "deserialize graph with empty data elements" do
+    xml = """
+    <?xml version="1.0"?>
+    <graphml xmlns="http://graphml.graphdrawing.org/xmlns">
+      <graph id="G" edgedefault="directed">
+        <node id="1"></node>
+        <node id="2"></node>
+        <edge source="1" target="2"></edge>
+      </graph>
+    </graphml>
+    """
+
+    {:ok, graph} = GraphML.deserialize(xml)
+    assert Yog.Model.node_count(graph) == 2
+    assert Yog.Model.edge_count(graph) == 1
+    assert Yog.Model.node(graph, 1) == %{}
+    assert Yog.Model.node(graph, 2) == %{}
+  end
+
+  test "deserialize graph with missing graph type defaults to directed" do
+    xml = """
+    <?xml version="1.0"?>
+    <graphml xmlns="http://graphml.graphdrawing.org/xmlns">
+      <graph id="G">
+        <node id="1"></node>
+      </graph>
+    </graphml>
+    """
+
+    {:ok, graph} = GraphML.deserialize(xml)
+    assert Yog.Model.type(graph) == :directed
+  end
+
+  test "deserialize handles string node ids" do
+    xml = """
+    <?xml version="1.0"?>
+    <graphml xmlns="http://graphml.graphdrawing.org/xmlns">
+      <graph id="G" edgedefault="directed">
+        <node id="alice"></node>
+        <node id="bob"></node>
+        <edge source="alice" target="bob"></edge>
+      </graph>
+    </graphml>
+    """
+
+    {:ok, graph} = GraphML.deserialize(xml)
+    assert Yog.Model.node_count(graph) == 2
+    assert Yog.has_edge?(graph, "alice", "bob")
+  end
+
   test "roundtrip fixture file" do
     fixture_path = "test/fixtures/io/sample.graphml"
     output_path = "/tmp/test_yog_graphml_output.graphml"

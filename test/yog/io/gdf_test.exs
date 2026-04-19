@@ -575,6 +575,173 @@ defmodule Yog.IO.GDFTest do
     assert length(Yog.successors(graph, 2)) == 1
   end
 
+  # =============================================================================
+  # EDGE CASE TESTS
+  # =============================================================================
+
+  test "serialize graph with empty map node data" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, %{})
+      |> Yog.add_node(2, %{})
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: "edge")
+
+    # Should not crash
+    gdf_str = GDF.serialize(graph)
+
+    assert String.contains?(gdf_str, "nodedef>")
+    assert String.contains?(gdf_str, "edgedef>")
+    assert String.contains?(gdf_str, "1,2,true,edge")
+  end
+
+  test "serialize graph with empty map edge data" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "Alice")
+      |> Yog.add_node(2, "Bob")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: %{})
+
+    gdf_str = GDF.serialize(graph)
+
+    assert String.contains?(gdf_str, "1,Alice")
+    assert String.contains?(gdf_str, "edgedef>")
+  end
+
+  test "serialize graph with nil node data" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+
+    gdf_str = GDF.serialize(graph)
+
+    assert String.contains?(gdf_str, "1,")
+    assert String.contains?(gdf_str, "2,")
+  end
+
+  test "serialize graph with mixed node data types" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "Alice")
+      |> Yog.add_node(2, 42)
+      |> Yog.add_node(3, :atom_value)
+      |> Yog.add_node(4, %{})
+
+    gdf_str = GDF.serialize(graph)
+
+    assert String.contains?(gdf_str, "1,Alice")
+    assert String.contains?(gdf_str, "2,42")
+    assert String.contains?(gdf_str, "3,atom_value")
+  end
+
+  test "serialize empty graph" do
+    graph = Yog.directed()
+    gdf_str = GDF.serialize(graph)
+
+    assert String.contains?(gdf_str, "nodedef>name VARCHAR")
+    assert String.contains?(gdf_str, "edgedef>node1 VARCHAR,node2 VARCHAR,directed BOOLEAN")
+  end
+
+  test "deserialize edge with missing nodes auto-creates nodes with empty maps" do
+    gdf_str = """
+    nodedef>name VARCHAR,label VARCHAR
+    edgedef>node1 VARCHAR,node2 VARCHAR,directed BOOLEAN,weight VARCHAR
+    1,2,true,10
+    """
+
+    {:ok, graph} = GDF.deserialize(gdf_str)
+
+    # Both nodes should exist
+    assert length(Yog.all_nodes(graph)) == 2
+
+    # Auto-created nodes should have empty map data
+    assert Yog.Model.node(graph, 1) == %{}
+    assert Yog.Model.node(graph, 2) == %{}
+  end
+
+  test "deserialize handles rows with mismatched column counts gracefully" do
+    gdf_str = """
+    nodedef>name VARCHAR,label VARCHAR
+    1,Alice
+    2,Bob,extra
+    edgedef>node1 VARCHAR,node2 VARCHAR,directed BOOLEAN
+    """
+
+    {:ok, graph} = GDF.deserialize(gdf_str)
+
+    # Should still parse valid rows
+    assert length(Yog.all_nodes(graph)) == 1
+    assert Yog.Model.node(graph, 1)["label"] == "Alice"
+  end
+
+  test "deserialize handles string node ids gracefully" do
+    gdf_str = """
+    nodedef>name VARCHAR,label VARCHAR
+    abc,Alice
+    edgedef>node1 VARCHAR,node2 VARCHAR,directed BOOLEAN
+    """
+
+    {:ok, graph} = GDF.deserialize(gdf_str)
+
+    # Non-integer IDs should be skipped in nodes
+    assert Yog.all_nodes(graph) == []
+  end
+
+  test "write_with and read_with roundtrip with custom mappers" do
+    path = "/tmp/test_yog_gdf_custom.gdf"
+
+    original =
+      Yog.directed()
+      |> Yog.add_node(1, %{name: "Alice", age: 30})
+      |> Yog.add_node(2, %{name: "Bob", age: 25})
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: %{relation: "friend", since: 2020})
+
+    node_attr = fn data ->
+      %{
+        "name" => data.name,
+        "age" => Integer.to_string(data.age)
+      }
+    end
+
+    edge_attr = fn data ->
+      %{
+        "relation" => data.relation,
+        "since" => Integer.to_string(data.since)
+      }
+    end
+
+    try do
+      assert {:ok, nil} =
+               GDF.write_with(path, node_attr, edge_attr, GDF.default_options(), original)
+
+      node_folder = fn attrs ->
+        %{
+          name: Map.get(attrs, "name", ""),
+          age: String.to_integer(Map.get(attrs, "age", "0"))
+        }
+      end
+
+      edge_folder = fn attrs ->
+        %{
+          relation: Map.get(attrs, "relation", ""),
+          since: String.to_integer(Map.get(attrs, "since", "0"))
+        }
+      end
+
+      {:ok, loaded} = GDF.read_with(path, node_folder, edge_folder)
+
+      assert Yog.Model.node(loaded, 1).name == "Alice"
+      assert Yog.Model.node(loaded, 1).age == 30
+      assert Yog.Model.node(loaded, 2).name == "Bob"
+
+      {_, edge_data} = Yog.successors(loaded, 1) |> hd()
+      assert edge_data.relation == "friend"
+      assert edge_data.since == 2020
+    after
+      File.rm(path)
+    end
+  end
+
   test "roundtrip fixture file" do
     fixture_path = "test/fixtures/io/sample.gdf"
     output_path = "/tmp/test_yog_gdf_output.gdf"

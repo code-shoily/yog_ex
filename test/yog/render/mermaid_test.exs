@@ -103,6 +103,176 @@ defmodule Yog.Render.MermaidTest do
     end
   end
 
+  describe "edge cases" do
+    test "renders empty graph" do
+      graph = Yog.directed()
+      mermaid = Mermaid.to_mermaid(graph, Mermaid.default_options())
+
+      assert String.contains?(mermaid, "graph TD")
+      refute String.contains?(mermaid, "-->")
+    end
+
+    test "renders graph with empty map node data" do
+      graph =
+        Yog.directed()
+        |> Yog.add_node(1, %{})
+        |> Yog.add_node(2, %{})
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+
+      mermaid = Mermaid.to_mermaid(graph, Mermaid.default_options())
+
+      # Should fall back to node ID as label
+      assert String.contains?(mermaid, "1[\"1\"]")
+      assert String.contains?(mermaid, "2[\"2\"]")
+      assert String.contains?(mermaid, "-->")
+    end
+
+    test "renders graph with nil node data" do
+      graph =
+        Yog.directed()
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+
+      mermaid = Mermaid.to_mermaid(graph, Mermaid.default_options())
+
+      # nil to_string gives "", so falls back to node ID
+      assert String.contains?(mermaid, "1[\"1\"]")
+      assert String.contains?(mermaid, "2[\"2\"]")
+    end
+
+    test "renders graph with atom node ids" do
+      graph =
+        Yog.directed()
+        |> Yog.add_node(:start, "Start")
+        |> Yog.add_node(:end, "End")
+        |> Yog.add_edge_ensure(from: :start, to: :end, with: 5)
+
+      mermaid = Mermaid.to_mermaid(graph, Mermaid.default_options())
+
+      assert String.contains?(mermaid, "start")
+      assert String.contains?(mermaid, "end")
+      assert String.contains?(mermaid, "-->")
+    end
+
+    test "renders graph with empty map edge data" do
+      graph =
+        Yog.directed()
+        |> Yog.add_node(1, "A")
+        |> Yog.add_node(2, "B")
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: %{})
+
+      mermaid = Mermaid.to_mermaid(graph, Mermaid.default_options())
+
+      # Empty map edge data should produce no label part
+      assert String.contains?(mermaid, "1 --> 2")
+    end
+
+    test "renders graph with nil edge data" do
+      graph =
+        Yog.directed()
+        |> Yog.add_node(1, "A")
+        |> Yog.add_node(2, "B")
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: nil)
+
+      mermaid = Mermaid.to_mermaid(graph, Mermaid.default_options())
+
+      assert String.contains?(mermaid, "1 --> 2")
+    end
+
+    test "escapes quotes in labels" do
+      graph =
+        Yog.directed()
+        |> Yog.add_node(1, "Say \"hello\"")
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: "Say \"hi\"")
+
+      mermaid = Mermaid.to_mermaid(graph, Mermaid.default_options())
+
+      assert String.contains?(mermaid, "#quot;")
+      refute String.contains?(mermaid, "\"Say \"hello\"")
+    end
+
+    test "escapes newlines in labels" do
+      graph =
+        Yog.directed()
+        |> Yog.add_node(1, "Line 1\nLine 2")
+
+      mermaid = Mermaid.to_mermaid(graph, Mermaid.default_options())
+
+      assert String.contains?(mermaid, "<br/>")
+      refute String.contains?(mermaid, "\nLine 2")
+    end
+
+    test "renders single node without edges" do
+      graph = Yog.directed() |> Yog.add_node(1, "Only")
+      mermaid = Mermaid.to_mermaid(graph, Mermaid.default_options())
+
+      assert String.contains?(mermaid, "1[\"Only\"]")
+      refute String.contains?(mermaid, "-->")
+    end
+
+    test "renders all node shapes" do
+      graph =
+        Yog.directed()
+        |> Yog.add_node(1, "A")
+        |> Yog.add_node(2, "B")
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+
+      shapes = [
+        :rounded_rect,
+        :stadium,
+        :subroutine,
+        :cylinder,
+        :circle,
+        :asymmetric,
+        :rhombus,
+        :hexagon,
+        :parallelogram,
+        :parallelogram_alt,
+        :trapezoid,
+        :trapezoid_alt
+      ]
+
+      for shape <- shapes do
+        opts = Map.put(Mermaid.default_options(), :node_shape, shape)
+        mermaid = Mermaid.to_mermaid(graph, opts)
+        assert String.contains?(mermaid, "graph TD"), "Shape #{shape} should render"
+      end
+    end
+
+    test "renders all directions" do
+      graph =
+        Yog.directed()
+        |> Yog.add_node(1, "A")
+        |> Yog.add_node(2, "B")
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+
+      for dir <- [:td, :lr, :bt, :rl] do
+        opts = Map.put(Mermaid.default_options(), :direction, dir)
+        mermaid = Mermaid.to_mermaid(graph, opts)
+        assert String.contains?(mermaid, "graph #{String.upcase(to_string(dir))}")
+      end
+    end
+
+    test "handles edge highlighting with reversed edge tuple" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_node(1, "A")
+        |> Yog.add_node(2, "B")
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+
+      opts =
+        Map.merge(Mermaid.default_options(), %{
+          highlighted_edges: [{2, 1}]
+        })
+
+      mermaid = Mermaid.to_mermaid(graph, opts)
+
+      # Should match reversed edge tuple for undirected
+      assert String.contains?(mermaid, "linkStyle")
+    end
+  end
+
   describe "path_to_options/2" do
     test "creates highlighted options from path" do
       base_opts = Mermaid.default_options()

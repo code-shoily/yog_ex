@@ -173,7 +173,7 @@ defmodule Yog.IO.Graph6 do
       value <= 62 ->
         {:ok, value, rest}
 
-      value == 126 ->
+      c == 126 ->
         parse_extended_header(rest)
 
       true ->

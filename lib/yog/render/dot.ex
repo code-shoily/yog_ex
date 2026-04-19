@@ -621,13 +621,13 @@ defmodule Yog.Render.DOT do
   defp build_graph_attrs(options) do
     attrs =
       [
-        options.layout && "layout=#{layout_to_string(options.layout)}",
-        options.rankdir && "rankdir=#{rankdir_to_string(options.rankdir)}",
-        options.bgcolor && "bgcolor=\"#{options.bgcolor}\"",
-        options.splines && "splines=#{splines_to_string(options.splines)}",
-        options.overlap && "overlap=#{overlap_to_string(options.overlap)}",
-        options.nodesep && "nodesep=#{options.nodesep}",
-        options.ranksep && "ranksep=#{options.ranksep}"
+        if(options.layout, do: "layout=#{layout_to_string(options.layout)}"),
+        if(options.rankdir, do: "rankdir=#{rankdir_to_string(options.rankdir)}"),
+        if(options.bgcolor, do: "bgcolor=\"#{options.bgcolor}\""),
+        if(options.splines, do: "splines=#{splines_to_string(options.splines)}"),
+        if(options.overlap != nil, do: "overlap=#{overlap_to_string(options.overlap)}"),
+        if(options.nodesep != nil, do: "nodesep=#{options.nodesep}"),
+        if(options.ranksep != nil, do: "ranksep=#{options.ranksep}")
       ]
       |> Enum.reject(&is_nil/1)
 
