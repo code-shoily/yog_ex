@@ -53,7 +53,8 @@ defmodule Yog.IO.LEDA do
       :ok
   """
   def default_options do
-    {:leda_options, &Kernel.to_string/1, &Kernel.to_string/1, fn s -> s end, fn s -> s end}
+    {:leda_options, fn data -> Yog.Utils.to_label("", data) end, &Yog.Utils.to_weight_label/1,
+     fn s -> s end, fn s -> s end}
   end
 
   @doc """

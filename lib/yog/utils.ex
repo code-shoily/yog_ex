@@ -235,4 +235,63 @@ defmodule Yog.Utils do
   def map_fold(map, acc, fun) when is_map(map) and is_function(fun, 3) do
     :maps.fold(fun, acc, map)
   end
+
+  @doc """
+  Safely converts node data to a string label.
+
+  If data is a map (common in GraphML or GDF imports), it looks for common
+  labeling keys (`"label"`, `:label`). If not found or if the data is empty,
+  it falls back to the node ID.
+
+  ## Examples
+
+      iex> Yog.Utils.to_label(1, "Alice")
+      "Alice"
+      iex> Yog.Utils.to_label(1, %{"label" => "Alice", "age" => 30})
+      "Alice"
+      iex> Yog.Utils.to_label(2, %{})
+      "2"
+  """
+  @spec to_label(Yog.node_id(), any()) :: String.t()
+  def to_label(id, data) do
+    label =
+      if is_map(data) do
+        Map.get(data, "label") || Map.get(data, :label)
+      else
+        data
+      end
+
+    label_str = Kernel.to_string(label)
+
+    if label_str == "" do
+      Kernel.to_string(id)
+    else
+      label_str
+    end
+  end
+
+  @doc """
+  Safely converts edge weight/data to a string label.
+
+  If data is a map, it looks for common weight/labeling keys (`"weight"`,
+  `:weight`, `"label"`, `:label`). If not found, it returns an empty string.
+
+  ## Examples
+
+      iex> Yog.Utils.to_weight_label(5)
+      "5"
+      iex> Yog.Utils.to_weight_label(%{"weight" => "10", "type" => "road"})
+      "10"
+      iex> Yog.Utils.to_weight_label(%{})
+      ""
+  """
+  @spec to_weight_label(any()) :: String.t()
+  def to_weight_label(weight) do
+    if is_map(weight) do
+      Map.get(weight, "weight") || Map.get(weight, :weight) || Map.get(weight, "label") ||
+        Map.get(weight, :label) || ""
+    else
+      Kernel.to_string(weight)
+    end
+  end
 end

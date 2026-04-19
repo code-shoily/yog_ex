@@ -250,6 +250,89 @@ defmodule Yog.Transform do
   end
 
   @doc """
+  Relabels all node IDs in the graph using a mapping function.
+
+  This operation replaces every node ID `u` with `fun.(u)`. It updates all
+  node identifiers and all edge references (source and destination) to
+  maintain graph consistency.
+
+  **Warning:** If the function is not injective (i.e., different IDs map to the
+  same new ID), nodes will be merged. In such cases, the data of the last node
+  processed will be kept, and edges will be combined (last edge weight wins).
+
+  **Time Complexity:** O(V + E)
+
+  ## Parameters
+
+  - `graph` - The graph to relabel
+  - `fun` - Function `(node_id) -> new_node_id` (default: `:erlang.phash2/1`)
+
+  ## Examples
+
+  ### String to Integer relabeling
+
+      iex> graph = Yog.directed() |> Yog.add_node("A", 1) |> Yog.add_node("B", 2)
+      iex> relabeled = Yog.Transform.relabel_nodes(graph, fn
+      ...>   "A" -> 1
+      ...>   "B" -> 2
+      ...> end)
+      iex> Yog.Model.has_node?(relabeled, 1)
+      true
+
+  ### Default: hashing IDs to integers
+
+      iex> graph = Yog.directed() |> Yog.add_node("user_123", nil)
+      iex> hashed = Yog.Transform.relabel_nodes(graph)
+      iex> id = Map.keys(hashed.nodes) |> List.first()
+      iex> is_integer(id)
+      true
+  """
+  @spec relabel_nodes(Graph.t(), (Yog.node_id() -> Yog.node_id())) :: Graph.t()
+  def relabel_nodes(%Graph{} = graph, fun \\ &:erlang.phash2/1) do
+    # Rebuild the graph to ensure consistency and handle potential merges
+    base = Model.new(graph.kind)
+
+    # First pass: add all relabeled nodes
+    graph_with_nodes =
+      Enum.reduce(graph.nodes, base, fn {id, data}, acc ->
+        Model.add_node(acc, fun.(id), data)
+      end)
+
+    # Second pass: add all relabeled edges
+    Enum.reduce(Model.all_edges(graph), graph_with_nodes, fn {u, v, w}, acc ->
+      Model.add_edge!(acc, fun.(u), fun.(v), w)
+    end)
+  end
+
+  @doc """
+  Normalizes all node IDs to a continuous range of integers `0..n-1`.
+
+  The mapping is deterministic, based on the sorted order of existing node IDs.
+  This is useful for preparing graphs for formats like Graph6 or Sparse6,
+  or for optimizing algorithms that benefit from integer indexing.
+
+  **Time Complexity:** O(V log V + E)
+
+  ## Example
+
+      iex> graph = Yog.undirected() |> Yog.add_node("B", nil) |> Yog.add_node("A", nil)
+      iex> normalized = Yog.Transform.normalize_node_ids(graph)
+      iex> Map.keys(normalized.nodes) |> Enum.sort()
+      [0, 1]
+  """
+  @spec normalize_node_ids(Graph.t()) :: Graph.t()
+  def normalize_node_ids(%Graph{} = graph) do
+    mapping =
+      graph.nodes
+      |> Map.keys()
+      |> Enum.sort()
+      |> Enum.with_index()
+      |> Map.new()
+
+    relabel_nodes(graph, fn id -> Map.fetch!(mapping, id) end)
+  end
+
+  @doc """
   Transforms node data using a function in parallel, preserving graph structure.
 
   This is the async version of `map_nodes/2` that uses `Task.async_stream/3` to

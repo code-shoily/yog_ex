@@ -1,0 +1,103 @@
+# How-To: Multigraphs & Edge Collapsing
+
+```elixir
+Mix.install([
+  {:yog_ex, path: "/home/mafinar/repos/elixir/yog_ex"},
+  {:kino_vizjs, "~> 0.5.0"}
+])
+```
+
+## Introduction
+
+A **Multigraph** allows multiple (parallel) edges between the same pair of nodes. This is common in transport networks (multiple flights between two cities) or social networks (multiple types of interactions).
+
+While `Yog` supports multigraphs natively via `Yog.Multi`, many classic algorithms (like Dijkstra or Max-Flow) are optimized for **Simple Graphs**. To bridge this gap, `Yog` allows you to "collapse" parallel edges into a single edge using a custom strategy.
+
+## 🏗️ Creating a Multigraph
+
+```elixir
+alias Yog.Multi
+
+# Create an undirected multigraph
+mg = Multi.undirected()
+  |> Multi.add_node(:london, nil)
+  |> Multi.add_node(:paris, nil)
+
+# Add multiple edges (parallel edges)
+# add_edge returns {graph, edge_id}
+{mg, e1} = Multi.add_edge(mg, :london, :paris, 100) # Flight
+{mg, e2} = Multi.add_edge(mg, :london, :paris, 50)  # Train
+{mg, e3} = Multi.add_edge(mg, :london, :paris, 300) # Ferry
+
+IO.puts "Total edges: #{Multi.size(mg)}"
+```
+
+## 📉 Collapsing Strategies
+
+To run a shortest-path algorithm, we might only care about the *cheapest* or *fastest* option. We can collapse the multigraph into a simple graph.
+
+### 1. Keep Minimum (Shortest Path)
+When finding the shortest path, we usually want to keep only the edge with the smallest weight.
+
+```elixir
+# Collapse keeping the minimum weight
+g_min = Multi.to_simple_graph(mg, fn a, b -> min(a, b) end)
+
+IO.puts "Simple Graph Edge Weight: #{Yog.Model.edge_weight(g_min, :london, :paris)}"
+# Should be 50
+```
+
+### 2. Keep Maximum (Throughput)
+In some scenarios, you might want to know the maximum capacity of any single link.
+
+```elixir
+g_max = Multi.to_simple_graph(mg, fn a, b -> max(a, b) end)
+
+IO.puts "Simple Graph Edge Weight: #{Yog.Model.edge_weight(g_max, :london, :paris)}"
+# Should be 300
+```
+
+### 3. Sum Weights (Total Capacity)
+For Max-Flow problems, you often want to sum the capacities of all parallel links.
+
+```elixir
+g_sum = Multi.to_simple_graph(mg, fn a, b -> a + b end)
+
+IO.puts "Simple Graph Edge Weight: #{Yog.Model.edge_weight(g_sum, :london, :paris)}"
+# Should be 450 (100 + 50 + 300)
+```
+
+## 🚀 Running Algorithms
+
+Once collapsed, you can use any standard `Yog` algorithm.
+
+```elixir
+# 1. Create a complex multigraph
+mg = Multi.undirected()
+  |> Multi.add_node(:a, nil)
+  |> Multi.add_node(:b, nil)
+  |> Multi.add_node(:c, nil)
+  # Parallel edges between A and B
+  |> (fn g -> {g, _} = Multi.add_edge(g, :a, :b, 10); g end).()
+  |> (fn g -> {g, _} = Multi.add_edge(g, :a, :b, 5); g end).()
+  # Single edge between B and C
+  |> (fn g -> {g, _} = Multi.add_edge(g, :b, :c, 2); g end).()
+
+# 2. Collapse for shortest path
+simple_g = Multi.to_simple_graph(mg, &min/2)
+
+# 3. Solve!
+{:ok, path} = Yog.Pathfinding.shortest_path(in: simple_g, from: :a, to: :c)
+
+IO.inspect(path.nodes, label: "Shortest Path Nodes")
+IO.puts "Total Weight: #{path.total_weight}" # Should be 7 (5 + 2)
+```
+
+## Summary
+
+Multigraphs are powerful for modeling, but simple graphs are often better for analysis.
+*   Use `Yog.Multi` to capture the full complexity of your data.
+*   Use `to_simple_graph/2` to prepare your data for algorithms.
+*   Choose your **combine function** (`min`, `max`, `sum`) based on the problem you are solving.
+
+Next, explore **Customizing Visualizations** to see how to render these parallel edges!

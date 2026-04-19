@@ -1,0 +1,106 @@
+# Network Flow & Capacity
+
+```elixir
+Mix.install([
+  {:yog_ex, path: "/home/mafinar/repos/elixir/yog_ex"},
+  {:kino_vizjs, "~> 0.5.0"}
+])
+```
+
+## Introduction
+
+Network Flow algorithms help solve optimization problems where something (water, data, electricity, goods) moves through a network with limited capacity.
+
+The most famous result in this field is the **Max-Flow Min-Cut Theorem**, which states that the maximum flow through a network is equal to the capacity of the smallest bottleneck (the minimum cut).
+
+## 🚰 Maximum Flow
+
+How much "stuff" can we push from a Source to a Sink?
+
+```elixir
+alias Yog.Flow.MaxFlow
+
+# Create a flow network
+# Edges represent (from, to, capacity)
+g = Yog.directed()
+  |> Yog.add_edges!([
+    {:s, :a, 10}, {:s, :b, 10},
+    {:a, :c, 8}, {:a, :b, 2},
+    {:b, :c, 9},
+    {:c, :t, 20}
+  ])
+
+# Calculate Max Flow using Dinic's algorithm (efficient for dense networks)
+result = MaxFlow.dinic(g, :s, :t)
+
+IO.puts "Maximum Flow from S to T: #{result.max_flow}"
+```
+
+## ✂️ Minimum Cut (Finding the Bottleneck)
+
+The minimum cut is the set of edges that, if removed, would completely disconnect the source from the sink with the minimum possible total capacity. These are your network's true bottlenecks.
+
+```elixir
+# Extract the min-cut from the previous result
+min_cut = MaxFlow.min_cut(result)
+
+IO.puts "Min-Cut Capacity: #{min_cut.capacity}"
+IO.inspect(min_cut.source_side, label: "Nodes on Source side")
+IO.inspect(min_cut.sink_side, label: "Nodes on Sink side")
+
+# Let's visualize the cut!
+# We'll highlight edges that cross the cut
+cut_edges = 
+  for u <- min_cut.source_side, 
+      {v, cap} <- Yog.Model.successors(g, u), 
+      v in min_cut.sink_side, 
+      do: {u, v}
+
+dot = Yog.Render.DOT.to_dot(g, highlight_edges: cut_edges)
+Kino.VizJS.render(dot)
+```
+
+## 💰 Min-Cost Max-Flow
+
+Sometimes you don't just want the most flow; you want the *cheapest* flow. In this scenario, edges have both a **capacity** and a **unit cost**.
+
+```elixir
+# Successive Shortest Path algorithm is perfect for this
+# Each edge is {u, v, %{capacity: C, cost: P}}
+g = Yog.directed()
+  |> Yog.add_edge_ensure(:s, :a, %{capacity: 10, cost: 2})
+  |> Yog.add_edge_ensure(:a, :t, %{capacity: 5, cost: 10})
+  |> Yog.add_edge_ensure(:s, :t, %{capacity: 2, cost: 100})
+
+# Find max flow with minimum total cost
+# result = Yog.Flow.SuccessiveShortestPath.calculate(g, :s, :t)
+# IO.puts "Flow: #{result.flow}, Total Cost: #{result.cost}"
+```
+
+## 🤝 Bipartite Matching
+
+One of the most powerful applications of Max-Flow is solving **Matching Problems** (e.g., matching jobs to candidates). By adding a virtual source and sink, any matching problem becomes a flow problem.
+
+```elixir
+# Yog provides a dedicated module for this too
+g = Yog.undirected()
+  |> Yog.add_edges!([
+    {"Job1", "Alice", 1}, {"Job1", "Bob", 1},
+    {"Job2", "Alice", 1},
+    {"Job3", "Charlie", 1}
+  ])
+
+matching = Yog.Matching.HopcroftKarp.max_matching(g)
+IO.inspect(matching, label: "Optimal Job-Candidate Pairs")
+```
+
+## Summary
+
+`Yog`'s Flow suite includes:
+
+1. **Max-Flow** (Edmonds-Karp, Dinic, Push-Relabel) for throughput.
+2. **Min-Cut** for bottleneck identification.
+3. **Min-Cost Max-Flow** for economical optimization.
+4. **Global Min-Cut** (Stoer-Wagner) for general graph clustering.
+
+You've now explored the core pillars of the Yog library! Check the [Algorithm Catalog](ALGORITHMS.md) for even more advanced techniques.

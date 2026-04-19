@@ -5,7 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.97.0] - 2026-04-18
+
+> **Note**: No more breaking changes. The focus will be on performance, documentation, and bug fixes in preparation for 1.0.0 in early 2027.
+
+#### Added
+
+#### Fixed
+
+#### Rendering & I/O Robustness
+- **Universal Safe Labeling**: Resolved a critical `Protocol.UndefinedError` (String.Chars not implemented for Map) when rendering or serializing graphs containing complex metadata (common in GraphML, GDF, and JSON imports).
+  - Added `Yog.Utils.to_label/2` and `Yog.Utils.to_weight_label/1` to handle data maps gracefully by looking for common keys (`"label"`, `"weight"`, `:label`, `:weight`).
+  - Refactored `Mermaid`, `DOT`, `GraphML`, `GDF`, `Pajek`, `TGF`, `LEDA`, `MatrixMarket`, and `List` modules to use these safe helpers by default.
+  - Prevents crashes when importing from GraphML and immediately visualizing via `to_mermaid/1` or `to_dot/1`.
 
 #### Added
 

@@ -1,0 +1,104 @@
+# How-To: Customizing Visualizations
+
+```elixir
+Mix.install([
+  {:yog_ex, path: "/home/mafinar/repos/elixir/yog_ex"},
+  {:kino_vizjs, "~> 0.5.0"}
+])
+```
+
+## Introduction
+
+Visualizing a graph is often the first step in debugging or communicating a complex algorithm. `Yog` provides a powerful `Yog.Render.DOT` engine that transforms your graphs into [Graphviz DOT](https://graphviz.org/doc/info/lang.html) strings, which can be rendered in Livebook using `Kino.VizJS`.
+
+## 🎨 Basic Styling
+
+You can provide global attributes to the `to_dot/2` function to change the overall look.
+
+```elixir
+g = Yog.Generator.Classic.petersen()
+
+# Change layout direction and node shape
+dot = Yog.Render.DOT.to_dot(g, 
+  graph_attributes: [rankdir: "LR", bgcolor: "#f8fafc"],
+  node_attributes: [shape: "doublecircle", color: "#6366f1", fontname: "Outfit"]
+)
+
+Kino.VizJS.render(dot)
+```
+
+## ✨ Highlighting Paths & Nodes
+
+A common task is to highlight the result of an algorithm (e.g., a shortest path).
+
+```elixir
+g = Yog.Generator.Classic.grid_2d(5, 5)
+source = 0
+target = 24
+
+{:ok, path} = Yog.Pathfinding.shortest_path(in: Yog.Builder.GridGraph.to_graph(g), from: source, to: target)
+
+# Highlight nodes and edges in the path
+dot = Yog.Render.DOT.to_dot(g, 
+  highlight_nodes: path.nodes,
+  highlight_edges: Enum.chunk_every(path.nodes, 2, 1, :discard) |> Enum.map(fn [u, v] -> {u, v} end)
+)
+
+Kino.VizJS.render(dot)
+```
+
+## 🏷️ Custom Node & Edge Labels
+
+You can provide a mapping or a function to generate labels based on node/edge data.
+
+```elixir
+g = Yog.directed()
+  |> Yog.add_node(1, %{name: "Alice", role: "Admin"})
+  |> Yog.add_node(2, %{name: "Bob", role: "User"})
+  |> Yog.add_edge!(1, 2, %{action: "Deletes"})
+
+# Generate labels from data
+node_labels = Map.new(Yog.Model.all_nodes(g), fn id -> 
+  data = Yog.Model.node(g, id)
+  {id, data.name}
+end)
+
+edge_labels = Map.new(Yog.Model.all_edges(g), fn {u, v, weight} -> 
+  {{u, v}, weight.action}
+end)
+
+dot = Yog.Render.DOT.to_dot(g, 
+  node_labels: node_labels,
+  edge_labels: edge_labels
+)
+
+Kino.VizJS.render(dot)
+```
+
+## 🏗️ Theming
+
+`Yog` comes with several built-in themes to quickly switch between styles.
+
+```elixir
+g = Yog.Generator.Classic.binary_tree(3)
+
+# 1. Dark Theme
+dot_dark = Yog.Render.DOT.to_dot(g, theme: :dark)
+IO.puts "--- Dark Theme ---"
+Kino.VizJS.render(dot_dark)
+
+# 2. Minimal Theme
+dot_min = Yog.Render.DOT.to_dot(g, theme: :minimal)
+IO.puts "--- Minimal Theme ---"
+Kino.VizJS.render(dot_min)
+```
+
+## Summary
+
+Customizing visualizations in `Yog` is highly flexible:
+1.  **Global Attributes**: Control the layout and background.
+2.  **Highlighting**: Bring attention to specific nodes or edges.
+3.  **Data-Driven Labels**: Use your actual Elixir data to label the graph.
+4.  **Themes**: Use professionally curated presets for a quick premium look.
+
+In the next "How-To", we'll look at **Importing and Exporting** graphs in formats like GraphML and JSON.

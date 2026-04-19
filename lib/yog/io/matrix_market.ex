@@ -48,7 +48,7 @@ defmodule Yog.IO.MatrixMarket do
   - `edge_weight`: Function to convert edge data to a number.
   """
   def default_options do
-    {:matrix_market_options, &Kernel.to_string/1}
+    {:matrix_market_options, &Yog.Utils.to_weight_label/1}
   end
 
   @doc """

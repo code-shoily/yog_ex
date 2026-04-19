@@ -65,7 +65,7 @@ defmodule Yog.IO.Pajek do
       :ok
   """
   def default_options do
-    {:pajek_options, &Kernel.to_string/1, fn _ -> :none end,
+    {:pajek_options, fn data -> Yog.Utils.to_label("", data) end, fn _ -> :none end,
      fn _ -> default_node_attributes() end, false, false}
   end
 

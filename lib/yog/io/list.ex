@@ -251,7 +251,7 @@ defmodule Yog.IO.List do
         neighbor_str =
           if weighted do
             neighbors
-            |> Enum.map_join(" ", fn {n, w} -> "#{n},#{w}" end)
+            |> Enum.map_join(" ", fn {n, w} -> "#{n},#{Yog.Utils.to_weight_label(w)}" end)
           else
             neighbors
             |> Enum.map_join(" ", fn {n, _w} -> "#{n}" end)

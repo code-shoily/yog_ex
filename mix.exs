@@ -1,7 +1,7 @@
 defmodule YogEx.MixProject do
   use Mix.Project
 
-  @version "0.96.0"
+  @version "0.97.0"
   @source_url "https://github.com/code-shoily/yog_ex"
 
   def project do
@@ -93,8 +93,28 @@ defmodule YogEx.MixProject do
         {"examples/README.md", [filename: "examples_readme", title: "Examples README"]},
         {"lib/yog/functional/README.md",
          [filename: "functional_readme", title: "Functional API README"]},
-        {"livebooks/networkx_inspired_tutorial.livemd",
-         [filename: "networkx_tutorial", title: "NetworkX Tutorial"]},
+        {"livebooks/guides/getting_started.livemd",
+         [filename: "getting_started", title: "Getting Started"]},
+        {"livebooks/how_to/maze_generation.livemd",
+         [filename: "maze_generation", title: "Maze Generation"]},
+        {"livebooks/guides/traversals_and_pathfinding.livemd",
+         [filename: "traversals_and_pathfinding", title: "Traversals & Pathfinding"]},
+        {"livebooks/guides/network_analysis.livemd",
+         [filename: "network_analysis", title: "Network Analysis"]},
+        {"livebooks/guides/network_flow.livemd",
+         [filename: "network_flow", title: "Network Flow"]},
+        {"livebooks/guides/graph_properties.livemd",
+         [filename: "graph_properties", title: "Graph Properties"]},
+        {"livebooks/guides/dag_analysis.livemd",
+         [filename: "dag_analysis", title: "DAG Analysis"]},
+        {"livebooks/gallery/graph_catalog.livemd",
+         [filename: "graph_catalog", title: "Graph Gallery"]},
+        {"livebooks/how_to/customizing_visualizations.livemd",
+         [filename: "customizing_visualizations", title: "Customizing Visualizations"]},
+        {"livebooks/how_to/import_export.livemd",
+         [filename: "import_export", title: "Importing & Exporting"]},
+        {"livebooks/how_to/multigraphs_and_collapsing.livemd",
+         [filename: "multigraphs_and_collapsing", title: "Multigraphs & Collapsing"]},
         "ALGORITHMS.md",
         "PROPERTIES.md",
         "CHANGELOG.md"
@@ -158,10 +178,21 @@ defmodule YogEx.MixProject do
           "README.md",
           "examples_readme",
           "functional_readme",
-          "GLEAM_ELIXIR_COMPARISON.md"
+          "getting_started",
+          "traversals_and_pathfinding",
+          "network_analysis",
+          "network_flow",
+          "graph_properties",
+          "dag_analysis"
         ],
-        Livebooks: [
-          "networkx_tutorial"
+        Gallery: [
+          "graph_catalog"
+        ],
+        "How-To": [
+          "maze_generation",
+          "customizing_visualizations",
+          "import_export",
+          "multigraphs_and_collapsing"
         ],
         Reference: [
           "ALGORITHMS.md",
