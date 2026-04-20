@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gexf xmlns="http://gexf.net/1.3" version="1.3">
+  <graph mode="static" defaultedgetype="directed">
+    <attributes class="node">
+      <attribute id="0" title="label" type="string"/>
+    </attributes>
+    <nodes>
+      <node id="1" label="Alice">
+        <attvalues>
+          <attvalue for="0" value="Alice"/>
+        </attvalues>
+      </node>
+      <node id="2" label="Bob">
+        <attvalues>
+          <attvalue for="0" value="Bob"/>
+        </attvalues>
+      </node>
+      <node id="3" label="Charlie">
+        <attvalues>
+          <attvalue for="0" value="Charlie"/>
+        </attvalues>
+      </node>
+    </nodes>
+    <edges>
+      <edge id="0" source="1" target="2" weight="friend"/>
+      <edge id="1" source="2" target="3" weight="colleague"/>
+      <edge id="2" source="1" target="3" weight="friend"/>
+    </edges>
+  </graph>
+</gexf>
