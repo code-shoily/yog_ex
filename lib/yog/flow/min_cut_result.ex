@@ -111,24 +111,4 @@ defmodule Yog.Flow.MinCutResult do
   """
   @spec partition_product(t()) :: non_neg_integer()
   def partition_product(%__MODULE__{source_side_size: s, sink_side_size: t}), do: s * t
-
-  @doc """
-  Compute the cut value from a graph and the partition.
-
-  This function is kept for backward compatibility but requires
-  the actual node sets to compute the value. For new code, use
-  the `cut_value` field directly.
-
-  ## Deprecated
-
-  The cut value is now computed during the algorithm and stored
-  in the `cut_value` field. Use that instead.
-  """
-  @deprecated "Use the cut_value field directly"
-  @spec compute_cut_value(t(), Yog.graph()) :: number()
-  def compute_cut_value(%__MODULE__{cut_value: cv}, _graph) when not is_nil(cv) do
-    cv
-  end
-
-  def compute_cut_value(%__MODULE__{}, _graph), do: 0
 end

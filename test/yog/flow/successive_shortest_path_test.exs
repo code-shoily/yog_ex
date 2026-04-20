@@ -264,5 +264,52 @@ defmodule Yog.Flow.SuccessiveShortestPathTest do
                  get_cost
                )
     end
+
+    test "negative cost cycle returns infeasible" do
+      {:ok, graph} =
+        Yog.directed()
+        |> Yog.add_node(1, {-5, nil})
+        |> Yog.add_node(2, {5, nil})
+        |> Yog.add_edges([
+          {1, 2, {10, 10}},
+          {2, 1, {10, -20}}
+        ])
+
+      get_demand = fn
+        {d, _} -> d
+        _ -> 0
+      end
+
+      get_capacity = fn {c, _} -> c end
+      get_cost = fn {_, cost} -> cost end
+
+      assert {:error, :infeasible} =
+               SuccessiveShortestPath.min_cost_flow(
+                 graph,
+                 get_demand,
+                 get_capacity,
+                 get_cost
+               )
+    end
+
+    test "zero supply/demand with edges" do
+      graph =
+        Yog.directed()
+        |> Yog.add_node(1, {0, nil})
+        |> Yog.add_node(2, {0, nil})
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: {10, 1})
+
+      get_demand = fn {d, _} -> d end
+      get_capacity = fn {c, _} -> c end
+      get_cost = fn {_, cost} -> cost end
+
+      assert {:ok, %{cost: 0, flow: []}} =
+               SuccessiveShortestPath.min_cost_flow(
+                 graph,
+                 get_demand,
+                 get_capacity,
+                 get_cost
+               )
+    end
   end
 end

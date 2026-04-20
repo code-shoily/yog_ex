@@ -1188,4 +1188,13 @@ defmodule Yog.Flow.MaxFlowTest do
       assert 3 not in reachable
     end
   end
+
+  describe "max_flow/4" do
+    test "fallbacks to edmonds_karp for unknown algorithm" do
+      graph = Yog.directed() |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+      result = MaxFlow.max_flow(graph, 1, 2, :non_existent_algo)
+      assert result.max_flow == 10
+      assert result.algorithm == :edmonds_karp
+    end
+  end
 end

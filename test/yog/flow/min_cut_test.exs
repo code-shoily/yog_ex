@@ -621,6 +621,40 @@ defmodule Yog.Flow.MinCutTest do
     end
   end
 
+  describe "global_min_cut/2 edge cases" do
+    test "single node with track_partitions" do
+      graph = Yog.undirected() |> Yog.add_node(1, "A")
+      result = MinCut.global_min_cut(graph, track_partitions: true)
+      assert result.cut_value == 0
+      assert MapSet.member?(result.source_side, 1)
+      assert MapSet.size(result.sink_side) == 0
+    end
+
+    test "empty graph with track_partitions" do
+      graph = Yog.undirected()
+      result = MinCut.global_min_cut(graph, track_partitions: true)
+      assert result.cut_value == 0
+      assert MapSet.size(result.source_side) == 0
+      assert MapSet.size(result.sink_side) == 0
+    end
+  end
+
+  describe "karger_stein/2 more edge cases" do
+    test "disconnected graph" do
+      graph = Yog.undirected() |> Yog.add_node(1, nil) |> Yog.add_node(2, nil)
+      # No edges
+      result = MinCut.karger_stein(graph)
+      assert result.cut_value == 0
+    end
+
+    test "single node" do
+      graph = Yog.undirected() |> Yog.add_node(1, nil)
+      result = MinCut.karger_stein(graph)
+      assert result.cut_value == 0
+      assert MapSet.member?(result.source_side, 1)
+    end
+  end
+
   describe "edge cases" do
     test "two nodes with multiple edges" do
       # Note: Adding multiple edges between same nodes creates separate entries
@@ -649,6 +683,13 @@ defmodule Yog.Flow.MinCutTest do
 
       # Min cut in disconnected graph is 0
       assert result.cut_value == 0
+    end
+
+    test "s_t_min_cut/4 fallbacks to edmonds_karp for unknown algorithm" do
+      graph = Yog.directed() |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+      result = MinCut.s_t_min_cut(graph, 1, 2, :non_existent_algo)
+      assert result.cut_value == 10
+      assert result.algorithm == :edmonds_karp
     end
   end
 end
