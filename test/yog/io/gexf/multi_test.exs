@@ -393,4 +393,99 @@ defmodule Yog.IO.GEXF.MultiTest do
   test "read nonexistent file" do
     assert {:error, _} = Multi.read("/tmp/nonexistent_multi_xyz.gexf")
   end
+
+  test "deserialize invalid xml returns error" do
+    assert {:error, _} = Multi.deserialize("not xml at all")
+    assert {:error, _} = Multi.deserialize("<?xml version=\"1.0\"?><invalid>")
+  end
+
+  test "write_with and read_with multigraph file" do
+    path = "/tmp/test_yog_gexf_multi_write_with.gexf"
+
+    original =
+      Yog.Multi.new(:directed)
+      |> Yog.Multi.add_node(1, %{name: "Alice", age: 30})
+      |> Yog.Multi.add_node(2, %{name: "Bob", age: 25})
+      |> Yog.Multi.add_edge(1, 2, %{type: "friend", since: "2020"})
+      |> elem(0)
+
+    node_attr = fn data ->
+      %{"name" => data.name, "age" => Integer.to_string(data.age)}
+    end
+
+    edge_attr = fn data ->
+      %{"type" => data.type, "since" => data.since}
+    end
+
+    node_folder = fn attrs ->
+      %{
+        name: Map.get(attrs, "name", ""),
+        age: String.to_integer(Map.get(attrs, "age", "0"))
+      }
+    end
+
+    edge_folder = fn attrs ->
+      %{
+        type: Map.get(attrs, "type", ""),
+        since: Map.get(attrs, "since", "")
+      }
+    end
+
+    try do
+      assert {:ok, nil} = Multi.write_with(path, node_attr, edge_attr, original)
+      assert File.exists?(path)
+
+      {:ok, loaded} = Multi.read_with(path, node_folder, edge_folder)
+
+      assert loaded.nodes[1].name == "Alice"
+      assert loaded.nodes[1].age == 30
+
+      edge_data =
+        loaded.edges
+        |> Map.values()
+        |> hd()
+        |> elem(2)
+
+      assert edge_data.type == "friend"
+      assert edge_data.since == "2020"
+    after
+      File.rm(path)
+    end
+  end
+
+  test "deserialize edges without explicit id" do
+    xml = """
+    <?xml version="1.0"?>
+    <gexf version="1.3">
+      <graph defaultedgetype="directed">
+        <nodes>
+          <node id="1" label="A"/>
+          <node id="2" label="B"/>
+        </nodes>
+        <edges>
+          <edge source="1" target="2"/>
+        </edges>
+      </graph>
+    </gexf>
+    """
+
+    {:ok, graph} = Multi.deserialize(xml)
+    assert Model.order(graph) == 2
+    assert Model.size(graph) == 1
+  end
+
+  test "deserialize multi with missing graph type defaults to directed" do
+    xml = """
+    <?xml version="1.0"?>
+    <gexf version="1.3">
+      <graph>
+        <nodes><node id="1"/></nodes>
+        <edges></edges>
+      </graph>
+    </gexf>
+    """
+
+    {:ok, graph} = Multi.deserialize(xml)
+    assert graph.kind == :directed
+  end
 end

@@ -547,4 +547,78 @@ defmodule Yog.IO.GEXFTest do
       File.rm(output_path)
     end
   end
+
+  test "deserialize invalid xml returns error" do
+    assert {:error, _} = GEXF.deserialize("not xml at all")
+    assert {:error, _} = GEXF.deserialize("<?xml version=\"1.0\"?><invalid>")
+  end
+
+  test "deserialize duplicate edges keeps only one" do
+    xml = """
+    <?xml version="1.0"?>
+    <gexf version="1.3">
+      <graph defaultedgetype="directed">
+        <nodes>
+          <node id="1" label="A"/>
+          <node id="2" label="B"/>
+        </nodes>
+        <edges>
+          <edge source="1" target="2" weight="first"/>
+          <edge source="1" target="2" weight="second"/>
+        </edges>
+      </graph>
+    </gexf>
+    """
+
+    {:ok, graph} = GEXF.deserialize(xml)
+    assert length(Yog.successors(graph, 1)) == 1
+  end
+
+  test "write_with and read_with file" do
+    path = "/tmp/test_yog_gexf_write_with.gexf"
+
+    original =
+      Yog.directed()
+      |> Yog.add_node(1, %{name: "Alice", age: 30})
+      |> Yog.add_node(2, %{name: "Bob", age: 25})
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: %{type: "friend", since: "2020"})
+
+    node_attr = fn data ->
+      %{"name" => data.name, "age" => Integer.to_string(data.age)}
+    end
+
+    edge_attr = fn data ->
+      %{"type" => data.type, "since" => data.since}
+    end
+
+    node_folder = fn attrs ->
+      %{
+        name: Map.get(attrs, "name", ""),
+        age: String.to_integer(Map.get(attrs, "age", "0"))
+      }
+    end
+
+    edge_folder = fn attrs ->
+      %{
+        type: Map.get(attrs, "type", ""),
+        since: Map.get(attrs, "since", "")
+      }
+    end
+
+    try do
+      assert {:ok, nil} = GEXF.write_with(path, node_attr, edge_attr, original)
+      assert File.exists?(path)
+
+      {:ok, loaded} = GEXF.read_with(path, node_folder, edge_folder)
+
+      assert Yog.Model.node(loaded, 1).name == "Alice"
+      assert Yog.Model.node(loaded, 1).age == 30
+
+      {_, edge_data} = Yog.successors(loaded, 1) |> hd()
+      assert edge_data.type == "friend"
+      assert edge_data.since == "2020"
+    after
+      File.rm(path)
+    end
+  end
 end
