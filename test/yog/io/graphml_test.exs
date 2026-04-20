@@ -545,4 +545,129 @@ defmodule Yog.IO.GraphMLTest do
     # Cleanup
     File.rm(output_path)
   end
+
+  test "write_with_types and read file" do
+    path = "/tmp/test_yog_graphml_write_types.graphml"
+
+    original =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+
+    node_attr = fn data -> %{"label" => data} end
+    edge_attr = fn _ -> %{} end
+
+    try do
+      assert {:ok, nil} = GraphML.write_with_types(path, node_attr, edge_attr, original)
+      assert File.exists?(path)
+
+      {:ok, loaded} = GraphML.read(path)
+      assert Yog.Model.node_count(loaded) == 2
+      assert Yog.Model.node(loaded, 1)["label"] == "A"
+    after
+      File.rm(path)
+    end
+  end
+
+  test "read_with custom mappers" do
+    path = "/tmp/test_yog_graphml_read_with.graphml"
+
+    xml = """
+    <?xml version="1.0"?>
+    <graphml xmlns="http://graphml.graphdrawing.org/xmlns">
+      <graph id="G" edgedefault="directed">
+        <node id="1"><data key="name">Alice</data></node>
+        <node id="2"><data key="name">Bob</data></node>
+        <edge source="1" target="2"><data key="relation">friend</data></edge>
+      </graph>
+    </graphml>
+    """
+
+    File.write!(path, xml)
+
+    try do
+      node_folder = fn attrs -> %{name: Map.get(attrs, "name", "")} end
+      edge_folder = fn attrs -> Map.get(attrs, "relation", "") end
+
+      {:ok, graph} = GraphML.read_with(path, node_folder, edge_folder)
+      assert Yog.Model.node(graph, 1).name == "Alice"
+      assert Yog.Model.node(graph, 2).name == "Bob"
+
+      {_, edge_data} = Yog.successors(graph, 1) |> hd()
+      assert edge_data == "friend"
+    after
+      File.rm(path)
+    end
+  end
+
+  test "deserialize invalid xml returns error" do
+    assert {:error, _} = GraphML.deserialize("not xml at all")
+    assert {:error, _} = GraphML.deserialize("<?xml version=\"1.0\"?><invalid>")
+  end
+
+  test "serialize with zero indent and no xml declaration" do
+    graph = Yog.directed() |> Yog.add_node(1, "Alice")
+    options = {:graphml_options, 0, false}
+
+    node_attr = fn data -> %{"label" => data} end
+    edge_attr = fn _ -> %{} end
+
+    xml = GraphML.serialize_with_options(node_attr, edge_attr, options, graph)
+
+    refute String.contains?(xml, "<?xml")
+    assert String.contains?(xml, "<node id=\"1\">")
+  end
+
+  test "serialize graph with no nodes produces empty graphml" do
+    graph = Yog.directed()
+    xml = GraphML.serialize(graph)
+
+    assert String.contains?(xml, "<graphml")
+    assert String.contains?(xml, "edgedefault=\"directed\"")
+  end
+
+  test "deserialize edge with no data elements" do
+    xml = """
+    <?xml version="1.0"?>
+    <graphml xmlns="http://graphml.graphdrawing.org/xmlns">
+      <graph id="G" edgedefault="directed">
+        <node id="1"></node>
+        <node id="2"></node>
+        <edge source="1" target="2"></edge>
+      </graph>
+    </graphml>
+    """
+
+    {:ok, graph} = GraphML.deserialize(xml)
+    assert Yog.Model.edge_count(graph) == 1
+
+    {_, edge_data} = Yog.successors(graph, 1) |> hd()
+    assert edge_data == %{}
+  end
+
+  test "roundtrip with custom attribute types" do
+    original =
+      Yog.directed()
+      |> Yog.add_node(1, %{name: "Alice", age: 30})
+      |> Yog.add_node(2, %{name: "Bob", age: 25})
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: %{since: "2020", weight: 5})
+
+    node_attr = fn data ->
+      %{"name" => data.name, "age" => Integer.to_string(data.age)}
+    end
+
+    edge_attr = fn data ->
+      %{"since" => data.since, "weight" => Integer.to_string(data.weight)}
+    end
+
+    xml = GraphML.serialize_with(node_attr, edge_attr, original)
+    {:ok, loaded} = GraphML.deserialize(xml)
+
+    assert Yog.Model.node(loaded, 1)["name"] == "Alice"
+    assert Yog.Model.node(loaded, 1)["age"] == "30"
+
+    {_, edge_data} = Yog.successors(loaded, 1) |> hd()
+    assert edge_data["since"] == "2020"
+    assert edge_data["weight"] == "5"
+  end
 end
