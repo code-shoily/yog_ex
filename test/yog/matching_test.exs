@@ -378,4 +378,180 @@ defmodule Yog.MatchingTest do
       end
     end)
   end
+
+  defp matching_size(matching), do: div(map_size(matching), 2)
+
+  describe "Blossom Algorithm" do
+    test "empty graph" do
+      graph = Yog.undirected()
+      matching = Matching.blossom_maximum_matching(graph)
+      assert matching == %{}
+    end
+
+    test "isolated vertices" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_node(3, nil)
+
+      matching = Matching.blossom_maximum_matching(graph)
+      assert matching == %{}
+    end
+
+    test "single edge" do
+      graph = Yog.from_edges(:undirected, [{1, 2, 1}])
+      matching = Matching.blossom_maximum_matching(graph)
+      assert matching_size(matching) == 1
+      assert matching[1] == 2
+      assert matching[2] == 1
+    end
+
+    test "triangle (C3) - odd cycle" do
+      graph = Yog.from_edges(:undirected, [{1, 2, 1}, {2, 3, 1}, {3, 1, 1}])
+      matching = Matching.blossom_maximum_matching(graph)
+      assert matching_size(matching) == 1
+      assert valid_matching?(matching)
+    end
+
+    test "square (C4) - even cycle" do
+      graph = Yog.from_edges(:undirected, [{1, 2, 1}, {2, 3, 1}, {3, 4, 1}, {4, 1, 1}])
+      matching = Matching.blossom_maximum_matching(graph)
+      assert matching_size(matching) == 2
+      assert valid_matching?(matching)
+    end
+
+    test "pentagon (C5) - odd cycle" do
+      graph =
+        Yog.from_edges(:undirected, [
+          {1, 2, 1},
+          {2, 3, 1},
+          {3, 4, 1},
+          {4, 5, 1},
+          {5, 1, 1}
+        ])
+
+      matching = Matching.blossom_maximum_matching(graph)
+      assert matching_size(matching) == 2
+      assert valid_matching?(matching)
+    end
+
+    test "complete K4" do
+      edges = for i <- 1..4, j <- 1..4, i < j, do: {i, j, 1}
+      graph = Yog.from_edges(:undirected, edges)
+      matching = Matching.blossom_maximum_matching(graph)
+      assert matching_size(matching) == 2
+      assert valid_matching?(matching)
+    end
+
+    test "complete K5" do
+      edges = for i <- 1..5, j <- 1..5, i < j, do: {i, j, 1}
+      graph = Yog.from_edges(:undirected, edges)
+      matching = Matching.blossom_maximum_matching(graph)
+      assert matching_size(matching) == 2
+      assert valid_matching?(matching)
+    end
+
+    test "complete K6" do
+      edges = for i <- 1..6, j <- 1..6, i < j, do: {i, j, 1}
+      graph = Yog.from_edges(:undirected, edges)
+      matching = Matching.blossom_maximum_matching(graph)
+      assert matching_size(matching) == 3
+      assert valid_matching?(matching)
+    end
+
+    test "star graph" do
+      graph = Yog.from_edges(:undirected, [{1, 2, 1}, {1, 3, 1}, {1, 4, 1}, {1, 5, 1}])
+      matching = Matching.blossom_maximum_matching(graph)
+      assert matching_size(matching) == 1
+      assert valid_matching?(matching)
+    end
+
+    test "path P5" do
+      graph =
+        Yog.from_edges(:undirected, [
+          {1, 2, 1},
+          {2, 3, 1},
+          {3, 4, 1},
+          {4, 5, 1}
+        ])
+
+      matching = Matching.blossom_maximum_matching(graph)
+      assert matching_size(matching) == 2
+      assert valid_matching?(matching)
+    end
+
+    test "Petersen graph" do
+      graph = Yog.Generator.Classic.petersen()
+      matching = Matching.blossom_maximum_matching(graph)
+      assert matching_size(matching) == 5
+      assert valid_matching?(matching)
+    end
+
+    test "two disjoint triangles" do
+      graph =
+        Yog.from_edges(:undirected, [
+          {1, 2, 1},
+          {2, 3, 1},
+          {3, 1, 1},
+          {4, 5, 1},
+          {5, 6, 1},
+          {6, 4, 1}
+        ])
+
+      matching = Matching.blossom_maximum_matching(graph)
+      assert matching_size(matching) == 2
+      assert valid_matching?(matching)
+    end
+
+    test "bowtie graph (two triangles sharing a vertex)" do
+      graph =
+        Yog.from_edges(:undirected, [
+          {1, 2, 1},
+          {2, 3, 1},
+          {3, 1, 1},
+          {3, 4, 1},
+          {4, 5, 1},
+          {5, 3, 1}
+        ])
+
+      matching = Matching.blossom_maximum_matching(graph)
+      assert matching_size(matching) == 2
+      assert valid_matching?(matching)
+    end
+
+    test "agrees with hopcroft_karp on bipartite graph" do
+      graph =
+        Yog.from_edges(:undirected, [
+          {:a1, :b1, 1},
+          {:a1, :b2, 1},
+          {:a2, :b2, 1},
+          {:a2, :b3, 1},
+          {:a3, :b3, 1}
+        ])
+
+      hk = Matching.hopcroft_karp(graph)
+      bl = Matching.blossom_maximum_matching(graph)
+
+      assert matching_size(hk) == matching_size(bl)
+    end
+
+    test "valid matching property on random graph" do
+      # Build a small random non-bipartite graph
+      edges =
+        for i <- 1..8, j <- 1..8, i < j, :rand.uniform() < 0.4, do: {i, j, 1}
+
+      graph =
+        Yog.undirected()
+        |> Yog.add_nodes_from(Enum.map(1..8, &{&1, nil}))
+        |> then(fn g ->
+          Enum.reduce(edges, g, fn {u, v, w}, acc ->
+            Yog.add_edge_ensure(acc, from: u, to: v, with: w)
+          end)
+        end)
+
+      matching = Matching.blossom_maximum_matching(graph)
+      assert valid_matching?(matching)
+    end
+  end
 end
