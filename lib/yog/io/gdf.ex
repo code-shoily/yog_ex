@@ -51,9 +51,11 @@ defmodule Yog.IO.GDF do
   - `separator`: `","`
   - `include_types`: `true`
   - `include_directed`: `{:none}` (auto-detects from graph type)
+  - `node_formatter`: `Kernel.to_string/1`
+  - `edge_formatter`: `Kernel.to_string/1`
   """
   def default_options do
-    {:gdf_options, ",", true, :none}
+    {:gdf_options, ",", true, :none, &Kernel.to_string/1, &Kernel.to_string/1}
   end
 
   @doc """
@@ -83,83 +85,81 @@ defmodule Yog.IO.GDF do
       true
   """
   def serialize_with(node_attr, edge_attr, options, graph) do
-    {:gdf_options, separator, include_types, _include_directed} = options
+    {separator, include_types, node_fmt, edge_fmt} =
+      case options do
+        {:gdf_options, sep, types, _, n_fmt, e_fmt} -> {sep, types, n_fmt, e_fmt}
+        {:gdf_options, sep, types, _} -> {sep, types, &Kernel.to_string/1, &Kernel.to_string/1}
+      end
+
     %Yog.Graph{kind: type, nodes: nodes_map} = graph
 
-    # Build node attributes map for all nodes
-    node_attrs_list =
+    # 1. Schema Discovery for Nodes
+    all_nodes_data =
       nodes_map
-      |> Enum.sort()
+      |> Enum.sort_by(fn {id, _} -> id end)
       |> Enum.map(fn {id, data} ->
         attrs = node_attr.(data)
-        # Prepend ID as first "name" column (don't overwrite existing "name")
-        [{" name", Kernel.to_string(id)}] ++ Map.to_list(attrs)
+        # Ensure ID is there as 'name', and remove any user 'name' to avoid collision
+        attrs = attrs |> Map.delete("name") |> Map.put("name", id)
+        {id, attrs}
       end)
 
-    # Extract node column names (preserve order and duplicates)
     node_columns =
-      if Enum.empty?(node_attrs_list) do
-        ["name"]
-      else
-        node_attrs_list
-        |> List.first()
-        |> Enum.map(fn {k, _v} -> String.trim(k) end)
-      end
+      all_nodes_data
+      |> Enum.reduce(MapSet.new(), fn {_, attrs}, acc ->
+        MapSet.union(acc, MapSet.new(Map.keys(attrs)))
+      end)
+      |> MapSet.delete("name")
+      |> Enum.sort()
+      |> then(fn cols -> ["name" | cols] end)
 
-    # Build node header
-    node_header =
-      if include_types do
-        "nodedef>" <>
-          Enum.map_join(node_columns, separator, fn col -> "#{col} VARCHAR" end)
-      else
-        "nodedef>" <> Enum.join(node_columns, separator)
-      end
+    node_header = build_section_header("nodedef>", node_columns, separator, include_types)
 
-    # Build node data lines
     node_lines =
-      Enum.map(node_attrs_list, fn attrs_list ->
-        Enum.map_join(attrs_list, separator, fn {_k, v} ->
-          escape_csv(v, separator)
+      Enum.map(all_nodes_data, fn {_, attrs} ->
+        Enum.map_join(node_columns, separator, fn col ->
+          value = Map.get(attrs, col, "")
+          escape_csv(value, separator, node_fmt)
         end)
       end)
 
-    # Build edge attributes
+    # 2. Schema Discovery for Edges
     edges = Model.all_edges(graph)
 
-    edge_attrs_list =
+    all_edges_data =
       Enum.map(edges, fn {from, to, weight} ->
         attrs = edge_attr.(weight)
-        directed_value = if type == :directed, do: "true", else: "false"
+
+        attrs =
+          attrs
+          |> Map.delete("node1")
+          |> Map.delete("node2")
+          |> Map.delete("directed")
+          |> Map.put("node1", from)
+          |> Map.put("node2", to)
+          |> Map.put("directed", if(type == :directed, do: "true", else: "false"))
 
         attrs
-        |> Map.put("node1", Kernel.to_string(from))
-        |> Map.put("node2", Kernel.to_string(to))
-        |> Map.put("directed", directed_value)
       end)
 
-    # Extract edge column names
     edge_columns =
-      if Enum.empty?(edge_attrs_list) do
-        ["node1", "node2", "directed"]
-      else
-        edge_attrs_list
-        |> List.first()
-        |> Map.keys()
-        |> Enum.sort()
-        |> move_to_front("node1")
-        |> move_to_front("node2", 1)
-        |> move_to_front("directed", 2)
-      end
+      all_edges_data
+      |> Enum.reduce(MapSet.new(), fn attrs, acc ->
+        MapSet.union(acc, MapSet.new(Map.keys(attrs)))
+      end)
+      |> MapSet.delete("node1")
+      |> MapSet.delete("node2")
+      |> MapSet.delete("directed")
+      |> Enum.sort()
+      |> then(fn cols -> ["node1", "node2", "directed" | cols] end)
 
-    # Build edge header
-    edge_header = build_edge_header(edge_columns, separator, include_types)
+    edge_header = build_section_header("edgedef>", edge_columns, separator, include_types)
 
-    # Build edge data lines
     edge_lines =
-      Enum.map(edge_attrs_list, fn attrs ->
+      Enum.map(all_edges_data, fn attrs ->
         Enum.map_join(edge_columns, separator, fn col ->
           value = Map.get(attrs, col, "")
-          escape_csv(value, separator)
+          escape_csv(value, separator, edge_fmt)
         end)
       end)
 
@@ -168,20 +168,20 @@ defmodule Yog.IO.GDF do
     |> Enum.join("\n")
   end
 
-  defp build_edge_header(edge_columns, separator, include_types) do
+  defp build_section_header(prefix, columns, separator, include_types) do
     if include_types do
-      "edgedef>" <>
-        Enum.map_join(edge_columns, separator, fn col ->
-          type_str = get_edge_column_type(col)
+      prefix <>
+        Enum.map_join(columns, separator, fn col ->
+          type_str = get_column_type(prefix, col)
           "#{col} #{type_str}"
         end)
     else
-      "edgedef>" <> Enum.join(edge_columns, separator)
+      prefix <> Enum.join(columns, separator)
     end
   end
 
-  defp get_edge_column_type("directed"), do: "BOOLEAN"
-  defp get_edge_column_type(_), do: "VARCHAR"
+  defp get_column_type(_, "directed"), do: "BOOLEAN"
+  defp get_column_type(_, _), do: "VARCHAR"
 
   @doc """
   Serializes a graph to GDF format where node and edge data are strings.
@@ -356,8 +356,8 @@ defmodule Yog.IO.GDF do
 
   # Private functions
 
-  defp escape_csv(value, separator) do
-    str_value = Kernel.to_string(value)
+  defp escape_csv(value, separator, formatter) do
+    str_value = if is_binary(value), do: value, else: formatter.(value)
 
     # Check if we need to quote (contains separator, quotes, or newlines)
     needs_quoting =
@@ -372,12 +372,6 @@ defmodule Yog.IO.GDF do
     else
       str_value
     end
-  end
-
-  defp move_to_front(list, item, position \\ 0) do
-    list
-    |> List.delete(item)
-    |> List.insert_at(position, item)
   end
 
   defp parse_gdf(input, node_folder, edge_folder) do
@@ -466,16 +460,18 @@ defmodule Yog.IO.GDF do
     else
       [id_str | _rest] = values
 
-      case Integer.parse(id_str) do
-        {id, _} ->
-          attrs = Enum.zip(columns, values) |> Enum.into(%{})
-          data = node_folder.(attrs)
-          new_graph = Yog.Model.add_node(acc_graph, id, data)
-          {:cont, {:ok, new_graph}}
+      # Yog supports any term as ID. Convert to integer if possible for convenience,
+      # but keep as string otherwise.
+      id =
+        case Integer.parse(id_str) do
+          {val, ""} -> val
+          _ -> id_str
+        end
 
-        :error ->
-          {:cont, {:ok, acc_graph}}
-      end
+      attrs = Enum.zip(columns, values) |> Enum.into(%{})
+      data = node_folder.(attrs)
+      new_graph = Yog.Model.add_node(acc_graph, id, data)
+      {:cont, {:ok, new_graph}}
     end
   end
 
@@ -522,8 +518,22 @@ defmodule Yog.IO.GDF do
   end
 
   defp add_edge_from_attrs(attrs, acc_graph, edge_folder) do
-    with {from, _} <- Integer.parse(Map.get(attrs, "node1", "")),
-         {to, _} <- Integer.parse(Map.get(attrs, "node2", "")) do
+    node1_str = Map.get(attrs, "node1", "")
+    node2_str = Map.get(attrs, "node2", "")
+
+    if node1_str != "" and node2_str != "" do
+      from =
+        case Integer.parse(node1_str) do
+          {val, ""} -> val
+          _ -> node1_str
+        end
+
+      to =
+        case Integer.parse(node2_str) do
+          {val, ""} -> val
+          _ -> node2_str
+        end
+
       # Ensure nodes exist (auto-create if needed)
       acc_graph = ensure_node_exists(acc_graph, from, edge_folder)
       acc_graph = ensure_node_exists(acc_graph, to, edge_folder)
@@ -535,7 +545,7 @@ defmodule Yog.IO.GDF do
         {:error, _} -> {:cont, {:ok, acc_graph}}
       end
     else
-      _ -> {:cont, {:ok, acc_graph}}
+      {:cont, {:ok, acc_graph}}
     end
   end
 
