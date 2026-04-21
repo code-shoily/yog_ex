@@ -684,7 +684,7 @@ defmodule Yog.Render.DOT do
   defp build_node_lines(nodes, options) do
     Enum.map_join(nodes, "", fn {id, data} ->
       label = options.node_label.(id, data)
-      id_str = to_string(id)
+      id_str = Yog.Utils.safe_string(id)
 
       # Build attribute list starting with label
       attrs = [{:label, label}]
@@ -748,7 +748,7 @@ defmodule Yog.Render.DOT do
             ""
 
           ids ->
-            Enum.map_join(ids, ";\n", &("    " <> to_string(&1))) <> ";\n"
+            Enum.map_join(ids, ";\n", &("    " <> Yog.Utils.safe_string(&1))) <> ";\n"
         end
 
       header <> label <> style <> fillcolor <> color <> node_list <> "  }\n"
@@ -760,7 +760,7 @@ defmodule Yog.Render.DOT do
   defp build_ranks(rank_list) do
     Enum.map_join(rank_list, "", fn {rank_type, node_ids} ->
       rank_str = Atom.to_string(rank_type)
-      nodes = Enum.map_join(node_ids, "; ", &to_string/1)
+      nodes = Enum.map_join(node_ids, "; ", &Yog.Utils.safe_string/1)
       "  {rank=#{rank_str}; #{nodes};}\n"
     end)
   end
@@ -804,7 +804,7 @@ defmodule Yog.Render.DOT do
         # Format attributes
         attr_str = format_attributes_list(attrs)
 
-        "  #{from_id} #{arrow} #{to_id} [#{attr_str}];\n"
+        "  #{Yog.Utils.safe_string(from_id)} #{arrow} #{Yog.Utils.safe_string(to_id)} [#{attr_str}];\n"
       end)
     end)
     |> Enum.join("")

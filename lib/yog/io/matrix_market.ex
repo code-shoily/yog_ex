@@ -45,22 +45,22 @@ defmodule Yog.IO.MatrixMarket do
   @doc """
   Returns default Matrix Market serialization options.
 
-  - `edge_weight`: Function to convert edge data to a number.
-  - `edge_formatter`: `Kernel.to_string/1`
-  - `node_formatter`: `Kernel.to_string/1`
+  - `weight_formatter` - Function to convert edge weights to strings (default: `&Yog.Utils.safe_string/1`)
+  - `edge_formatter`: `Yog.Utils.safe_string/1`
+  - `node_formatter`: `Yog.Utils.safe_string/1`
   """
   def default_options do
-    {:matrix_market_options, &Yog.Utils.to_weight_label/1, &Kernel.to_string/1,
-     &Kernel.to_string/1}
+    {:matrix_market_options, &Yog.Utils.to_weight_label/1, &Yog.Utils.safe_string/1,
+     &Yog.Utils.safe_string/1}
   end
 
   @doc """
   Creates Matrix Market options with custom configurations.
   """
-  def options_with(edge_weight, opts \\ []) do
-    edge_fmt = Keyword.get(opts, :edge_formatter, &Kernel.to_string/1)
-    node_fmt = Keyword.get(opts, :node_formatter, &Kernel.to_string/1)
-    {:matrix_market_options, edge_weight, edge_fmt, node_fmt}
+  def options_with(weight_formatter, opts \\ []) do
+    node_fmt = Keyword.get(opts, :node_formatter, &Yog.Utils.safe_string/1)
+    edge_fmt = Keyword.get(opts, :edge_formatter, &Yog.Utils.safe_string/1)
+    {:matrix_market_options, weight_formatter, edge_fmt, node_fmt}
   end
 
   @doc """
@@ -86,10 +86,10 @@ defmodule Yog.IO.MatrixMarket do
   Serializes a graph to Matrix Market format with custom options.
   """
   def serialize_with(options, graph) do
-    {edge_weight_fn, edge_fmt, node_fmt} =
+    {weight_fmt, node_fmt, edge_fmt} =
       case options do
-        {:matrix_market_options, ew, ef, nf} -> {ew, ef, nf}
-        {:matrix_market_options, ew} -> {ew, &Kernel.to_string/1, &Kernel.to_string/1}
+        {:matrix_market_options, wf, ef, nf} -> {wf, nf, ef}
+        {:matrix_market_options, wf} -> {wf, &Yog.Utils.safe_string/1, &Yog.Utils.safe_string/1}
       end
 
     %Yog.Graph{kind: type} = graph
@@ -109,7 +109,7 @@ defmodule Yog.IO.MatrixMarket do
     data_lines =
       edges
       |> Enum.map_join("\n", fn {from, to, weight} ->
-        w_str = edge_weight_fn.(weight)
+        w_str = weight_fmt.(weight)
         "#{node_fmt.(from)} #{node_fmt.(to)} #{edge_fmt.(w_str)}"
       end)
 

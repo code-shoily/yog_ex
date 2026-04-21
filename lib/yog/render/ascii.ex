@@ -205,7 +205,7 @@ defmodule Yog.Render.ASCII do
 
         # Get cell content (centered in 3 spaces)
         content = Map.get(occupants, cell_id, " ")
-        cell_text = " #{content} "
+        cell_text = " #{Yog.Utils.safe_string(content)} "
 
         # Check if there's a passage to the right
         if has_passage?(graph, cell_id, right_id) do
@@ -275,7 +275,7 @@ defmodule Yog.Render.ASCII do
       if c < cols do
         cell_id = Grid.coord_to_id(r, c, cols)
         content = Map.get(occupants, cell_id, " ")
-        wall <> " #{content} "
+        wall <> " #{Yog.Utils.safe_string(content)} "
       else
         wall
       end

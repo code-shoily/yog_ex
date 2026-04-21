@@ -54,7 +54,7 @@ defmodule Yog.IO.TGF do
   """
   def default_options do
     {:tgf_options, fn data -> Yog.Utils.to_label("", data) end, fn _ -> :none end,
-     &Kernel.to_string/1, &Kernel.to_string/1}
+     &Yog.Utils.safe_string/1, &Yog.Utils.safe_string/1}
   end
 
   @doc """
@@ -84,8 +84,8 @@ defmodule Yog.IO.TGF do
       :ok
   """
   def options_with(node_label, edge_label, opts \\ []) do
-    node_fmt = Keyword.get(opts, :node_formatter, &Kernel.to_string/1)
-    edge_fmt = Keyword.get(opts, :edge_formatter, &Kernel.to_string/1)
+    node_fmt = Keyword.get(opts, :node_formatter, &Yog.Utils.safe_string/1)
+    edge_fmt = Keyword.get(opts, :edge_formatter, &Yog.Utils.safe_string/1)
     {:tgf_options, node_label, edge_label, node_fmt, edge_fmt}
   end
 
@@ -122,8 +122,11 @@ defmodule Yog.IO.TGF do
   def serialize_with(options, graph) do
     {node_label_fn, edge_label_fn, node_fmt, edge_fmt} =
       case options do
-        {:tgf_options, n_lbl, e_lbl, n_fmt, e_fmt} -> {n_lbl, e_lbl, n_fmt, e_fmt}
-        {:tgf_options, n_lbl, e_lbl} -> {n_lbl, e_lbl, &Kernel.to_string/1, &Kernel.to_string/1}
+        {:tgf_options, n_lbl, e_lbl, n_fmt, e_fmt} ->
+          {n_lbl, e_lbl, n_fmt, e_fmt}
+
+        {:tgf_options, n_lbl, e_lbl} ->
+          {n_lbl, e_lbl, &Yog.Utils.safe_string/1, &Yog.Utils.safe_string/1}
       end
 
     %Yog.Graph{nodes: nodes_map} = graph

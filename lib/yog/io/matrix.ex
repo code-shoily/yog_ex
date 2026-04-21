@@ -207,7 +207,7 @@ defmodule Yog.IO.Matrix do
 
   ## Options
 
-  - `weight_formatter` - Function to convert edge weights to strings (default: `&Kernel.to_string/1`)
+  - `weight_formatter` - Function to convert edge weights to strings (default: `&Yog.Utils.safe_string/1`)
   - `delimiter` - String to separate values (default: " ")
 
   ## Examples
@@ -231,7 +231,7 @@ defmodule Yog.IO.Matrix do
   """
   @spec to_string(Yog.graph(), keyword()) :: String.t()
   def to_string(graph, opts \\ []) do
-    weight_fmt = Keyword.get(opts, :weight_formatter, &Kernel.to_string/1)
+    weight_fmt = Keyword.get(opts, :weight_formatter, &Yog.Utils.safe_string/1)
     delimiter = Keyword.get(opts, :delimiter, " ")
 
     {_nodes, matrix} = to_matrix(graph)

@@ -298,7 +298,7 @@ defmodule Yog.Render.Mermaid do
   defp build_node_lines(nodes, options) do
     Enum.map_join(nodes, "\n", fn {id, data} ->
       label = options.node_label.(id, data)
-      node_def = "  #{id}#{node_shape_brackets(options.node_shape, label)}"
+      node_def = "  #{Yog.Utils.safe_string(id)}#{node_shape_brackets(options.node_shape, label)}"
 
       # Add highlight class if this node is in the highlighted list
       if options.highlighted_nodes && id in options.highlighted_nodes do
@@ -337,7 +337,9 @@ defmodule Yog.Render.Mermaid do
 
         label = options.edge_label.(weight)
         label_part = if label == "", do: "", else: "|#{label}|"
-        edge_def = "  #{from_id} #{arrow}#{label_part} #{to_id}"
+
+        edge_def =
+          "  #{Yog.Utils.safe_string(from_id)} #{arrow}#{label_part} #{Yog.Utils.safe_string(to_id)}"
 
         # Check if this edge should be highlighted
         is_highlighted =

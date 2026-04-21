@@ -55,7 +55,7 @@ defmodule Yog.IO.GDF do
   - `edge_formatter`: `Kernel.to_string/1`
   """
   def default_options do
-    {:gdf_options, ",", true, :none, &Kernel.to_string/1, &Kernel.to_string/1}
+    {:gdf_options, ",", true, :none, &Yog.Utils.safe_string/1, &Yog.Utils.safe_string/1}
   end
 
   @doc """
@@ -87,8 +87,11 @@ defmodule Yog.IO.GDF do
   def serialize_with(node_attr, edge_attr, options, graph) do
     {separator, include_types, node_fmt, edge_fmt} =
       case options do
-        {:gdf_options, sep, types, _, n_fmt, e_fmt} -> {sep, types, n_fmt, e_fmt}
-        {:gdf_options, sep, types, _} -> {sep, types, &Kernel.to_string/1, &Kernel.to_string/1}
+        {:gdf_options, sep, types, _, n_fmt, e_fmt} ->
+          {sep, types, n_fmt, e_fmt}
+
+        {:gdf_options, sep, types, _} ->
+          {sep, types, &Yog.Utils.safe_string/1, &Yog.Utils.safe_string/1}
       end
 
     %Yog.Graph{kind: type, nodes: nodes_map} = graph

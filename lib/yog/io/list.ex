@@ -269,7 +269,7 @@ defmodule Yog.IO.List do
   def to_string(graph, opts \\ []) do
     weighted = Keyword.get(opts, :weighted, false)
     delimiter = Keyword.get(opts, :delimiter, ":")
-    node_fmt = Keyword.get(opts, :node_formatter, &Kernel.to_string/1)
+    node_fmt = Keyword.get(opts, :node_formatter, &Yog.Utils.safe_string/1)
     weight_fmt = Keyword.get(opts, :weight_formatter, &Yog.Utils.to_weight_label/1)
 
     entries = to_list(graph)

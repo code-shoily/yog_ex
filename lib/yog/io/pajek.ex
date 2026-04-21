@@ -68,8 +68,8 @@ defmodule Yog.IO.Pajek do
   """
   def default_options do
     {:pajek_options, fn data -> Yog.Utils.to_label("", data) end, fn _ -> :none end,
-     fn _ -> default_node_attributes() end, false, false, &Kernel.to_string/1,
-     &Kernel.to_string/1}
+     fn _ -> default_node_attributes() end, false, false, &Yog.Utils.safe_string/1,
+     &Yog.Utils.safe_string/1}
   end
 
   @doc """
@@ -110,8 +110,8 @@ defmodule Yog.IO.Pajek do
         include_visuals,
         opts \\ []
       ) do
-    node_fmt = Keyword.get(opts, :node_formatter, &Kernel.to_string/1)
-    edge_fmt = Keyword.get(opts, :edge_formatter, &Kernel.to_string/1)
+    node_fmt = Keyword.get(opts, :node_formatter, &Yog.Utils.safe_string/1)
+    edge_fmt = Keyword.get(opts, :edge_formatter, &Yog.Utils.safe_string/1)
 
     {:pajek_options, node_label, edge_weight, node_attributes, include_coordinates,
      include_visuals, node_fmt, edge_fmt}
@@ -157,7 +157,7 @@ defmodule Yog.IO.Pajek do
           {nl, ew, na, ic, iv, nf, ef}
 
         {:pajek_options, nl, ew, na, ic, iv} ->
-          {nl, ew, na, ic, iv, &Kernel.to_string/1, &Kernel.to_string/1}
+          {nl, ew, na, ic, iv, &Yog.Utils.safe_string/1, &Yog.Utils.safe_string/1}
       end
 
     %Yog.Graph{kind: type, nodes: nodes_map} = graph

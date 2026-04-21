@@ -48,13 +48,13 @@ defmodule Yog.IO.LEDA do
 
   ## Example
 
-      iex> {:leda_options, _ns, _es, _nd, _ed} = Yog.IO.LEDA.default_options()
+      iex> {:leda_options, _, _, _, _, _, _} = Yog.IO.LEDA.default_options()
       iex> :ok
       :ok
   """
   def default_options do
     {:leda_options, fn data -> Yog.Utils.to_label("", data) end, &Yog.Utils.to_weight_label/1,
-     fn s -> s end, fn s -> s end}
+     fn s -> s end, fn s -> s end, &Yog.Utils.safe_string/1, &Yog.Utils.safe_string/1}
   end
 
   @doc """
@@ -86,8 +86,10 @@ defmodule Yog.IO.LEDA do
         fn str -> String.to_integer(str) end        # Deserialize edge
       )
   """
-  def options_with(node_serializer, edge_serializer, node_deserializer, edge_deserializer) do
-    {:leda_options, node_serializer, edge_serializer, node_deserializer, edge_deserializer}
+  def options_with(node_ser, edge_ser, node_deser, edge_deser, opts \\ []) do
+    node_fmt = Keyword.get(opts, :node_formatter, &Yog.Utils.safe_string/1)
+    edge_fmt = Keyword.get(opts, :edge_formatter, &Yog.Utils.safe_string/1)
+    {:leda_options, node_ser, edge_ser, node_deser, edge_deser, node_fmt, edge_fmt}
   end
 
   @doc """
@@ -122,7 +124,15 @@ defmodule Yog.IO.LEDA do
       leda = Yog.IO.LEDA.serialize_with(options, graph)
   """
   def serialize_with(options, graph) do
-    {:leda_options, node_ser, edge_ser, _, _} = options
+    {node_ser, edge_ser, _node_deser, _edge_deser, node_fmt, _edge_fmt} =
+      case options do
+        {:leda_options, ns, es, nd, ed, nf, ef} ->
+          {ns, es, nd, ed, nf, ef}
+
+        {:leda_options, ns, es, nd, ed} ->
+          {ns, es, nd, ed, &Yog.Utils.safe_string/1, &Yog.Utils.safe_string/1}
+      end
+
     %Yog.Graph{kind: type, nodes: nodes_map} = graph
 
     # Direction: -1 for directed, -2 for undirected
@@ -147,7 +157,7 @@ defmodule Yog.IO.LEDA do
       edges
       |> Enum.map(fn {from, to, weight} ->
         serialized = edge_ser.(weight)
-        "#{from} #{to} 0 |{#{serialized}}|"
+        "#{node_fmt.(from)} #{node_fmt.(to)} 0 |{#{serialized}}|"
       end)
 
     (["LEDA.GRAPH", "string", "string", direction, "#{node_count}"] ++
