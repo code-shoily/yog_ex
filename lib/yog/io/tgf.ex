@@ -43,15 +43,18 @@ defmodule Yog.IO.TGF do
   Default behavior:
   - Node labels: Convert data to string using `to_string/1`
   - Edge labels: No labels (returns `:none`)
+  - Node formatter: `Kernel.to_string/1`
+  - Edge formatter: `Kernel.to_string/1`
 
   ## Example
 
-      iex> {:tgf_options, _node_fn, _edge_fn} = Yog.IO.TGF.default_options()
+      iex> {:tgf_options, _node_fn, _edge_fn, _node_fmt, _edge_fmt} = Yog.IO.TGF.default_options()
       iex> :ok
       :ok
   """
   def default_options do
-    {:tgf_options, fn data -> Yog.Utils.to_label("", data) end, fn _ -> :none end}
+    {:tgf_options, fn data -> Yog.Utils.to_label("", data) end, fn _ -> :none end,
+     &Kernel.to_string/1, &Kernel.to_string/1}
   end
 
   @doc """
@@ -76,12 +79,14 @@ defmodule Yog.IO.TGF do
       ...>   fn data -> "Node: " <> to_string(data) end,
       ...>   fn weight -> {:some, "W:" <> to_string(weight)} end
       ...> )
-      iex> {:tgf_options, _, _} = options
+      iex> {:tgf_options, _, _, _, _} = options
       iex> :ok
       :ok
   """
-  def options_with(node_label, edge_label) do
-    {:tgf_options, node_label, edge_label}
+  def options_with(node_label, edge_label, opts \\ []) do
+    node_fmt = Keyword.get(opts, :node_formatter, &Kernel.to_string/1)
+    edge_fmt = Keyword.get(opts, :edge_formatter, &Kernel.to_string/1)
+    {:tgf_options, node_label, edge_label, node_fmt, edge_fmt}
   end
 
   @doc """
@@ -115,7 +120,12 @@ defmodule Yog.IO.TGF do
       true
   """
   def serialize_with(options, graph) do
-    {:tgf_options, node_label_fn, edge_label_fn} = options
+    {node_label_fn, edge_label_fn, node_fmt, edge_fmt} =
+      case options do
+        {:tgf_options, n_lbl, e_lbl, n_fmt, e_fmt} -> {n_lbl, e_lbl, n_fmt, e_fmt}
+        {:tgf_options, n_lbl, e_lbl} -> {n_lbl, e_lbl, &Kernel.to_string/1, &Kernel.to_string/1}
+      end
+
     %Yog.Graph{nodes: nodes_map} = graph
 
     # Serialize nodes
@@ -124,7 +134,7 @@ defmodule Yog.IO.TGF do
       |> Enum.sort()
       |> Enum.map(fn {id, data} ->
         label = node_label_fn.(data)
-        "#{id} #{label}"
+        "#{node_fmt.(id)} #{node_fmt.(label)}"
       end)
 
     # Serialize edges
@@ -134,8 +144,8 @@ defmodule Yog.IO.TGF do
       edges
       |> Enum.map(fn {from, to, weight} ->
         case edge_label_fn.(weight) do
-          :none -> "#{from} #{to}"
-          {:some, label} -> "#{from} #{to} #{label}"
+          :none -> "#{node_fmt.(from)} #{node_fmt.(to)}"
+          {:some, label} -> "#{node_fmt.(from)} #{node_fmt.(to)} #{edge_fmt.(label)}"
         end
       end)
 
@@ -396,9 +406,6 @@ defmodule Yog.IO.TGF do
       {:ok, id, data} ->
         add_node_if_unique(graph, id, data, rest, node_parser, warnings, line_num)
 
-      {:error, error} ->
-        {:error, error}
-
       {:warning, warning} ->
         parse_nodes_loop(rest, graph, node_parser, [warning | warnings], line_num + 1)
     end
@@ -420,26 +427,16 @@ defmodule Yog.IO.TGF do
     case String.split(line, ~r/\s+/, parts: 2) do
       [id_str] ->
         # No label, use ID as label
-        case parse_int(id_str) do
-          {:ok, id} ->
-            data = node_parser.(id, Integer.to_string(id))
-            {:ok, id, data}
-
-          :error ->
-            {:error, {:invalid_node_id, line_num, id_str}}
-        end
+        {:ok, id} = parse_int(id_str)
+        data = node_parser.(id, Kernel.to_string(id))
+        {:ok, id, data}
 
       [id_str, label] ->
-        case parse_int(id_str) do
-          {:ok, id} ->
-            # Normalize whitespace: trim and collapse multiple spaces to single space
-            normalized_label = label |> String.split() |> Enum.join(" ")
-            data = node_parser.(id, normalized_label)
-            {:ok, id, data}
-
-          :error ->
-            {:error, {:invalid_node_id, line_num, id_str}}
-        end
+        {:ok, id} = parse_int(id_str)
+        # Normalize whitespace: trim and collapse multiple spaces to single space
+        normalized_label = label |> String.split() |> Enum.join(" ")
+        data = node_parser.(id, normalized_label)
+        {:ok, id, data}
 
       [] ->
         {:warning, {:empty_line, line_num}}
@@ -469,9 +466,6 @@ defmodule Yog.IO.TGF do
     case parse_edge_line(trimmed, line_num, edge_parser) do
       {:ok, from, to, weight} ->
         add_edge_with_nodes(graph, from, to, weight, rest, edge_parser, warnings, line_num)
-
-      {:error, error} ->
-        {:error, error}
 
       {:warning, warning} ->
         parse_edges_loop(rest, graph, edge_parser, [warning | warnings], line_num + 1)
@@ -523,17 +517,14 @@ defmodule Yog.IO.TGF do
     end
   end
 
-  defp parse_int_or_error(str, line_num) do
-    case parse_int(str) do
-      {:ok, int} -> {:ok, int}
-      :error -> {:error, {:invalid_edge_endpoint, line_num, str}}
-    end
+  defp parse_int_or_error(str, _line_num) do
+    parse_int(str)
   end
 
   defp parse_int(str) do
     case Integer.parse(str) do
       {int, ""} -> {:ok, int}
-      _ -> :error
+      _ -> {:ok, str}
     end
   end
 
@@ -543,7 +534,7 @@ defmodule Yog.IO.TGF do
     if Map.has_key?(nodes_map, id) do
       graph
     else
-      Yog.Model.add_node(graph, id, Integer.to_string(id))
+      Yog.Model.add_node(graph, id, Kernel.to_string(id))
     end
   end
 end

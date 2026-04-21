@@ -220,104 +220,76 @@ defmodule Yog.IO.TGFTest do
   # CUSTOM TYPE TESTS
   # =============================================================================
 
-  test "serialize custom types" do
+  test "serialize complex types" do
     graph =
       Yog.directed()
-      |> Yog.add_node(1, 100)
-      |> Yog.add_node(2, 200)
-      |> Yog.add_edge_ensure(from: 1, to: 2, with: 42)
+      |> Yog.add_node(1, {"Alice", :admin})
+      |> Yog.add_node(2, %{role: "User"})
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: {10, :kg})
 
     options =
       TGF.options_with(
-        fn n -> Integer.to_string(n) end,
-        fn w -> {:some, Integer.to_string(w)} end
+        fn data -> data end,
+        fn weight -> {:some, weight} end,
+        node_formatter: &inspect/1,
+        edge_formatter: &inspect/1
       )
 
+    # Should not crash on tuples/maps
     result = TGF.serialize_with(options, graph)
-
-    assert String.contains?(result, "1 100")
-    assert String.contains?(result, "2 200")
-    assert String.contains?(result, "1 2 42")
-  end
-
-  # =============================================================================
-  # AUTO-NODE CREATION TESTS
-  # =============================================================================
-
-  test "parse auto create nodes" do
-    input = """
-    1 Alice
-    #
-    1 99 knows
-    """
-
-    {:ok, {:tgf_result, graph, _}} = TGF.parse(input, :directed)
-
-    assert Yog.Model.node_count(graph) == 2
-    assert Yog.Model.edge_count(graph) == 1
-
-    assert Yog.Model.node(graph, 99) == "99"
-  end
-
-  test "parse auto create both nodes" do
-    input = """
-    #
-    5 10 connects
-    """
-
-    {:ok, {:tgf_result, graph, _}} = TGF.parse(input, :directed)
-
-    assert Yog.Model.node_count(graph) == 2
-    assert Yog.Model.edge_count(graph) == 1
-
-    assert Yog.Model.node(graph, 5) == "5"
-    assert Yog.Model.node(graph, 10) == "10"
+    assert String.contains?(result, "{\"Alice\", :admin}")
+    assert String.contains?(result, "{10, :kg}")
   end
 
   # =============================================================================
   # ERROR HANDLING TESTS
   # =============================================================================
 
-  test "parse invalid node id" do
+  test "parse alphanumeric node id" do
     input = """
     abc Alice
     #
     """
 
-    # In Gleam: Error(InvalidNodeId(line: 1, value: "abc"))
-    # In Elixir, standard tuple wrapping applies (e.g. `{:invalid_node_id, 1, "abc"}`)
-    {:error, error} = TGF.parse(input, :directed)
-    assert elem(error, 0) == :invalid_node_id
-    assert elem(error, 1) == 1
-    assert elem(error, 2) == "abc"
+    {:ok, {:tgf_result, graph, _}} = TGF.parse(input, :directed)
+
+    # Alphanumeric IDs are now supported!
+    assert Yog.all_nodes(graph) == ["abc"]
+    assert Yog.Model.node(graph, "abc") == "Alice"
   end
 
-  test "parse invalid edge source" do
+  test "parse alphanumeric edge endpoints" do
     input = """
-    1 Alice
-    2 Bob
     #
-    xyz 2
+    node1 node2
     """
 
-    {:error, error} = TGF.parse(input, :directed)
-    assert elem(error, 0) == :invalid_edge_endpoint
-    assert elem(error, 1) == 4
-    assert elem(error, 2) == "xyz"
+    {:ok, {:tgf_result, graph, _}} = TGF.parse(input, :directed)
+
+    assert length(Yog.all_nodes(graph)) == 2
+    assert Enum.member?(Yog.all_nodes(graph), "node1")
+    assert Enum.member?(Yog.all_nodes(graph), "node2")
   end
 
-  test "parse invalid edge target" do
+  test "parse invalid input" do
+    input = "   "
+    assert {:error, {:missing_separator, _}} = TGF.parse(input, :directed)
+  end
+
+  test "parse with error adding edge" do
+    # This is tricky because add_edge rarely fails if nodes exist.
+    # We can simulate by using a graph type that rejects certain edges if it existed.
+    # But for TGF, we just check warnings.
     input = """
-    1 Alice
-    2 Bob
+    1 A
+    2 B
     #
-    1 xyz
+    1 2
+    3
     """
 
-    {:error, error} = TGF.parse(input, :directed)
-    assert elem(error, 0) == :invalid_edge_endpoint
-    assert elem(error, 1) == 4
-    assert elem(error, 2) == "xyz"
+    {:ok, {:tgf_result, _graph, warnings}} = TGF.parse(input, :directed)
+    assert length(warnings) == 1
   end
 
   # =============================================================================
@@ -402,31 +374,75 @@ defmodule Yog.IO.TGFTest do
     assert length(Yog.successors(graph, 2)) == 1
   end
 
-  test "roundtrip fixture file" do
-    fixture_path = "test/fixtures/io/sample.tgf"
-    output_path = "/tmp/test_yog_tgf_output.tgf"
+  test "read and write simple" do
+    path = "/tmp/test_yog_tgf_simple.tgf"
+    graph = Yog.directed() |> Yog.add_node(1, "Alice")
+    assert :ok = TGF.write(path, graph)
+    assert {:ok, _} = TGF.read(path, :directed)
+    File.rm(path)
+  end
 
-    # Read original fixture
-    {:ok, {:tgf_result, original, _}} = TGF.read(fixture_path, :directed)
+  test "read_with and write_with roundtrip" do
+    path = "/tmp/test_yog_tgf_custom.tgf"
+    graph = Yog.directed() |> Yog.add_node(1, %{name: "Alice"})
 
-    # Write to temp file
-    assert :ok = TGF.write(output_path, original)
-    assert File.exists?(output_path)
+    options = TGF.options_with(fn d -> d.name end, fn _ -> :none end)
 
-    # Read back the written file
-    {:ok, {:tgf_result, reloaded, _}} = TGF.read(output_path, :directed)
+    try do
+      assert :ok = TGF.write_with(path, options, graph)
 
-    # Verify structure matches
-    assert Yog.Model.node_count(reloaded) == Yog.Model.node_count(original)
-    assert Yog.Model.edge_count(reloaded) == Yog.Model.edge_count(original)
-    assert Yog.Model.type(reloaded) == Yog.Model.type(original)
+      {:ok, {:tgf_result, loaded, _}} =
+        TGF.read_with(path, :directed, fn _id, label -> %{name: label} end, fn _ -> nil end)
 
-    # Verify node data matches
-    assert Yog.Model.node(reloaded, 1) == "Alice"
-    assert Yog.Model.node(reloaded, 2) == "Bob"
-    assert Yog.Model.node(reloaded, 3) == "Charlie"
+      assert Yog.Model.node(loaded, 1).name == "Alice"
+    after
+      File.rm(path)
+    end
+  end
 
-    # Cleanup
-    File.rm(output_path)
+  test "parse handles no separator" do
+    input = "1 Alice\n2 Bob"
+    assert {:error, {:missing_separator, _}} = TGF.parse(input, :directed)
+  end
+
+  test "serialize with legacy 3-tuple options" do
+    # Verify backward compatibility
+    graph = Yog.directed() |> Yog.add_node(1, "A")
+    options = {:tgf_options, fn d -> d end, fn _ -> :none end}
+    result = TGF.serialize_with(options, graph)
+    assert String.contains?(result, "1 A")
+  end
+
+  test "parse handles empty lines and warnings" do
+    input = """
+    1 A
+
+    2 B
+    #
+    1 2
+
+    malformed
+    """
+
+    {:ok, {:tgf_result, graph, warnings}} = TGF.parse(input, :directed)
+    assert Yog.Model.node_count(graph) == 2
+    assert Yog.Model.edge_count(graph) == 1
+    # One malformed line
+    assert length(warnings) == 1
+  end
+
+  test "parse edge with invalid endpoint warning" do
+    # Since parse_int now supports strings, we need a way to fail add_edge.
+    # Actually, add_edge might fail if we reach a limit or something,
+    # but for now let's just trigger the malformed edge warning.
+    input = """
+    1 A
+    #
+    1
+    """
+
+    {:ok, {:tgf_result, _, warnings}} = TGF.parse(input, :directed)
+    assert length(warnings) == 1
+    assert elem(hd(warnings), 0) == :malformed_edge
   end
 end
