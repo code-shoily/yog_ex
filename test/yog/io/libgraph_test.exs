@@ -107,4 +107,75 @@ defmodule Yog.IO.LibgraphTest do
     assert Yog.Model.order(yog_dag.graph) == 2
     assert yog_dag.graph.nodes[1] == "a"
   end
+
+  test "to_libgraph handles map-based weights safely" do
+    graph =
+      Yog.directed()
+      |> Yog.add_edge_with(1, 2, %{weight: 10, meta: "foo"}, & &1)
+
+    libgraph = Libgraph.to_libgraph(graph)
+    edge = hd(Graph.edges(libgraph))
+    assert edge.weight == 10
+    # Original data preserved in label
+    assert edge.label == %{weight: 10, meta: "foo"}
+  end
+
+  test "to_libgraph handles custom weight_fn for complex data" do
+    # User case: %{travel_time: {10, :minute}}
+    data = %{route: :bus, travel_time: {10, :minute}}
+
+    graph =
+      Yog.directed()
+      |> Yog.add_edge_with(1, 2, data, & &1)
+
+    # Use custom weight_fn to extract the 10
+    libgraph =
+      Libgraph.to_libgraph(graph,
+        weight_fn: fn
+          %{travel_time: {mins, :minute}} -> mins
+          _ -> 1
+        end
+      )
+
+    edge = hd(Graph.edges(libgraph))
+    assert edge.weight == 10
+    assert edge.label == data
+  end
+
+  test "to_libgraph handles multigraphs safely" do
+    {multi, _} =
+      Yog.Multi.new(:directed)
+      |> Yog.Multi.add_edge(1, 2, 5)
+
+    {multi, _} = Yog.Multi.add_edge(multi, 1, 2, 10)
+
+    libgraph = Libgraph.to_libgraph(multi)
+    assert libgraph.type == :directed
+    assert length(Graph.edges(libgraph)) == 2
+    # Libgraph handles parallel edges by having multiple entries in edges list
+    weights = Graph.edges(libgraph) |> Enum.map(& &1.weight) |> Enum.sort()
+    assert weights == [5, 10]
+  end
+
+  test "to_libgraph uses default weight 1 for non-numerical weights in maps" do
+    graph =
+      Yog.directed()
+      |> Yog.add_edge_with(1, 2, %{weight: "not a number"}, & &1)
+
+    libgraph = Libgraph.to_libgraph(graph)
+    edge = hd(Graph.edges(libgraph))
+    assert edge.weight == 1
+    assert edge.label == %{weight: "not a number"}
+  end
+
+  test "to_libgraph handles non-map non-number data safely" do
+    graph =
+      Yog.directed()
+      |> Yog.add_edge_with(1, 2, :some_atom, & &1)
+
+    libgraph = Libgraph.to_libgraph(graph)
+    edge = hd(Graph.edges(libgraph))
+    assert edge.weight == 1
+    assert edge.label == :some_atom
+  end
 end
