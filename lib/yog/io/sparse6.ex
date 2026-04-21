@@ -166,20 +166,20 @@ defmodule Yog.IO.Sparse6 do
     end
   end
 
-  defp parse_extended_header(<<a, b, c, rest::binary>>) do
-    n = (a - 63) * 4096 + (b - 63) * 64 + (c - 63)
+  defp parse_extended_header(<<126, a, b, c, d, e, f, rest::binary>>) do
+    n =
+      (a - 63) * 1_073_741_824 +
+        (b - 63) * 16_777_216 +
+        (c - 63) * 262_144 +
+        (d - 63) * 4096 +
+        (e - 63) * 64 +
+        (f - 63)
+
     {:ok, n, rest}
   end
 
-  defp parse_extended_header(<<126, a, b, c, d, e, f, rest::binary>>) do
-    n =
-      (a - 63) * 2_821_109_907_456 +
-        (b - 63) * 68_719_476_736 +
-        (c - 63) * 1_073_741_824 +
-        (d - 63) * 16_777_216 +
-        (e - 63) * 262_144 +
-        (f - 63) * 4096
-
+  defp parse_extended_header(<<a, b, c, rest::binary>>) do
+    n = (a - 63) * 4096 + (b - 63) * 64 + (c - 63)
     {:ok, n, rest}
   end
 
@@ -283,13 +283,18 @@ defmodule Yog.IO.Sparse6 do
 
   defp encode_edges(graph, n) do
     # Build adjacency by column (higher endpoint), rows in decreasing order
+    edges_by_high =
+      Enum.reduce(Model.all_edges(graph), %{}, fn {u, v, _}, acc ->
+        {low, high} = if u < v, do: {u, v}, else: {v, u}
+        Map.update(acc, high, [low], fn existing -> [low | existing] end)
+      end)
+
     columns =
       for v <- 1..(n - 1)//1 do
         rows =
-          for u <- (v - 1)..0//-1,
-              Model.has_edge?(graph, u, v) do
-            u
-          end
+          edges_by_high
+          |> Map.get(v, [])
+          |> Enum.sort(:desc)
 
         {v, rows}
       end
@@ -327,16 +332,16 @@ defmodule Yog.IO.Sparse6 do
   end
 
   defp encode_header(n) do
-    a = div(n, 2_821_109_907_456)
-    r1 = rem(n, 2_821_109_907_456)
-    b = div(r1, 68_719_476_736)
-    r2 = rem(r1, 68_719_476_736)
-    c = div(r2, 1_073_741_824)
-    r3 = rem(r2, 1_073_741_824)
-    d = div(r3, 16_777_216)
-    r4 = rem(r3, 16_777_216)
-    e = div(r4, 262_144)
-    f = div(rem(r4, 262_144), 4096)
+    a = div(n, 1_073_741_824)
+    r1 = rem(n, 1_073_741_824)
+    b = div(r1, 16_777_216)
+    r2 = rem(r1, 16_777_216)
+    c = div(r2, 262_144)
+    r3 = rem(r2, 262_144)
+    d = div(r3, 4096)
+    r4 = rem(r3, 4096)
+    e = div(r4, 64)
+    f = rem(r4, 64)
     <<126, 126, a + 63, b + 63, c + 63, d + 63, e + 63, f + 63>>
   end
 

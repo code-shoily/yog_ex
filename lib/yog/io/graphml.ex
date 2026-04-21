@@ -110,14 +110,14 @@ defmodule Yog.IO.GraphML do
 
   ## Example
 
-      iex> {:graphml_options, indent, include_xml_declaration} = Yog.IO.GraphML.default_options()
+      iex> {:graphml_options, indent, include_xml_declaration, _, _} = Yog.IO.GraphML.default_options()
       iex> indent
       2
       iex> include_xml_declaration
       true
   """
   def default_options do
-    {:graphml_options, 2, true}
+    {:graphml_options, 2, true, &Yog.Utils.safe_string/1, &Yog.Utils.safe_string/1}
   end
 
   @doc """
@@ -198,7 +198,7 @@ defmodule Yog.IO.GraphML do
       iex> graph = Yog.directed() |> Yog.add_node(1, "A")
       iex> node_attr = fn data -> %{"label" => data} end
       iex> edge_attr = fn _ -> %{} end
-      iex> options = {:graphml_options, 4, false}  # 4-space indent, no XML declaration
+      iex> options = {:graphml_options, 4, false, &Yog.Utils.safe_string/1, &Yog.Utils.safe_string/1}  # 4-space indent, no XML declaration
       iex> xml = Yog.IO.GraphML.serialize_with_types_and_options(node_attr, edge_attr, options, graph)
       iex> String.contains?(xml, "<?xml")
       false
@@ -208,10 +208,24 @@ defmodule Yog.IO.GraphML do
   end
 
   @doc """
+  Creates GraphML options with custom formatting.
+  """
+  def options_with(indent, include_declaration, opts \\ []) do
+    node_fmt = Keyword.get(opts, :node_formatter, &Yog.Utils.safe_string/1)
+    edge_fmt = Keyword.get(opts, :edge_formatter, &Yog.Utils.safe_string/1)
+    {:graphml_options, indent, include_declaration, node_fmt, edge_fmt}
+  end
+
+  @doc """
   Serializes a graph to a GraphML string with custom options.
   """
   def serialize_with_options(node_attr, edge_attr, options, graph) do
-    {:graphml_options, indent, include_xml_declaration} = options
+    {indent, include_xml_declaration, node_fmt, edge_fmt} =
+      case options do
+        {:graphml_options, i, d, nf, ef} -> {i, d, nf, ef}
+        {:graphml_options, i, d} -> {i, d, &Kernel.to_string/1, &Kernel.to_string/1}
+      end
+
     %Yog.Graph{kind: type, nodes: nodes_map} = graph
 
     # Collect all node and edge attributes
@@ -254,11 +268,11 @@ defmodule Yog.IO.GraphML do
     key_defs =
       (Enum.map(node_keys, fn key ->
          indent_str <>
-           "<key id=\"#{escape_xml(key)}\" for=\"node\" attr.name=\"#{escape_xml(key)}\" attr.type=\"string\"/>"
+           "<key id=\"#{escape_xml(key, node_fmt)}\" for=\"node\" attr.name=\"#{escape_xml(key, node_fmt)}\" attr.type=\"string\"/>"
        end) ++
          Enum.map(edge_keys, fn key ->
            indent_str <>
-             "<key id=\"#{escape_xml(key)}\" for=\"edge\" attr.name=\"#{escape_xml(key)}\" attr.type=\"string\"/>"
+             "<key id=\"#{escape_xml(key, edge_fmt)}\" for=\"edge\" attr.name=\"#{escape_xml(key, edge_fmt)}\" attr.type=\"string\"/>"
          end))
       |> Enum.join("\n")
 
@@ -279,7 +293,8 @@ defmodule Yog.IO.GraphML do
           Enum.map_join(attrs, "\n", fn {key, value} ->
             indent_str <>
               indent_str <>
-              indent_str <> "<data key=\"#{escape_xml(key)}\">#{escape_xml(value)}</data>"
+              indent_str <>
+              "<data key=\"#{escape_xml(key, node_fmt)}\">#{escape_xml(value, node_fmt)}</data>"
           end)
 
         node_content =
@@ -289,7 +304,7 @@ defmodule Yog.IO.GraphML do
             ""
           end
 
-        indent_str <> indent_str <> "<node id=\"#{id}\">#{node_content}</node>"
+        indent_str <> indent_str <> "<node id=\"#{node_fmt.(id)}\">#{node_content}</node>"
       end)
 
     nodes_section = if nodes_xml != "", do: nodes_xml <> "\n", else: ""
@@ -304,7 +319,8 @@ defmodule Yog.IO.GraphML do
           Enum.map_join(attrs, "\n", fn {key, value} ->
             indent_str <>
               indent_str <>
-              indent_str <> "<data key=\"#{escape_xml(key)}\">#{escape_xml(value)}</data>"
+              indent_str <>
+              "<data key=\"#{escape_xml(key, edge_fmt)}\">#{escape_xml(value, edge_fmt)}</data>"
           end)
 
         edge_content =
@@ -315,7 +331,8 @@ defmodule Yog.IO.GraphML do
           end
 
         indent_str <>
-          indent_str <> "<edge source=\"#{from}\" target=\"#{to}\">#{edge_content}</edge>"
+          indent_str <>
+          "<edge source=\"#{node_fmt.(from)}\" target=\"#{node_fmt.(to)}\">#{edge_content}</edge>"
       end)
 
     edges_section = if edges_xml != "", do: edges_xml <> "\n", else: ""
@@ -635,9 +652,9 @@ defmodule Yog.IO.GraphML do
 
   # Private functions
 
-  defp escape_xml(value) do
+  defp escape_xml(value, formatter) do
     value
-    |> Kernel.to_string()
+    |> formatter.()
     |> String.replace("&", "&amp;")
     |> String.replace("<", "&lt;")
     |> String.replace(">", "&gt;")

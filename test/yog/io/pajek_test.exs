@@ -98,6 +98,29 @@ defmodule Yog.IO.PajekTest do
     assert String.contains?(result, ~s("Bob"))
   end
 
+  test "serialize complex types" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, {"Alice", :admin})
+      |> Yog.add_node(2, %{role: "User"})
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: {10, :kg})
+
+    options =
+      Pajek.options_with(
+        fn d -> d end,
+        fn w -> {:some, w} end,
+        fn _ -> Pajek.default_node_attributes() end,
+        false,
+        false,
+        node_formatter: &inspect/1,
+        edge_formatter: &inspect/1
+      )
+
+    result = Pajek.serialize_with(options, graph)
+    assert String.contains?(result, "{\"Alice\", :admin}")
+    assert String.contains?(result, "{10, :kg}")
+  end
+
   test "to_string alias test" do
     graph =
       Yog.directed()
@@ -151,9 +174,30 @@ defmodule Yog.IO.PajekTest do
     assert {:error, :empty_input} = Pajek.parse("")
   end
 
+  test "parse alphanumeric ids" do
+    input = "*Vertices 2\nA \"Alice\"\nB \"Bob\"\n*Arcs\nA B"
+
+    {:ok, {:pajek_result, graph, _warnings}} = Pajek.parse(input)
+
+    assert Yog.all_nodes(graph) == ["A", "B"]
+    assert Yog.Model.node(graph, "A") == "Alice"
+  end
+
   test "parse invalid header" do
     input = "Invalid\n1 \"A\"\n*Arcs\n1 2"
     assert {:error, {:invalid_vertices_line, 1, "Invalid"}} = Pajek.parse(input)
+  end
+
+  test "parse edge header edge cases" do
+    input = """
+    *Vertices 1
+    1 "A"
+
+    *UnknownHeader
+    """
+
+    {:ok, {:pajek_result, graph, _}} = Pajek.parse(input)
+    assert Yog.Model.node_count(graph) == 1
   end
 
   test "parse multiple edges" do
@@ -336,12 +380,57 @@ defmodule Yog.IO.PajekTest do
   end
 
   test "parse with malformed lines" do
-    input = "*Vertices 2\n1 \"A\"\n2 \"B\"\n*Arcs\n1 2\ninvalid line\n2 1"
+    input = """
+    *Vertices 2
+    1 "A"
+    2 "B"
+    *Arcs
+    1 2
+    malformed line
+    2 1
+    """
 
     {:ok, {:pajek_result, graph, warnings}} = Pajek.parse(input)
 
     assert Yog.Model.edge_count(graph) == 2
     assert warnings != []
+  end
+
+  test "parse weight edge cases" do
+    input = """
+    *Vertices 2
+    1 "A"
+    2 "B"
+    *Arcs
+    1 2 string_weight
+    """
+
+    {:ok, {:pajek_result, graph, _}} = Pajek.parse_with(input, & &1, & &1)
+    # Weight should be "string_weight"
+    {_, _, weight} = hd(Yog.Model.all_edges(graph))
+    assert weight == {:some, "string_weight"}
+  end
+
+  test "parse unquoted node with only ID" do
+    input = """
+    *Vertices 1
+    1
+    *Arcs
+    """
+
+    {:ok, {:pajek_result, graph, _}} = Pajek.parse(input)
+    assert Yog.Model.node(graph, 1) == "1"
+  end
+
+  test "parse legacy options" do
+    graph = Yog.directed() |> Yog.add_node(1, "A")
+
+    options =
+      {:pajek_options, fn d -> d end, fn _ -> :none end,
+       fn _ -> Pajek.default_node_attributes() end, false, false}
+
+    result = Pajek.serialize_with(options, graph)
+    assert String.contains?(result, "1 \"A\"")
   end
 
   # =============================================================================

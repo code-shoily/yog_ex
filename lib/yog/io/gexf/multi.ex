@@ -10,11 +10,34 @@ defmodule Yog.IO.GEXF.Multi do
   alias Yog.IO.GEXF.Common
   alias Yog.IO.XMLUtils
   alias Yog.Multi.Model
+  alias Yog.Utils
+
+  @doc """
+  Returns default GEXF serialization options.
+  """
+  def default_options do
+    {:gexf_options, &Utils.safe_string/1, &Utils.safe_string/1}
+  end
+
+  @doc """
+  Creates GEXF options with custom formatters.
+  """
+  def options_with(node_fmt, edge_fmt) do
+    {:gexf_options, node_fmt, edge_fmt}
+  end
 
   @doc """
   Serializes a multigraph to GEXF with custom attribute mappers.
   """
   def serialize_with(node_attr, edge_attr, graph) do
+    serialize_with_options(node_attr, edge_attr, default_options(), graph)
+  end
+
+  @doc """
+  Serializes a multigraph to GEXF format with custom attribute mappers and options.
+  """
+  def serialize_with_options(node_attr, edge_attr, options, graph) do
+    {:gexf_options, node_fmt, edge_fmt} = options
     %Model.Graph{kind: type, nodes: nodes_map, edges: edges_map} = graph
     edge_default = if type == :directed, do: "directed", else: "undirected"
 
@@ -31,8 +54,8 @@ defmodule Yog.IO.GEXF.Multi do
       "<gexf xmlns=\"http://gexf.net/1.3\" xmlns:viz=\"http://gexf.net/1.3/viz\" version=\"1.3\">\n",
       "  <graph mode=\"static\" defaultedgetype=\"#{edge_default}\">\n",
       Common.build_attribute_definitions(node_keys, edge_keys),
-      Common.build_nodes_xml(nodes_map, node_attr, node_keys),
-      build_edges_xml(edges_map, edge_attr, edge_keys),
+      Common.build_nodes_xml(nodes_map, node_attr, node_keys, node_fmt),
+      build_edges_xml(edges_map, edge_attr, edge_keys, node_fmt, edge_fmt),
       "  </graph>\n",
       "</gexf>"
     ]
@@ -106,7 +129,7 @@ defmodule Yog.IO.GEXF.Multi do
   # Serialization helpers
   # ==========================================================================
 
-  defp build_edges_xml(edges_map, edge_attr, edge_keys) do
+  defp build_edges_xml(edges_map, edge_attr, edge_keys, node_fmt, edge_fmt) do
     if map_size(edges_map) == 0 do
       "    <edges></edges>\n"
     else
@@ -114,7 +137,16 @@ defmodule Yog.IO.GEXF.Multi do
         edges_map
         |> Enum.sort_by(fn {eid, _} -> eid end)
         |> Enum.map(fn {eid, {from, to, weight}} ->
-          Common.build_single_edge_xml(eid, from, to, weight, edge_attr, edge_keys)
+          Common.build_single_edge_xml(
+            eid,
+            from,
+            to,
+            weight,
+            edge_attr,
+            edge_keys,
+            node_fmt,
+            edge_fmt
+          )
         end)
 
       ["    <edges>\n", edges_inner, "    </edges>\n"]

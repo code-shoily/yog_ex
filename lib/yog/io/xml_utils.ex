@@ -5,7 +5,7 @@ defmodule Yog.IO.XMLUtils do
   Escapes special XML characters in a string.
   """
   def escape_xml(value) do
-    str = to_string(value)
+    str = Yog.Utils.safe_string(value)
 
     if String.contains?(str, ["&", "<", ">", "\"", "'"]) do
       String.replace(str, ~r/[&<>"']/, fn

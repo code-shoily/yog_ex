@@ -261,10 +261,10 @@ defmodule Yog.Utils do
         data
       end
 
-    label_str = Kernel.to_string(label)
+    label_str = safe_string(label)
 
     if label_str == "" do
-      Kernel.to_string(id)
+      safe_string(id)
     else
       label_str
     end
@@ -288,10 +288,29 @@ defmodule Yog.Utils do
   @spec to_weight_label(any()) :: String.t()
   def to_weight_label(weight) do
     if is_map(weight) do
-      Map.get(weight, "weight") || Map.get(weight, :weight) || Map.get(weight, "label") ||
-        Map.get(weight, :label) || ""
+      label =
+        Map.get(weight, "weight") || Map.get(weight, :weight) || Map.get(weight, "label") ||
+          Map.get(weight, :label) || ""
+
+      safe_string(label)
     else
-      Kernel.to_string(weight)
+      safe_string(weight)
+    end
+  end
+
+  @doc """
+  Safely converts any Elixir term to a string.
+
+  Uses `Kernel.to_string/1` for binaries, atoms, and numbers, and falls back
+  to `inspect/1` for complex types like tuples, maps, and lists.
+  """
+  def safe_string(val) do
+    case val do
+      nil -> ""
+      v when is_binary(v) -> v
+      v when is_atom(v) -> Atom.to_string(v)
+      v when is_number(v) -> Kernel.to_string(v)
+      v -> inspect(v)
     end
   end
 end

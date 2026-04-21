@@ -53,41 +53,51 @@ defmodule Yog.IO.JSON do
   """
   def default_export_options do
     {:json_export_options, :yog_generic, true, &default_node_serializer/1,
-     &default_edge_serializer/1, false, %{}}
+     &default_edge_serializer/1, false, %{}, &Yog.Utils.safe_string/1, &Yog.Utils.safe_string/1}
   end
 
   @doc """
   Creates export options with custom serializers for generic types.
   """
-  def export_options_with(node_serializer, edge_serializer) do
-    {:json_export_options, :yog_generic, true, node_serializer, edge_serializer, false, %{}}
+  def export_options_with(node_serializer, edge_serializer, opts \\ []) do
+    node_fmt = Keyword.get(opts, :node_formatter, &Yog.Utils.safe_string/1)
+    edge_fmt = Keyword.get(opts, :edge_formatter, &Yog.Utils.safe_string/1)
+
+    {:json_export_options, :yog_generic, true, node_serializer, edge_serializer, false, %{},
+     node_fmt, edge_fmt}
   end
 
   @doc """
   Converts a graph to a JSON string according to options.
   """
   def to_json(graph, options \\ default_export_options()) do
-    {:json_export_options, format, include_metadata?, node_ser, edge_ser, _pretty?, _meta} =
-      options
+    {format, include_metadata?, node_ser, edge_ser, _pretty?, _meta, node_fmt, edge_fmt} =
+      case options do
+        {:json_export_options, f, im, ns, es, p, m, nf, ef} ->
+          {f, im, ns, es, p, m, nf, ef}
+
+        {:json_export_options, f, im, ns, es, p, m} ->
+          {f, im, ns, es, p, m, &Yog.Utils.safe_string/1, &Yog.Utils.safe_string/1}
+      end
 
     case format do
       :yog_generic ->
-        to_generic_format(graph, node_ser, edge_ser, include_metadata?)
+        to_generic_format(graph, node_ser, edge_ser, include_metadata?, node_fmt, edge_fmt)
 
       :network_x ->
-        to_networkx_format(graph, node_ser, edge_ser, include_metadata?)
+        to_networkx_format(graph, node_ser, edge_ser, include_metadata?, node_fmt, edge_fmt)
 
       :d3_force ->
-        to_d3_format(graph, node_ser, edge_ser)
+        to_d3_format(graph, node_ser, edge_ser, node_fmt, edge_fmt)
 
       :cytoscape ->
-        to_cytoscape_format(graph, node_ser, edge_ser)
+        to_cytoscape_format(graph, node_ser, edge_ser, node_fmt, edge_fmt)
 
       :visjs ->
-        to_visjs_format(graph, node_ser, edge_ser)
+        to_visjs_format(graph, node_ser, edge_ser, node_fmt, edge_fmt)
 
       _ ->
-        to_generic_format(graph, node_ser, edge_ser, include_metadata?)
+        to_generic_format(graph, node_ser, edge_ser, include_metadata?, node_fmt, edge_fmt)
     end
     |> Jason.encode!()
   end
@@ -150,10 +160,16 @@ defmodule Yog.IO.JSON do
   Converts a multigraph to a JSON string.
   """
   def to_json_multi(graph, options \\ default_export_options()) do
-    {:json_export_options, _format, include_metadata?, node_ser, edge_ser, _pretty?, _meta} =
-      options
+    {_format, include_metadata?, node_ser, edge_ser, _pretty?, _meta, node_fmt, edge_fmt} =
+      case options do
+        {:json_export_options, f, im, ns, es, p, m, nf, ef} ->
+          {f, im, ns, es, p, m, nf, ef}
 
-    to_generic_multi_format(graph, node_ser, edge_ser, include_metadata?)
+        {:json_export_options, f, im, ns, es, p, m} ->
+          {f, im, ns, es, p, m, &Yog.Utils.safe_string/1, &Yog.Utils.safe_string/1}
+      end
+
+    to_generic_multi_format(graph, node_ser, edge_ser, include_metadata?, node_fmt, edge_fmt)
     |> Jason.encode!()
   end
 
@@ -192,18 +208,34 @@ defmodule Yog.IO.JSON do
   defp gleam_json_to_term(other), do: other
 
   # Serialize data using the provided serializer
-  defp serialize_data(data, serializer) do
+  defp serialize_data(data, serializer, formatter) do
     result = serializer.(data)
 
     # Check if result is a Gleam JSON iolist (starts with numbers or nested lists)
     if is_list(result) and (is_integer(List.first(result)) or is_list(List.first(result))) do
       gleam_json_to_term(result)
     else
-      result
+      deep_clean(result, formatter)
     end
   end
 
-  defp to_generic_format(graph, node_ser, edge_ser, include_metadata?) do
+  defp deep_clean(data, formatter) do
+    case data do
+      m when is_map(m) ->
+        Map.new(m, fn {k, v} -> {deep_clean(k, formatter), deep_clean(v, formatter)} end)
+
+      l when is_list(l) ->
+        Enum.map(l, &deep_clean(&1, formatter))
+
+      v when is_binary(v) or is_number(v) or is_boolean(v) or is_nil(v) ->
+        v
+
+      v ->
+        formatter.(v)
+    end
+  end
+
+  defp to_generic_format(graph, node_ser, edge_ser, include_metadata?, node_fmt, edge_fmt) do
     %Yog.Graph{kind: type, nodes: nodes_map} = graph
     graph_type = if type == :directed, do: "directed", else: "undirected"
     edges = Model.all_edges(graph)
@@ -211,17 +243,17 @@ defmodule Yog.IO.JSON do
     nodes_json =
       Enum.map(nodes_map, fn {id, data} ->
         %{
-          id: id,
-          data: serialize_data(data, node_ser)
+          id: node_fmt.(id),
+          data: serialize_data(data, node_ser, node_fmt)
         }
       end)
 
     edges_json =
       Enum.map(edges, fn {from, to, weight} ->
         %{
-          source: from,
-          target: to,
-          weight: serialize_data(weight, edge_ser)
+          source: node_fmt.(from),
+          target: node_fmt.(to),
+          weight: serialize_data(weight, edge_ser, edge_fmt)
         }
       end)
 
@@ -240,7 +272,7 @@ defmodule Yog.IO.JSON do
     end
   end
 
-  defp to_networkx_format(graph, node_ser, edge_ser, include_metadata?) do
+  defp to_networkx_format(graph, node_ser, edge_ser, include_metadata?, node_fmt, edge_fmt) do
     %Yog.Graph{kind: type, nodes: nodes_map} = graph
     directed = type == :directed
     edges = Model.all_edges(graph)
@@ -248,17 +280,17 @@ defmodule Yog.IO.JSON do
     nodes_json =
       Enum.map(nodes_map, fn {id, data} ->
         %{
-          id: id,
-          data: serialize_data(data, node_ser)
+          id: node_fmt.(id),
+          data: serialize_data(data, node_ser, node_fmt)
         }
       end)
 
     links_json =
       Enum.map(edges, fn {from, to, weight} ->
         %{
-          source: from,
-          target: to,
-          weight: serialize_data(weight, edge_ser)
+          source: node_fmt.(from),
+          target: node_fmt.(to),
+          weight: serialize_data(weight, edge_ser, edge_fmt)
         }
       end)
 
@@ -277,24 +309,24 @@ defmodule Yog.IO.JSON do
     end
   end
 
-  defp to_d3_format(graph, node_ser, edge_ser) do
+  defp to_d3_format(graph, node_ser, edge_ser, node_fmt, edge_fmt) do
     %Yog.Graph{nodes: nodes_map} = graph
     edges = Model.all_edges(graph)
 
     nodes_json =
       Enum.map(nodes_map, fn {id, data} ->
         %{
-          id: id,
-          data: serialize_data(data, node_ser)
+          id: node_fmt.(id),
+          data: serialize_data(data, node_ser, node_fmt)
         }
       end)
 
     links_json =
       Enum.map(edges, fn {from, to, weight} ->
         %{
-          source: from,
-          target: to,
-          weight: serialize_data(weight, edge_ser)
+          source: node_fmt.(from),
+          target: node_fmt.(to),
+          weight: serialize_data(weight, edge_ser, edge_fmt)
         }
       end)
 
@@ -304,7 +336,7 @@ defmodule Yog.IO.JSON do
     }
   end
 
-  defp to_cytoscape_format(graph, node_ser, edge_ser) do
+  defp to_cytoscape_format(graph, node_ser, edge_ser, node_fmt, edge_fmt) do
     %Yog.Graph{nodes: nodes_map} = graph
     edges = Model.all_edges(graph)
 
@@ -312,8 +344,8 @@ defmodule Yog.IO.JSON do
       Enum.map(nodes_map, fn {id, data} ->
         %{
           data: %{
-            id: id,
-            label: serialize_data(data, node_ser)
+            id: node_fmt.(id),
+            label: serialize_data(data, node_ser, node_fmt)
           }
         }
       end)
@@ -322,9 +354,9 @@ defmodule Yog.IO.JSON do
       Enum.map(edges, fn {from, to, weight} ->
         %{
           data: %{
-            source: from,
-            target: to,
-            weight: serialize_data(weight, edge_ser)
+            source: node_fmt.(from),
+            target: node_fmt.(to),
+            weight: serialize_data(weight, edge_ser, edge_fmt)
           }
         }
       end)
@@ -334,24 +366,24 @@ defmodule Yog.IO.JSON do
     }
   end
 
-  defp to_visjs_format(graph, node_ser, edge_ser) do
+  defp to_visjs_format(graph, node_ser, edge_ser, node_fmt, edge_fmt) do
     %Yog.Graph{nodes: nodes_map} = graph
     edges = Model.all_edges(graph)
 
     nodes_json =
       Enum.map(nodes_map, fn {id, data} ->
         %{
-          id: id,
-          label: serialize_data(data, node_ser)
+          id: node_fmt.(id),
+          label: serialize_data(data, node_ser, node_fmt)
         }
       end)
 
     edges_json =
       Enum.map(edges, fn {from, to, weight} ->
         %{
-          from: from,
-          to: to,
-          label: serialize_data(weight, edge_ser)
+          from: node_fmt.(from),
+          to: node_fmt.(to),
+          label: serialize_data(weight, edge_ser, edge_fmt)
         }
       end)
 
@@ -361,7 +393,7 @@ defmodule Yog.IO.JSON do
     }
   end
 
-  defp to_generic_multi_format(graph, node_ser, edge_ser, include_metadata?) do
+  defp to_generic_multi_format(graph, node_ser, edge_ser, include_metadata?, node_fmt, edge_fmt) do
     # Note: using direct field access as this function handles both Yog.Graph and Yog.Multi.Graph
     # This will be replaced with protocol dispatch when protocols are implemented
     graph_type = if graph.kind == :directed, do: "directed", else: "undirected"
@@ -378,18 +410,18 @@ defmodule Yog.IO.JSON do
     nodes_json =
       Enum.map(nodes, fn {id, data} ->
         %{
-          id: id,
-          data: serialize_data(data, node_ser)
+          id: node_fmt.(id),
+          data: serialize_data(data, node_ser, node_fmt)
         }
       end)
 
     edges_json =
       Enum.map(edges, fn {edge_id, from, to, weight} ->
         %{
-          id: edge_id,
-          source: from,
-          target: to,
-          weight: serialize_data(weight, edge_ser)
+          id: node_fmt.(edge_id),
+          source: node_fmt.(from),
+          target: node_fmt.(to),
+          weight: serialize_data(weight, edge_ser, edge_fmt)
         }
       end)
 

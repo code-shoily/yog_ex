@@ -46,16 +46,21 @@ defmodule Yog.IO.MatrixMarket do
   Returns default Matrix Market serialization options.
 
   - `edge_weight`: Function to convert edge data to a number.
+  - `edge_formatter`: `Kernel.to_string/1`
+  - `node_formatter`: `Kernel.to_string/1`
   """
   def default_options do
-    {:matrix_market_options, &Yog.Utils.to_weight_label/1}
+    {:matrix_market_options, &Yog.Utils.to_weight_label/1, &Kernel.to_string/1,
+     &Kernel.to_string/1}
   end
 
   @doc """
   Creates Matrix Market options with custom configurations.
   """
-  def options_with(edge_weight) do
-    {:matrix_market_options, edge_weight}
+  def options_with(edge_weight, opts \\ []) do
+    edge_fmt = Keyword.get(opts, :edge_formatter, &Kernel.to_string/1)
+    node_fmt = Keyword.get(opts, :node_formatter, &Kernel.to_string/1)
+    {:matrix_market_options, edge_weight, edge_fmt, node_fmt}
   end
 
   @doc """
@@ -81,7 +86,12 @@ defmodule Yog.IO.MatrixMarket do
   Serializes a graph to Matrix Market format with custom options.
   """
   def serialize_with(options, graph) do
-    {:matrix_market_options, edge_weight_fn} = options
+    {edge_weight_fn, edge_fmt, node_fmt} =
+      case options do
+        {:matrix_market_options, ew, ef, nf} -> {ew, ef, nf}
+        {:matrix_market_options, ew} -> {ew, &Kernel.to_string/1, &Kernel.to_string/1}
+      end
+
     %Yog.Graph{kind: type} = graph
 
     node_count = Model.order(graph)
@@ -100,7 +110,7 @@ defmodule Yog.IO.MatrixMarket do
       edges
       |> Enum.map_join("\n", fn {from, to, weight} ->
         w_str = edge_weight_fn.(weight)
-        "#{from} #{to} #{w_str}"
+        "#{node_fmt.(from)} #{node_fmt.(to)} #{edge_fmt.(w_str)}"
       end)
 
     [header, comment, size_line, data_lines, ""]
@@ -305,15 +315,33 @@ defmodule Yog.IO.MatrixMarket do
              {to, ""} <- Integer.parse(to_str) do
           weight_val =
             case {header.field, weight_parts} do
-              {"pattern", _} -> 1.0
-              {"real", [w | _]} -> parse_float(w)
-              {"integer", [w | _]} -> parse_int(w)
-              {"complex", [r, i | _]} -> {parse_float(r), parse_float(i)}
-              {_, [w | _]} -> w
-              _ -> 1.0
+              {"pattern", _} ->
+                1.0
+
+              {"real", [w | _]} ->
+                parse_float(w)
+
+              {"integer", [w | _]} ->
+                parse_int(w)
+
+              {"complex", [r, i | _]} ->
+                {parse_float(r), parse_float(i)}
+
+              {"complex", _} ->
+                # Incomplete complex field
+                {:warning, {:incomplete_complex_line, line}}
+
+              {_, [w | _]} ->
+                w
+
+              _ ->
+                1.0
             end
 
-          {:ok, from, to, edge_parser.(weight_val)}
+          case weight_val do
+            {:warning, _} = warning -> warning
+            val -> {:ok, from, to, edge_parser.(val)}
+          end
         else
           _ -> {:warning, {:invalid_edge_line, line}}
         end

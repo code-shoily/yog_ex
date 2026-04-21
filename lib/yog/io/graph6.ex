@@ -92,10 +92,27 @@ defmodule Yog.IO.Graph6 do
 
         if valid_node_range?(nodes) do
           n = length(nodes)
-          bits = adjacency_bits(graph, n)
-          header = encode_header(n)
-          payload = encode_payload(bits)
-          {:ok, header <> payload}
+
+          # Safety check: Graph6 is O(V^2) and not suitable for very large graphs
+          # 258,048 is the threshold for 6-char header, but bitstring size is ~4.1GB.
+          # We'll allow up to 100k nodes (~625MB bitstring) before warning/erroring.
+          if n > 100_000 do
+            {:error, :graph_too_large_for_graph6}
+          else
+            if Model.edge_count(graph) == 0 do
+              header = encode_header(n)
+              expected_bits = div(n * (n - 1), 2)
+              expected_chars = div(expected_bits + 5, 6)
+              # In Graph6, '?' represents 0 (63-63)
+              payload = String.duplicate("?", expected_chars)
+              {:ok, header <> payload}
+            else
+              bits = adjacency_bits(graph, n)
+              header = encode_header(n)
+              payload = encode_payload(bits)
+              {:ok, header <> payload}
+            end
+          end
         else
           {:error, :invalid_node_ids}
         end
@@ -181,20 +198,20 @@ defmodule Yog.IO.Graph6 do
     end
   end
 
-  defp parse_extended_header(<<a, b, c, rest::binary>>) do
-    n = (a - 63) * 4096 + (b - 63) * 64 + (c - 63)
+  defp parse_extended_header(<<126, a, b, c, d, e, f, rest::binary>>) do
+    n =
+      (a - 63) * 1_073_741_824 +
+        (b - 63) * 16_777_216 +
+        (c - 63) * 262_144 +
+        (d - 63) * 4096 +
+        (e - 63) * 64 +
+        (f - 63)
+
     {:ok, n, rest}
   end
 
-  defp parse_extended_header(<<126, a, b, c, d, e, f, rest::binary>>) do
-    n =
-      (a - 63) * 2_821_109_907_456 +
-        (b - 63) * 68_719_476_736 +
-        (c - 63) * 1_073_741_824 +
-        (d - 63) * 16_777_216 +
-        (e - 63) * 262_144 +
-        (f - 63) * 4096
-
+  defp parse_extended_header(<<a, b, c, rest::binary>>) do
+    n = (a - 63) * 4096 + (b - 63) * 64 + (c - 63)
     {:ok, n, rest}
   end
 
@@ -205,15 +222,30 @@ defmodule Yog.IO.Graph6 do
     expected_chars = div(expected_bits + 5, 6)
 
     if byte_size(rest) == expected_chars do
-      bits =
-        for <<c <- rest>>, into: <<>> do
-          <<c - 63::6>>
-        end
+      # Fast path: if it's all '?' (0), return early without building bitstring
+      if all_zeros?(rest) do
+        {:ok, :empty}
+      else
+        bits =
+          for <<c <- rest>>, into: <<>> do
+            <<c - 63::6>>
+          end
 
-      {:ok, bits}
+        {:ok, bits}
+      end
     else
       {:error, :invalid_payload_length}
     end
+  end
+
+  defp all_zeros?(<<>>), do: true
+  defp all_zeros?(<<"?", rest::binary>>), do: all_zeros?(rest)
+  defp all_zeros?(_), do: false
+
+  defp build_graph(:empty, n) do
+    Enum.reduce(0..(n - 1)//1, Yog.undirected(), fn i, acc ->
+      Model.add_node(acc, i, nil)
+    end)
   end
 
   defp build_graph(bits, n) do
@@ -247,11 +279,33 @@ defmodule Yog.IO.Graph6 do
   end
 
   defp adjacency_bits(graph, n) do
-    for j <- 1..(n - 1)//1,
-        i <- 0..(j - 1)//1,
-        into: <<>> do
-      if Model.has_edge?(graph, i, j), do: <<1::1>>, else: <<0::1>>
-    end
+    # Get all edges once and group by higher endpoint
+    edges_by_high =
+      Enum.reduce(Model.all_edges(graph), %{}, fn {u, v, _}, acc ->
+        {low, high} = if u < v, do: {u, v}, else: {v, u}
+        Map.update(acc, high, [low], fn existing -> [low | existing] end)
+      end)
+
+    1..(n - 1)//1
+    |> Enum.map(fn j ->
+      case Map.get(edges_by_high, j) do
+        nil ->
+          <<0::size(j)>>
+
+        rows ->
+          sorted_rows = Enum.sort(rows)
+
+          {bits, last_idx} =
+            Enum.reduce(sorted_rows, {<<>>, -1}, fn u, {b_acc, last} ->
+              gap_size = u - last - 1
+              {<<b_acc::bitstring, 0::size(gap_size), 1::1>>, u}
+            end)
+
+          remaining = j - last_idx - 1
+          <<bits::bitstring, 0::size(remaining)>>
+      end
+    end)
+    |> :erlang.list_to_bitstring()
   end
 
   defp encode_header(n) when n <= 62 do
@@ -266,16 +320,16 @@ defmodule Yog.IO.Graph6 do
   end
 
   defp encode_header(n) do
-    a = div(n, 2_821_109_907_456)
-    r1 = rem(n, 2_821_109_907_456)
-    b = div(r1, 68_719_476_736)
-    r2 = rem(r1, 68_719_476_736)
-    c = div(r2, 1_073_741_824)
-    r3 = rem(r2, 1_073_741_824)
-    d = div(r3, 16_777_216)
-    r4 = rem(r3, 16_777_216)
-    e = div(r4, 262_144)
-    f = div(rem(r4, 262_144), 4096)
+    a = div(n, 1_073_741_824)
+    r1 = rem(n, 1_073_741_824)
+    b = div(r1, 16_777_216)
+    r2 = rem(r1, 16_777_216)
+    c = div(r2, 262_144)
+    r3 = rem(r2, 262_144)
+    d = div(r3, 4096)
+    r4 = rem(r3, 4096)
+    e = div(r4, 64)
+    f = rem(r4, 64)
     <<126, 126, a + 63, b + 63, c + 63, d + 63, e + 63, f + 63>>
   end
 

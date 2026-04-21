@@ -11,14 +11,16 @@ defmodule Yog.IO.JSONTest do
 
   test "default_export_options creates valid options tuple" do
     options = JSON.default_export_options()
-    assert {:json_export_options, :yog_generic, true, _, _, false, %{}} = options
+    assert {:json_export_options, :yog_generic, true, _, _, false, %{}, _, _} = options
   end
 
   test "export_options_with creates valid options tuple" do
     node_ser = fn n -> "node_#{n}" end
     edge_ser = fn e -> "edge_#{e}" end
     options = JSON.export_options_with(node_ser, edge_ser)
-    assert {:json_export_options, :yog_generic, true, ^node_ser, ^edge_ser, false, %{}} = options
+
+    assert {:json_export_options, :yog_generic, true, ^node_ser, ^edge_ser, false, %{}, _, _} =
+             options
   end
 
   # =============================================================================
@@ -42,11 +44,11 @@ defmodule Yog.IO.JSONTest do
     assert length(result["nodes"]) == 2
     assert length(result["edges"]) == 1
 
-    assert Enum.any?(result["nodes"], fn n -> n["id"] == 1 && n["data"] == "Alice" end)
-    assert Enum.any?(result["nodes"], fn n -> n["id"] == 2 && n["data"] == "Bob" end)
+    assert Enum.any?(result["nodes"], fn n -> n["id"] == "1" && n["data"] == "Alice" end)
+    assert Enum.any?(result["nodes"], fn n -> n["id"] == "2" && n["data"] == "Bob" end)
 
     assert Enum.any?(result["edges"], fn e ->
-             e["source"] == 1 && e["target"] == 2 && e["weight"] == "follows"
+             e["source"] == "1" && e["target"] == "2" && e["weight"] == "follows"
            end)
   end
 
@@ -92,7 +94,7 @@ defmodule Yog.IO.JSONTest do
     # Create options with metadata disabled
     options =
       {:json_export_options, :yog_generic, false, &Function.identity/1, &Function.identity/1,
-       false, %{}}
+       false, %{}, &Kernel.to_string/1, &Kernel.to_string/1}
 
     json_string = JSON.to_json(graph, options)
     result = Jason.decode!(json_string)
@@ -150,11 +152,11 @@ defmodule Yog.IO.JSONTest do
     json_string = JSON.to_json(graph, options)
     result = Jason.decode!(json_string)
 
-    alice = Enum.find(result["nodes"], fn n -> n["id"] == 1 end)
+    alice = Enum.find(result["nodes"], fn n -> n["id"] == "1" end)
     assert alice["data"]["name"] == "Alice"
     assert alice["data"]["age"] == 30
 
-    edge = Enum.find(result["edges"], fn e -> e["source"] == 1 end)
+    edge = Enum.find(result["edges"], fn e -> e["source"] == "1" end)
     assert edge["weight"]["type"] == "follows"
     assert edge["weight"]["since"] == 2020
   end
@@ -172,7 +174,7 @@ defmodule Yog.IO.JSONTest do
 
     options =
       {:json_export_options, :network_x, true, &Function.identity/1, &Function.identity/1, false,
-       %{}}
+       %{}, &Kernel.to_string/1, &Kernel.to_string/1}
 
     json_string = JSON.to_json(graph, options)
     result = Jason.decode!(json_string)
@@ -193,7 +195,7 @@ defmodule Yog.IO.JSONTest do
 
     options =
       {:json_export_options, :network_x, false, &Function.identity/1, &Function.identity/1, false,
-       %{}}
+       %{}, &Kernel.to_string/1, &Kernel.to_string/1}
 
     json_string = JSON.to_json(graph, options)
     result = Jason.decode!(json_string)
@@ -237,7 +239,7 @@ defmodule Yog.IO.JSONTest do
 
     options =
       {:json_export_options, :d3_force, false, &Function.identity/1, &Function.identity/1, false,
-       %{}}
+       %{}, &Kernel.to_string/1, &Kernel.to_string/1}
 
     json_string = JSON.to_json(graph, options)
     result = Jason.decode!(json_string)
@@ -281,7 +283,7 @@ defmodule Yog.IO.JSONTest do
 
     options =
       {:json_export_options, :cytoscape, false, &Function.identity/1, &Function.identity/1, false,
-       %{}}
+       %{}, &Kernel.to_string/1, &Kernel.to_string/1}
 
     json_string = JSON.to_json(graph, options)
     result = Jason.decode!(json_string)
@@ -290,7 +292,7 @@ defmodule Yog.IO.JSONTest do
     elements = result["elements"]
 
     assert Enum.any?(elements, fn e ->
-             Map.get(e, "data", %{}) |> Map.get("id") == 1
+             Map.get(e, "data", %{}) |> Map.get("id") == "1"
            end)
   end
 
@@ -330,13 +332,13 @@ defmodule Yog.IO.JSONTest do
 
     options =
       {:json_export_options, :visjs, false, &Function.identity/1, &Function.identity/1, false,
-       %{}}
+       %{}, &Kernel.to_string/1, &Kernel.to_string/1}
 
     json_string = JSON.to_json(graph, options)
     result = Jason.decode!(json_string)
 
-    assert result["nodes"] |> Enum.any?(fn n -> n["id"] == 1 && n["label"] == "A" end)
-    assert result["edges"] |> Enum.any?(fn e -> e["from"] == 1 && e["to"] == 2 end)
+    assert result["nodes"] |> Enum.any?(fn n -> n["id"] == "1" && n["label"] == "A" end)
+    assert result["edges"] |> Enum.any?(fn e -> e["from"] == "1" && e["to"] == "2" end)
   end
 
   # =============================================================================
@@ -391,7 +393,7 @@ defmodule Yog.IO.JSONTest do
     json_string = JSON.to_json(graph, options)
     result = Jason.decode!(json_string)
 
-    assert Enum.any?(result["edges"], fn e -> e["source"] == 1 && e["target"] == 1 end)
+    assert Enum.any?(result["edges"], fn e -> e["source"] == "1" && e["target"] == "1" end)
   end
 
   test "to_json with large graph" do
@@ -423,12 +425,35 @@ defmodule Yog.IO.JSONTest do
 
     options =
       {:json_export_options, :unknown_format, true, &Function.identity/1, &Function.identity/1,
-       false, %{}}
+       false, %{}, &Kernel.to_string/1, &Kernel.to_string/1}
 
     json_string = JSON.to_json(graph, options)
     result = Jason.decode!(json_string)
 
     assert result["format"] == "yog-generic"
+  end
+
+  test "to_json with complex data types and default formatters" do
+    graph = Yog.directed() |> Yog.add_node({1, :a}, %{meta: {10, :min}})
+    json_string = JSON.to_json(graph)
+    result = Jason.decode!(json_string)
+
+    node = Enum.find(result["nodes"], fn n -> n["id"] == "{1, :a}" end)
+    assert node["data"]["meta"] == "{10, :min}"
+  end
+
+  test "to_json with custom formatters" do
+    graph = Yog.directed() |> Yog.add_node(1, "Alice")
+
+    options =
+      JSON.export_options_with(&Function.identity/1, &Function.identity/1,
+        node_formatter: fn id -> "NODE_#{id}" end
+      )
+
+    json_string = JSON.to_json(graph, options)
+    result = Jason.decode!(json_string)
+
+    assert Enum.any?(result["nodes"], fn n -> n["id"] == "NODE_1" end)
   end
 
   # =============================================================================
@@ -469,7 +494,7 @@ defmodule Yog.IO.JSONTest do
 
     options =
       {:json_export_options, :d3_force, false, &Function.identity/1, &Function.identity/1, false,
-       %{}}
+       %{}, &Kernel.to_string/1, &Kernel.to_string/1}
 
     try do
       assert {:ok, nil} = JSON.write_with(path, options, graph)

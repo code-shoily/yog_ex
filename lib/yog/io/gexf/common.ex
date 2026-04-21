@@ -10,7 +10,7 @@ defmodule Yog.IO.GEXF.Common do
     attrs_list
     |> Enum.reduce(%{}, fn attrs, acc ->
       Enum.reduce(attrs, acc, fn {key, value}, inner_acc ->
-        key_str = to_string_key(key)
+        key_str = Yog.Utils.safe_string(key)
 
         if Map.has_key?(inner_acc, key_str) or viz_key?(key_str) or key_str == special_key do
           inner_acc
@@ -30,7 +30,7 @@ defmodule Yog.IO.GEXF.Common do
   def infer_type(_), do: "string"
 
   def to_string_key(k) when is_binary(k), do: k
-  def to_string_key(k), do: to_string(k)
+  def to_string_key(k), do: Yog.Utils.safe_string(k)
 
   def build_attribute_definitions(node_keys, edge_keys) do
     node_defs =
@@ -39,7 +39,7 @@ defmodule Yog.IO.GEXF.Common do
       |> Enum.map(fn {key, meta} ->
         [
           "    <attribute id=\"",
-          to_string(meta.id),
+          Yog.Utils.safe_string(meta.id),
           "\" title=\"",
           XMLUtils.escape_xml(key),
           "\" type=\"",
@@ -54,7 +54,7 @@ defmodule Yog.IO.GEXF.Common do
       |> Enum.map(fn {key, meta} ->
         [
           "    <attribute id=\"",
-          to_string(meta.id),
+          Yog.Utils.safe_string(meta.id),
           "\" title=\"",
           XMLUtils.escape_xml(key),
           "\" type=\"",
@@ -75,7 +75,7 @@ defmodule Yog.IO.GEXF.Common do
     ]
   end
 
-  def build_nodes_xml(nodes_map, node_attr, node_keys) do
+  def build_nodes_xml(nodes_map, node_attr, node_keys, node_fmt \\ &Yog.Utils.safe_string/1) do
     if map_size(nodes_map) == 0 do
       "    <nodes></nodes>\n"
     else
@@ -84,14 +84,14 @@ defmodule Yog.IO.GEXF.Common do
         |> Enum.sort()
         |> Enum.map(fn {id, data} ->
           attrs = node_attr.(data)
-          label = Map.get(attrs, "label") || Map.get(attrs, :label) || to_string(id)
+          label = Map.get(attrs, "label") || Map.get(attrs, :label) || node_fmt.(id)
 
           attvalues = build_attvalues(attrs, node_keys, "label")
           viz_xml = build_viz_xml(attrs)
 
           [
             "    <node id=\"",
-            XMLUtils.escape_xml(id),
+            XMLUtils.escape_xml(node_fmt.(id)),
             "\" label=\"",
             XMLUtils.escape_xml(label),
             "\">\n",
@@ -108,7 +108,16 @@ defmodule Yog.IO.GEXF.Common do
     end
   end
 
-  def build_single_edge_xml(edge_id, from, to, weight, edge_attr, edge_keys) do
+  def build_single_edge_xml(
+        edge_id,
+        from,
+        to,
+        weight,
+        edge_attr,
+        edge_keys,
+        node_fmt \\ &Yog.Utils.safe_string/1,
+        edge_fmt \\ &Yog.Utils.safe_string/1
+      ) do
     attrs = edge_attr.(weight)
     weight_val = Map.get(attrs, "weight") || Map.get(attrs, :weight) || ""
 
@@ -117,11 +126,11 @@ defmodule Yog.IO.GEXF.Common do
 
     [
       "    <edge id=\"",
-      to_string(edge_id),
+      edge_fmt.(edge_id),
       "\" source=\"",
-      XMLUtils.escape_xml(from),
+      XMLUtils.escape_xml(node_fmt.(from)),
       "\" target=\"",
-      XMLUtils.escape_xml(to),
+      XMLUtils.escape_xml(node_fmt.(to)),
       "\"",
       if(weight_val != "", do: [" weight=\"", XMLUtils.escape_xml(weight_val), "\""], else: ""),
       ">\n",
@@ -151,18 +160,18 @@ defmodule Yog.IO.GEXF.Common do
 
             [
               "      <viz:color r=\"",
-              to_string(r),
+              Yog.Utils.safe_string(r),
               "\" g=\"",
-              to_string(g),
+              Yog.Utils.safe_string(g),
               "\" b=\"",
-              to_string(b),
+              Yog.Utils.safe_string(b),
               "\" a=\"",
-              to_string(a),
+              Yog.Utils.safe_string(a),
               "\"/>\n"
             ]
 
           "viz:size" ->
-            ["      <viz:size value=\"", to_string(value), "\"/>\n"]
+            ["      <viz:size value=\"", Yog.Utils.safe_string(value), "\"/>\n"]
 
           "viz:position" ->
             x = Map.get(value, :x) || Map.get(value, "x", 0.0)
@@ -171,11 +180,11 @@ defmodule Yog.IO.GEXF.Common do
 
             [
               "      <viz:position x=\"",
-              to_string(x),
+              Yog.Utils.safe_string(x),
               "\" y=\"",
-              to_string(y),
+              Yog.Utils.safe_string(y),
               "\" z=\"",
-              to_string(z),
+              Yog.Utils.safe_string(z),
               "\"/>\n"
             ]
 
@@ -203,7 +212,7 @@ defmodule Yog.IO.GEXF.Common do
         if meta != nil do
           [
             "        <attvalue for=\"",
-            to_string(meta.id),
+            Yog.Utils.safe_string(meta.id),
             "\" value=\"",
             XMLUtils.escape_xml(value),
             "\"/>\n"

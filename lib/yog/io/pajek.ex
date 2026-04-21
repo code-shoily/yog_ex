@@ -57,16 +57,19 @@ defmodule Yog.IO.Pajek do
   - Node attributes: No special visualization
   - Coordinates: Not included
   - Visuals: Not included
+  - Node formatter: `Kernel.to_string/1`
+  - Edge formatter: `Kernel.to_string/1`
 
   ## Example
 
-      iex> {:pajek_options, _, _, _, _, _} = Yog.IO.Pajek.default_options()
+      iex> {:pajek_options, _, _, _, _, _, _, _} = Yog.IO.Pajek.default_options()
       iex> :ok
       :ok
   """
   def default_options do
     {:pajek_options, fn data -> Yog.Utils.to_label("", data) end, fn _ -> :none end,
-     fn _ -> default_node_attributes() end, false, false}
+     fn _ -> default_node_attributes() end, false, false, &Kernel.to_string/1,
+     &Kernel.to_string/1}
   end
 
   @doc """
@@ -99,9 +102,19 @@ defmodule Yog.IO.Pajek do
         false                                        # No visuals
       )
   """
-  def options_with(node_label, edge_weight, node_attributes, include_coordinates, include_visuals) do
+  def options_with(
+        node_label,
+        edge_weight,
+        node_attributes,
+        include_coordinates,
+        include_visuals,
+        opts \\ []
+      ) do
+    node_fmt = Keyword.get(opts, :node_formatter, &Kernel.to_string/1)
+    edge_fmt = Keyword.get(opts, :edge_formatter, &Kernel.to_string/1)
+
     {:pajek_options, node_label, edge_weight, node_attributes, include_coordinates,
-     include_visuals}
+     include_visuals, node_fmt, edge_fmt}
   end
 
   @doc """
@@ -137,8 +150,15 @@ defmodule Yog.IO.Pajek do
       pajek = Yog.IO.Pajek.serialize_with(options, graph)
   """
   def serialize_with(options, graph) do
-    {:pajek_options, node_label_fn, edge_weight_fn, _node_attr_fn, _include_coords,
-     _include_visuals} = options
+    {node_label_fn, edge_weight_fn, _node_attr_fn, _include_coords, _include_visuals, node_fmt,
+     edge_fmt} =
+      case options do
+        {:pajek_options, nl, ew, na, ic, iv, nf, ef} ->
+          {nl, ew, na, ic, iv, nf, ef}
+
+        {:pajek_options, nl, ew, na, ic, iv} ->
+          {nl, ew, na, ic, iv, &Kernel.to_string/1, &Kernel.to_string/1}
+      end
 
     %Yog.Graph{kind: type, nodes: nodes_map} = graph
 
@@ -151,7 +171,7 @@ defmodule Yog.IO.Pajek do
       |> Enum.sort()
       |> Enum.map_join("\n", fn {id, data} ->
         label = node_label_fn.(data)
-        ~s(#{id} "#{label}")
+        ~s(#{node_fmt.(id)} "#{node_fmt.(label)}")
       end)
 
     # Edges section
@@ -163,8 +183,8 @@ defmodule Yog.IO.Pajek do
       edges
       |> Enum.map_join("\n", fn {from, to, weight} ->
         case edge_weight_fn.(weight) do
-          :none -> "#{from} #{to}"
-          {:some, w} -> "#{from} #{to} #{w}"
+          :none -> "#{node_fmt.(from)} #{node_fmt.(to)}"
+          {:some, w} -> "#{node_fmt.(from)} #{node_fmt.(to)} #{edge_fmt.(w)}"
         end
       end)
 
@@ -489,7 +509,7 @@ defmodule Yog.IO.Pajek do
   end
 
   defp parse_quoted_node(line, node_parser) do
-    case Regex.run(~r/^(\d+)\s+"([^"]*)"/, line) do
+    case Regex.run(~r/^([^\s]+)\s+"([^"]*)"/, line) do
       [_, id_str, label] ->
         parse_node_id(id_str, label, node_parser, line)
 
@@ -505,21 +525,17 @@ defmodule Yog.IO.Pajek do
         parse_node_id(id_str, label_word, node_parser, line)
 
       [id_str] ->
-        case Integer.parse(id_str) do
-          {id, _} -> {:ok, id, node_parser.(Integer.to_string(id))}
-          :error -> {:warning, {:invalid_node_id, line}}
-        end
+        {:ok, id} = parse_int(id_str)
+        {:ok, id, node_parser.(Kernel.to_string(id))}
 
       _ ->
         {:warning, {:invalid_node_line, line}}
     end
   end
 
-  defp parse_node_id(id_str, label, node_parser, line) do
-    case Integer.parse(id_str) do
-      {id, _} -> {:ok, id, node_parser.(label)}
-      :error -> {:warning, {:invalid_node_id, line}}
-    end
+  defp parse_node_id(id_str, label, node_parser, _line) do
+    {:ok, id} = parse_int(id_str)
+    {:ok, id, node_parser.(label)}
   end
 
   defp parse_edge_header([line | rest]) do
@@ -637,7 +653,7 @@ defmodule Yog.IO.Pajek do
   defp parse_int(str) do
     case Integer.parse(str) do
       {int, _} -> {:ok, int}
-      :error -> :error
+      :error -> {:ok, str}
     end
   end
 end

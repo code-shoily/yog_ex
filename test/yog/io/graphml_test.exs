@@ -126,7 +126,7 @@ defmodule Yog.IO.GraphMLTest do
   test "serialize with options" do
     graph = Yog.directed() |> Yog.add_node(1, "Alice")
 
-    # The Gleam type GraphMLOptions has fields `indent` and `xml_declaration`
+    # The Gleam type GraphMLOptions has fields `indent`, `xml_declaration`, `node_fmt`, `edge_fmt`
     # Default options returns the structure we can update
     options = GraphML.default_options() |> put_elem(1, 0) |> put_elem(2, false)
 
@@ -607,7 +607,7 @@ defmodule Yog.IO.GraphMLTest do
 
   test "serialize with zero indent and no xml declaration" do
     graph = Yog.directed() |> Yog.add_node(1, "Alice")
-    options = {:graphml_options, 0, false}
+    options = {:graphml_options, 0, false, &Kernel.to_string/1, &Kernel.to_string/1}
 
     node_attr = fn data -> %{"label" => data} end
     edge_attr = fn _ -> %{} end
@@ -616,6 +616,29 @@ defmodule Yog.IO.GraphMLTest do
 
     refute String.contains?(xml, "<?xml")
     assert String.contains?(xml, "<node id=\"1\">")
+  end
+
+  test "serialize complex data with formatters" do
+    graph = Yog.directed() |> Yog.add_node({1, :a}, %{meta: {10, :min}})
+
+    node_attr = fn data -> %{"data" => data.meta} end
+    edge_attr = fn _ -> %{} end
+
+    # Should not crash and use default formatters
+    xml = GraphML.serialize_with(node_attr, edge_attr, graph)
+    assert String.contains?(xml, "node id=\"{1, :a}\"")
+    assert String.contains?(xml, "{10, :min}")
+  end
+
+  test "serialize with custom formatters" do
+    graph = Yog.directed() |> Yog.add_node(1, "Alice")
+    node_attr = fn _ -> %{} end
+    edge_attr = fn _ -> %{} end
+
+    options = GraphML.options_with(2, true, node_formatter: fn id -> "NODE_#{id}" end)
+    xml = GraphML.serialize_with_options(node_attr, edge_attr, options, graph)
+
+    assert String.contains?(xml, "node id=\"NODE_1\"")
   end
 
   test "serialize graph with no nodes produces empty graphml" do

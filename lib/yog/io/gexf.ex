@@ -22,11 +22,38 @@ defmodule Yog.IO.GEXF do
   alias Yog.IO.GEXF.Common
   alias Yog.IO.XMLUtils
   alias Yog.Model
+  alias Yog.Utils
+
+  @doc """
+  Returns default GEXF serialization options.
+
+  The options control data formatting:
+  - **node_formatter:** Function to convert node IDs to strings (default: `safe_string/1`)
+  - **edge_formatter:** Function to convert edge IDs to strings (default: `safe_string/1`)
+  """
+  def default_options do
+    {:gexf_options, &Utils.safe_string/1, &Utils.safe_string/1}
+  end
+
+  @doc """
+  Creates GEXF options with custom formatters.
+  """
+  def options_with(node_fmt, edge_fmt) do
+    {:gexf_options, node_fmt, edge_fmt}
+  end
 
   @doc """
   Serializes a graph to GEXF format with custom attribute mappers.
   """
   def serialize_with(node_attr, edge_attr, graph) do
+    serialize_with_options(node_attr, edge_attr, default_options(), graph)
+  end
+
+  @doc """
+  Serializes a graph to GEXF format with custom attribute mappers and options.
+  """
+  def serialize_with_options(node_attr, edge_attr, options, graph) do
+    {:gexf_options, node_fmt, edge_fmt} = options
     %Yog.Graph{kind: type, nodes: nodes_map} = graph
     edge_default = if type == :directed, do: "directed", else: "undirected"
 
@@ -42,8 +69,8 @@ defmodule Yog.IO.GEXF do
       "<gexf xmlns=\"http://gexf.net/1.3\" xmlns:viz=\"http://gexf.net/1.3/viz\" version=\"1.3\">\n",
       "  <graph mode=\"static\" defaultedgetype=\"#{edge_default}\">\n",
       Common.build_attribute_definitions(node_keys, edge_keys),
-      Common.build_nodes_xml(nodes_map, node_attr, node_keys),
-      build_edges_xml(edges, edge_attr, edge_keys),
+      Common.build_nodes_xml(nodes_map, node_attr, node_keys, node_fmt),
+      build_edges_xml(edges, edge_attr, edge_keys, node_fmt, edge_fmt),
       "  </graph>\n",
       "</gexf>"
     ]
@@ -117,7 +144,7 @@ defmodule Yog.IO.GEXF do
   # Serialization helpers
   # ==========================================================================
 
-  defp build_edges_xml(edges, edge_attr, edge_keys) do
+  defp build_edges_xml(edges, edge_attr, edge_keys, node_fmt, edge_fmt) do
     if edges == [] do
       "    <edges></edges>\n"
     else
@@ -125,7 +152,16 @@ defmodule Yog.IO.GEXF do
         edges
         |> Enum.with_index()
         |> Enum.map(fn {{from, to, weight}, idx} ->
-          Common.build_single_edge_xml(idx, from, to, weight, edge_attr, edge_keys)
+          Common.build_single_edge_xml(
+            idx,
+            from,
+            to,
+            weight,
+            edge_attr,
+            edge_keys,
+            node_fmt,
+            edge_fmt
+          )
         end)
 
       ["    <edges>\n", edges_inner, "    </edges>\n"]

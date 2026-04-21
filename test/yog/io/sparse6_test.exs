@@ -185,6 +185,45 @@ defmodule Yog.IO.Sparse6Test do
       assert Yog.Model.node_count(parsed) == 63
       assert Yog.Model.edge_count(parsed) == 62
     end
+
+    test "roundtrip with 100 nodes (triggers extended header N=3 chars)" do
+      n = 100
+
+      graph =
+        Enum.reduce(0..(n - 1), Yog.undirected(), fn i, acc -> Yog.add_node(acc, i, nil) end)
+
+      assert {:ok, s6} = Sparse6.serialize(graph)
+      assert String.contains?(s6, "~")
+      assert {:ok, parsed} = Sparse6.parse(s6)
+      assert Yog.Model.node_count(parsed) == n
+    end
+
+    test "roundtrip with 300,000 nodes (triggers extended header N=6 chars)" do
+      n = 300_000
+
+      graph =
+        Enum.reduce(0..(n - 1), Yog.undirected(), fn i, acc -> Yog.add_node(acc, i, nil) end)
+
+      assert {:ok, s6} = Sparse6.serialize(graph)
+      assert String.contains?(s6, "~~")
+      assert {:ok, parsed} = Sparse6.parse(s6)
+      assert Yog.Model.node_count(parsed) == n
+    end
+
+    test "large gaps (triggers extended number encoding)" do
+      # gap > 30 triggers ~
+      # gap > 4126 triggers ~~
+      n = 5001
+
+      graph =
+        Enum.reduce(0..(n - 1), Yog.undirected(), fn i, acc -> Yog.add_node(acc, i, nil) end)
+
+      graph = Yog.add_edge_ensure(graph, 0, 5000, 1)
+      assert {:ok, s6} = Sparse6.serialize(graph)
+      assert String.contains?(s6, "~~")
+      assert {:ok, parsed} = Sparse6.parse(s6)
+      assert Yog.has_edge?(parsed, 0, 5000)
+    end
   end
 
   describe "file I/O" do
