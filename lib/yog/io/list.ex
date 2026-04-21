@@ -42,6 +42,15 @@ defmodule Yog.IO.List do
   3: 4,7
   ```
 
+  ## Limitations
+
+  This format is intended for simple graphs where:
+  - Node IDs are integers or strings.
+  - Edge weights are numbers or maps with a `"weight"` key.
+
+  For graphs with complex node IDs (like tuples) or rich metadata, use `Yog.IO.JSON`
+  or `Yog.IO.GEXF` instead.
+
   ## Use Cases
 
   - Importing graphs from text files and databases
@@ -102,6 +111,11 @@ defmodule Yog.IO.List do
   """
   @spec from_list(:directed | :undirected, [adjacency_entry()]) :: Yog.graph()
   def from_list(type, entries) when is_list(entries) do
+    unless type in [:directed, :undirected] do
+      raise ArgumentError,
+            "Invalid graph type: #{inspect(type)}. Expected :directed or :undirected"
+    end
+
     base = Yog.new(type)
 
     # First pass: add all nodes
@@ -130,6 +144,7 @@ defmodule Yog.IO.List do
   Creates a graph from a string representation of an adjacency list.
 
   Parses a string in the format:
+
   ```
   node_id: neighbor1 neighbor2...
   ```
@@ -164,6 +179,11 @@ defmodule Yog.IO.List do
   """
   @spec from_string(:directed | :undirected, String.t(), keyword()) :: Yog.graph()
   def from_string(type, string, opts \\ []) do
+    unless type in [:directed, :undirected] do
+      raise ArgumentError,
+            "Invalid graph type: #{inspect(type)}. Expected :directed or :undirected"
+    end
+
     weighted = Keyword.get(opts, :weighted, false)
     delimiter = Keyword.get(opts, :delimiter, ":")
 
@@ -171,7 +191,7 @@ defmodule Yog.IO.List do
       string
       |> String.split("\n", trim: true)
       |> Enum.map(&String.trim/1)
-      |> Enum.reject(&String.starts_with?(&1, "#"))
+      |> Enum.reject(fn line -> line == "" or String.starts_with?(line, "#") end)
       |> Enum.map(fn line ->
         parse_line(line, delimiter, weighted)
       end)
@@ -224,6 +244,8 @@ defmodule Yog.IO.List do
 
   - `weighted` - `true` to include weights (format: "neighbor,weight")
   - `delimiter` - Delimiter between node and neighbors (default: ":")
+  - `node_formatter` - Function to convert node IDs to strings (default: `&Kernel.to_string/1`)
+  - `weight_formatter` - Function to convert edge weights to strings (default: `&Yog.Utils.to_weight_label/1`)
 
   ## Examples
 
@@ -233,16 +255,22 @@ defmodule Yog.IO.List do
       iex> Yog.IO.List.to_string(graph)
       "1: 2\\n2: 1 3\\n3: 2"
 
+      iex> # Using custom formatters for complex types
       iex> graph = Yog.undirected()
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
-      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 7)
-      iex> Yog.IO.List.to_string(graph, weighted: true)
-      "1: 2,5\\n2: 1,5 3,7\\n3: 2,7"
+      ...>   |> Yog.add_edge_with({1, 2}, {3, 4}, [weight: 10], & &1)
+      iex> Yog.IO.List.to_string(graph,
+      ...>   node_formatter: fn {a, b} -> "\#{a}_\#{b}" end,
+      ...>   weight_formatter: fn [weight: w] -> "w\#{w}" end,
+      ...>   weighted: true
+      ...> )
+      "1_2: 3_4,w10\\n3_4: 1_2,w10"
   """
   @spec to_string(Yog.graph(), keyword()) :: String.t()
   def to_string(graph, opts \\ []) do
     weighted = Keyword.get(opts, :weighted, false)
     delimiter = Keyword.get(opts, :delimiter, ":")
+    node_fmt = Keyword.get(opts, :node_formatter, &Kernel.to_string/1)
+    weight_fmt = Keyword.get(opts, :weight_formatter, &Yog.Utils.to_weight_label/1)
 
     entries = to_list(graph)
 
@@ -251,16 +279,16 @@ defmodule Yog.IO.List do
         neighbor_str =
           if weighted do
             neighbors
-            |> Enum.map_join(" ", fn {n, w} -> "#{n},#{Yog.Utils.to_weight_label(w)}" end)
+            |> Enum.map_join(" ", fn {n, w} -> "#{node_fmt.(n)},#{weight_fmt.(w)}" end)
           else
             neighbors
-            |> Enum.map_join(" ", fn {n, _w} -> "#{n}" end)
+            |> Enum.map_join(" ", fn {n, _w} -> "#{node_fmt.(n)}" end)
           end
 
         if neighbor_str == "" do
-          "#{node_id}#{delimiter}"
+          "#{node_fmt.(node_id)}#{delimiter}"
         else
-          "#{node_id}#{delimiter} #{neighbor_str}"
+          "#{node_fmt.(node_id)}#{delimiter} #{neighbor_str}"
         end
       end)
 
@@ -269,9 +297,8 @@ defmodule Yog.IO.List do
 
   # Private helper to parse a single line of adjacency list
   defp parse_line(line, delimiter, weighted) do
-    case String.split(line, delimiter, parts: 2, trim: true) do
+    case String.split(line, delimiter, parts: 2) do
       [node_str] ->
-        # Node with no neighbors
         {parse_id(node_str), []}
 
       [node_str, neighbors_str] ->
@@ -283,6 +310,10 @@ defmodule Yog.IO.List do
 
   defp parse_id(str) do
     str = String.trim(str)
+
+    if str == "" do
+      raise ArgumentError, "Node ID cannot be empty"
+    end
 
     case Integer.parse(str) do
       {int, ""} -> int
@@ -314,7 +345,5 @@ defmodule Yog.IO.List do
       {int, ""} -> int
       _ -> String.to_float(str)
     end
-  rescue
-    _ -> 1
   end
 end

@@ -6,6 +6,12 @@ defmodule Yog.IO.ListTest do
   doctest Yog.IO.List
 
   describe "from_list/2" do
+    test "raises on invalid graph type" do
+      assert_raise ArgumentError, fn ->
+        List.from_list(:invalid, [{1, [{2, 1}]}])
+      end
+    end
+
     test "creates undirected graph from adjacency list" do
       entries = [
         {1, [{2, 1}, {3, 1}]},
@@ -149,6 +155,63 @@ defmodule Yog.IO.ListTest do
       assert Yog.Model.order(graph) == 3
       assert Yog.Model.edge_count(graph) == 2
     end
+
+    test "handles blank lines gracefully" do
+      text = "1: 2\n   \n2: 3\n"
+      graph = List.from_string(:undirected, text)
+      assert Yog.Model.order(graph) == 3
+      assert Yog.Model.edge_count(graph) == 2
+    end
+
+    test "raises on lines with only delimiter" do
+      text = "1: 2\n:\n2: 3\n"
+
+      assert_raise ArgumentError, fn ->
+        List.from_string(:undirected, text)
+      end
+    end
+
+    test "raises on invalid weight" do
+      text = "1: 2,abc\n"
+
+      assert_raise ArgumentError, fn ->
+        List.from_string(:undirected, text, weighted: true)
+      end
+    end
+
+    test "raises on invalid graph type" do
+      assert_raise ArgumentError, fn ->
+        List.from_string(:invalid, "1: 2")
+      end
+    end
+
+    test "raises on empty node ID" do
+      text = " : 2\n"
+
+      assert_raise ArgumentError, fn ->
+        List.from_string(:undirected, text)
+      end
+    end
+
+    test "handles float weights" do
+      text = "1: 2,1.5 3,0.5"
+      graph = List.from_string(:directed, text, weighted: true)
+      assert Yog.successors(graph, 1) == [{2, 1.5}, {3, 0.5}]
+    end
+
+    test "handles mixed weighted/unweighted neighbors" do
+      # 2 has weight 5, 3 defaults to 1
+      text = "1: 2,5 3"
+      graph = List.from_string(:directed, text, weighted: true)
+      assert Yog.successors(graph, 1) == [{2, 5}, {3, 1}]
+    end
+
+    test "handles lines without delimiter" do
+      text = "1\n2\n"
+      graph = List.from_string(:undirected, text)
+      assert Yog.Model.order(graph) == 2
+      assert Yog.Model.edge_count(graph) == 0
+    end
   end
 
   describe "to_list/1" do
@@ -207,6 +270,15 @@ defmodule Yog.IO.ListTest do
       assert str == "1: 2,5\n2: 1,5"
     end
 
+    test "exports weighted format with floats" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1.5)
+
+      str = List.to_string(graph, weighted: true)
+      assert str == "1: 2,1.5\n2: 1,1.5"
+    end
+
     test "exports nodes with no neighbors" do
       graph =
         Yog.undirected()
@@ -223,6 +295,21 @@ defmodule Yog.IO.ListTest do
 
       str = List.to_string(graph, delimiter: "->")
       assert str == "1-> 2\n2-> 1"
+    end
+
+    test "custom formatters for complex types" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_edge_with({1, 2}, {3, 4}, [weight: 10], & &1)
+
+      str =
+        List.to_string(graph,
+          node_formatter: fn {a, b} -> "#{a}_#{b}" end,
+          weight_formatter: fn [weight: w] -> "w#{w}" end,
+          weighted: true
+        )
+
+      assert str == "1_2: 3_4,w10\n3_4: 1_2,w10"
     end
   end
 
