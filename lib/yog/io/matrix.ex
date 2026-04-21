@@ -32,6 +32,12 @@ defmodule Yog.IO.Matrix do
   - Dense graph representations
   - Interoperability with matrix-based graph libraries
 
+  ## Limitations
+
+  Adjacency matrices are primarily designed for numerical edge weights. While
+  `to_matrix/1` can return any Elixir term, `from_matrix/2` strictly expects
+  numerical weights (or `0`/`nil` for no edge).
+
   ## See Also
 
   - `Yog.IO.JSON` - JSON graph format
@@ -92,16 +98,25 @@ defmodule Yog.IO.Matrix do
   - `ArgumentError` if the matrix is not square
   """
   @spec from_matrix(:directed | :undirected, [[number()]]) :: Yog.graph()
-  def from_matrix(type, matrix) when is_list(matrix) do
+  def from_matrix(type, matrix) do
+    unless type in [:directed, :undirected] do
+      raise ArgumentError,
+            "Invalid graph type: #{inspect(type)}. Expected :directed or :undirected"
+    end
+
+    unless is_list(matrix) do
+      raise ArgumentError, "Adjacency matrix must be a list of lists, got: #{inspect(matrix)}"
+    end
+
     n = length(matrix)
 
     # Handle empty matrix
     if n == 0 do
       Yog.new(type)
     else
-      # Validate matrix is square
-      if Enum.any?(matrix, fn row -> length(row) != n end) do
-        raise ArgumentError, "Adjacency matrix must be square (n x n)"
+      # Validate matrix is a list of lists and square
+      if Enum.any?(matrix, fn row -> not is_list(row) or length(row) != n end) do
+        raise ArgumentError, "Adjacency matrix must be a list of lists forming a square (n x n)"
       end
 
       base = Yog.new(type)
@@ -187,10 +202,58 @@ defmodule Yog.IO.Matrix do
     {nodes, matrix}
   end
 
+  @doc """
+  Exports a graph to a string representation of an adjacency matrix.
+
+  ## Options
+
+  - `weight_formatter` - Function to convert edge weights to strings (default: `&Kernel.to_string/1`)
+  - `delimiter` - String to separate values (default: " ")
+
+  ## Examples
+
+      iex> graph = Yog.undirected()
+      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 7)
+      iex> Yog.IO.Matrix.to_string(graph)
+      "0 5 0\\n5 0 7\\n0 7 0"
+
+      iex> # Using custom weight formatter for complex weights
+      iex> graph = Yog.undirected()
+      ...>   |> Yog.add_edge_with(1, 2, [weight: 10], & &1)
+      iex> Yog.IO.Matrix.to_string(graph,
+      ...>   weight_formatter: fn
+      ...>     0 -> "0"
+      ...>     [weight: w] -> "w\#{w}"
+      ...>   end
+      ...> )
+      "0 w10\\nw10 0"
+  """
+  @spec to_string(Yog.graph(), keyword()) :: String.t()
+  def to_string(graph, opts \\ []) do
+    weight_fmt = Keyword.get(opts, :weight_formatter, &Kernel.to_string/1)
+    delimiter = Keyword.get(opts, :delimiter, " ")
+
+    {_nodes, matrix} = to_matrix(graph)
+
+    matrix
+    |> Enum.map_join("\n", fn row ->
+      Enum.map_join(row, delimiter, weight_fmt)
+    end)
+  end
+
   # Helper to safely get matrix entry
   defp get_entry(matrix, row, col) do
-    matrix
-    |> Enum.at(row)
-    |> Enum.at(col)
+    weight =
+      matrix
+      |> Enum.at(row)
+      |> Enum.at(col)
+
+    if weight != 0 and weight != nil and not is_number(weight) do
+      raise ArgumentError,
+            "Adjacency matrix entries must be numbers, got #{inspect(weight)} at [#{row}][#{col}]"
+    end
+
+    weight
   end
 end

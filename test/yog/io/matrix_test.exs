@@ -6,6 +6,12 @@ defmodule Yog.IO.MatrixTest do
   doctest Yog.IO.Matrix
 
   describe "from_matrix/2" do
+    test "raises on invalid graph type" do
+      assert_raise ArgumentError, fn ->
+        Matrix.from_matrix(:invalid, [[0, 1], [1, 0]])
+      end
+    end
+
     test "creates undirected graph from unweighted matrix" do
       matrix = [
         [0, 1, 1, 0],
@@ -83,6 +89,24 @@ defmodule Yog.IO.MatrixTest do
         ])
       end
     end
+
+    test "raises on non-list matrix" do
+      assert_raise ArgumentError, fn ->
+        Matrix.from_matrix(:undirected, nil)
+      end
+    end
+
+    test "raises on non-list row in matrix" do
+      assert_raise ArgumentError, fn ->
+        Matrix.from_matrix(:undirected, [nil, [1, 0]])
+      end
+    end
+
+    test "raises on non-numeric entry" do
+      assert_raise ArgumentError, fn ->
+        Matrix.from_matrix(:undirected, [[0, :a], [:b, 0]])
+      end
+    end
   end
 
   describe "to_matrix/1" do
@@ -134,6 +158,43 @@ defmodule Yog.IO.MatrixTest do
 
       assert Yog.Model.order(restored) == Yog.Model.order(original)
       assert Yog.Model.edge_count(restored) == Yog.Model.edge_count(original)
+    end
+  end
+
+  describe "to_string/2" do
+    test "exports matrix to string" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 7)
+
+      str = Matrix.to_string(graph)
+      assert str == "0 5 0\n5 0 7\n0 7 0"
+    end
+
+    test "custom delimiter" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+
+      str = Matrix.to_string(graph, delimiter: ",")
+      assert str == "0,5\n5,0"
+    end
+
+    test "custom weight formatter for complex types" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_edge_with(1, 2, [weight: 10], & &1)
+
+      str =
+        Matrix.to_string(graph,
+          weight_formatter: fn
+            0 -> "0"
+            [weight: w] -> "w#{w}"
+          end
+        )
+
+      assert str == "0 w10\nw10 0"
     end
   end
 
