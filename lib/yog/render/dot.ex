@@ -110,21 +110,33 @@ defmodule Yog.Render.DOT do
   @typedoc "Node shapes"
   @type node_shape ::
           :box
+          | :box3d
           | :circle
-          | :ellipse
+          | :cloud
+          | :component
+          | :cylinder
           | :diamond
+          | :doublecircle
+          | :ellipse
+          | :folder
           | :hexagon
-          | :pentagon
-          | :octagon
-          | :triangle
-          | :rectangle
-          | :square
-          | :rect
-          | :invtriangle
           | :house
           | :invhouse
+          | :invtriangle
+          | :note
+          | :octagon
           | :parallelogram
+          | :pentagon
+          | :plain
+          | :plaintext
+          | :point
+          | :rect
+          | :rectangle
+          | :square
+          | :tab
           | :trapezoid
+          | :triangle
+          | :underline
           | {:custom, String.t()}
 
   @typedoc "Visual style"
@@ -164,14 +176,18 @@ defmodule Yog.Render.DOT do
 
   In Graphviz, subgraphs with names starting with "cluster_" are rendered
   as bounded rectangles around the contained nodes.
+
+  Subgraphs may be nested by providing the `subgraphs` key, which creates
+  a cluster hierarchy (e.g. VPC → AZ → nodes).
   """
   @type subgraph :: %{
           name: String.t(),
           label: String.t() | nil,
-          node_ids: [Yog.node_id()],
+          node_ids: [Yog.node_id()] | nil,
           style: style() | nil,
           fillcolor: String.t() | nil,
-          color: String.t() | nil
+          color: String.t() | nil,
+          subgraphs: [subgraph()] | nil
         }
 
   @typedoc "Options for customizing DOT (Graphviz) diagram rendering"
@@ -360,7 +376,7 @@ defmodule Yog.Render.DOT do
     nodes_str = build_node_lines(nodes, options)
 
     # Generate subgraphs
-    subgraphs_str = build_subgraphs(options.subgraphs)
+    subgraphs_str = build_subgraphs(options.subgraphs, 1)
 
     # Generate rank constraints
     ranks_str = build_ranks(options.ranks)
@@ -708,51 +724,62 @@ defmodule Yog.Render.DOT do
     end)
   end
 
-  defp build_subgraphs(nil), do: ""
+  defp build_subgraphs(nil, _indent), do: ""
+  defp build_subgraphs([], _indent), do: ""
 
-  defp build_subgraphs(subgraph_list) do
-    Enum.map_join(subgraph_list, "", fn sub ->
-      header = "  subgraph #{sub.name} {\n"
+  defp build_subgraphs(subgraph_list, indent) when is_list(subgraph_list) do
+    Enum.map_join(subgraph_list, "", &build_subgraph(&1, indent))
+  end
 
-      label =
-        if sub.label do
-          "    label=\"#{sub.label}\";\n"
-        else
+  defp build_subgraph(sub, indent) do
+    prefix = String.duplicate("  ", indent)
+    inner_prefix = String.duplicate("  ", indent + 1)
+
+    header = "#{prefix}subgraph #{sub.name} {\n"
+
+    label =
+      if sub.label do
+        "#{inner_prefix}label=\"#{sub.label}\";\n"
+      else
+        ""
+      end
+
+    style =
+      cond do
+        sub.style ->
+          "#{inner_prefix}style=#{style_to_string(sub.style)};\n"
+
+        sub.fillcolor ->
+          "#{inner_prefix}style=filled;\n"
+
+        true ->
           ""
-        end
+      end
 
-      style =
-        if sub.style do
-          "    style=#{style_to_string(sub.style)};\n"
-        else
-          ""
-        end
+    fillcolor =
+      if sub.fillcolor do
+        "#{inner_prefix}fillcolor=\"#{sub.fillcolor}\";\n"
+      else
+        ""
+      end
 
-      fillcolor =
-        if sub.fillcolor do
-          "    fillcolor=\"#{sub.fillcolor}\";\n"
-        else
-          ""
-        end
+    color =
+      if sub.color do
+        "#{inner_prefix}color=\"#{sub.color}\";\n"
+      else
+        ""
+      end
 
-      color =
-        if sub.color do
-          "    color=\"#{sub.color}\";\n"
-        else
-          ""
-        end
+    node_list =
+      case Map.get(sub, :node_ids) do
+        nil -> ""
+        [] -> ""
+        ids -> Enum.map_join(ids, ";\n", &"#{inner_prefix}#{Yog.Utils.safe_string(&1)}") <> ";\n"
+      end
 
-      node_list =
-        case sub.node_ids do
-          [] ->
-            ""
+    nested = build_subgraphs(Map.get(sub, :subgraphs), indent + 1)
 
-          ids ->
-            Enum.map_join(ids, ";\n", &("    " <> Yog.Utils.safe_string(&1))) <> ";\n"
-        end
-
-      header <> label <> style <> fillcolor <> color <> node_list <> "  }\n"
-    end)
+    header <> label <> style <> fillcolor <> color <> node_list <> nested <> "#{prefix}}\n"
   end
 
   defp build_ranks(nil), do: ""
@@ -915,21 +942,33 @@ defmodule Yog.Render.DOT do
   defp rankdir_to_string(:rl), do: "RL"
 
   defp node_shape_to_string(:box), do: "box"
+  defp node_shape_to_string(:box3d), do: "box3d"
   defp node_shape_to_string(:circle), do: "circle"
-  defp node_shape_to_string(:ellipse), do: "ellipse"
+  defp node_shape_to_string(:cloud), do: "cloud"
+  defp node_shape_to_string(:component), do: "component"
+  defp node_shape_to_string(:cylinder), do: "cylinder"
   defp node_shape_to_string(:diamond), do: "diamond"
+  defp node_shape_to_string(:doublecircle), do: "doublecircle"
+  defp node_shape_to_string(:ellipse), do: "ellipse"
+  defp node_shape_to_string(:folder), do: "folder"
   defp node_shape_to_string(:hexagon), do: "hexagon"
-  defp node_shape_to_string(:pentagon), do: "pentagon"
-  defp node_shape_to_string(:octagon), do: "octagon"
-  defp node_shape_to_string(:triangle), do: "triangle"
-  defp node_shape_to_string(:rectangle), do: "rectangle"
-  defp node_shape_to_string(:square), do: "square"
-  defp node_shape_to_string(:rect), do: "rect"
-  defp node_shape_to_string(:invtriangle), do: "invtriangle"
   defp node_shape_to_string(:house), do: "house"
   defp node_shape_to_string(:invhouse), do: "invhouse"
+  defp node_shape_to_string(:invtriangle), do: "invtriangle"
+  defp node_shape_to_string(:note), do: "note"
+  defp node_shape_to_string(:octagon), do: "octagon"
   defp node_shape_to_string(:parallelogram), do: "parallelogram"
+  defp node_shape_to_string(:pentagon), do: "pentagon"
+  defp node_shape_to_string(:plain), do: "plain"
+  defp node_shape_to_string(:plaintext), do: "plaintext"
+  defp node_shape_to_string(:point), do: "point"
+  defp node_shape_to_string(:rect), do: "rect"
+  defp node_shape_to_string(:rectangle), do: "rectangle"
+  defp node_shape_to_string(:square), do: "square"
+  defp node_shape_to_string(:tab), do: "tab"
   defp node_shape_to_string(:trapezoid), do: "trapezoid"
+  defp node_shape_to_string(:triangle), do: "triangle"
+  defp node_shape_to_string(:underline), do: "underline"
   defp node_shape_to_string({:custom, s}), do: s
 
   defp style_to_string(:solid), do: "solid"

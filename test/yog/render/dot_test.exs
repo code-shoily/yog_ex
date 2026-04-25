@@ -247,6 +247,59 @@ defmodule Yog.Render.DOTTest do
       refute String.contains?(dot, "    fillcolor=")
     end
 
+    test "renders nested subgraphs" do
+      graph =
+        Yog.directed()
+        |> Yog.add_node(1, "A")
+        |> Yog.add_node(2, "B")
+        |> Yog.add_node(3, "C")
+        |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}])
+
+      opts =
+        Map.put(DOT.default_options(), :subgraphs, [
+          %{
+            name: "cluster_vpc",
+            label: "VPC",
+            node_ids: nil,
+            style: :filled,
+            fillcolor: "lightgrey",
+            color: nil,
+            subgraphs: [
+              %{
+                name: "cluster_az1",
+                label: "AZ-1",
+                node_ids: [1, 2],
+                style: nil,
+                fillcolor: nil,
+                color: nil,
+                subgraphs: nil
+              },
+              %{
+                name: "cluster_az2",
+                label: "AZ-2",
+                node_ids: [3],
+                style: nil,
+                fillcolor: nil,
+                color: nil,
+                subgraphs: nil
+              }
+            ]
+          }
+        ])
+
+      dot = DOT.to_dot(graph, opts)
+
+      assert String.contains?(dot, "subgraph cluster_vpc")
+      assert String.contains?(dot, "subgraph cluster_az1")
+      assert String.contains?(dot, "subgraph cluster_az2")
+      assert String.contains?(dot, "label=\"VPC\"")
+      assert String.contains?(dot, "label=\"AZ-1\"")
+      assert String.contains?(dot, "label=\"AZ-2\"")
+      # Nested subgraphs should be indented inside their parent
+      assert Regex.match?(~r/subgraph cluster_vpc \{[\s\S]*?  subgraph cluster_az1 \{/m, dot)
+      assert Regex.match?(~r/subgraph cluster_vpc \{[\s\S]*?  subgraph cluster_az2 \{/m, dot)
+    end
+
     test "renders with invalid graph fallback" do
       # Testing fallback behavior when graph is missing nodes, out_edges, or kind
       dot = DOT.to_dot(%{}, DOT.default_options())
@@ -560,21 +613,33 @@ defmodule Yog.Render.DOTTest do
     test "covers all node_shape options" do
       shapes = [
         :box,
+        :box3d,
         :circle,
-        :ellipse,
+        :cloud,
+        :component,
+        :cylinder,
         :diamond,
+        :doublecircle,
+        :ellipse,
+        :folder,
         :hexagon,
-        :pentagon,
-        :octagon,
-        :triangle,
-        :rectangle,
-        :square,
-        :rect,
-        :invtriangle,
         :house,
         :invhouse,
+        :invtriangle,
+        :note,
+        :octagon,
         :parallelogram,
+        :pentagon,
+        :plain,
+        :plaintext,
+        :point,
+        :rect,
+        :rectangle,
+        :square,
+        :tab,
         :trapezoid,
+        :triangle,
+        :underline,
         {:custom, "my_shape"}
       ]
 
