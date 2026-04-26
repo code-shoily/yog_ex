@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.97.1] - 2026-04-18
+
+### Changed
+
+- **Multigraph architecture unified**: `Yog.Multi.Graph` is now the single canonical multigraph struct (previously there were two incompatible structs: `Yog.Multi.Graph` and `Yog.Multi.Model.Graph`).
+  - `Yog.Multi.Graph` defines the struct and implements `Enumerable` and `Inspect` protocols.
+  - `Yog.Multi.Model` holds all operations (`add_node/3`, `add_edge/4`, `remove_node/2`, `successors/2`, `predecessors/2`, etc.) acting on `Yog.Multi.Graph`.
+  - `Yog.Multi.DOT` now correctly renders graphs built via the `Yog.Multi` facade.
+  - `Yog.IO.GEXF.Multi` and `Yog.IO.Libgraph` updated to pattern-match on `%Yog.Multi.Graph{}`.
+
 ## [0.97.0] - 2026-04-18
 
 > **Note**: No more breaking changes. The focus will be on performance, documentation, and bug fixes in preparation for 1.0.0 in early 2027.
