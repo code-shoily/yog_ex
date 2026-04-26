@@ -158,7 +158,7 @@ defmodule Yog.IO.Libgraph do
       end)
     end
 
-    def to_libgraph(%Yog.Multi.Model.Graph{} = multi, opts) do
+    def to_libgraph(%Yog.Multi.Graph{} = multi, opts) do
       type = multi.kind
 
       base_graph = Graph.new(type: type)

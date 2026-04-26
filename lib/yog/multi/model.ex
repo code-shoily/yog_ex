@@ -5,31 +5,18 @@ defmodule Yog.Multi.Model do
   A multigraph allows multiple (parallel) edges between the same pair of nodes.
   Both directed and undirected variants are supported.
 
-  The internal representation keeps three indices:
+  The internal representation keeps three indexes:
   - `edges`: EdgeId → {from, to, data} — canonical edge store
   - `out_edge_ids`: NodeId → [EdgeId] — outgoing edges per node
   - `in_edge_ids`: NodeId → [EdgeId] — incoming edges per node
+
+  All operations in this module work on `Yog.Multi.Graph` structs.
   """
 
-  defmodule Graph do
-    @moduledoc """
-    A multigraph that can hold multiple (parallel) edges between nodes.
-    """
-    @enforce_keys [:kind, :nodes, :edges, :out_edge_ids, :in_edge_ids, :next_edge_id]
-    defstruct [:kind, :nodes, :edges, :out_edge_ids, :in_edge_ids, :next_edge_id]
-
-    @type t :: %__MODULE__{
-            kind: Yog.graph_type(),
-            nodes: %{Yog.node_id() => any()},
-            edges: %{integer() => {Yog.node_id(), Yog.node_id(), any()}},
-            out_edge_ids: %{Yog.node_id() => MapSet.t(integer())},
-            in_edge_ids: %{Yog.node_id() => MapSet.t(integer())},
-            next_edge_id: integer()
-          }
-  end
+  alias Yog.Multi.Graph
 
   @type t :: Graph.t()
-  @type edge_id :: integer()
+  @type edge_id :: Graph.edge_id()
 
   # ============================================================
   # Construction
@@ -39,28 +26,19 @@ defmodule Yog.Multi.Model do
   Creates a new, empty multigraph of the given type.
   """
   @spec new(Yog.graph_type()) :: t()
-  def new(graph_type) do
-    %Graph{
-      kind: graph_type,
-      nodes: %{},
-      edges: %{},
-      out_edge_ids: %{},
-      in_edge_ids: %{},
-      next_edge_id: 0
-    }
-  end
+  def new(graph_type), do: Graph.new(graph_type)
 
   @doc """
   Creates a new, empty directed multigraph.
   """
   @spec directed() :: t()
-  def directed, do: new(:directed)
+  def directed, do: Graph.directed()
 
   @doc """
   Creates a new, empty undirected multigraph.
   """
   @spec undirected() :: t()
-  def undirected, do: new(:undirected)
+  def undirected, do: Graph.undirected()
 
   # ============================================================
   # Node Operations
@@ -70,7 +48,7 @@ defmodule Yog.Multi.Model do
   Adds a node with the given ID and data.
   If the node already exists, its data is replaced (edges are unaffected).
   """
-  @spec add_node(t(), Yog.node_id(), any()) :: t()
+  @spec add_node(t(), Yog.Model.node_id(), any()) :: t()
   def add_node(graph, id, data) do
     %{graph | nodes: Map.put(graph.nodes, id, data)}
   end
@@ -78,7 +56,7 @@ defmodule Yog.Multi.Model do
   @doc """
   Removes a node and all edges connected to it.
   """
-  @spec remove_node(t(), Yog.node_id()) :: t()
+  @spec remove_node(t(), Yog.Model.node_id()) :: t()
   def remove_node(graph, id) do
     out_ids = Map.get(graph.out_edge_ids, id, MapSet.new())
     in_ids = Map.get(graph.in_edge_ids, id, MapSet.new())
@@ -97,7 +75,7 @@ defmodule Yog.Multi.Model do
   @doc """
   Returns all node IDs in the multigraph.
   """
-  @spec all_nodes(t()) :: [Yog.node_id()]
+  @spec all_nodes(t()) :: [Yog.Model.node_id()]
   def all_nodes(graph), do: Map.keys(graph.nodes)
 
   @doc """
@@ -118,7 +96,7 @@ defmodule Yog.Multi.Model do
   For undirected graphs, a single `EdgeId` is issued and the reverse
   direction is indexed automatically.
   """
-  @spec add_edge(t(), Yog.node_id(), Yog.node_id(), any()) :: {t(), edge_id()}
+  @spec add_edge(t(), Yog.Model.node_id(), Yog.Model.node_id(), any()) :: {t(), edge_id()}
   def add_edge(graph, from, to, data) do
     eid = graph.next_edge_id
     new_edges = Map.put(graph.edges, eid, {from, to, data})
@@ -190,7 +168,7 @@ defmodule Yog.Multi.Model do
   Returns all parallel edges between `from` and `to` as
   `[{edge_id, edge_data}]`.
   """
-  @spec edges_between(t(), Yog.node_id(), Yog.node_id()) :: [{edge_id(), any()}]
+  @spec edges_between(t(), Yog.Model.node_id(), Yog.Model.node_id()) :: [{edge_id(), any()}]
   def edges_between(graph, from, to) do
     edge_ids = Map.get(graph.out_edge_ids, from, MapSet.new())
 
@@ -200,9 +178,19 @@ defmodule Yog.Multi.Model do
   end
 
   @doc """
+  Returns the number of parallel edges between two nodes.
+  """
+  @spec edge_count(t(), Yog.Model.node_id(), Yog.Model.node_id()) :: non_neg_integer()
+  def edge_count(graph, from, to) do
+    graph
+    |> edges_between(from, to)
+    |> Kernel.length()
+  end
+
+  @doc """
   Returns all outgoing edges from `id` as `[{to_node, edge_id, edge_data}]`.
   """
-  @spec successors(t(), Yog.node_id()) :: [{Yog.node_id(), edge_id(), any()}]
+  @spec successors(t(), Yog.Model.node_id()) :: [{Yog.Model.node_id(), edge_id(), any()}]
   def successors(graph, id) do
     edge_ids = Map.get(graph.out_edge_ids, id, MapSet.new())
 
@@ -219,7 +207,7 @@ defmodule Yog.Multi.Model do
   @doc """
   Returns all incoming edges to `id` as `[{from_node, edge_id, edge_data}]`.
   """
-  @spec predecessors(t(), Yog.node_id()) :: [{Yog.node_id(), edge_id(), any()}]
+  @spec predecessors(t(), Yog.Model.node_id()) :: [{Yog.Model.node_id(), edge_id(), any()}]
   def predecessors(graph, id) do
     edge_ids = Map.get(graph.in_edge_ids, id, MapSet.new())
 
@@ -237,7 +225,7 @@ defmodule Yog.Multi.Model do
   Returns the out-degree of a node (number of outgoing edges).
   For undirected graphs, this equals the total degree.
   """
-  @spec out_degree(t(), Yog.node_id()) :: integer()
+  @spec out_degree(t(), Yog.Model.node_id()) :: integer()
   def out_degree(graph, id) do
     MapSet.size(Map.get(graph.out_edge_ids, id, MapSet.new()))
   end
@@ -245,7 +233,7 @@ defmodule Yog.Multi.Model do
   @doc """
   Returns the in-degree of a node (number of incoming edges).
   """
-  @spec in_degree(t(), Yog.node_id()) :: integer()
+  @spec in_degree(t(), Yog.Model.node_id()) :: integer()
   def in_degree(graph, id) do
     MapSet.size(Map.get(graph.in_edge_ids, id, MapSet.new()))
   end
@@ -277,6 +265,32 @@ defmodule Yog.Multi.Model do
   end
 
   @doc """
+  Converts the multigraph to a simple graph.
+  When there are parallel edges, only the first edge is kept.
+  """
+  @spec to_simple_graph(t()) :: Yog.graph()
+  def to_simple_graph(graph) do
+    base_graph =
+      Enum.reduce(graph.nodes, Yog.Model.new(graph.kind), fn {id, data}, g ->
+        Yog.Model.add_node(g, id, data)
+      end)
+
+    seen = MapSet.new()
+
+    Enum.reduce(graph.edges, {base_graph, seen}, fn {_eid, {src, dst, data}}, {g, seen_acc} ->
+      key = if graph.kind == :undirected and src > dst, do: {dst, src}, else: {src, dst}
+
+      if MapSet.member?(seen_acc, key) do
+        {g, seen_acc}
+      else
+        new_g = Yog.Model.add_edge!(g, src, dst, data)
+        {new_g, MapSet.put(seen_acc, key)}
+      end
+    end)
+    |> elem(0)
+  end
+
+  @doc """
   Collapses parallel edges, keeping the minimum weight.
   """
   @spec to_simple_graph_min_edges(t()) :: Yog.graph()
@@ -292,6 +306,38 @@ defmodule Yog.Multi.Model do
   @spec to_simple_graph_sum_edges(t(), (any(), any() -> any())) :: Yog.graph()
   def to_simple_graph_sum_edges(graph, add) do
     to_simple_graph(graph, add)
+  end
+
+  @doc """
+  Backward compatibility: convert from legacy map format.
+  """
+  @spec from_map(map()) :: t()
+  def from_map(%{kind: k, nodes: n, edges: e} = map) do
+    next_id = Map.get(map, :next_edge_id, 0)
+
+    %Graph{
+      kind: k,
+      nodes: n,
+      edges: e,
+      out_edge_ids: Map.get(map, :out_edge_ids, %{}),
+      in_edge_ids: Map.get(map, :in_edge_ids, %{}),
+      next_edge_id: next_id
+    }
+  end
+
+  @doc """
+  Convert to legacy map format.
+  """
+  @spec to_map(t()) :: map()
+  def to_map(%Graph{} = graph) do
+    %{
+      kind: graph.kind,
+      nodes: graph.nodes,
+      edges: graph.edges,
+      out_edge_ids: graph.out_edge_ids,
+      in_edge_ids: graph.in_edge_ids,
+      next_edge_id: graph.next_edge_id
+    }
   end
 
   # ============================================================

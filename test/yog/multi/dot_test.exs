@@ -1,7 +1,6 @@
 defmodule Yog.Multi.DOTTest do
   use ExUnit.Case
   alias Yog.Multi.DOT
-  alias Yog.Multi.Graph
 
   describe "default_options/0" do
     test "returns multigraph defaults" do
@@ -15,7 +14,7 @@ defmodule Yog.Multi.DOTTest do
 
   describe "to_dot/2" do
     test "renders empty multigraph" do
-      multi = Graph.new(:directed)
+      multi = Yog.Multi.Graph.new(:directed)
       dot = DOT.to_dot(multi)
 
       assert String.contains?(dot, "digraph G {")
@@ -24,12 +23,12 @@ defmodule Yog.Multi.DOTTest do
 
     test "renders parallel edges in directed graph" do
       multi =
-        Graph.new(:directed)
-        |> Graph.add_node(1, "Server")
-        |> Graph.add_node(2, "Database")
+        Yog.Multi.directed()
+        |> Yog.Multi.add_node(1, "Server")
+        |> Yog.Multi.add_node(2, "Database")
 
-      {:ok, multi, id1} = Graph.add_edge(multi, 1, 2, 5.0)
-      {:ok, multi, id2} = Graph.add_edge(multi, 1, 2, 15.0)
+      {multi, _id1} = Yog.Multi.add_edge(multi, 1, 2, 5.0)
+      {multi, _id2} = Yog.Multi.add_edge(multi, 1, 2, 15.0)
 
       dot = DOT.to_dot(multi)
 
@@ -42,30 +41,29 @@ defmodule Yog.Multi.DOTTest do
 
     test "renders parallel edges in undirected graph without duplication" do
       multi =
-        Graph.new(:undirected)
-        |> Graph.add_node(1, "A")
-        |> Graph.add_node(2, "B")
+        Yog.Multi.undirected()
+        |> Yog.Multi.add_node(1, "A")
+        |> Yog.Multi.add_node(2, "B")
 
-      {:ok, multi, _id1} = Graph.add_edge(multi, 1, 2, 10)
-      {:ok, multi, _id2} = Graph.add_edge(multi, 1, 2, 20)
+      {multi, _id1} = Yog.Multi.add_edge(multi, 1, 2, 10)
+      {multi, _id2} = Yog.Multi.add_edge(multi, 1, 2, 20)
 
       dot = DOT.to_dot(multi)
 
       assert String.contains?(dot, "graph")
       assert String.contains?(dot, "1 -- 2")
       edge_lines = String.split(dot, "\n") |> Enum.filter(&String.contains?(&1, "--"))
-      # Since it's undirected, we only want 2 total edges rendered, not 4.
       assert length(edge_lines) == 2
     end
 
     test "supports per-edge configuration via edge_id" do
       multi =
-        Graph.new(:directed)
-        |> Graph.add_node(1, "A")
-        |> Graph.add_node(2, "B")
+        Yog.Multi.directed()
+        |> Yog.Multi.add_node(1, "A")
+        |> Yog.Multi.add_node(2, "B")
 
-      {:ok, multi, id1} = Graph.add_edge(multi, 1, 2, 1.0)
-      {:ok, multi, _id2} = Graph.add_edge(multi, 1, 2, 2.0)
+      {multi, id1} = Yog.Multi.add_edge(multi, 1, 2, 1.0)
+      {multi, _id2} = Yog.Multi.add_edge(multi, 1, 2, 2.0)
 
       opts = %{
         DOT.default_options()
@@ -84,12 +82,12 @@ defmodule Yog.Multi.DOTTest do
 
     test "highlights specific multigraph edge by edge_id" do
       multi =
-        Graph.new(:directed)
-        |> Graph.add_node(1, "A")
-        |> Graph.add_node(2, "B")
+        Yog.Multi.directed()
+        |> Yog.Multi.add_node(1, "A")
+        |> Yog.Multi.add_node(2, "B")
 
-      {:ok, multi, id1} = Graph.add_edge(multi, 1, 2, 10)
-      {:ok, multi, _id2} = Graph.add_edge(multi, 1, 2, 20)
+      {multi, id1} = Yog.Multi.add_edge(multi, 1, 2, 10)
+      {multi, _id2} = Yog.Multi.add_edge(multi, 1, 2, 20)
 
       opts = %{DOT.default_options() | highlighted_edges: [id1]}
 
@@ -101,13 +99,13 @@ defmodule Yog.Multi.DOTTest do
 
     test "renders with subgraphs and styling" do
       multi =
-        Graph.new(:directed)
-        |> Graph.add_node(1, "A")
-        |> Graph.add_node(2, "B")
-        |> Graph.add_node(3, "C")
+        Yog.Multi.directed()
+        |> Yog.Multi.add_node(1, "A")
+        |> Yog.Multi.add_node(2, "B")
+        |> Yog.Multi.add_node(3, "C")
 
-      {:ok, multi, _} = Graph.add_edge(multi, 1, 2, 1.0)
-      {:ok, multi, _} = Graph.add_edge(multi, 2, 3, 1.0)
+      {multi, _} = Yog.Multi.add_edge(multi, 1, 2, 1.0)
+      {multi, _} = Yog.Multi.add_edge(multi, 2, 3, 1.0)
 
       opts = %{
         DOT.default_options()
@@ -133,28 +131,28 @@ defmodule Yog.Multi.DOTTest do
     test "renders large complex multigraph for Livebook visual inspection" do
       # Create a large mock system architecture graph
       multi =
-        Graph.new(:directed)
+        Yog.Multi.directed()
         # Core microservices
-        |> Graph.add_node("API", %{type: :service, desc: "Gateway API"})
-        |> Graph.add_node("Auth", %{type: :service, desc: "Auth Service"})
-        |> Graph.add_node("UserDB", %{type: :db, desc: "PostgreSQL"})
-        |> Graph.add_node("Payment", %{type: :service, desc: "Stripe Integration"})
-        |> Graph.add_node("Cache", %{type: :infra, desc: "Redis"})
-        |> Graph.add_node("Analytics", %{type: :service, desc: "Data Pipeline"})
+        |> Yog.Multi.add_node("API", %{type: :service, desc: "Gateway API"})
+        |> Yog.Multi.add_node("Auth", %{type: :service, desc: "Auth Service"})
+        |> Yog.Multi.add_node("UserDB", %{type: :db, desc: "PostgreSQL"})
+        |> Yog.Multi.add_node("Payment", %{type: :service, desc: "Stripe Integration"})
+        |> Yog.Multi.add_node("Cache", %{type: :infra, desc: "Redis"})
+        |> Yog.Multi.add_node("Analytics", %{type: :service, desc: "Data Pipeline"})
 
       # Establish parallel flows
       # API <-> Auth traffic
-      {:ok, multi, _} = Graph.add_edge(multi, "API", "Auth", "Auth Check (REST)")
-      {:ok, multi, _} = Graph.add_edge(multi, "API", "Auth", "Token Refresh (gRPC)")
+      {multi, _} = Yog.Multi.add_edge(multi, "API", "Auth", "Auth Check (REST)")
+      {multi, _} = Yog.Multi.add_edge(multi, "API", "Auth", "Token Refresh (gRPC)")
 
       # Auth <-> DB connections
-      {:ok, multi, _} = Graph.add_edge(multi, "Auth", "UserDB", "Read (SQL)")
-      {:ok, multi, _} = Graph.add_edge(multi, "Auth", "UserDB", "Update Session (SQL)")
+      {multi, _} = Yog.Multi.add_edge(multi, "Auth", "UserDB", "Read (SQL)")
+      {multi, _} = Yog.Multi.add_edge(multi, "Auth", "UserDB", "Update Session (SQL)")
 
       # Payment pipeline
-      {:ok, multi, _} = Graph.add_edge(multi, "API", "Payment", "Process Charge")
-      {:ok, multi, _} = Graph.add_edge(multi, "Payment", "Cache", "Idempotency Lock")
-      {:ok, multi, _} = Graph.add_edge(multi, "Payment", "Analytics", "Metric emission")
+      {multi, _} = Yog.Multi.add_edge(multi, "API", "Payment", "Process Charge")
+      {multi, _} = Yog.Multi.add_edge(multi, "Payment", "Cache", "Idempotency Lock")
+      {multi, _} = Yog.Multi.add_edge(multi, "Payment", "Analytics", "Metric emission")
 
       # Custom large styling options suitable for direct Livebook copy
       opts = %{

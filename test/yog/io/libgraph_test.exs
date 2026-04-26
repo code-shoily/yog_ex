@@ -41,7 +41,7 @@ defmodule Yog.IO.LibgraphTest do
       Graph.new(type: :directed)
       |> Graph.add_edge(1, 2, weight: 5)
 
-    assert {:ok, %Yog.Multi.Model.Graph{} = multi} =
+    assert {:ok, %Yog.Multi.Graph{} = multi} =
              Libgraph.from_libgraph(libgraph, force_type: :multi)
 
     assert multi.kind == :directed

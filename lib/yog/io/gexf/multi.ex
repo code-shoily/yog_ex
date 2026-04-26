@@ -1,6 +1,6 @@
 defmodule Yog.IO.GEXF.Multi do
   @moduledoc """
-  GEXF serialization support for **multigraphs** (`Yog.Multi.Model.Graph`).
+  GEXF serialization support for **multigraphs** (`Yog.Multi.Graph`).
 
   Mirrors `Yog.IO.GEXF` but works with parallel edges. Each edge in the
   multigraph is preserved as a distinct `<edge>` element with its internal
@@ -9,6 +9,7 @@ defmodule Yog.IO.GEXF.Multi do
 
   alias Yog.IO.GEXF.Common
   alias Yog.IO.XMLUtils
+  alias Yog.Multi.Graph
   alias Yog.Multi.Model
   alias Yog.Utils
 
@@ -38,7 +39,7 @@ defmodule Yog.IO.GEXF.Multi do
   """
   def serialize_with_options(node_attr, edge_attr, options, graph) do
     {:gexf_options, node_fmt, edge_fmt} = options
-    %Model.Graph{kind: type, nodes: nodes_map, edges: edges_map} = graph
+    %Graph{kind: type, nodes: nodes_map, edges: edges_map} = graph
     edge_default = if type == :directed, do: "directed", else: "undirected"
 
     node_attrs_list = Enum.map(nodes_map, fn {_id, data} -> node_attr.(data) end)

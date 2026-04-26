@@ -381,42 +381,34 @@ defmodule Yog.Multi.DOT do
 
   defp build_edge_lines(edges, options, arrow, kind) do
     edges
-    |> Enum.flat_map(fn {{from_id, to_id}, edge_list} ->
-      # In undirected graphs, only render edges where from_id <= to_id
-      if kind == :undirected and from_id > to_id do
-        []
-      else
-        Enum.map(edge_list, fn {edge_id, weight} ->
-          label = options.edge_label.(edge_id, weight)
-          attrs = [{:label, label}]
+    |> Enum.map_join("", fn {edge_id, {from_id, to_id, weight}} ->
+      label = options.edge_label.(edge_id, weight)
+      attrs = [{:label, label}]
 
-          is_highlighted =
-            options.highlighted_edges &&
-              (MapSet.member?(options.highlighted_edges, edge_id) ||
-                 MapSet.member?(options.highlighted_edges, {from_id, to_id}) ||
-                 (kind == :undirected &&
-                    MapSet.member?(options.highlighted_edges, {to_id, from_id})))
+      is_highlighted =
+        options.highlighted_edges &&
+          (MapSet.member?(options.highlighted_edges, edge_id) ||
+             MapSet.member?(options.highlighted_edges, {from_id, to_id}) ||
+             (kind == :undirected &&
+                MapSet.member?(options.highlighted_edges, {to_id, from_id})))
 
-          attrs =
-            if is_highlighted do
-              [
-                {:penwidth, options.highlight_penwidth},
-                {:color, options.highlight_color} | attrs
-              ]
-            else
-              attrs
-            end
+      attrs =
+        if is_highlighted do
+          [
+            {:penwidth, options.highlight_penwidth},
+            {:color, options.highlight_color} | attrs
+          ]
+        else
+          attrs
+        end
 
-          custom_attrs = options.edge_attributes.(from_id, to_id, edge_id, weight)
-          attrs = merge_attributes_list(attrs, custom_attrs)
+      custom_attrs = options.edge_attributes.(from_id, to_id, edge_id, weight)
+      attrs = merge_attributes_list(attrs, custom_attrs)
 
-          attr_str = format_attributes_list(attrs)
+      attr_str = format_attributes_list(attrs)
 
-          "  #{Yog.Utils.safe_string(from_id)} #{arrow} #{Yog.Utils.safe_string(to_id)} [#{attr_str}];\n"
-        end)
-      end
+      "  #{Yog.Utils.safe_string(from_id)} #{arrow} #{Yog.Utils.safe_string(to_id)} [#{attr_str}];\n"
     end)
-    |> Enum.join("")
   end
 
   defp merge_attributes_list(base, []), do: base
