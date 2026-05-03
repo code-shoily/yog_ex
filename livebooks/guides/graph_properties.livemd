@@ -35,7 +35,7 @@ g = Yog.from_edges(:undirected, [
 
 IO.puts "MST Total Weight: #{result.total_weight}"
 
-# # Visualize the MST (highlighting the edges)
+# Visualize the MST (highlighting the edges)
 mst_options = Yog.Render.DOT.mst_to_options(result, Yog.Render.DOT.theme(:minimal))
 dot = Yog.Render.DOT.to_dot(g, mst_options)
 Kino.VizJS.render(dot, height: "400px")
@@ -62,11 +62,28 @@ konigsberg =
   ])
 
 case Yog.Property.Eulerian.eulerian_circuit(konigsberg) do
-  {:ok, _} ->
+  {:ok, path} ->
     IO.puts("Eulerian circuit exists!")
+    IO.inspect(path, label: "Circuit")
 
   {:error, _} ->
     IO.puts("No Eulerian circuit possible. (Euler was right!)")
+end
+
+# A graph that DOES have an Eulerian circuit (all even degrees)
+square = Yog.undirected()
+  |> Yog.add_edges!([
+    {:a, :b, 1}, {:b, :c, 1},
+    {:c, :d, 1}, {:d, :a, 1}
+  ])
+
+case Yog.Property.Eulerian.eulerian_circuit(square) do
+  {:ok, path} ->
+    IO.puts("Square has an Eulerian circuit!")
+    IO.inspect(path, label: "Circuit")
+
+  {:error, _} ->
+    IO.puts("No Eulerian circuit.")
 end
 ```
 
@@ -79,17 +96,21 @@ g = Yog.Generator.Classic.petersen()
 
 # Calculate a greedy coloring
 {upper, colors} = Yog.Property.Coloring.coloring_greedy(g)
+IO.puts "Greedy coloring used #{upper} colors."
 
-IO.puts "Used #{upper} colors."
+# Try DSatur heuristic
+{upper_dsatur, colors_dsatur} = Yog.Property.Coloring.coloring_dsatur(g)
+IO.puts "DSatur used #{upper_dsatur} colors."
 
 # Visualize with colors!
 color_values = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]
-node_styles = Map.new(colors, fn {node, color_idx} -> 
-  color = Enum.at(color_values, color_idx)
-  {node, [color: color, style: "filled", fillcolor: color]}
-end)
 
-dot = Yog.Render.DOT.to_dot(g)
+node_attrs = fn id, _data ->
+  color = Enum.at(color_values, rem(Map.get(colors_dsatur, id, 0), length(color_values)))
+  [{:fillcolor, color}, {:style, "filled"}]
+end
+
+dot = Yog.Render.DOT.to_dot(g, Yog.Render.DOT.theme(:minimal) |> Map.put(:node_attributes, node_attrs))
 Kino.VizJS.render(dot)
 ```
 
@@ -106,6 +127,18 @@ if Yog.Property.Planarity.planar?(k5) do
 else
   IO.puts "K5 is NOT planar (as expected)"
 end
+
+# K3,3 (complete bipartite) is the other famous non-planar graph
+k33 = Yog.Generator.Classic.complete_bipartite(3, 3)
+IO.puts "K3,3 planar? #{Yog.Property.Planarity.planar?(k33)}"
+
+# A grid graph IS planar
+grid = Yog.Generator.Classic.grid_2d(4, 4)
+IO.puts "Grid planar? #{Yog.Property.Planarity.planar?(grid)}"
+
+# Get an embedding for the planar grid
+{:ok, embedding} = Yog.Property.Planarity.planar_embedding(grid)
+IO.inspect(map_size(embedding), label: "Embedding faces")
 ```
 
 ## Summary

@@ -3,7 +3,7 @@
 ```elixir
 Mix.install([
   {:yog_ex, path: "/home/mafinar/repos/elixir/yog_ex"},
-  {:kino_vizjs, "~> 0.5.0"}
+  {:kino_vizjs, "~> 0.8.0"}
 ])
 ```
 
@@ -20,6 +20,7 @@ A 3-regular graph with 10 nodes and 15 edges. It is a frequent counterexample in
 
 ```elixir
 petersen = Yog.Generator.Classic.petersen()
+IO.puts("Nodes: #{Yog.node_count(petersen)}, Edges: #{Yog.edge_count(petersen)}")
 Kino.VizJS.render(Yog.Render.DOT.to_dot(petersen))
 ```
 
@@ -28,6 +29,7 @@ Every node is connected to every other node.
 
 ```elixir
 k5 = Yog.Generator.Classic.complete(5)
+IO.puts("Nodes: #{Yog.node_count(k5)}, Edges: #{Yog.edge_count(k5)}")
 Kino.VizJS.render(Yog.Render.DOT.to_dot(k5))
 ```
 
@@ -36,6 +38,7 @@ Nodes arranged in a grid, connecting to their neighbors (up, down, left, right).
 
 ```elixir
 grid = Yog.Generator.Classic.grid_2d(4, 4)
+IO.puts("Nodes: #{Yog.node_count(grid)}, Edges: #{Yog.edge_count(grid)}")
 Kino.VizJS.render(Yog.Render.DOT.to_dot(grid))
 ```
 
@@ -46,23 +49,38 @@ A **Star** has one central hub, while a **Wheel** adds a cycle around the rim.
 star = Yog.Generator.Classic.star(7)
 wheel = Yog.Generator.Classic.wheel(7)
 
-IO.puts "--- Star ---"
+IO.puts("Star — Nodes: #{Yog.node_count(star)}, Edges: #{Yog.edge_count(star)}")
 Kino.VizJS.render(Yog.Render.DOT.to_dot(star))
 
-IO.puts "--- Wheel ---"
+IO.puts("Wheel — Nodes: #{Yog.node_count(wheel)}, Edges: #{Yog.edge_count(wheel)}")
 Kino.VizJS.render(Yog.Render.DOT.to_dot(wheel))
+```
+
+### Binary Tree and Hypercube
+
+```elixir
+# A perfect binary tree of depth 3
+tree = Yog.Generator.Classic.binary_tree(3)
+IO.puts("Binary Tree — Nodes: #{Yog.node_count(tree)}, Edges: #{Yog.edge_count(tree)}")
+Kino.VizJS.render(Yog.Render.DOT.to_dot(tree))
+
+# A 4-dimensional hypercube (16 nodes, 32 edges)
+hypercube = Yog.Generator.Classic.hypercube(4)
+IO.puts("Hypercube — Nodes: #{Yog.node_count(hypercube)}, Edges: #{Yog.edge_count(hypercube)}")
+Kino.VizJS.render(Yog.Render.DOT.to_dot(hypercube))
 ```
 
 ## 🎲 Random Graph Models
 
 Random graphs are used to model real-world phenomena like social networks, the internet, or biological systems.
 
-### Erdos-Renyi ($G(n, p)$)
+### Erdős-Rényi ($G(n, p)$)
 Edges are created between any two nodes with a fixed probability $p$.
 
 ```elixir
 # 20 nodes, each edge has 15% chance of existing
-er = Yog.Generator.Random.gnp(20, 0.15)
+er = Yog.Generator.Random.erdos_renyi_gnp(20, 0.15)
+IO.puts("Nodes: #{Yog.node_count(er)}, Edges: #{Yog.edge_count(er)}")
 Kino.VizJS.render(Yog.Render.DOT.to_dot(er))
 ```
 
@@ -72,6 +90,7 @@ Starts with a regular ring lattice and then rewires edges to create "short cuts,
 ```elixir
 # 20 nodes, each connected to 4 neighbors, 10% rewiring
 ws = Yog.Generator.Random.watts_strogatz(20, 4, 0.1)
+IO.puts("Nodes: #{Yog.node_count(ws)}, Edges: #{Yog.edge_count(ws)}")
 Kino.VizJS.render(Yog.Render.DOT.to_dot(ws))
 ```
 
@@ -81,6 +100,7 @@ Uses "preferential attachment" (the rich get richer) to create networks with pow
 ```elixir
 # 30 nodes, each new node attaches to 2 existing ones
 ba = Yog.Generator.Random.barabasi_albert(30, 2)
+IO.puts("Nodes: #{Yog.node_count(ba)}, Edges: #{Yog.edge_count(ba)}")
 Kino.VizJS.render(Yog.Render.DOT.to_dot(ba))
 ```
 
@@ -91,7 +111,43 @@ Generates graphs with predefined community structures.
 # 3 communities of 10 nodes each
 # High probability of edges within groups, low between them
 g = Yog.Generator.Random.sbm([10, 10, 10], [[0.8, 0.05, 0.05], [0.05, 0.8, 0.05], [0.05, 0.05, 0.8]])
-Kino.VizJS.render(Yog.Render.DOT.to_dot(g))
+IO.puts("Nodes: #{Yog.node_count(g)}, Edges: #{Yog.edge_count(g)}")
+
+# Color nodes by their planted community
+opts = Yog.Render.DOT.community_to_options(%Yog.Community.Result{
+  assignments: Map.new(0..9, &{&1, 0}) |> Map.merge(Map.new(10..19, &{&1, 1})) |> Map.merge(Map.new(20..29, &{&1, 2})),
+  num_communities: 3,
+  metadata: %{}
+})
+Kino.VizJS.render(Yog.Render.DOT.to_dot(g, opts))
+```
+
+## 🧪 Quick Property Checks
+
+Every generated graph can be analyzed immediately.
+
+```elixir
+# Pick any graph from above
+g = Yog.Generator.Classic.petersen()
+
+IO.inspect([
+  node_count: Yog.node_count(g),
+  edge_count: Yog.edge_count(g),
+  is_regular: Yog.regular?(g, 3),
+  is_connected: Yog.Connectivity.connected?(g),
+  diameter: Yog.Property.Structure.diameter(g),
+  girth: Yog.Property.Structure.girth(g)
+], label: "Petersen Properties")
+```
+
+## 🌐 Mermaid Rendering
+
+All graphs can also be rendered as Mermaid diagrams for embedding in Markdown documents.
+
+```elixir
+g = Yog.Generator.Classic.petersen()
+mermaid = Yog.Render.Mermaid.to_mermaid(g, Yog.Render.Mermaid.theme(:minimal))
+IO.puts(mermaid)
 ```
 
 ## Summary

@@ -3,7 +3,7 @@
 ```elixir
 Mix.install([
   {:yog_ex, path: "/home/mafinar/repos/elixir/yog_ex"},
-  {:kino_vizjs, "~> 0.8.0"},
+  {:kino_vizjs, "~> 0.8.0"}
 ])
 ```
 
@@ -68,6 +68,25 @@ g = g |> Yog.add_simple_edge!(3, 1)
 Kino.VizJS.render(Yog.Render.DOT.to_dot(g))
 ```
 
+### Live Builder
+
+For incremental construction, use the `Live` builder. It tracks pending changes and syncs them efficiently.
+
+```elixir
+builder =
+  Yog.Builder.Live.new()
+  |> Yog.Builder.Live.add_edge("A", "B", 10)
+  |> Yog.Builder.Live.add_edge("B", "C", 5)
+
+{builder, g_live} = Yog.Builder.Live.sync(builder, Yog.directed())
+IO.puts("Live-built graph has #{Yog.node_count(g_live)} nodes and #{Yog.edge_count(g_live)} edges")
+
+# Add more edges incrementally
+builder = Yog.Builder.Live.add_edge(builder, "C", "D", 3)
+{_builder, g_live} = Yog.Builder.Live.sync(builder, g_live)
+IO.puts("After incremental sync: #{Yog.node_count(g_live)} nodes, #{Yog.edge_count(g_live)} edges")
+```
+
 ## Examining the Graph
 
 You can query the graph's structure using functions in the main `Yog` module or `Yog.Model`.
@@ -81,6 +100,9 @@ IO.inspect(Yog.successors(g, 2), label: "Successors of 2")
 
 # Get neighbors regardless of direction
 IO.inspect(Yog.neighbors(g, 3), label: "Neighbors of 3")
+
+# Check if the graph is cyclic
+IO.puts("Is cyclic? #{Yog.cyclic?(g)}")
 ```
 
 ## Transformations
@@ -105,7 +127,7 @@ numeric_only = Yog.Transform.filter_nodes_indexed(g, fn id, _ -> is_integer(id) 
 
 ```elixir
 # Find the shortest path from 1 to 3
-case Yog.Pathfinding.Dijkstra.shortest_path(g, 1, 3) do
+case Yog.Pathfinding.shortest_path(g, 1, 3) do
   {:ok, path} -> 
     IO.puts "Found path with weight: #{path.weight}"
     IO.inspect(path.nodes, label: "Path")
@@ -114,9 +136,38 @@ case Yog.Pathfinding.Dijkstra.shortest_path(g, 1, 3) do
 end
 ```
 
+### Community Detection
+
+```elixir
+# Generate a graph with communities and detect them
+sbm = Yog.Generator.Random.sbm([8, 8, 8], [[0.7, 0.1, 0.1], [0.1, 0.7, 0.1], [0.1, 0.1, 0.7]])
+result = Yog.Community.Louvain.detect(sbm)
+
+IO.puts("Detected #{result.num_communities} communities")
+IO.inspect(result.assignments, label: "Node -> Community")
+
+# Visualize with community colors
+opts = Yog.Render.DOT.community_to_options(result)
+Kino.VizJS.render(Yog.Render.DOT.to_dot(sbm, opts))
+```
+
+## Visualization Formats
+
+`Yog` supports both Graphviz DOT and Mermaid.js output.
+
+```elixir
+# Graphviz DOT (rich, customizable)
+dot = Yog.Render.DOT.to_dot(g, Yog.Render.DOT.theme(:dark))
+Kino.VizJS.render(dot)
+
+# Mermaid.js (great for Markdown docs)
+mermaid = Yog.Render.Mermaid.to_mermaid(g, Yog.Render.Mermaid.theme(:minimal))
+IO.puts(mermaid)
+```
+
 ## Serialization
 
-You can easily import/export graphs in various formats like GraphML, JSON, or DOT.
+You can easily import/export graphs in various formats like GraphML, JSON, GDF, Graph6, or DOT.
 
 ```elixir
 xml = """
@@ -156,10 +207,9 @@ xml = """
 # Let's load the graph
 {:ok, graph} = Yog.IO.GraphML.deserialize(xml)
 
-# Let's check out graph6 version
+# Export to GDF (GUESS format)
 gdf = Yog.IO.GDF.serialize(graph)
-
-IO.puts gdf
+IO.puts String.slice(gdf, 0, 300) <> "..."
 ```
 
 ## Next Steps

@@ -19,11 +19,12 @@ GraphML is an XML-based format that is the de-facto standard for graph interchan
 g = Yog.Generator.Classic.petersen()
 
 # 1. Export to GraphML string
-{:ok, xml} = Yog.IO.GraphML.to_graphml(g)
+{:ok, xml} = Yog.IO.GraphML.serialize(g)
 IO.puts String.slice(xml, 0, 200) <> "..."
 
 # 2. Import from GraphML string
-# {:ok, imported_g} = Yog.IO.GraphML.from_graphml(xml)
+{:ok, imported_g} = Yog.IO.GraphML.deserialize(xml)
+IO.puts("Imported graph has #{Yog.node_count(imported_g)} nodes and #{Yog.edge_count(imported_g)} edges")
 ```
 
 ## 📄 JSON (For Web & Data)
@@ -37,11 +38,48 @@ g = Yog.undirected()
   |> Yog.add_edge!(1, 2, %{type: "friend"})
 
 # 1. Export to JSON (uses Jason internally)
-{:ok, json} = Yog.IO.JSON.to_json(g)
+{:ok, json} = Yog.IO.JSON.serialize(g)
 IO.puts json
 
 # 2. Import from JSON
-{:ok, imported_g} = Yog.IO.JSON.from_json(json)
+{:ok, imported_g} = Yog.IO.JSON.deserialize(json)
+IO.puts("Imported: #{Yog.node_count(imported_g)} nodes")
+```
+
+## 🗃️ GDF (GUESS Format)
+
+GDF is a simple CSV-like format used by the GUESS visualization tool and Gephi.
+
+```elixir
+g = Yog.Generator.Classic.cycle(5)
+
+# Export to GDF
+gdf = Yog.IO.GDF.serialize(g)
+IO.puts gdf
+
+# Import from GDF
+{:ok, imported} = Yog.IO.GDF.deserialize(gdf)
+IO.puts("Imported: #{Yog.node_count(imported)} nodes, #{Yog.edge_count(imported)} edges")
+```
+
+## 🔢 Graph6 (Compact Encoding)
+
+Graph6 is a compact text format for encoding small graphs. It's popular in mathematics and competitions.
+
+```elixir
+g = Yog.Generator.Classic.petersen()
+
+# Export to graph6
+{:ok, g6} = Yog.IO.Graph6.serialize(g)
+IO.puts("Graph6: #{g6}")
+
+# Import from graph6
+{:ok, imported} = Yog.IO.Graph6.deserialize(g6)
+IO.puts("Imported: #{Yog.node_count(imported)} nodes, #{Yog.edge_count(imported)} edges")
+
+# Cycle graph C5
+c5_g6 = Yog.IO.Graph6.encode_graph6(Yog.Generator.Classic.cycle(5))
+IO.puts("C5 in graph6: #{c5_g6}")
 ```
 
 ## 🛠️ Interoperability with `libgraph`
@@ -54,9 +92,11 @@ lg = Graph.new() |> Graph.add_edge(1, 2)
 
 # Convert to Yog
 yg = Yog.IO.Libgraph.from_libgraph(lg)
+IO.puts("Yog graph: #{Yog.node_count(yg)} nodes")
 
 # Convert back to libgraph
 lg_back = Yog.IO.Libgraph.to_libgraph(yg)
+IO.puts("Back to libgraph: #{length(Graph.vertices(lg_back))} vertices")
 ```
 
 ## 🖼️ DOT (For Visualization)
@@ -75,7 +115,8 @@ IO.puts dot
 `Yog`'s I/O suite allows you to:
 1.  **Collaborate**: Use **GraphML** to share data with researchers using other languages.
 2.  **Build**: Use **JSON** to power interactive web visualizations.
-3.  **Migrate**: Use the **libgraph** bridge to leverage existing Elixir codebases.
-4.  **Publish**: Use **DOT** to generate high-quality diagrams.
+3.  **Archive**: Use **Graph6** for compact, lossless graph encoding.
+4.  **Migrate**: Use the **libgraph** bridge to leverage existing Elixir codebases.
+5.  **Publish**: Use **DOT** to generate high-quality diagrams.
 
 Next, explore the **Gallery** to see more exotic graph structures!

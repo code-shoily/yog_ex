@@ -3,31 +3,36 @@
 ```elixir
 Mix.install([
   {:yog_ex, path: "/home/mafinar/repos/elixir/yog_ex"},
-  {:kino_vizjs, "~> 0.5.0"}
+  {:kino_vizjs, "~> 0.8.0"}
 ])
 ```
 
 ## Introduction
 
-Visualizing a graph is often the first step in debugging or communicating a complex algorithm. `Yog` provides a powerful `Yog.Render.DOT` engine that transforms your graphs into [Graphviz DOT](https://graphviz.org/doc/info/lang.html) strings, which can be rendered in Livebook using `Kino.VizJS`.
+Visualizing a graph is often the first step in debugging or communicating a complex algorithm. `Yog` provides powerful `Yog.Render.DOT` and `Yog.Render.Mermaid` engines that transform your graphs into visual diagrams.
 
-## 🎨 Basic Styling
+## 🎨 Graphviz DOT Styling
 
-You can provide global attributes to the `to_dot/2` function to change the overall look.
+### Basic Styling
+
+Control the overall look with the options map:
 
 ```elixir
 g = Yog.Generator.Classic.petersen()
 
-# Change layout direction and node shape
-dot = Yog.Render.DOT.to_dot(g, 
-  graph_attributes: [rankdir: "LR", bgcolor: "#f8fafc"],
-  node_attributes: [shape: "doublecircle", color: "#6366f1", fontname: "Outfit"]
+# Change layout direction, background, and node shape
+dot = Yog.Render.DOT.to_dot(g,
+  Yog.Render.DOT.default_options()
+  |> Map.put(:rankdir, :lr)
+  |> Map.put(:bgcolor, "#f8fafc")
+  |> Map.put(:node_shape, :doublecircle)
+  |> Map.put(:node_color, "#6366f1")
 )
 
 Kino.VizJS.render(dot)
 ```
 
-## ✨ Highlighting Paths & Nodes
+### Highlighting Paths & Nodes
 
 A common task is to highlight the result of an algorithm (e.g., a shortest path).
 
@@ -38,67 +43,186 @@ target = 24
 
 {:ok, path} = Yog.Pathfinding.shortest_path(in: Yog.Builder.GridGraph.to_graph(g), from: source, to: target)
 
-# Highlight nodes and edges in the path
-dot = Yog.Render.DOT.to_dot(g, 
-  highlight_nodes: path.nodes,
-  highlight_edges: Enum.chunk_every(path.nodes, 2, 1, :discard) |> Enum.map(fn [u, v] -> {u, v} end)
-)
+# Use path_to_options for automatic highlighting
+opts = Yog.Render.DOT.path_to_options(path, Yog.Render.DOT.theme(:presentation))
+dot = Yog.Render.DOT.to_dot(g, opts)
 
 Kino.VizJS.render(dot)
 ```
 
-## 🏷️ Custom Node & Edge Labels
+### Per-Node and Per-Edge Styling
 
-You can provide a mapping or a function to generate labels based on node/edge data.
+Use callback functions for fine-grained control:
 
 ```elixir
 g = Yog.directed()
   |> Yog.add_node(1, %{name: "Alice", role: "Admin"})
   |> Yog.add_node(2, %{name: "Bob", role: "User"})
-  |> Yog.add_edge!(1, 2, %{action: "Deletes"})
+  |> Yog.add_node(3, %{name: "Carol", role: "Admin"})
+  |> Yog.add_edges!([{1, 2, %{action: "Deletes"}}, {2, 3, %{action: "Views"}}])
 
-# Generate labels from data
-node_labels = Map.new(Yog.Model.all_nodes(g), fn id -> 
-  data = Yog.Model.node(g, id)
-  {id, data.name}
-end)
+node_attrs = fn id, data ->
+  case data.role do
+    "Admin" -> [{:fillcolor, "#ef4444"}, {:style, "filled"}]
+    "User" -> [{:fillcolor, "#3b82f6"}, {:style, "filled"}]
+    _ -> []
+  end
+end
 
-edge_labels = Map.new(Yog.Model.all_edges(g), fn {u, v, weight} -> 
-  {{u, v}, weight.action}
-end)
+edge_attrs = fn _from, _to, weight ->
+  case weight.action do
+    "Deletes" -> [{:color, "#ef4444"}, {:penwidth, 2}]
+    _ -> [{:color, "#94a3b8"}]
+  end
+end
 
-dot = Yog.Render.DOT.to_dot(g, 
-  node_labels: node_labels,
-  edge_labels: edge_labels
+dot = Yog.Render.DOT.to_dot(g,
+  Yog.Render.DOT.default_options()
+  |> Map.put(:node_attributes, node_attrs)
+  |> Map.put(:edge_attributes, edge_attrs)
 )
 
 Kino.VizJS.render(dot)
 ```
 
-## 🏗️ Theming
+### Subgraphs and Clusters
 
-`Yog` comes with several built-in themes to quickly switch between styles.
+Group nodes visually using subgraphs:
+
+```elixir
+g = Yog.directed()
+  |> Yog.add_node(:api, "API Gateway")
+  |> Yog.add_node(:auth, "Auth Service")
+  |> Yog.add_node(:db, "Database")
+  |> Yog.add_node(:cache, "Cache")
+  |> Yog.add_edges!([{:api, :auth, 1}, {:auth, :db, 1}, {:api, :cache, 1}])
+
+opts = %{
+  Yog.Render.DOT.default_options()
+  | subgraphs: [
+      %{
+        name: "cluster_backend",
+        label: "Backend Services",
+        node_ids: [:auth, :db],
+        style: :filled,
+        fillcolor: "#e0f2fe",
+        color: "#0284c7"
+      }
+    ]
+}
+
+Kino.VizJS.render(Yog.Render.DOT.to_dot(g, opts))
+```
+
+### Theming
+
+`Yog` comes with several built-in themes:
 
 ```elixir
 g = Yog.Generator.Classic.binary_tree(3)
 
 # 1. Dark Theme
-dot_dark = Yog.Render.DOT.to_dot(g, theme: :dark)
-IO.puts "--- Dark Theme ---"
+dot_dark = Yog.Render.DOT.to_dot(g, Yog.Render.DOT.theme(:dark))
 Kino.VizJS.render(dot_dark)
 
 # 2. Minimal Theme
-dot_min = Yog.Render.DOT.to_dot(g, theme: :minimal)
-IO.puts "--- Minimal Theme ---"
+dot_min = Yog.Render.DOT.to_dot(g, Yog.Render.DOT.theme(:minimal))
 Kino.VizJS.render(dot_min)
+
+# 3. Presentation Theme
+dot_pres = Yog.Render.DOT.to_dot(g, Yog.Render.DOT.theme(:presentation))
+Kino.VizJS.render(dot_pres)
+```
+
+## 🧜 Mermaid.js Rendering
+
+Mermaid is perfect for embedding diagrams in Markdown, GitHub, Notion, and documentation.
+
+### Basic Mermaid
+
+```elixir
+g = Yog.directed()
+  |> Yog.add_edges!([
+    {"Start", "Process", 1},
+    {"Process", "End", 1}
+  ])
+
+mermaid = Yog.Render.Mermaid.to_mermaid(g)
+IO.puts(mermaid)
+```
+
+### Mermaid Themes
+
+```elixir
+# Dark theme for dark-mode documentation
+mermaid_dark = Yog.Render.Mermaid.to_mermaid(g, Yog.Render.Mermaid.theme(:dark))
+IO.puts(mermaid_dark)
+```
+
+### Mermaid with Custom Styling
+
+```elixir
+g = Yog.directed()
+  |> Yog.add_node(:server, "Server")
+  |> Yog.add_node(:db, "Database")
+  |> Yog.add_edge_ensure(:server, :db, "SQL")
+
+node_attrs = fn id, _data ->
+  case id do
+    :server -> [{:fill, "#dbeafe"}, {:stroke, "#2563eb"}]
+    :db -> [{:fill, "#dcfce7"}, {:stroke, "#16a34a"}]
+    _ -> []
+  end
+end
+
+mermaid = Yog.Render.Mermaid.to_mermaid(g,
+  Yog.Render.Mermaid.default_options()
+  |> Map.put(:node_attributes, node_attrs)
+  |> Map.put(:node_shape, :cylinder)
+)
+IO.puts(mermaid)
+```
+
+## 🎯 Algorithm Helper Options
+
+`Yog` provides convenience functions to highlight algorithm results:
+
+```elixir
+# 1. MST highlighting
+weighted = Yog.from_edges(:undirected, [
+    {:a, :b, 4}, {:a, :h, 8}, {:b, :c, 8},
+    {:c, :d, 7}, {:c, :f, 4}, {:d, :e, 9},
+    {:e, :f, 10}, {:f, :g, 2}, {:g, :h, 1}
+  ])
+
+{:ok, mst} = Yog.MST.kruskal(in: weighted)
+mst_opts = Yog.Render.DOT.mst_to_options(mst, Yog.Render.DOT.theme(:minimal))
+Kino.VizJS.render(Yog.Render.DOT.to_dot(weighted, mst_opts))
+
+# 2. Community highlighting
+sbm = Yog.Generator.Random.sbm([8, 8], [[0.8, 0.1], [0.1, 0.8]])
+comm = Yog.Community.Louvain.detect(sbm)
+comm_opts = Yog.Render.DOT.community_to_options(comm)
+Kino.VizJS.render(Yog.Render.DOT.to_dot(sbm, comm_opts))
+
+# 3. Min-Cut highlighting
+flow = Yog.directed()
+  |> Yog.add_edges!([{:s, :a, 10}, {:s, :b, 10}, {:a, :t, 10}, {:b, :t, 5}])
+
+result = Yog.Flow.MaxFlow.dinic(flow, :s, :t)
+min_cut = Yog.Flow.MaxFlow.min_cut(result)
+cut_opts = Yog.Render.DOT.cut_to_options(min_cut)
+Kino.VizJS.render(Yog.Render.DOT.to_dot(flow, cut_opts))
 ```
 
 ## Summary
 
 Customizing visualizations in `Yog` is highly flexible:
-1.  **Global Attributes**: Control the layout and background.
-2.  **Highlighting**: Bring attention to specific nodes or edges.
-3.  **Data-Driven Labels**: Use your actual Elixir data to label the graph.
-4.  **Themes**: Use professionally curated presets for a quick premium look.
+1.  **Global Attributes**: Control layout, background, and defaults via the options map.
+2.  **Highlighting**: Use `path_to_options`, `mst_to_options`, `community_to_options`, `cut_to_options`.
+3.  **Data-Driven Styling**: Use callback functions for per-node and per-edge attributes.
+4.  **Subgraphs**: Group nodes visually into clusters.
+5.  **Themes**: Use professionally curated presets for DOT and Mermaid.
+6.  **Dual Formats**: Export to Graphviz DOT (rich) or Mermaid.js (portable).
 
 In the next "How-To", we'll look at **Importing and Exporting** graphs in formats like GraphML and JSON.

@@ -3,7 +3,7 @@
 ```elixir
 Mix.install([
   {:yog_ex, path: "/home/mafinar/repos/elixir/yog_ex"},
-  {:kino_vizjs, "~> 0.5.0"}
+  {:kino_vizjs, "~> 0.8.0"}
 ])
 ```
 
@@ -64,8 +64,61 @@ path = Yog.DAG.Algorithm.longest_path(dag)
 IO.inspect(path, label: "Critical Path")
 
 # Highlight it!
-dot = Yog.Render.DOT.to_dot(tasks, highlight_nodes: path)
+path_opts = Yog.Render.DOT.path_to_options(%{nodes: path, weight: 0})
+dot = Yog.Render.DOT.to_dot(tasks, path_opts)
 Kino.VizJS.render(dot)
+```
+
+## 🔄 Cycle Detection
+
+Before treating a graph as a DAG, you should verify it has no cycles.
+
+```elixir
+# This graph has a cycle
+cyclic = Yog.directed()
+  |> Yog.add_edges!([
+    {"A", "B", 1},
+    {"B", "C", 1},
+    {"C", "A", 1}  # Cycle!
+  ])
+
+IO.puts("Is cyclic? #{Yog.cyclic?(cyclic)}")
+
+# This graph is a DAG
+acyclic = Yog.directed()
+  |> Yog.add_edges!([
+    {"A", "B", 1},
+    {"B", "C", 1}
+  ])
+
+IO.puts("Is acyclic? #{Yog.acyclic?(acyclic)}")
+
+# DAG.Model.from_graph will fail on cyclic graphs
+case Yog.DAG.Model.from_graph(cyclic) do
+  {:ok, _dag} -> IO.puts("Valid DAG")
+  {:error, :contains_cycle} -> IO.puts("Cannot create DAG: graph contains a cycle")
+end
+```
+
+## ✂️ Transitive Reduction
+
+Transitive reduction finds the "skeleton" of a DAG by removing redundant edges—edges that are implied by other paths. This is how Git computes its merge base.
+
+```elixir
+g = Yog.directed()
+  |> Yog.add_edges!([
+    {"A", "B", 1},
+    {"B", "C", 1},
+    {"A", "C", 1}  # Redundant: A -> C is implied by A -> B -> C
+  ])
+
+{:ok, dag} = Yog.DAG.Model.from_graph(g)
+reduced = Yog.DAG.Algorithm.transitive_reduction(dag)
+
+IO.puts("Original edges: #{Yog.edge_count(g)}")
+IO.puts("Reduced edges:  #{Yog.edge_count(reduced)}")
+
+Kino.VizJS.render(Yog.Render.DOT.to_dot(reduced))
 ```
 
 ## 🌳 Shared Dependencies (LCA)
@@ -90,12 +143,36 @@ lcas = Yog.DAG.Algorithm.lowest_common_ancestors(dag, "UserAuth", "Logging")
 IO.inspect(lcas, label: "Shared Ancestors")
 ```
 
+## 🌐 Mermaid Rendering
+
+DAGs are perfect for Mermaid diagrams since they naturally flow in one direction.
+
+```elixir
+g = Yog.directed()
+  |> Yog.add_edges!([
+    {"Design", "Code", 1},
+    {"Design", "Tests", 1},
+    {"Code", "Review", 1},
+    {"Tests", "Review", 1},
+    {"Review", "Deploy", 1}
+  ])
+
+mermaid = Yog.Render.Mermaid.to_mermaid(g, %{
+  Yog.Render.Mermaid.default_options()
+  | direction: :lr,
+    node_shape: :rounded_rect
+})
+IO.puts(mermaid)
+```
+
 ## Summary
 
 `Yog`'s DAG toolkit provides:
 1.  **Topological Sort & Generations** for scheduling and parallel processing.
 2.  **Longest Path** for critical path analysis.
 3.  **LCA** for dependency resolution and merge operations.
-4.  **Guaranteed Safety**: The `DAG` type ensures you never accidentally introduce a circular dependency.
+4.  **Cycle Detection** to validate DAG constraints.
+5.  **Transitive Reduction** to find the minimal edge set.
+6.  **Guaranteed Safety**: The `DAG` type ensures you never accidentally introduce a circular dependency.
 
 Next, explore **Graph Properties** to see how to analyze the mathematical constraints of your network!

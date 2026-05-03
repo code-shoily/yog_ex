@@ -29,6 +29,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Credo alias warnings in `Yog.Multi.Mermaid`.
 
+#### Builders
+
+- **`Yog.Builder.Live.sync_multi/2`** — New function to sync pending changes to a multigraph (`Yog.Multi.Graph`).
+  - `add_edge` creates parallel edges rather than overwriting existing ones.
+  - `remove_edge` removes all parallel edges between the given node pair.
+  - Supports incremental sync, unweighted/simple edges, node removal, and both directed/undirected multigraphs.
+
+#### Documentation & Livebooks
+
+- **All 11 livebooks reviewed and improved** with better content and code coverage:
+  - **`gallery/graph_catalog`** — Added Mermaid rendering, property checks (regularity, connectivity, diameter, girth), hypercube and binary tree generators.
+  - **`guides/getting_started`** — Added `Yog.Builder.Live` example, community detection, Mermaid export, and more query examples.
+  - **`guides/dag_analysis`** — Added cycle detection, transitive reduction with visualization, Mermaid rendering, and `Yog.acyclic?/1`.
+  - **`guides/graph_properties`** — Fixed coloring visualization (now actually applies colors to DOT), added DSatur comparison, exact coloring, K3,3 planarity, and planar embedding.
+  - **`guides/network_analysis`** — Fixed community detection API (`.assignments` instead of `.communities`), added degree/closeness centrality, articulation point/bridge visualization with per-element styling.
+  - **`guides/network_flow`** — Added global min-cut (Stoer-Wagner), fixed bipartite matching example, removed broken min-cost max-flow placeholder.
+  - **`guides/traversals_and_pathfinding`** — Added Bellman-Ford with negative weights, real A* grid example using `Yog.Builder.GridGraph`, Johnson's mention.
+  - **`how_to/customizing_visualizations`** — Fixed old API usage (`node_attributes` as function, not keyword list), added Mermaid themes, per-node/edge styling, subgraphs, and algorithm helpers (`path_to_options`, `mst_to_options`, `community_to_options`, `cut_to_options`).
+  - **`how_to/import_export`** — Added Graph6 and GDF format coverage.
+  - **`how_to/maze_generation`** — Added Wilson's algorithm demonstration, algorithm property comparison table, path length analysis across algorithms.
+  - **`how_to/multigraphs_and_collapsing`** — Added multigraph visualization (`Yog.Multi.DOT` and `Yog.Multi.Mermaid`), `Yog.Builder.Live.sync_multi/2` example, per-edge styled rendering, Eulerian circuits on multigraphs, BFS/DFS traversals.
+
 ## [0.97.1] - 2026-04-18
 
 ### Changed

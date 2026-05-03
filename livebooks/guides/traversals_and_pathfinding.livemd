@@ -13,7 +13,7 @@ Graph traversal and pathfinding are at the heart of graph theory. Whether you ar
 
 ## 🚶 Basic Traversals: BFS and DFS
 
-systematic exploration of a graph comes in two main flavors:
+Systematic exploration of a graph comes in two main flavors:
 
 * **Breadth-First Search (BFS)**: Explores neighbors level-by-level. Ideal for finding the shortest path in unweighted graphs.
 * **Depth-First Search (DFS)**: Goes as deep as possible before backtracking. Great for cycle detection and topological sorting.
@@ -80,15 +80,42 @@ IO.inspect(path.nodes, label: "Route")
 A* uses a heuristic to "guide" the search towards the goal, making it much faster for coordinate-based graphs.
 
 ```elixir
-# On a grid, the heuristic could be the Manhattan distance
+# Create a small grid graph
+grid = Yog.Builder.GridGraph.new(5, 5)
+graph = Yog.Builder.GridGraph.to_graph(grid)
+
+# Manhattan distance heuristic
 heuristic = fn node, goal ->
-  {r1, c1} = node
-  {r2, c2} = goal
+  {r1, c1} = Yog.Builder.GridGraph.id_to_coord(grid, node)
+  {r2, c2} = Yog.Builder.GridGraph.id_to_coord(grid, goal)
   abs(r1 - r2) + abs(c1 - c2)
 end
 
-# (Pseudocode example - grid generation not shown for brevity)
-# {:ok, path} = Yog.Pathfinding.a_star(in: grid, from: {0,0}, to: {10,10}, heuristic: heuristic)
+start = Yog.Builder.GridGraph.coord_to_id(grid, 0, 0)
+goal = Yog.Builder.GridGraph.coord_to_id(grid, 4, 4)
+
+{:ok, path} = Yog.Pathfinding.a_star(in: graph, from: start, to: goal, heuristic: heuristic)
+
+IO.puts "A* path length: #{path.weight}"
+IO.inspect(path.nodes, label: "Path nodes")
+```
+
+### Bellman-Ford (Negative Weights)
+
+Dijkstra fails with negative edge weights. Bellman-Ford handles them correctly.
+
+```elixir
+# A graph with a negative edge
+g = Yog.from_edges(:directed, [
+    {:s, :a, 5},
+    {:s, :b, 4},
+    {:a, :c, 3},
+    {:b, :a, -6},  # Negative edge!
+    {:c, :b, 2}
+  ])
+
+{:ok, distances} = Yog.Pathfinding.BellmanFord.shortest_path(in: g, from: :s)
+IO.inspect(distances, label: "Shortest distances from S")
 ```
 
 ## 🗺️ All-Pairs Shortest Paths (Floyd-Warshall)
@@ -103,7 +130,8 @@ g = Yog.from_edges(:directed, [
 # Returns a nested map %{from => %{to => distance}}
 {:ok, distances} = Yog.Pathfinding.floyd_warshall(in: g)
 
-IO.inspect(distances[{1,3}], label: "Distance from 1 to 3")
+IO.inspect(distances[1][3], label: "Distance from 1 to 3")
+IO.inspect(distances[2][1], label: "Distance from 2 to 1 (no path = :infinity)")
 ```
 
 ## 🎨 Visualizing the Result
@@ -132,7 +160,7 @@ Kino.VizJS.render(dot)
 
 1. **Linear traversals** (BFS/DFS) for structure exploration.
 2. **Structural sorting** (Topological Sort) for DAGs.
-3. **Weighted pathfinding** (Dijkstra, Bellman-Ford, A*).
+3. **Weighted pathfinding** (Dijkstra, A*, Bellman-Ford).
 4. **All-pairs distance** (Floyd-Warshall, Johnson's).
 
 Next, try exploring **Community Detection** to see how nodes group together!

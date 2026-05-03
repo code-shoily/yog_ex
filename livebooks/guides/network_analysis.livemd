@@ -3,7 +3,7 @@
 ```elixir
 Mix.install([
   {:yog_ex, path: "/home/mafinar/repos/elixir/yog_ex"},
-  {:kino_vizjs, "~> 0.5.0"}
+  {:kino_vizjs, "~> 0.8.0"}
 ])
 ```
 
@@ -19,6 +19,7 @@ Centrality measures tell us which nodes are the most "important," but "importanc
 
 *   **Degree Centrality**: Who has the most connections? (Popularity)
 *   **Betweenness Centrality**: Who acts as a bridge between groups? (Brokerage)
+*   **Closeness Centrality**: Who can reach everyone else fastest? (Efficiency)
 *   **PageRank**: Who is connected to other important nodes? (Influence)
 
 ```elixir
@@ -30,12 +31,18 @@ g = Yog.undirected()
     {:d, :e, 1}, {:e, :f, 1}, {:f, :d, 1}  # Triangle 2
   ])
 
-# 1. PageRank (Influence)
-IO.inspect(Yog.Centrality.pagerank(g), label: "PageRank Scores")
+# 1. Degree Centrality
+IO.inspect(Yog.Centrality.degree_total(g), label: "Degree")
 
 # 2. Betweenness (Brokerage)
 # Node :c and :d should have high scores as they bridge the two groups
-IO.inspect(Yog.Centrality.betweenness(g), label: "Betweenness Scores")
+IO.inspect(Yog.Centrality.betweenness(g), label: "Betweenness")
+
+# 3. Closeness
+IO.inspect(Yog.Centrality.closeness(g), label: "Closeness")
+
+# 4. PageRank (Influence)
+IO.inspect(Yog.Centrality.pagerank(g), label: "PageRank Scores")
 ```
 
 ## 🏘️ Community Detection
@@ -48,23 +55,14 @@ Community detection finds groups of nodes that are more densely connected to eac
 g = Yog.Generator.Random.sbm([10, 10, 10], [[0.8, 0.1, 0.1], [0.1, 0.8, 0.1], [0.1, 0.1, 0.8]])
 
 # Detect communities using the Louvain method
-communities = Yog.Community.Louvain.detect(g)
+result = Yog.Community.Louvain.detect(g)
 
-IO.puts "Found #{length(communities.communities)} communities."
+IO.puts "Found #{result.num_communities} communities."
+IO.inspect(result.assignments, label: "Node -> Community")
 
 # Visualize it! (We'll color nodes by community)
-colors = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]
-node_styles = 
-  communities.communities
-  |> Enum.with_index()
-  |> Enum.flat_map(fn {nodes, idx} -> 
-    color = Enum.at(colors, rem(idx, length(colors)))
-    Enum.map(nodes, fn node -> {node, [color: color, style: "filled", fillcolor: color]} end)
-  end)
-  |> Map.new()
-
-dot = Yog.Render.DOT.to_dot(g, node_attributes: node_styles)
-Kino.VizJS.render(dot)
+opts = Yog.Render.DOT.community_to_options(result)
+Kino.VizJS.render(Yog.Render.DOT.to_dot(g, opts))
 ```
 
 ## 🏗️ Connectivity & Robustness
@@ -81,11 +79,37 @@ g = Yog.undirected()
 
 # Find Articulation Points
 # Nodes 3 and 4 are articulation points
-IO.inspect(Yog.Connectivity.Articulation.find(g), label: "Articulation Points")
+aps = Yog.Connectivity.Articulation.find(g)
+IO.inspect(aps, label: "Articulation Points")
 
 # Find Bridges
 # Edge {3, 4} is a bridge
-IO.inspect(Yog.Connectivity.Bridge.find(g), label: "Bridges")
+bridges = Yog.Connectivity.Bridge.find(g)
+IO.inspect(bridges, label: "Bridges")
+
+# Visualize with articulation points highlighted
+node_attrs = fn id, _data ->
+  if id in aps do
+    [{:fillcolor, "#ef4444"}, {:style, "filled"}, {:shape, "doublecircle"}]
+  else
+    []
+  end
+end
+
+edge_attrs = fn u, v, _w ->
+  if {u, v} in bridges or {v, u} in bridges do
+    [{:color, "#ef4444"}, {:penwidth, 3}]
+  else
+    []
+  end
+end
+
+dot = Yog.Render.DOT.to_dot(g,
+  Yog.Render.DOT.theme(:minimal)
+  |> Map.put(:node_attributes, node_attrs)
+  |> Map.put(:edge_attributes, edge_attrs)
+)
+Kino.VizJS.render(dot)
 ```
 
 ## Summary

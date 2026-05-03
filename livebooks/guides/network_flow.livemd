@@ -3,7 +3,7 @@
 ```elixir
 Mix.install([
   {:yog_ex, path: "/home/mafinar/repos/elixir/yog_ex"},
-  {:kino_vizjs, "~> 0.5.0"}
+  {:kino_vizjs, "~> 0.8.0"}
 ])
 ```
 
@@ -49,32 +49,30 @@ IO.inspect(min_cut.source_side, label: "Nodes on Source side")
 IO.inspect(min_cut.sink_side, label: "Nodes on Sink side")
 
 # Let's visualize the cut!
-# We'll highlight edges that cross the cut
-cut_edges = 
-  for u <- min_cut.source_side, 
-      {v, cap} <- Yog.Model.successors(g, u), 
-      v in min_cut.sink_side, 
-      do: {u, v}
-
-dot = Yog.Render.DOT.to_dot(g, highlight_edges: cut_edges)
+# We'll color nodes by which side of the cut they are on
+cut_opts = Yog.Render.DOT.cut_to_options(min_cut)
+dot = Yog.Render.DOT.to_dot(g, cut_opts)
 Kino.VizJS.render(dot)
 ```
 
-## 💰 Min-Cost Max-Flow
+## 🌍 Global Min-Cut
 
-Sometimes you don't just want the most flow; you want the *cheapest* flow. In this scenario, edges have both a **capacity** and a **unit cost**.
+Sometimes you want the minimum cut of the entire graph (not just between a specific source and sink). The Stoer-Wagner algorithm finds this efficiently.
 
 ```elixir
-# Successive Shortest Path algorithm is perfect for this
-# Each edge is {u, v, %{capacity: C, cost: P}}
-g = Yog.directed()
-  |> Yog.add_edge_ensure(:s, :a, %{capacity: 10, cost: 2})
-  |> Yog.add_edge_ensure(:a, :t, %{capacity: 5, cost: 10})
-  |> Yog.add_edge_ensure(:s, :t, %{capacity: 2, cost: 100})
+# Create an undirected graph
+g = Yog.undirected()
+  |> Yog.add_edges!([
+    {:a, :b, 3}, {:a, :c, 2},
+    {:b, :c, 4}, {:b, :d, 1},
+    {:c, :d, 5}
+  ])
 
-# Find max flow with minimum total cost
-# result = Yog.Flow.SuccessiveShortestPath.calculate(g, :s, :t)
-# IO.puts "Flow: #{result.flow}, Total Cost: #{result.cost}"
+# Find the global minimum cut
+global_cut = Yog.Flow.MinCut.global_min_cut(g, track_partitions: true)
+IO.puts("Global min-cut value: #{global_cut.cut_value}")
+IO.inspect(global_cut.source_side, label: "Source side")
+IO.inspect(global_cut.sink_side, label: "Sink side")
 ```
 
 ## 🤝 Bipartite Matching
@@ -92,6 +90,10 @@ g = Yog.undirected()
 
 matching = Yog.Matching.HopcroftKarp.max_matching(g)
 IO.inspect(matching, label: "Optimal Job-Candidate Pairs")
+
+# Count how many jobs got matched
+matched_jobs = matching |> Map.keys() |> Enum.filter(&String.starts_with?(&1, "Job")) |> length()
+IO.puts("Matched #{matched_jobs} jobs")
 ```
 
 ## Summary
@@ -100,7 +102,7 @@ IO.inspect(matching, label: "Optimal Job-Candidate Pairs")
 
 1. **Max-Flow** (Edmonds-Karp, Dinic, Push-Relabel) for throughput.
 2. **Min-Cut** for bottleneck identification.
-3. **Min-Cost Max-Flow** for economical optimization.
-4. **Global Min-Cut** (Stoer-Wagner) for general graph clustering.
+3. **Global Min-Cut** (Stoer-Wagner, Karger-Stein) for general graph clustering.
+4. **Bipartite Matching** for assignment problems.
 
 You've now explored the core pillars of the Yog library! Check the [Algorithm Catalog](ALGORITHMS.md) for even more advanced techniques.

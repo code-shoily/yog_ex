@@ -3,7 +3,7 @@
 ```elixir
 Mix.install([
   {:yog_ex, path: "/home/mafinar/repos/elixir/yog_ex"},
-  {:kino_vizjs, "~> 0.5.0"}
+  {:kino_vizjs, "~> 0.8.0"}
 ])
 ```
 
@@ -30,6 +30,9 @@ sidewinder = Yog.Generator.Maze.sidewinder(rows, cols)
 # 3. Recursive Backtracker - Most popular for games, very twisty
 backtracker = Yog.Generator.Maze.recursive_backtracker(rows, cols)
 
+# 4. Wilson's - Perfectly uniform, but slower
+wilson = Yog.Generator.Maze.wilson(rows, cols)
+
 IO.puts "--- Binary Tree ---"
 IO.puts Yog.Render.ASCII.grid_to_string_unicode(binary_tree)
 
@@ -38,6 +41,9 @@ IO.puts Yog.Render.ASCII.grid_to_string_unicode(sidewinder)
 
 IO.puts "\n--- Recursive Backtracker ---"
 IO.puts Yog.Render.ASCII.grid_to_string_unicode(backtracker)
+
+IO.puts "\n--- Wilson's ---"
+IO.puts Yog.Render.ASCII.grid_to_string_unicode(wilson)
 ```
 
 ## 🧠 Solving the Maze
@@ -64,7 +70,7 @@ case Yog.Pathfinding.Dijkstra.shortest_path(graph, from: start_node, to: end_nod
       |> Map.put(end_node, "E")
 
     IO.puts Yog.Render.ASCII.grid_to_string_unicode(maze, occupants)
-    IO.puts "\nPath length: #{path.total_weight} steps"
+    IO.puts "\nPath length: #{path.weight} steps"
 
   :error ->
     IO.puts "No path found! (Wait, perfect mazes always have a path... check implementation)"
@@ -93,6 +99,36 @@ maze2 = Yog.Generator.Maze.recursive_backtracker(10, 10, seed: 123)
 
 # These will be identical
 Yog.Render.ASCII.grid_to_string(maze1) == Yog.Render.ASCII.grid_to_string(maze2) |> IO.inspect(label: "Identical?")
+```
+
+## 🧪 Algorithm Properties
+
+Different algorithms have different characteristics:
+
+| Algorithm | Speed | Bias | Texture | Use Case |
+|-----------|-------|------|---------|----------|
+| Binary Tree | $O(n)$ | Strong diagonal | Long corridors | Procedural terrain |
+| Sidewinder | $O(n)$ | Horizontal | Long rows | Quick previews |
+| Recursive Backtracker | $O(n)$ | None | Twisty, winding | Games, puzzles |
+| Wilson's | $O(n^2)$ | None | Perfectly uniform | Scientific simulation |
+| Aldous-Broder | $O(n^2)$ | None | Uniform but slow | Theoretical analysis |
+
+```elixir
+# Compare the "twistiness" by looking at average path length
+mazes = [
+  {"Binary Tree", Yog.Generator.Maze.binary_tree(20, 20)},
+  {"Sidewinder", Yog.Generator.Maze.sidewinder(20, 20)},
+  {"Backtracker", Yog.Generator.Maze.recursive_backtracker(20, 20)},
+  {"Wilson's", Yog.Generator.Maze.wilson(20, 20)}
+]
+
+for {name, maze} <- mazes do
+  graph = Yog.Builder.GridGraph.to_graph(maze)
+  start = Yog.Builder.GridGraph.coord_to_id(maze, 0, 0)
+  finish = Yog.Builder.GridGraph.coord_to_id(maze, 19, 19)
+  {:ok, path} = Yog.Pathfinding.shortest_path(in: graph, from: start, to: finish)
+  IO.puts("#{name}: shortest path = #{path.weight} steps")
+end
 ```
 
 ## Summary

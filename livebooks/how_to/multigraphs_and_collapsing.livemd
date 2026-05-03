@@ -3,7 +3,7 @@
 ```elixir
 Mix.install([
   {:yog_ex, path: "/home/mafinar/repos/elixir/yog_ex"},
-  {:kino_vizjs, "~> 0.5.0"}
+  {:kino_vizjs, "~> 0.8.0"}
 ])
 ```
 
@@ -30,6 +30,64 @@ mg = Multi.undirected()
 {mg, e3} = Multi.add_edge(mg, :london, :paris, 300) # Ferry
 
 IO.puts "Total edges: #{Multi.size(mg)}"
+IO.inspect Multi.edges_between(mg, :london, :paris), label: "Edges between London and Paris"
+```
+
+## 🎨 Visualizing Multigraphs
+
+`Yog` can render multigraphs with both DOT and Mermaid, showing parallel edges as distinct lines.
+
+```elixir
+# DOT rendering (rich, customizable)
+dot = Yog.Multi.DOT.to_dot(mg)
+Kino.VizJS.render(dot)
+
+# Mermaid rendering (great for docs)
+mermaid = Yog.Multi.Mermaid.to_mermaid(mg)
+IO.puts(mermaid)
+```
+
+### Styled Multigraph Rendering
+
+```elixir
+# Render with per-edge styling
+opts = %{
+  Yog.Multi.DOT.default_options()
+  | edge_attributes: fn _from, _to, edge_id, weight ->
+      color =
+        cond do
+          weight == 50 -> "#10b981"  # Train (fastest)
+          weight == 100 -> "#3b82f6" # Flight
+          true -> "#f59e0b"          # Ferry
+        end
+      [{:color, color}, {:penwidth, 2}]
+    end
+}
+
+Kino.VizJS.render(Yog.Multi.DOT.to_dot(mg, opts))
+```
+
+## 🏗️ Building Multigraphs Incrementally
+
+Use `Yog.Builder.Live` with `sync_multi/2` to build multigraphs incrementally.
+
+```elixir
+builder =
+  Yog.Builder.Live.new()
+  |> Yog.Builder.Live.add_edge("A", "B", 10)
+  |> Yog.Builder.Live.add_edge("A", "B", 20)
+  |> Yog.Builder.Live.add_edge("B", "C", 5)
+
+{builder, multi} = Yog.Builder.Live.sync_multi(builder, Yog.Multi.directed())
+IO.puts("After first sync: #{Multi.order(multi)} nodes, #{Multi.size(multi)} edges")
+
+# Add more parallel edges incrementally
+builder = Yog.Builder.Live.add_edge(builder, "A", "B", 30)
+{_builder, multi} = Yog.Builder.Live.sync_multi(builder, multi)
+IO.puts("After second sync: #{Multi.order(multi)} nodes, #{Multi.size(multi)} edges")
+
+# Query parallel edges
+IO.inspect Multi.edges_between(multi, 0, 1), label: "Edges A -> B"
 ```
 
 ## 📉 Collapsing Strategies
@@ -90,13 +148,48 @@ simple_g = Multi.to_simple_graph(mg, &min/2)
 {:ok, path} = Yog.Pathfinding.shortest_path(in: simple_g, from: :a, to: :c)
 
 IO.inspect(path.nodes, label: "Shortest Path Nodes")
-IO.puts "Total Weight: #{path.total_weight}" # Should be 7 (5 + 2)
+IO.puts "Total Weight: #{path.weight}" # Should be 7 (5 + 2)
+```
+
+## 🔄 Multigraph Algorithms
+
+Some algorithms work directly on multigraphs without collapsing.
+
+### Eulerian Circuits and Paths
+
+```elixir
+# Build a multigraph that has an Eulerian circuit
+mg = Multi.undirected()
+  |> Multi.add_node(:a, nil)
+  |> Multi.add_node(:b, nil)
+  |> Multi.add_node(:c, nil)
+  |> (fn g -> {g, _} = Multi.add_edge(g, :a, :b, 1); g end).()
+  |> (fn g -> {g, _} = Multi.add_edge(g, :a, :b, 2); g end).()
+  |> (fn g -> {g, _} = Multi.add_edge(g, :b, :c, 3); g end).()
+  |> (fn g -> {g, _} = Multi.add_edge(g, :b, :c, 4); g end).()
+
+IO.puts("Has Eulerian circuit? #{Multi.has_eulerian_circuit?(mg)}")
+
+if Multi.has_eulerian_circuit?(mg) do
+  circuit = Multi.find_eulerian_circuit(mg)
+  IO.inspect(circuit, label: "Eulerian Circuit")
+end
+```
+
+### Traversals
+
+```elixir
+# BFS and DFS work on multigraphs too
+IO.inspect(Multi.bfs(mg, :a), label: "BFS from A")
+IO.inspect(Multi.dfs(mg, :a), label: "DFS from A")
 ```
 
 ## Summary
 
 Multigraphs are powerful for modeling, but simple graphs are often better for analysis.
 *   Use `Yog.Multi` to capture the full complexity of your data.
+*   Use `Yog.Builder.Live.sync_multi/2` to build multigraphs incrementally.
+*   Use `Yog.Multi.DOT` and `Yog.Multi.Mermaid` to visualize parallel edges.
 *   Use `to_simple_graph/2` to prepare your data for algorithms.
 *   Choose your **combine function** (`min`, `max`, `sum`) based on the problem you are solving.
 
