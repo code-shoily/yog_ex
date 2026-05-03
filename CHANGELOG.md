@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.97.2] - Unreleased
+
+### Added
+
+#### Rendering
+
+- **`Yog.Multi.Mermaid`** — New Mermaid.js renderer for multigraphs (`Yog.Multi.Graph`).
+  - Supports parallel edges between the same pair of nodes.
+  - `edge_id`-based callbacks (`edge_label/2`, `edge_attributes/4`) for per-edge customization.
+  - Highlighting by `edge_id` or `{from, to}` tuple.
+  - Subgraphs, per-node styling, and all node shapes/directions.
+- **`Yog.Render.Mermaid` parity with `Yog.Render.DOT`**:
+  - `node_attributes/2` callback for per-node inline styling (`style node_id fill:...,stroke:...`).
+  - `edge_attributes/3` callback for per-edge styling via `linkStyle index ...`.
+  - `subgraphs` option for Mermaid `subgraph ... end` blocks.
+  - `theme/1` — Presets: `:default`, `:dark`, `:minimal`, `:presentation`.
+  - `mst_to_options/2`, `community_to_options/2`, `cut_to_options/2`, `matching_to_options/2`.
+  - `default_options_with_edge_formatter/1` and `default_options_with/1`.
+  - Internal `MapSet` conversion for O(1) highlight membership checks.
+
+### Fixed
+
+- Credo alias warnings in `Yog.Multi.Mermaid`.
+
 ## [0.97.1] - 2026-04-18
 
 ### Changed
