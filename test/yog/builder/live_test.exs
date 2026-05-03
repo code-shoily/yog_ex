@@ -124,4 +124,122 @@ defmodule Yog.Builder.LiveTest do
     {_builder, graph} = Live.sync(builder, graph)
     assert length(Yog.all_nodes(graph)) == 3
   end
+
+  test "live_builder_sync_multi_directed_test" do
+    builder =
+      Live.new()
+      |> Live.add_edge("A", "B", 10)
+      |> Live.add_edge("B", "C", 5)
+
+    {_builder, multi} = Live.sync_multi(builder, Yog.Multi.directed())
+
+    assert Yog.Multi.order(multi) == 3
+    assert Yog.Multi.size(multi) == 2
+  end
+
+  test "live_builder_sync_multi_parallel_edges_test" do
+    builder =
+      Live.new()
+      |> Live.add_edge("A", "B", 10)
+      |> Live.add_edge("A", "B", 20)
+      |> Live.add_edge("A", "B", 30)
+
+    {_builder, multi} = Live.sync_multi(builder, Yog.Multi.directed())
+
+    assert Yog.Multi.order(multi) == 2
+    assert Yog.Multi.size(multi) == 3
+
+    # Verify parallel edges are tracked independently
+    edges = Yog.Multi.edges_between(multi, 0, 1)
+    assert length(edges) == 3
+    weights = Enum.map(edges, fn {_eid, data} -> data end) |> Enum.sort()
+    assert weights == [10, 20, 30]
+  end
+
+  test "live_builder_sync_multi_undirected_test" do
+    builder =
+      Live.new()
+      |> Live.add_edge("A", "B", 10)
+      |> Live.add_edge("B", "A", 20)
+
+    {_builder, multi} = Live.sync_multi(builder, Yog.Multi.undirected())
+
+    assert Yog.Multi.order(multi) == 2
+    assert Yog.Multi.size(multi) == 2
+  end
+
+  test "live_builder_sync_multi_remove_edge_test" do
+    builder =
+      Live.new()
+      |> Live.add_edge("A", "B", 10)
+      |> Live.add_edge("A", "B", 20)
+      |> Live.remove_edge("A", "B")
+
+    {_builder, multi} = Live.sync_multi(builder, Yog.Multi.directed())
+
+    assert Yog.Multi.order(multi) == 2
+    assert Yog.Multi.size(multi) == 0
+  end
+
+  test "live_builder_sync_multi_remove_node_test" do
+    builder =
+      Live.new()
+      |> Live.add_edge("A", "B", 10)
+      |> Live.add_edge("B", "C", 20)
+      |> Live.remove_node("B")
+
+    {_builder, multi} = Live.sync_multi(builder, Yog.Multi.directed())
+
+    # Nodes A and C remain; B and its edges are removed
+    assert Yog.Multi.order(multi) == 2
+    assert Yog.Multi.size(multi) == 0
+  end
+
+  test "live_builder_sync_multi_empty_pending_test" do
+    builder = Live.new()
+    multi = Yog.Multi.directed()
+
+    {builder, multi} = Live.sync_multi(builder, multi)
+    assert Yog.Multi.order(multi) == 0
+    assert builder.pending == []
+  end
+
+  test "live_builder_sync_multi_incremental_sync_test" do
+    builder =
+      Live.new()
+      |> Live.add_edge("A", "B", 10)
+
+    {builder, multi} = Live.sync_multi(builder, Yog.Multi.directed())
+    assert Yog.Multi.order(multi) == 2
+    assert Yog.Multi.size(multi) == 1
+
+    builder = Live.add_edge(builder, "B", "C", 5)
+    {_builder, multi} = Live.sync_multi(builder, multi)
+    assert Yog.Multi.order(multi) == 3
+    assert Yog.Multi.size(multi) == 2
+  end
+
+  test "live_builder_sync_multi_unweighted_edge_test" do
+    builder =
+      Live.new()
+      |> Live.add_unweighted_edge("A", "B")
+
+    {_builder, multi} = Live.sync_multi(builder, Yog.Multi.directed())
+    assert Yog.Multi.size(multi) == 1
+
+    edge_data = Yog.Multi.edges_between(multi, 0, 1)
+    assert [{_eid, nil}] = edge_data
+  end
+
+  test "live_builder_sync_multi_simple_edge_test" do
+    builder =
+      Live.new()
+      |> Live.add_simple_edge("A", "B")
+
+    {_builder, multi} = Live.sync_multi(builder, Yog.Multi.directed())
+    assert Yog.Multi.size(multi) == 1
+
+    edge_data = Yog.Multi.edges_between(multi, 0, 1)
+    assert [{_eid, 1}] = edge_data
+  end
 end

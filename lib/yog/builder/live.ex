@@ -50,6 +50,20 @@ defmodule Yog.Builder.Live do
   - Use `purge_pending/1` to abandon changes
   - Use `checkpoint/1` to keep registry but clear pending
 
+  ## Multigraphs
+
+  The same builder can sync to multigraphs (`Yog.Multi.Graph`) via `sync_multi/2`.
+  All operations (add/remove) work identically; the only difference is that
+  `add_edge` creates parallel edges rather than replacing existing ones.
+
+      builder = Yog.Builder.Live.new() |> Yog.Builder.Live.add_edge("A", "B", 10)
+      {builder, multi} = Yog.Builder.Live.sync_multi(builder, Yog.Multi.directed())
+
+      # Add a parallel edge
+      builder = Yog.Builder.Live.add_edge(builder, "A", "B", 20)
+      {_builder, multi} = Yog.Builder.Live.sync_multi(builder, multi)
+      # multi now has TWO edges between A and B
+
   ## Limitations
 
   - **Memory:** Pending changes are stored in memory until synced
@@ -75,6 +89,7 @@ defmodule Yog.Builder.Live do
 
   alias Yog.Builder.Labeled
   alias Yog.Model
+  alias Yog.Multi.Model, as: MultiModel
 
   defstruct registry: %{}, next_id: 0, pending: []
 
@@ -274,7 +289,7 @@ defmodule Yog.Builder.Live do
   # ============= Synchronization =============
 
   @doc """
-  Applies all pending changes to the graph.
+  Applies all pending changes to a simple graph.
 
   Returns `{builder, updated_graph}` where the builder has cleared its pending queue.
   This is an O(ΔE) operation where ΔE is the number of pending edges.
@@ -300,6 +315,33 @@ defmodule Yog.Builder.Live do
     new_graph = apply_transitions(graph, transitions)
 
     # Return builder with empty pending
+    {%{builder | pending: []}, new_graph}
+  end
+
+  @doc """
+  Applies all pending changes to a multigraph.
+
+  Returns `{builder, updated_multigraph}` where the builder has cleared its pending
+  queue. Unlike `sync/2`, this creates parallel edges when the same pair of nodes
+  is connected multiple times.
+
+  ## Examples
+
+      iex> builder = Yog.Builder.Live.new()
+      ...> |> Yog.Builder.Live.add_edge("A", "B", 10)
+      ...> |> Yog.Builder.Live.add_edge("A", "B", 20)
+      iex> {_builder, multi} = Yog.Builder.Live.sync_multi(builder, Yog.Multi.directed())
+      iex> Yog.Multi.size(multi)
+      2
+  """
+  @spec sync_multi(t(), Yog.Multi.Graph.t()) :: {t(), Yog.Multi.Graph.t()}
+  def sync_multi(%__MODULE__{pending: []} = builder, graph) do
+    {builder, graph}
+  end
+
+  def sync_multi(%__MODULE__{pending: pending} = builder, graph) do
+    transitions = Enum.reverse(pending)
+    new_graph = apply_multi_transitions(graph, transitions)
     {%{builder | pending: []}, new_graph}
   end
 
@@ -449,6 +491,30 @@ defmodule Yog.Builder.Live do
 
         {:remove_node, id} ->
           Model.remove_node(g, id)
+      end
+    end)
+  end
+
+  defp apply_multi_transitions(graph, transitions) do
+    Enum.reduce(transitions, graph, fn transition, g ->
+      case transition do
+        {:add_node, id, label} ->
+          MultiModel.add_node(g, id, label)
+
+        {:add_edge, src, dst, weight} ->
+          {new_g, _edge_id} = MultiModel.add_edge(g, src, dst, weight)
+          new_g
+
+        {:remove_edge, src, dst} ->
+          # Remove all parallel edges between src and dst
+          edges = MultiModel.edges_between(g, src, dst)
+
+          Enum.reduce(edges, g, fn {edge_id, _data}, acc_g ->
+            MultiModel.remove_edge(acc_g, edge_id)
+          end)
+
+        {:remove_node, id} ->
+          MultiModel.remove_node(g, id)
       end
     end)
   end
