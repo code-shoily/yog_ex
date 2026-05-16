@@ -204,6 +204,19 @@ defmodule Yog.IO.Graph6Test do
       assert Yog.Model.node_count(parsed) == n
     end
 
+    test "roundtrip with 62 nodes (max 1-char header)" do
+      n = 62
+
+      graph =
+        Enum.reduce(0..(n - 1), Yog.undirected(), fn i, acc -> Yog.add_node(acc, i, nil) end)
+
+      assert {:ok, g6} = Graph6.serialize(graph)
+      assert byte_size(g6) > 0
+      assert String.at(g6, 0) != "~"
+      assert {:ok, parsed} = Graph6.parse(g6)
+      assert Yog.Model.node_count(parsed) == n
+    end
+
     test "rejects graphs with more than 100,000 nodes" do
       n = 100_001
 

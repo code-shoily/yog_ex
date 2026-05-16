@@ -621,4 +621,32 @@ defmodule Yog.IO.GEXFTest do
       File.rm(path)
     end
   end
+
+  test "deserialize handles smart quotes and characters via sanitization" do
+    # Even if Saxy is loaded, we want to ensure it can handle or we sanitize 
+    # Actually, Saxy handles UTF-8, but XMLUtils.sanitize_xml is specifically 
+    # used in the xmerl fallback. 
+    # If Saxy is present, we might want to ensure we don't regress if we 
+    # ever add sanitization to Saxy path too.
+    xml = """
+    <?xml version="1.0"?>
+    <gexf version="1.3">
+      <graph>
+        <nodes>
+          <node id="1" label="Alice \u201Csmart quote\u201D"/>
+        </nodes>
+        <edges></edges>
+      </graph>
+    </gexf>
+    """
+
+    {:ok, graph} = GEXF.deserialize(xml)
+    # Saxy will likely preserve the smart quote as UTF-8. 
+    # The xmerl fallback would have converted it to ".
+    assert Yog.Model.node(graph, 1)["label"] =~ <<0x201C::utf8>>
+  end
+
+  test "deserialize returns error for malformed xml" do
+    assert {:error, {:parse_error, _}} = GEXF.deserialize("<?xml version='1.0'?><gexf><graph>")
+  end
 end

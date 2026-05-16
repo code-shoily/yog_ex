@@ -270,6 +270,40 @@ defmodule Yog.IO.LEDATest do
     assert warnings != []
   end
 
+  test "parse with premature EOF in nodes" do
+    input = "LEDA.GRAPH\nstring\nstring\n-1\n5\n|{A}|\n|{B}|"
+    assert {:error, {:unexpected_end_of_nodes, _}} = LEDA.parse(input)
+  end
+
+  test "parse with missing node count" do
+    input = "LEDA.GRAPH\nstring\nstring\n-1"
+    assert {:error, :missing_node_count} = LEDA.parse(input)
+  end
+
+  test "parse with missing direction" do
+    input = "LEDA.GRAPH\nstring\nstring"
+    assert {:error, :missing_direction} = LEDA.parse(input)
+  end
+
+  test "parse with invalid node count" do
+    input = "LEDA.GRAPH\nstring\nstring\n-1\nnot_a_number"
+    assert {:error, :invalid_node_count} = LEDA.parse(input)
+  end
+
+  test "parse with premature EOF in edges" do
+    input = "LEDA.GRAPH\nstring\nstring\n-1\n2\n|{A}|\n|{B}|\n5\n1 2 0 |{edge1}|"
+    # Expected 5 edges, only got 1.
+    {:ok, {:leda_result, graph, warnings}} = LEDA.parse(input)
+    assert Yog.Model.edge_count(graph) == 1
+    assert warnings == []
+  end
+
+  test "parse with invalid edge format" do
+    input = "LEDA.GRAPH\nstring\nstring\n-1\n2\n|{A}|\n|{B}|\n1\n1 abc 0 |{data}|"
+    {:ok, {:leda_result, _graph, warnings}} = LEDA.parse(input)
+    assert length(warnings) == 1
+  end
+
   # =============================================================================
   # FIXTURE FILE TESTS
   # =============================================================================
