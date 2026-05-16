@@ -298,6 +298,78 @@ defmodule Yog.MultiTest do
     end
   end
 
+  describe "degree/2 delegation" do
+    test "degree/2 for directed graph sums in-degree and out-degree" do
+      {graph, _} =
+        Multi.directed()
+        |> Multi.add_node(1, "A")
+        |> Multi.add_node(2, "B")
+        |> Multi.add_node(3, "C")
+        |> Multi.add_edge(1, 2, 10)
+
+      {graph, _} = Multi.add_edge(graph, 3, 2, 20)
+      {graph, _} = Multi.add_edge(graph, 1, 2, 30)
+
+      assert Multi.degree(graph, 2) == 3
+      assert Multi.degree(graph, 1) == 2
+      assert Multi.degree(graph, 3) == 1
+    end
+
+    test "degree/2 for undirected graph equals out-degree" do
+      {graph, _} =
+        Multi.undirected()
+        |> Multi.add_node(1, "A")
+        |> Multi.add_node(2, "B")
+        |> Multi.add_node(3, "C")
+        |> Multi.add_edge(1, 2, 10)
+
+      {graph, _} = Multi.add_edge(graph, 1, 3, 20)
+      {graph, _} = Multi.add_edge(graph, 1, 2, 30)
+
+      assert Multi.degree(graph, 1) == 3
+      assert Multi.degree(graph, 2) == 2
+      assert Multi.degree(graph, 3) == 1
+    end
+  end
+
+  describe "has_edge/2 delegation" do
+    test "returns true for existing edge_id" do
+      {graph, eid} =
+        Multi.directed()
+        |> Multi.add_node(1, "A")
+        |> Multi.add_node(2, "B")
+        |> Multi.add_edge(1, 2, 10)
+
+      assert Multi.has_edge(graph, eid)
+    end
+
+    test "returns false for non-existent edge_id" do
+      graph =
+        Multi.directed()
+        |> Multi.add_node(1, "A")
+        |> Multi.add_node(2, "B")
+
+      refute Multi.has_edge(graph, 999)
+    end
+  end
+
+  describe "edge_count/3 delegation" do
+    test "returns count of parallel edges between nodes" do
+      {graph, _} =
+        Multi.directed()
+        |> Multi.add_node(1, "A")
+        |> Multi.add_node(2, "B")
+        |> Multi.add_edge(1, 2, 10)
+
+      {graph, _} = Multi.add_edge(graph, 1, 2, 20)
+      {graph, _} = Multi.add_edge(graph, 2, 1, 30)
+
+      assert Multi.edge_count(graph, 1, 2) == 2
+      assert Multi.edge_count(graph, 2, 1) == 1
+      assert Multi.edge_count(graph, 1, 3) == 0
+    end
+  end
+
   describe "out_degree/2 and in_degree/2 delegation" do
     test "out_degree/2 delegates to Model.out_degree/2" do
       {graph, _} =
@@ -641,8 +713,142 @@ defmodule Yog.MultiTest do
   end
 
   # =============================================================================
+  # Algorithms
+  # =============================================================================
+
+  describe "has_cycle?/1" do
+    test "detects cycle in directed multigraph" do
+      {graph, _} =
+        Multi.directed()
+        |> Multi.add_node(:a, nil)
+        |> Multi.add_node(:b, nil)
+        |> Multi.add_node(:c, nil)
+        |> Multi.add_edge(:a, :b, 1)
+
+      {graph, _} = Multi.add_edge(graph, :b, :c, 2)
+      {graph, _} = Multi.add_edge(graph, :c, :a, 3)
+
+      assert Multi.has_cycle?(graph)
+    end
+
+    test "returns false for acyclic directed multigraph" do
+      {graph, _} =
+        Multi.directed()
+        |> Multi.add_node(:a, nil)
+        |> Multi.add_node(:b, nil)
+        |> Multi.add_node(:c, nil)
+        |> Multi.add_edge(:a, :b, 1)
+
+      {graph, _} = Multi.add_edge(graph, :b, :c, 2)
+
+      refute Multi.has_cycle?(graph)
+    end
+
+    test "detects cycle in undirected multigraph" do
+      {graph, _} =
+        Multi.undirected()
+        |> Multi.add_node(1, nil)
+        |> Multi.add_node(2, nil)
+        |> Multi.add_node(3, nil)
+        |> Multi.add_edge(1, 2, 1)
+
+      {graph, _} = Multi.add_edge(graph, 2, 3, 1)
+      {graph, _} = Multi.add_edge(graph, 3, 1, 1)
+
+      assert Multi.has_cycle?(graph)
+    end
+
+    test "parallel edges do not create false cycle detection" do
+      {graph, _} =
+        Multi.directed()
+        |> Multi.add_node(:a, nil)
+        |> Multi.add_node(:b, nil)
+        |> Multi.add_edge(:a, :b, 1)
+
+      {graph, _} = Multi.add_edge(graph, :a, :b, 2)
+
+      refute Multi.has_cycle?(graph)
+    end
+  end
+
+  describe "topological_sort/1" do
+    test "returns valid topological order for DAG multigraph" do
+      {graph, _} =
+        Multi.directed()
+        |> Multi.add_node(:a, nil)
+        |> Multi.add_node(:b, nil)
+        |> Multi.add_node(:c, nil)
+        |> Multi.add_node(:d, nil)
+        |> Multi.add_edge(:a, :b, 1)
+
+      {graph, _} = Multi.add_edge(graph, :a, :c, 2)
+      {graph, _} = Multi.add_edge(graph, :b, :d, 3)
+      {graph, _} = Multi.add_edge(graph, :c, :d, 4)
+
+      assert {:ok, order} = Multi.topological_sort(graph)
+      assert length(order) == 4
+      assert :a in order
+      assert :d in order
+
+      # Verify ordering constraints
+      assert Enum.find_index(order, &(&1 == :a)) < Enum.find_index(order, &(&1 == :b))
+      assert Enum.find_index(order, &(&1 == :a)) < Enum.find_index(order, &(&1 == :c))
+      assert Enum.find_index(order, &(&1 == :b)) < Enum.find_index(order, &(&1 == :d))
+      assert Enum.find_index(order, &(&1 == :c)) < Enum.find_index(order, &(&1 == :d))
+    end
+
+    test "returns error for cyclic multigraph" do
+      {graph, _} =
+        Multi.directed()
+        |> Multi.add_node(:a, nil)
+        |> Multi.add_node(:b, nil)
+        |> Multi.add_node(:c, nil)
+        |> Multi.add_edge(:a, :b, 1)
+
+      {graph, _} = Multi.add_edge(graph, :b, :c, 2)
+      {graph, _} = Multi.add_edge(graph, :c, :a, 3)
+
+      assert {:error, :contains_cycle} = Multi.topological_sort(graph)
+    end
+
+    test "handles parallel edges in topological sort" do
+      {graph, _} =
+        Multi.directed()
+        |> Multi.add_node(:a, nil)
+        |> Multi.add_node(:b, nil)
+        |> Multi.add_node(:c, nil)
+        |> Multi.add_edge(:a, :b, 1)
+
+      {graph, _} = Multi.add_edge(graph, :a, :b, 2)
+      {graph, _} = Multi.add_edge(graph, :b, :c, 3)
+
+      assert {:ok, order} = Multi.topological_sort(graph)
+      assert Enum.find_index(order, &(&1 == :a)) < Enum.find_index(order, &(&1 == :b))
+      assert Enum.find_index(order, &(&1 == :b)) < Enum.find_index(order, &(&1 == :c))
+    end
+  end
+
+  # =============================================================================
   # Conversion - Facade Delegation to Model
   # =============================================================================
+
+  describe "to_simple_graph/1 delegation" do
+    test "delegates to Model.to_simple_graph/1 keeping first edge" do
+      {graph, _} =
+        Multi.directed()
+        |> Multi.add_node(1, "A")
+        |> Multi.add_node(2, "B")
+        |> Multi.add_edge(1, 2, 10)
+
+      {graph, _} = Multi.add_edge(graph, 1, 2, 20)
+
+      simple = Multi.to_simple_graph(graph)
+
+      assert is_struct(simple, Yog.Graph)
+      assert Yog.Model.has_edge?(simple, 1, 2)
+      assert Yog.Model.edge_data(simple, 1, 2) == 10
+    end
+  end
 
   describe "to_simple_graph/2 delegation" do
     test "delegates to Model.to_simple_graph/2" do
@@ -692,6 +898,40 @@ defmodule Yog.MultiTest do
       assert Yog.Model.node_count(simple) == 3
       assert Yog.node(simple, 1) == "A"
       assert Yog.node(simple, 2) == "B"
+    end
+  end
+
+  describe "to_simple_graph_min_edges/1 delegation" do
+    test "keeps minimum weight among parallel edges" do
+      {graph, _} =
+        Multi.directed()
+        |> Multi.add_node(1, "A")
+        |> Multi.add_node(2, "B")
+        |> Multi.add_edge(1, 2, 30)
+
+      {graph, _} = Multi.add_edge(graph, 1, 2, 10)
+      {graph, _} = Multi.add_edge(graph, 1, 2, 20)
+
+      simple = Multi.to_simple_graph_min_edges(graph)
+
+      assert Yog.Model.edge_data(simple, 1, 2) == 10
+    end
+  end
+
+  describe "to_simple_graph_sum_edges/2 delegation" do
+    test "sums weights with provided function" do
+      {graph, _} =
+        Multi.directed()
+        |> Multi.add_node(1, "A")
+        |> Multi.add_node(2, "B")
+        |> Multi.add_edge(1, 2, 10)
+
+      {graph, _} = Multi.add_edge(graph, 1, 2, 20)
+      {graph, _} = Multi.add_edge(graph, 1, 2, 30)
+
+      simple = Multi.to_simple_graph_sum_edges(graph, fn a, b -> a + b end)
+
+      assert Yog.Model.edge_data(simple, 1, 2) == 60
     end
   end
 

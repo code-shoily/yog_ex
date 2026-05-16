@@ -238,6 +238,21 @@ defmodule Yog.Multi.Model do
     MapSet.size(Map.get(graph.in_edge_ids, id, MapSet.new()))
   end
 
+  @doc """
+  Returns the total degree of a node.
+
+  For directed graphs: in-degree + out-degree.
+  For undirected graphs: same as out-degree.
+  """
+  @spec degree(t(), Yog.Model.node_id()) :: integer()
+  def degree(graph, id) do
+    if graph.kind == :undirected do
+      out_degree(graph, id)
+    else
+      in_degree(graph, id) + out_degree(graph, id)
+    end
+  end
+
   # ============================================================
   # Conversion
   # ============================================================
