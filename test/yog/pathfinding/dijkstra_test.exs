@@ -764,4 +764,97 @@ defmodule Yog.Pathfinding.DijkstraTest do
     # (A* with any goal would only guarantee correctness to that goal)
     assert map_size(distances) == 3
   end
+
+  test "single_source_distances_node_not_in_graph_test" do
+    graph = Yog.directed() |> Yog.add_node(1, "A")
+    assert Dijkstra.single_source_distances(graph, 99) == %{}
+  end
+
+  test "single_source_distances_native_loop_optimization_test" do
+    # This test is designed to reach a node multiple times, once with a longer path
+    # then a shorter path, but since Dijkstra pops in priority order, the shorter
+    # path should be processed first.
+    # Actually, to trigger the optimization (skipping a popped entry), we need
+    # to push an entry that is later surpassed by a better one already in the queue,
+    # OR pop an entry that is worse than the current distance in the map.
+
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_edge_ensure(1, 2, 10)
+      |> Yog.add_edge_ensure(1, 3, 1)
+      # 1 -> 3 -> 2 (total 2) is better than 1 -> 2 (total 10)
+      |> Yog.add_edge_ensure(3, 2, 1)
+
+    distances = Dijkstra.single_source_distances(graph, 1)
+    assert distances[2] == 2
+  end
+
+  test "implicit_dijkstra_by_keyword_api_test" do
+    successors = fn n -> if n < 5, do: [{n + 1, 1}], else: [] end
+
+    result =
+      Dijkstra.implicit_dijkstra_by(
+        from: 1,
+        successors_with_cost: successors,
+        visited_by: fn n -> n end,
+        is_goal: fn n -> n == 5 end,
+        zero: 0,
+        add: &add/2,
+        compare: &compare/2
+      )
+
+    assert {:ok, 4} = result
+  end
+
+  # ============= Widest Path Tests =============
+
+  test "widest_path_basic_test" do
+    # Two paths from 1 to 4:
+    # 1 -> 2 -> 4: bottleneck is min(100, 80) = 80
+    # 1 -> 3 -> 4: bottleneck is min(50, 200) = 50
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_node(3, "C")
+      |> Yog.add_node(4, "D")
+      |> Yog.add_edge_ensure(1, 2, 100)
+      |> Yog.add_edge_ensure(2, 4, 80)
+      |> Yog.add_edge_ensure(1, 3, 50)
+      |> Yog.add_edge_ensure(3, 4, 200)
+
+    {:ok, path} = Dijkstra.widest_path(graph, 1, 4)
+    assert path.nodes == [1, 2, 4]
+    assert path.weight == 80
+    assert path.algorithm == :widest_path
+  end
+
+  test "widest_path_no_path_test" do
+    graph = Yog.directed() |> Yog.add_node(1, "A") |> Yog.add_node(2, "B")
+    assert Dijkstra.widest_path(graph, 1, 2) == :error
+  end
+
+  test "widest_path_same_start_goal_test" do
+    graph = Yog.directed() |> Yog.add_node(1, "A")
+    {:ok, path} = Dijkstra.widest_path(graph, 1, 1)
+    assert path.nodes == [1]
+    assert path.weight == :infinity
+  end
+
+  test "widest_path_undirected_test" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_edge_ensure(1, 2, 10)
+      |> Yog.add_edge_ensure(2, 3, 20)
+      |> Yog.add_edge_ensure(1, 3, 5)
+
+    {:ok, path} = Dijkstra.widest_path(graph, 1, 3)
+    # Path 1 -> 2 -> 3 has bottleneck min(10, 20) = 10
+    # Path 1 -> 3 has bottleneck 5
+    assert path.nodes == [1, 2, 3]
+    assert path.weight == 10
+  end
 end
