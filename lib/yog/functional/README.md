@@ -161,6 +161,14 @@ end
 -   **Algorithm Suite**: Includes Topological Sort, SCC (Kosaraju), Dijkstra, Prim's MST, and Dominators.
 -   **Interop**: Convert to and from the adjacency-based `Yog.Graph` model using `Model.from_adjacency_graph/1`.
 
+## Modules
+
+-   [`Yog.Functional.Model`](Yog.Functional.Model.html) — Core inductive graph type, `match/2`, `embed/2`, `empty/0`, and conversion to/from `Yog.Graph`.
+-   [`Yog.Functional.Algorithms`](Yog.Functional.Algorithms.html) — Classic algorithms: topological sort, strongly connected components (Kosaraju), Dijkstra, Prim's MST, and dominators.
+-   [`Yog.Functional.Analysis`](Yog.Functional.Analysis.html) — Graph analysis utilities built on the inductive representation.
+-   [`Yog.Functional.Traversal`](Yog.Functional.Traversal.html) — Pure functional traversals (DFS, BFS) using the match-and-burn pattern.
+-   [`Yog.Functional.Transform`](Yog.Functional.Transform.html) — Graph transformations: map, filter, fold, and structural rewrites over inductive graphs.
+
 ## References
 
 -   **Martin Erwig (2001)**: [Inductive Graphs and Functional Graph Algorithms](https://web.engr.oregonstate.edu/~erwig/papers/InductiveGraphs_JFP01.pdf) - The foundational paper.

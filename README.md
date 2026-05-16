@@ -57,7 +57,7 @@ YogEx provides comprehensive graph algorithms organized into modules:
 
 **[I/O & Visualization](https://hexdocs.pm/yog_ex/Yog.IO.GraphML.html)** — GraphML, GDF, Pajek, LEDA, TGF, JSON serialization plus ASCII, DOT, and Mermaid rendering.
 
-**[Functional Graphs](https://hexdocs.pm/yog_ex/Yog.Functional.html)** *(Experimental)* — Pure inductive graph library (FGL) for elegant recursive algorithms.
+**[Functional (Experimental)](lib/yog/functional/README.md)** — Pure inductive graph library (FGL) for elegant recursive algorithms.
 
 **[Complete Algorithm Catalog](ALGORITHMS.md)** — See all 60+ algorithms, underlying data structures (Pairing Heap, Union-Find, HyperLogLog), and selection guidance with Big-O complexities.
 

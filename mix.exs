@@ -90,9 +90,9 @@ defmodule YogEx.MixProject do
       extras: [
         "README.md",
         {"lib/yog/CHEATSHEET.cheatmd", [title: "Cheat Sheet", filename: "cheat_sheet"]},
-        {"examples/README.md", [filename: "examples_readme", title: "Examples README"]},
+        {"examples/README.md", [filename: "examples_readme", title: "Examples"]},
         {"lib/yog/functional/README.md",
-         [filename: "functional_readme", title: "Functional API README"]},
+         [filename: "functional_readme", title: "Inductive Graphs (Experimental)"]},
         {"livebooks/guides/getting_started.livemd",
          [filename: "getting_started", title: "Getting Started"]},
         {"livebooks/how_to/maze_generation.livemd",
