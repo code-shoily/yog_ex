@@ -701,4 +701,56 @@ defmodule Yog.Generator.MazeTest do
       assert length(lines) == 21
     end
   end
+
+  describe "RNG state isolation" do
+    test "seeded maze generation does not pollute global RNG state" do
+      # Set a known global RNG state
+      :rand.seed(:exsss, 123_456)
+      n1 = :rand.uniform(1_000_000)
+
+      # Generate a maze with a different seed — this should not alter global state
+      Maze.binary_tree(5, 5, seed: 999_999)
+
+      n2 = :rand.uniform(1_000_000)
+
+      # Reset to the same known state and advance once
+      :rand.seed(:exsss, 123_456)
+      assert :rand.uniform(1_000_000) == n1
+      # The second draw should match n2 if global state was preserved
+      assert :rand.uniform(1_000_000) == n2
+    end
+
+    test "all algorithms preserve global RNG state" do
+      :rand.seed(:exsss, 42)
+      n1 = :rand.uniform(1_000_000)
+
+      Maze.sidewinder(5, 5, seed: 1)
+      Maze.recursive_backtracker(5, 5, seed: 2)
+      Maze.hunt_and_kill(5, 5, seed: 3)
+      Maze.aldous_broder(5, 5, seed: 4)
+      Maze.wilson(5, 5, seed: 5)
+      Maze.kruskal(5, 5, seed: 6)
+      Maze.prim_simplified(5, 5, seed: 7)
+      Maze.prim_true(5, 5, seed: 8)
+      Maze.ellers(5, 5, seed: 9)
+      Maze.growing_tree(5, 5, seed: 10)
+      Maze.recursive_division(5, 5, seed: 11)
+
+      n2 = :rand.uniform(1_000_000)
+
+      :rand.seed(:exsss, 42)
+      assert :rand.uniform(1_000_000) == n1
+      assert :rand.uniform(1_000_000) == n2
+    end
+
+    test "deterministic output with same seed" do
+      maze1 = Maze.binary_tree(5, 5, seed: 42)
+      maze2 = Maze.binary_tree(5, 5, seed: 42)
+
+      graph1 = GridGraph.to_graph(maze1)
+      graph2 = GridGraph.to_graph(maze2)
+
+      assert unique_edges(graph1) == unique_edges(graph2)
+    end
+  end
 end

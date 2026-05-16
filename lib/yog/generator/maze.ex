@@ -108,14 +108,16 @@ defmodule Yog.Generator.Maze do
   def binary_tree(rows, cols, opts \\ [])
 
   def binary_tree(rows, cols, opts) when rows > 0 and cols > 0 do
-    if seed = opts[:seed], do: :rand.seed(:exsss, seed)
+    seed = opts[:seed]
     bias = Keyword.get(opts, :bias, :ne)
 
-    grid = create_empty_grid(rows, cols)
+    with_seed(seed, fn ->
+      grid = create_empty_grid(rows, cols)
 
-    Enum.reduce(0..(rows - 1), grid, fn row, grid_acc ->
-      Enum.reduce(0..(cols - 1), grid_acc, fn col, g ->
-        carve_binary_tree(g, row, col, rows, cols, bias)
+      Enum.reduce(0..(rows - 1), grid, fn row, grid_acc ->
+        Enum.reduce(0..(cols - 1), grid_acc, fn col, g ->
+          carve_binary_tree(g, row, col, rows, cols, bias)
+        end)
       end)
     end)
   end
@@ -207,12 +209,14 @@ defmodule Yog.Generator.Maze do
   def sidewinder(rows, cols, opts \\ [])
 
   def sidewinder(rows, cols, opts) when rows > 0 and cols > 0 do
-    if seed = opts[:seed], do: :rand.seed(:exsss, seed)
+    seed = opts[:seed]
 
-    grid = create_empty_grid(rows, cols)
+    with_seed(seed, fn ->
+      grid = create_empty_grid(rows, cols)
 
-    Enum.reduce(0..(rows - 1), grid, fn row, grid_acc ->
-      carve_sidewinder_row(grid_acc, row, cols, row == rows - 1)
+      Enum.reduce(0..(rows - 1), grid, fn row, grid_acc ->
+        carve_sidewinder_row(grid_acc, row, cols, row == rows - 1)
+      end)
     end)
   end
 
@@ -311,15 +315,17 @@ defmodule Yog.Generator.Maze do
   def recursive_backtracker(rows, cols, opts \\ [])
 
   def recursive_backtracker(rows, cols, opts) when rows > 0 and cols > 0 do
-    if seed = opts[:seed], do: :rand.seed(:exsss, seed)
+    seed = opts[:seed]
 
-    grid = create_empty_grid(rows, cols)
-    total_cells = rows * cols
-    start_row = :rand.uniform(rows) - 1
-    start_col = :rand.uniform(cols) - 1
-    stack = [{start_row, start_col}]
+    with_seed(seed, fn ->
+      grid = create_empty_grid(rows, cols)
+      total_cells = rows * cols
+      start_row = :rand.uniform(rows) - 1
+      start_col = :rand.uniform(cols) - 1
+      stack = [{start_row, start_col}]
 
-    do_backtrack(grid, stack, MapSet.new(stack), rows, cols, total_cells)
+      do_backtrack(grid, stack, MapSet.new(stack), rows, cols, total_cells)
+    end)
   end
 
   def recursive_backtracker(_rows, _cols, _opts), do: create_empty_grid(0, 0)
@@ -399,17 +405,19 @@ defmodule Yog.Generator.Maze do
   def hunt_and_kill(rows, cols, opts \\ [])
 
   def hunt_and_kill(rows, cols, opts) when rows > 0 and cols > 0 do
-    if seed = opts[:seed], do: :rand.seed(:exsss, seed)
+    seed = opts[:seed]
     scan_mode = Keyword.get(opts, :scan_mode, :sequential)
 
-    grid = create_empty_grid(rows, cols)
+    with_seed(seed, fn ->
+      grid = create_empty_grid(rows, cols)
 
-    total_cells = rows * cols
+      total_cells = rows * cols
 
-    start_row = :rand.uniform(rows) - 1
-    start_col = :rand.uniform(cols) - 1
-    visited = MapSet.new([{start_row, start_col}])
-    do_hunt_and_kill(grid, {start_row, start_col}, visited, rows, cols, total_cells, scan_mode)
+      start_row = :rand.uniform(rows) - 1
+      start_col = :rand.uniform(cols) - 1
+      visited = MapSet.new([{start_row, start_col}])
+      do_hunt_and_kill(grid, {start_row, start_col}, visited, rows, cols, total_cells, scan_mode)
+    end)
   end
 
   def hunt_and_kill(_rows, _cols, _opts), do: create_empty_grid(0, 0)
@@ -506,19 +514,21 @@ defmodule Yog.Generator.Maze do
   def aldous_broder(rows, cols, opts \\ [])
 
   def aldous_broder(rows, cols, opts) when rows > 0 and cols > 0 do
-    if seed = opts[:seed], do: :rand.seed(:exsss, seed)
+    seed = opts[:seed]
 
-    grid = create_empty_grid(rows, cols)
-    total_cells = rows * cols
+    with_seed(seed, fn ->
+      grid = create_empty_grid(rows, cols)
+      total_cells = rows * cols
 
-    start_row = :rand.uniform(rows) - 1
-    start_col = :rand.uniform(cols) - 1
-    start_cell = {start_row, start_col}
+      start_row = :rand.uniform(rows) - 1
+      start_col = :rand.uniform(cols) - 1
+      start_cell = {start_row, start_col}
 
-    visited = MapSet.new([start_cell])
-    count = 1
+      visited = MapSet.new([start_cell])
+      count = 1
 
-    do_aldous_broder(grid, start_cell, visited, count, rows, cols, total_cells)
+      do_aldous_broder(grid, start_cell, visited, count, rows, cols, total_cells)
+    end)
   end
 
   def aldous_broder(_rows, _cols, _opts), do: create_empty_grid(0, 0)
@@ -589,17 +599,19 @@ defmodule Yog.Generator.Maze do
   def wilson(rows, cols, opts \\ [])
 
   def wilson(rows, cols, opts) when rows > 0 and cols > 0 do
-    if seed = opts[:seed], do: :rand.seed(:exsss, seed)
+    seed = opts[:seed]
 
-    grid = create_empty_grid(rows, cols)
+    with_seed(seed, fn ->
+      grid = create_empty_grid(rows, cols)
 
-    cells = for r <- 0..(rows - 1), c <- 0..(cols - 1), do: {r, c}
+      cells = for r <- 0..(rows - 1), c <- 0..(cols - 1), do: {r, c}
 
-    [first | rest] = Enum.shuffle(cells)
-    visited = MapSet.new([first])
-    unvisited = MapSet.new(rest)
+      [first | rest] = Enum.shuffle(cells)
+      visited = MapSet.new([first])
+      unvisited = MapSet.new(rest)
 
-    do_wilson(grid, visited, unvisited, rows, cols)
+      do_wilson(grid, visited, unvisited, rows, cols)
+    end)
   end
 
   def wilson(_rows, _cols, _opts), do: create_empty_grid(0, 0)
@@ -699,32 +711,34 @@ defmodule Yog.Generator.Maze do
   def kruskal(rows, cols, opts \\ [])
 
   def kruskal(rows, cols, opts) when rows > 0 and cols > 0 do
-    if seed = opts[:seed], do: :rand.seed(:exsss, seed)
+    seed = opts[:seed]
 
-    grid = create_empty_grid(rows, cols)
+    with_seed(seed, fn ->
+      grid = create_empty_grid(rows, cols)
 
-    horiz = for r <- 0..(rows - 1), c <- 0..(cols - 2), do: {{r, c}, {r, c + 1}}
-    vert = for r <- 0..(rows - 2), c <- 0..(cols - 1), do: {{r, c}, {r + 1, c}}
+      horiz = for r <- 0..(rows - 1), c <- 0..(cols - 2), do: {{r, c}, {r, c + 1}}
+      vert = for r <- 0..(rows - 2), c <- 0..(cols - 1), do: {{r, c}, {r + 1, c}}
 
-    edges = Enum.shuffle(horiz ++ vert)
-    dsu = Yog.DisjointSet.new()
+      edges = Enum.shuffle(horiz ++ vert)
+      dsu = Yog.DisjointSet.new()
 
-    {final_grid, _dsu} =
-      Enum.reduce(edges, {grid, dsu}, fn {u, v}, {g_acc, dsu_acc} ->
-        {new_dsu_find, is_connected} = Yog.DisjointSet.connected?(dsu_acc, u, v)
+      {final_grid, _dsu} =
+        Enum.reduce(edges, {grid, dsu}, fn {u, v}, {g_acc, dsu_acc} ->
+          {new_dsu_find, is_connected} = Yog.DisjointSet.connected?(dsu_acc, u, v)
 
-        if is_connected do
-          {g_acc, new_dsu_find}
-        else
-          {r1, c1} = u
-          {r2, c2} = v
-          new_g = add_passage(g_acc, r1, c1, r2, c2)
-          new_dsu = Yog.DisjointSet.union(new_dsu_find, u, v)
-          {new_g, new_dsu}
-        end
-      end)
+          if is_connected do
+            {g_acc, new_dsu_find}
+          else
+            {r1, c1} = u
+            {r2, c2} = v
+            new_g = add_passage(g_acc, r1, c1, r2, c2)
+            new_dsu = Yog.DisjointSet.union(new_dsu_find, u, v)
+            {new_g, new_dsu}
+          end
+        end)
 
-    final_grid
+      final_grid
+    end)
   end
 
   def kruskal(_rows, _cols, _opts), do: create_empty_grid(0, 0)
@@ -743,14 +757,16 @@ defmodule Yog.Generator.Maze do
   def prim_simplified(rows, cols, opts \\ [])
 
   def prim_simplified(rows, cols, opts) when rows > 0 and cols > 0 do
-    if seed = opts[:seed], do: :rand.seed(:exsss, seed)
+    seed = opts[:seed]
 
-    grid = create_empty_grid(rows, cols)
-    start_cell = {:rand.uniform(rows) - 1, :rand.uniform(cols) - 1}
-    visited = MapSet.new([start_cell])
-    frontier = unvisited_neighbors(start_cell, visited, rows, cols)
+    with_seed(seed, fn ->
+      grid = create_empty_grid(rows, cols)
+      start_cell = {:rand.uniform(rows) - 1, :rand.uniform(cols) - 1}
+      visited = MapSet.new([start_cell])
+      frontier = unvisited_neighbors(start_cell, visited, rows, cols)
 
-    do_prim_simplified(grid, frontier, visited, rows, cols)
+      do_prim_simplified(grid, frontier, visited, rows, cols)
+    end)
   end
 
   def prim_simplified(_rows, _cols, _opts), do: create_empty_grid(0, 0)
@@ -788,23 +804,25 @@ defmodule Yog.Generator.Maze do
   def prim_true(rows, cols, opts \\ [])
 
   def prim_true(rows, cols, opts) when rows > 0 and cols > 0 do
-    if seed = opts[:seed], do: :rand.seed(:exsss, seed)
+    seed = opts[:seed]
 
-    grid = create_empty_grid(rows, cols)
+    with_seed(seed, fn ->
+      grid = create_empty_grid(rows, cols)
 
-    weights =
-      for r <- 0..(rows - 1), c <- 0..(cols - 1), into: %{} do
-        {{r, c}, :rand.uniform(1000)}
-      end
+      weights =
+        for r <- 0..(rows - 1), c <- 0..(cols - 1), into: %{} do
+          {{r, c}, :rand.uniform(1000)}
+        end
 
-    start_cell = {:rand.uniform(rows) - 1, :rand.uniform(cols) - 1}
-    visited = MapSet.new([start_cell])
+      start_cell = {:rand.uniform(rows) - 1, :rand.uniform(cols) - 1}
+      visited = MapSet.new([start_cell])
 
-    frontier =
-      unvisited_neighbors(start_cell, visited, rows, cols)
-      |> Enum.map(fn cell -> {Map.get(weights, cell), cell} end)
+      frontier =
+        unvisited_neighbors(start_cell, visited, rows, cols)
+        |> Enum.map(fn cell -> {Map.get(weights, cell), cell} end)
 
-    do_prim_true(grid, frontier, visited, weights, rows, cols)
+      do_prim_true(grid, frontier, visited, weights, rows, cols)
+    end)
   end
 
   def prim_true(_rows, _cols, _opts), do: create_empty_grid(0, 0)
@@ -870,13 +888,15 @@ defmodule Yog.Generator.Maze do
   def ellers(rows, cols, opts \\ [])
 
   def ellers(rows, cols, opts) when rows > 0 and cols > 0 do
-    if seed = opts[:seed], do: :rand.seed(:exsss, seed)
+    seed = opts[:seed]
 
-    grid = create_empty_grid(rows, cols)
-    row_state = %{}
-    next_set_id = 0
+    with_seed(seed, fn ->
+      grid = create_empty_grid(rows, cols)
+      row_state = %{}
+      next_set_id = 0
 
-    do_ellers(grid, 0, rows, cols, row_state, next_set_id)
+      do_ellers(grid, 0, rows, cols, row_state, next_set_id)
+    end)
   end
 
   def ellers(_rows, _cols, _opts), do: create_empty_grid(0, 0)
@@ -989,14 +1009,16 @@ defmodule Yog.Generator.Maze do
   def growing_tree(rows, cols, opts \\ [])
 
   def growing_tree(rows, cols, opts) when rows > 0 and cols > 0 do
-    if seed = opts[:seed], do: :rand.seed(:exsss, seed)
+    seed = opts[:seed]
 
-    grid = create_empty_grid(rows, cols)
-    start_cell = {:rand.uniform(rows) - 1, :rand.uniform(cols) - 1}
-    active_cells = [start_cell]
-    visited = MapSet.new([start_cell])
+    with_seed(seed, fn ->
+      grid = create_empty_grid(rows, cols)
+      start_cell = {:rand.uniform(rows) - 1, :rand.uniform(cols) - 1}
+      active_cells = [start_cell]
+      visited = MapSet.new([start_cell])
 
-    do_growing_tree(grid, active_cells, visited, rows, cols, opts)
+      do_growing_tree(grid, active_cells, visited, rows, cols, opts)
+    end)
   end
 
   def growing_tree(_rows, _cols, _opts), do: create_empty_grid(0, 0)
@@ -1077,10 +1099,12 @@ defmodule Yog.Generator.Maze do
   def recursive_division(rows, cols, opts \\ [])
 
   def recursive_division(rows, cols, opts) when rows > 0 and cols > 0 do
-    if seed = opts[:seed], do: :rand.seed(:exsss, seed)
+    seed = opts[:seed]
 
-    grid = create_full_grid(rows, cols)
-    divide(grid, 0, 0, rows, cols)
+    with_seed(seed, fn ->
+      grid = create_full_grid(rows, cols)
+      divide(grid, 0, 0, rows, cols)
+    end)
   end
 
   def recursive_division(_rows, _cols, _opts), do: create_empty_grid(0, 0)
@@ -1271,5 +1295,23 @@ defmodule Yog.Generator.Maze do
     for(r <- 0..(rows - 1), c <- 0..(cols - 1), !MapSet.member?(visited, {r, c}), do: {r, c})
     |> Enum.shuffle()
     |> Enum.find(&has_visited_neighbor(&1, visited, rows, cols))
+  end
+
+  # ============================================================================
+  # RNG State Isolation
+  # ============================================================================
+
+  defp with_seed(nil, fun), do: fun.()
+
+  defp with_seed(seed, fun) do
+    old_state = :rand.export_seed()
+    :rand.seed(:exsss, seed)
+    result = fun.()
+
+    if old_state != :undefined do
+      :rand.seed(old_state)
+    end
+
+    result
   end
 end

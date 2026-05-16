@@ -44,6 +44,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `to_simple_graph_min_edges/1` — Collapse parallel edges keeping the minimum weight.
   - `to_simple_graph_sum_edges/2` — Collapse parallel edges summing weights via a custom function.
 
+#### Generators
+
+- **`Yog.Generator.Classic`** — Added missing `_with_type` variant:
+  - `prism_with_type/2` — Generate a prism (circular ladder) graph with a specified graph type.
+
 #### Rendering
 
 - **`Yog.Multi.Mermaid`** — New Mermaid.js renderer for multigraphs (`Yog.Multi.Graph`).
@@ -76,6 +81,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Mermaid undirected edge labels** — Fixed invalid `---|1|` syntax to correct `-- 1 ---`.
 - **Mermaid per-node shapes** — `node_shape` now accepts `(id, data) -> shape` function in addition to atom values.
 - Credo alias warnings in `Yog.Multi.Mermaid`.
+- **Maze generator RNG state isolation** — All maze algorithms (`binary_tree/3`, `sidewinder/3`, `recursive_backtracker/3`, `hunt_and_kill/3`, `aldous_broder/3`, `wilson/3`, `kruskal/3`, `prim_simplified/3`, `prim_true/3`, `ellers/3`, `growing_tree/3`, `recursive_division/3`) now restore the global `:rand` state after seeding, matching the behavior of `Yog.Generator.Random`. Previously, passing `:seed` permanently altered the global RNG state.
 - Removed accidental `IO.puts` debug output from `test/yog/multi/dot_test.exs`.
 
 #### Builders

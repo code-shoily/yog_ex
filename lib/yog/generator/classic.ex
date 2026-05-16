@@ -1264,6 +1264,14 @@ defmodule Yog.Generator.Classic do
   def prism(n), do: circular_ladder(n)
 
   @doc """
+  Generates a prism graph with specified graph type.
+
+  The n-sided prism graph is exactly the circular ladder CL_n.
+  """
+  @spec prism_with_type(integer(), Yog.graph_type()) :: Yog.graph()
+  def prism_with_type(n, graph_type), do: circular_ladder_with_type(n, graph_type)
+
+  @doc """
   Generates a Möbius ladder graph with n rungs.
 
   The Möbius ladder ML_n is formed from a circular ladder by giving it

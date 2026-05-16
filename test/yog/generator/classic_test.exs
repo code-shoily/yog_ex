@@ -708,6 +708,12 @@ defmodule Yog.Generator.ClassicTest do
     assert Yog.Model.edge_count(prism) == Yog.Model.edge_count(cl)
   end
 
+  test "prism_with_type/2 directed" do
+    prism = Classic.prism_with_type(5, :directed)
+    assert Yog.Model.type(prism) == :directed
+    assert Yog.Model.order(prism) == 10
+  end
+
   # ============= Möbius Ladder Tests =============
 
   test "mobius_ladder/1 creates correct structure" do
