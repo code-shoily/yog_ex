@@ -173,7 +173,7 @@ defmodule Yog.Render.Mermaid do
           # Graph-level attributes
           direction: direction(),
           # Node styling
-          node_shape: node_shape(),
+          node_shape: node_shape() | (Yog.node_id(), any() -> node_shape()),
           # Default styling (applied to all nodes/edges)
           default_fill: String.t() | nil,
           default_stroke: String.t() | nil,
@@ -275,6 +275,22 @@ defmodule Yog.Render.Mermaid do
         ) :: options()
   def default_options_with(node_label: node_label, edge_label: edge_label) do
     %{default_options() | node_label: node_label, edge_label: edge_label}
+  end
+
+  @doc """
+  Creates default Mermaid options with all edge labels hidden.
+
+  Use this when you want a clean diagram without edge annotations.
+
+  ## Example
+
+      mermaid = Yog.Render.Mermaid.to_mermaid(graph,
+        Yog.Render.Mermaid.default_options_without_labels()
+      )
+  """
+  @spec default_options_without_labels() :: options()
+  def default_options_without_labels do
+    %{default_options() | edge_label: fn _weight -> "" end}
   end
 
   @doc """
@@ -643,7 +659,15 @@ defmodule Yog.Render.Mermaid do
   defp build_node_lines(nodes, options) do
     Enum.map_join(nodes, "\n", fn {id, data} ->
       label = options.node_label.(id, data)
-      node_def = "  #{Yog.Utils.safe_string(id)}#{node_shape_brackets(options.node_shape, label)}"
+
+      shape =
+        if is_function(options.node_shape) do
+          options.node_shape.(id, data)
+        else
+          options.node_shape
+        end
+
+      node_def = "  #{Yog.Utils.safe_string(id)}#{node_shape_brackets(shape, label)}"
 
       # Add highlight class if this node is in the highlighted list
       if options.highlighted_nodes && MapSet.member?(options.highlighted_nodes, id) do
