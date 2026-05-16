@@ -36,6 +36,12 @@ defmodule Yog.Render.MermaidTest do
       assert opts.node_label.(1, nil) == "n:1"
       assert opts.edge_label.(5) == "w:5"
     end
+
+    test "default_options_without_labels/0" do
+      opts = Mermaid.default_options_without_labels()
+      assert opts.edge_label.(5) == ""
+      assert opts.edge_label.(nil) == ""
+    end
   end
 
   describe "to_mermaid/2" do
@@ -225,6 +231,64 @@ defmodule Yog.Render.MermaidTest do
         assert is_map(opts)
         assert opts.direction == :td
       end
+    end
+
+    test "dark theme renders with default class and font color" do
+      graph = Yog.directed() |> Yog.add_node(1, "A") |> Yog.add_edge_ensure(1, 2, 1)
+      mermaid = Mermaid.to_mermaid(graph, Mermaid.theme(:dark))
+      assert String.contains?(mermaid, "classDef default fill:#16213e,stroke:#e94560")
+      assert String.contains?(mermaid, "color:#ffffff")
+      assert String.contains?(mermaid, "linkStyle 0")
+      assert String.contains?(mermaid, "stroke:#e94560")
+    end
+
+    test "minimal theme renders thin lines" do
+      graph = Yog.directed() |> Yog.add_node(1, "A") |> Yog.add_edge_ensure(1, 2, 1)
+      mermaid = Mermaid.to_mermaid(graph, Mermaid.theme(:minimal))
+      assert String.contains?(mermaid, "classDef default fill:#ffffff,stroke:#333333")
+      assert String.contains?(mermaid, "stroke-width:1px")
+    end
+
+    test "presentation theme renders bold strokes" do
+      graph = Yog.directed() |> Yog.add_node(1, "A") |> Yog.add_edge_ensure(1, 2, 1)
+      mermaid = Mermaid.to_mermaid(graph, Mermaid.theme(:presentation))
+      assert String.contains?(mermaid, "classDef default fill:#4361ee,stroke:#f72585")
+      assert String.contains?(mermaid, "stroke-width:3px")
+    end
+
+    test "per-node shape function renders different shapes" do
+      graph =
+        Yog.directed()
+        |> Yog.add_node(:db, "DB")
+        |> Yog.add_node(:api, "API")
+        |> Yog.add_edge_ensure(:db, :api, 1)
+
+      opts = %{
+        Mermaid.default_options()
+        | node_shape: fn id, _ ->
+            case id do
+              :db -> :cylinder
+              :api -> :circle
+              _ -> :rounded_rect
+            end
+          end
+      }
+
+      mermaid = Mermaid.to_mermaid(graph, opts)
+      assert String.contains?(mermaid, "db[(\"DB\")]")
+      assert String.contains?(mermaid, "api((\"API\"))")
+    end
+
+    test "undirected graph with labels uses correct syntax" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_node(1, "A")
+        |> Yog.add_node(2, "B")
+        |> Yog.add_edge_ensure(1, 2, "10")
+
+      mermaid = Mermaid.to_mermaid(graph, Mermaid.default_options())
+      assert String.contains?(mermaid, "1 -- 10 --- 2")
+      refute String.contains?(mermaid, "1 ---|10| 2")
     end
 
     test "community_to_options generates node attributes" do

@@ -36,6 +36,12 @@ defmodule Yog.Render.DOTTest do
       assert opts.node_label.(1, nil) == "n:1"
       assert opts.edge_label.(5) == "w:5"
     end
+
+    test "default_options_without_labels/0" do
+      opts = DOT.default_options_without_labels()
+      assert opts.edge_label.(5) == ""
+      assert opts.edge_label.(nil) == ""
+    end
   end
 
   describe "to_dot/2" do
@@ -328,6 +334,30 @@ defmodule Yog.Render.DOTTest do
         assert is_map(opts)
         assert opts.graph_name == "G"
       end
+    end
+
+    test "dark theme renders with dark background" do
+      graph = Yog.directed() |> Yog.add_node(1, "A") |> Yog.add_edge_ensure(1, 2, 1)
+      dot = DOT.to_dot(graph, DOT.theme(:dark))
+      assert String.contains?(dot, "bgcolor=\"#1a1a2e\"")
+      assert String.contains?(dot, "fillcolor=\"#16213e\"")
+      assert String.contains?(dot, "fontcolor=\"#e0e0e0\"")
+    end
+
+    test "minimal theme renders wireframe style" do
+      graph = Yog.directed() |> Yog.add_node(1, "A") |> Yog.add_edge_ensure(1, 2, 1)
+      dot = DOT.to_dot(graph, DOT.theme(:minimal))
+      assert String.contains?(dot, "shape=circle")
+      assert String.contains?(dot, "style=solid")
+      assert String.contains?(dot, "penwidth=0.5")
+    end
+
+    test "presentation theme renders bold style" do
+      graph = Yog.directed() |> Yog.add_node(1, "A") |> Yog.add_edge_ensure(1, 2, 1)
+      dot = DOT.to_dot(graph, DOT.theme(:presentation))
+      assert String.contains?(dot, "fontname=\"Helvetica-Bold\"")
+      assert String.contains?(dot, "fontsize=18")
+      assert String.contains?(dot, "penwidth=2.0")
     end
 
     test "community_to_options generates node attributes" do

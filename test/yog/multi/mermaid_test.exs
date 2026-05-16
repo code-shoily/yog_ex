@@ -14,6 +14,142 @@ defmodule Yog.Multi.MermaidTest do
     end
   end
 
+  describe "custom formatters" do
+    test "default_options_with_edge_formatter/1" do
+      opts = Mermaid.default_options_with_edge_formatter(fn w -> "w:#{w}" end)
+      assert opts.edge_label.(:any_id, 5) == "w:5"
+    end
+
+    test "default_options_with/1" do
+      opts =
+        Mermaid.default_options_with(
+          node_label: fn id, _ -> "n:#{id}" end,
+          edge_label: fn w -> "w:#{w}" end
+        )
+
+      assert opts.node_label.(1, nil) == "n:1"
+      assert opts.edge_label.(:any_id, 5) == "w:5"
+    end
+
+    test "default_options_without_labels/0" do
+      opts = Mermaid.default_options_without_labels()
+      assert opts.edge_label.(:any_id, 5) == ""
+      assert opts.edge_label.(:any_id, nil) == ""
+    end
+  end
+
+  describe "themes" do
+    test "all themes return valid options" do
+      for theme <- [:default, :dark, :minimal, :presentation] do
+        opts = Mermaid.theme(theme)
+        assert is_map(opts)
+        assert opts.direction == :td
+      end
+    end
+
+    test "dark theme renders with default class and font color" do
+      multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "A")
+      {multi, _} = Yog.Multi.add_edge(multi, 1, 2, 1)
+      mermaid = Mermaid.to_mermaid(multi, Mermaid.theme(:dark))
+      assert String.contains?(mermaid, "classDef default fill:#16213e,stroke:#e94560")
+      assert String.contains?(mermaid, "color:#ffffff")
+      assert String.contains?(mermaid, "linkStyle 0")
+    end
+
+    test "minimal theme renders thin lines" do
+      multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "A")
+      {multi, _} = Yog.Multi.add_edge(multi, 1, 2, 1)
+      mermaid = Mermaid.to_mermaid(multi, Mermaid.theme(:minimal))
+      assert String.contains?(mermaid, "classDef default fill:#ffffff,stroke:#333333")
+      assert String.contains?(mermaid, "stroke-width:1px")
+    end
+
+    test "presentation theme renders bold strokes" do
+      multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "A")
+      {multi, _} = Yog.Multi.add_edge(multi, 1, 2, 1)
+      mermaid = Mermaid.to_mermaid(multi, Mermaid.theme(:presentation))
+      assert String.contains?(mermaid, "classDef default fill:#4361ee,stroke:#f72585")
+      assert String.contains?(mermaid, "stroke-width:3px")
+    end
+  end
+
+  describe "algorithm helpers" do
+    test "path_to_options highlights path nodes and edges" do
+      path = %{nodes: [1, 2, 3], weight: 10}
+      opts = Mermaid.path_to_options(path)
+      assert opts.highlighted_nodes == [1, 2, 3]
+      assert opts.highlighted_edges == [{1, 2}, {2, 3}]
+    end
+
+    test "mst_to_options highlights mst edges" do
+      result = %Yog.MST.Result{
+        edges: [
+          %{from: 1, to: 2, weight: 1},
+          %{from: 2, to: 3, weight: 2}
+        ],
+        total_weight: 3,
+        node_count: 3,
+        edge_count: 2,
+        algorithm: :kruskal,
+        root: nil
+      }
+
+      opts = Mermaid.mst_to_options(result)
+      assert opts.highlighted_nodes == [1, 2, 3]
+      assert {1, 2} in opts.highlighted_edges
+      assert {2, 3} in opts.highlighted_edges
+    end
+
+    test "community_to_options generates node attributes" do
+      result = %Yog.Community.Result{
+        assignments: %{1 => 0, 2 => 0, 3 => 1},
+        num_communities: 2,
+        metadata: %{modularity: 0.5}
+      }
+
+      opts = Mermaid.community_to_options(result)
+      assert is_function(opts.node_attributes, 2)
+
+      attrs = opts.node_attributes.(1, nil)
+      assert Keyword.has_key?(attrs, :fill)
+      assert Keyword.get(attrs, :stroke) == "#333333"
+
+      assert opts.node_attributes.(99, nil) == []
+    end
+
+    test "cut_to_options generates source/sink colors" do
+      result = %Yog.Flow.MinCutResult{
+        cut_value: 5,
+        source_side_size: 1,
+        sink_side_size: 1,
+        source_side: [1],
+        sink_side: [2],
+        algorithm: :edmonds_karp
+      }
+
+      opts = Mermaid.cut_to_options(result)
+      assert is_function(opts.node_attributes, 2)
+
+      source_attrs = opts.node_attributes.(1, nil)
+      assert Keyword.get(source_attrs, :fill) == "#a8d8ea"
+
+      sink_attrs = opts.node_attributes.(2, nil)
+      assert Keyword.get(sink_attrs, :fill) == "#f08080"
+
+      assert opts.node_attributes.(3, nil) == []
+    end
+
+    test "matching_to_options highlights matched edges" do
+      matching = %{1 => 2, 2 => 1, 3 => 4, 4 => 3}
+      opts = Mermaid.matching_to_options(matching)
+
+      assert opts.highlighted_nodes == [1, 2, 3, 4]
+      assert {1, 2} in opts.highlighted_edges
+      assert {3, 4} in opts.highlighted_edges
+      assert length(opts.highlighted_edges) == 2
+    end
+  end
+
   describe "to_mermaid/2" do
     test "renders empty multigraph" do
       multi = Yog.Multi.Graph.new(:directed)
@@ -168,6 +304,30 @@ defmodule Yog.Multi.MermaidTest do
 
       mermaid = Mermaid.to_mermaid(multi, opts)
       assert String.contains?(mermaid, "style 1 fill:#e1f5fe,stroke:#0288d1")
+    end
+
+    test "renders with per-node shape function" do
+      multi =
+        Yog.Multi.directed()
+        |> Yog.Multi.add_node(:db, "DB")
+        |> Yog.Multi.add_node(:api, "API")
+
+      {multi, _} = Yog.Multi.add_edge(multi, :db, :api, 1)
+
+      opts = %{
+        Mermaid.default_options()
+        | node_shape: fn id, _ ->
+            case id do
+              :db -> :cylinder
+              :api -> :circle
+              _ -> :rounded_rect
+            end
+          end
+      }
+
+      mermaid = Mermaid.to_mermaid(multi, opts)
+      assert String.contains?(mermaid, "db[(\"DB\")]")
+      assert String.contains?(mermaid, "api((\"API\"))")
     end
 
     test "renders with combined highlight and per-node attributes" do
