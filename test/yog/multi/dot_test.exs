@@ -364,7 +364,12 @@ defmodule Yog.Multi.DOTTest do
     test "renders custom node shape and layout" do
       multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "A")
 
-      opts = %{DOT.default_options() | node_shape: {:custom, "myshape"}, layout: {:custom, "mylayout"}}
+      opts = %{
+        DOT.default_options()
+        | node_shape: {:custom, "myshape"},
+          layout: {:custom, "mylayout"}
+      }
+
       dot = DOT.to_dot(multi, opts)
       assert String.contains?(dot, "shape=myshape")
       assert String.contains?(dot, "layout=mylayout")
