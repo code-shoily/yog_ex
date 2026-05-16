@@ -2,7 +2,7 @@
 
 ```elixir
 Mix.install([
-  {:yog_ex, path: "/home/mafinar/repos/elixir/yog_ex"},
+  {:yog_ex, "~> 0.98"},
   {:jason, "~> 1.4"} # Needed for JSON
 ])
 ```
