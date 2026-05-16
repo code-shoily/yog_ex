@@ -183,6 +183,41 @@ YogEx is used to solve [Advent of Code](https://adventofcode.com/) challenges.
 
 See all Advent of Code solutions tagged with `graph` that demonstrate usage of YogEx algorithms in the [Advent of Code repository](https://github.com/code-shoily/advent_of_code).
 
+## Projects Using Yog
+
+Yog powers several open-source libraries that build domain-specific abstractions on top of its graph engine:
+
+### [Choreo](https://github.com/code-shoily/choreo) — Domain-Specific Diagram Builders
+
+Analysis-first diagramming for Elixir. Instead of drawing static pictures, you model systems and get live answers — reachability, cycles, bottlenecks, threat generation, and more.
+
+- **Choreo** — Infrastructure architecture diagrams (databases, caches, services, queues)
+- **Choreo.FSM** — Finite state machines with determinism checks and shortest accepting paths
+- **Choreo.Dataflow** — Pipeline diagrams with throughput simulation and backpressure detection
+- **Choreo.Dependency** — Software dependency graphs with cycle detection and layer enforcement
+- **Choreo.DecisionTree** — Classification trees with feature importance and pruning
+- **Choreo.MindMap** — Concept mapping with orphan detection and root-to-leaf paths
+- **Choreo.ThreatModel** — STRIDE threat modeling with auto-generated severity scoring
+- **Choreo.Workflow** — Task orchestration with critical-path analysis and Saga-pattern compensations
+
+### [Tapestry](https://github.com/code-shoily/tapestry) — Graph-Native Domain Engine
+
+Model structured domains as typed multigraphs. Kanban boards, timelines, dependency networks, and structural analysis are all projections of the same underlying graph.
+
+- Project management with milestones, tasks, users, and labels
+- Query what blocks a task, what's ready to start, and who's the bottleneck
+- Critical-path analysis and transitive dependency tracking
+- Renders natively to Mermaid for GitHub, Notion, and Obsidian
+
+### [Meridian](https://github.com/code-shoily/meridian) — Spatial Graphs
+
+Projection-aware spatial graphs for Elixir. Brings geography into graph theory with coordinate-reference-system safety, map ingestion, and spatial algorithms.
+
+- Build graphs from H3 hex grids and geohash rectangles
+- Ingest and render GeoJSON for road networks and geographic data
+- Spatially-informed A*, Dijkstra, and widest-path routing
+- CRS-aware edge weights with earth-distance heuristics
+
 ## Development
 
 ### Running Tests
