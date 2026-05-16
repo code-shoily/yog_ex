@@ -17,6 +17,9 @@ Mix.install([
 
 ```elixir
 g = Yog.directed()
+  |> Yog.add_node("Start", nil)
+  |> Yog.add_node("Process", nil)
+  |> Yog.add_node("End", nil)
   |> Yog.add_edges!([
     {"Start", "Process", 1},
     {"Process", "End", 1}
@@ -25,6 +28,8 @@ g = Yog.directed()
 # Render with defaults
 mermaid = Yog.Render.Mermaid.to_mermaid(g)
 IO.puts(mermaid)
+
+Kino.Mermaid.new(mermaid)
 ```
 
 ---
@@ -45,14 +50,17 @@ IO.inspect(opts.highlight_fill, label: "Highlight Fill")
 Use this when edge data is not already a string (e.g., integers, structs).
 
 ```elixir
-g = Yog.directed()
-  |> Yog.add_edges!([{:a, :b, 42}, {:b, :c, 99}])
+g = Yog.from_edges(:undirected, [{:a, :b, 42}, {:b, :c, 99}])
 
 opts = Yog.Render.Mermaid.default_options_with_edge_formatter(fn weight ->
   "#{weight} ms"
 end)
 
-IO.puts(Yog.Render.Mermaid.to_mermaid(g, opts))
+mermaid = Yog.Render.Mermaid.to_mermaid(g, opts)
+
+IO.puts(mermaid)
+
+Kino.Mermaid.new(mermaid)
 ```
 
 ### `default_options_with/2`
@@ -66,11 +74,15 @@ g = Yog.directed()
   |> Yog.add_edge_ensure(1, 2, 100)
 
 opts = Yog.Render.Mermaid.default_options_with(
-  node_label: fn id, data -> "#{data.name} (#{data.role})" end,
+  node_label: fn _id, data -> "#{data.name} (#{data.role})" end,
   edge_label: fn weight -> "#{weight} Mbps" end
 )
 
-IO.puts(Yog.Render.Mermaid.to_mermaid(g, opts))
+mermaid = Yog.Render.Mermaid.to_mermaid(g, opts)
+
+IO.puts(mermaid)
+
+Kino.Mermaid.new(mermaid)
 ```
 
 ---
@@ -86,25 +98,35 @@ g = Yog.Generator.Classic.binary_tree(3)
 ### Default Theme
 
 ```elixir
-IO.puts(Yog.Render.Mermaid.to_mermaid(g, Yog.Render.Mermaid.theme(:default)))
+mermaid = Yog.Render.Mermaid.to_mermaid(g, Yog.Render.Mermaid.theme(:default))
+
+IO.puts(mermaid)
+
+Kino.Mermaid.new(mermaid)
 ```
 
 ### Dark Theme
 
 ```elixir
-IO.puts(Yog.Render.Mermaid.to_mermaid(g, Yog.Render.Mermaid.theme(:dark)))
+mermaid = Yog.Render.Mermaid.to_mermaid(g, Yog.Render.Mermaid.theme(:dark))
+
+Kino.Mermaid.new(mermaid)
 ```
 
 ### Minimal Theme
 
 ```elixir
-IO.puts(Yog.Render.Mermaid.to_mermaid(g, Yog.Render.Mermaid.theme(:minimal)))
+mermaid = Yog.Render.Mermaid.to_mermaid(g, Yog.Render.Mermaid.theme(:minimal))
+
+Kino.Mermaid.new(mermaid)
 ```
 
 ### Presentation Theme
 
 ```elixir
-IO.puts(Yog.Render.Mermaid.to_mermaid(g, Yog.Render.Mermaid.theme(:presentation)))
+mermaid = Yog.Render.Mermaid.to_mermaid(g, Yog.Render.Mermaid.theme(:presentation))
+
+Kino.Mermaid.new(mermaid)
 ```
 
 ---
@@ -114,32 +136,39 @@ IO.puts(Yog.Render.Mermaid.to_mermaid(g, Yog.Render.Mermaid.theme(:presentation)
 Control the layout flow.
 
 ```elixir
-g = Yog.directed()
-  |> Yog.add_edges!([{:a, :b, 1}, {:b, :c, 1}])
+g = Yog.from_edges(:directed, [{:a, :b, 1}, {:b, :c, 1}])
 ```
 
 ### Top-Down (`:td`)
 
 ```elixir
-IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | direction: :td}))
+Kino.Mermaid.new(
+  Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | direction: :td})
+)
 ```
 
 ### Left-to-Right (`:lr`)
 
 ```elixir
-IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | direction: :lr}))
+Kino.Mermaid.new(
+  Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | direction: :lr})
+)
 ```
 
 ### Bottom-to-Top (`:bt`)
 
 ```elixir
-IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | direction: :bt}))
+Kino.Mermaid.new(
+  Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | direction: :bt})
+)
 ```
 
 ### Right-to-Left (`:rl`)
 
 ```elixir
-IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | direction: :rl}))
+Kino.Mermaid.new(
+  Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | direction: :rl})
+)
 ```
 
 ---
@@ -158,61 +187,96 @@ g = Yog.directed()
 ### Rounded Rectangle
 
 ```elixir
-IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | node_shape: :rounded_rect}))
+Kino.Mermaid.new(
+  Yog.Render.Mermaid.to_mermaid(g, %{
+    Yog.Render.Mermaid.default_options()
+    | node_shape: :rounded_rect
+  })
+)
 ```
 
 ### Stadium (Pill)
 
 ```elixir
-IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | node_shape: :stadium}))
+Kino.Mermaid.new(
+  Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | node_shape: :stadium})
+)
 ```
 
 ### Subroutine
 
 ```elixir
-IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | node_shape: :subroutine}))
+Kino.Mermaid.new(
+  Yog.Render.Mermaid.to_mermaid(g, %{
+    Yog.Render.Mermaid.default_options()
+    | node_shape: :subroutine
+  })
+)
 ```
 
 ### Cylinder (Database)
 
 ```elixir
-IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | node_shape: :cylinder}))
+Kino.Mermaid.new(
+  Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | node_shape: :cylinder})
+)
 ```
 
 ### Circle
 
 ```elixir
-IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | node_shape: :circle}))
+Kino.Mermaid.new(
+  Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | node_shape: :circle})
+)
 ```
 
 ### Asymmetric (Flag)
 
 ```elixir
-IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | node_shape: :asymmetric}))
+Kino.Mermaid.new(
+  Yog.Render.Mermaid.to_mermaid(g, %{
+    Yog.Render.Mermaid.default_options()
+    | node_shape: :asymmetric
+  })
+)
 ```
 
 ### Rhombus (Decision)
 
 ```elixir
-IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | node_shape: :rhombus}))
+Kino.Mermaid.new(
+  Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | node_shape: :rhombus})
+)
 ```
 
 ### Hexagon
 
 ```elixir
-IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | node_shape: :hexagon}))
+Kino.Mermaid.new(
+  Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | node_shape: :hexagon})
+)
 ```
 
 ### Parallelogram
 
 ```elixir
-IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | node_shape: :parallelogram}))
+Kino.Mermaid.new(
+  Yog.Render.Mermaid.to_mermaid(g, %{
+    Yog.Render.Mermaid.default_options()
+    | node_shape: :parallelogram
+  })
+)
 ```
 
 ### Trapezoid
 
 ```elixir
-IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | node_shape: :trapezoid}))
+Kino.Mermaid.new(
+  Yog.Render.Mermaid.to_mermaid(g, %{
+    Yog.Render.Mermaid.default_options()
+    | node_shape: :trapezoid
+  })
+)
 ```
 
 ---
@@ -228,7 +292,7 @@ g = Yog.directed()
   |> Yog.add_node(3, %{name: "Carol", role: "Guest"})
   |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}])
 
-node_attrs = fn id, data ->
+node_attrs = fn _id, data ->
   case data.role do
     "Admin" -> [{:fill, "#ef4444"}, {:stroke, "#991b1b"}]
     "User" -> [{:fill, "#3b82f6"}, {:stroke, "#1e40af"}]
@@ -241,14 +305,13 @@ opts = %{
   | node_attributes: node_attrs
 }
 
-IO.puts(Yog.Render.Mermaid.to_mermaid(g, opts))
+Kino.Mermaid.new(Yog.Render.Mermaid.to_mermaid(g, opts))
 ```
 
 ### Per-Edge Styling (`edge_attributes`)
 
 ```elixir
-g = Yog.directed()
-  |> Yog.add_edges!([
+g = Yog.from_edges(:directed, [
     {:a, :b, %{priority: :high}},
     {:b, :c, %{priority: :low}},
     {:a, :c, %{priority: :medium}}
@@ -267,7 +330,7 @@ opts = %{
   | edge_attributes: edge_attrs
 }
 
-IO.puts(Yog.Render.Mermaid.to_mermaid(g, opts))
+Kino.Mermaid.new(Yog.Render.Mermaid.to_mermaid(g, opts))
 ```
 
 ---
@@ -300,7 +363,7 @@ opts = %{
     ]
 }
 
-IO.puts(Yog.Render.Mermaid.to_mermaid(g, opts))
+Kino.Mermaid.new(Yog.Render.Mermaid.to_mermaid(g, opts))
 ```
 
 ---
@@ -310,8 +373,7 @@ IO.puts(Yog.Render.Mermaid.to_mermaid(g, opts))
 ### Manual Highlighting
 
 ```elixir
-g = Yog.directed()
-  |> Yog.add_edges!([{:a, :b, 1}, {:b, :c, 1}, {:c, :d, 1}])
+g = Yog.from_edges(:directed, [{:a, :b, 1}, {:b, :c, 1}, {:c, :d, 1}])
 
 opts = %{
   Yog.Render.Mermaid.default_options()
@@ -319,7 +381,7 @@ opts = %{
     highlighted_edges: [{:a, :b}, {:b, :c}]
 }
 
-IO.puts(Yog.Render.Mermaid.to_mermaid(g, opts))
+Kino.Mermaid.new(Yog.Render.Mermaid.to_mermaid(g, opts))
 ```
 
 ### `path_to_options/2` — Shortest Path Highlighting
@@ -331,8 +393,8 @@ target = 24
 
 {:ok, path} = Yog.Pathfinding.shortest_path(in: g, from: source, to: target)
 
-opts = Yog.Render.Mermaid.path_to_options(path, Yog.Render.Mermaid.theme(:presentation))
-IO.puts(Yog.Render.Mermaid.to_mermaid(g, opts))
+opts = Yog.Render.Mermaid.path_to_options(path)
+Kino.Mermaid.new(Yog.Render.Mermaid.to_mermaid(g, opts))
 ```
 
 ---
@@ -349,14 +411,14 @@ weighted = Yog.from_edges(:undirected, [
 ])
 
 {:ok, mst} = Yog.MST.kruskal(in: weighted)
-mst_opts = Yog.Render.Mermaid.mst_to_options(mst, Yog.Render.Mermaid.theme(:minimal))
-IO.puts(Yog.Render.Mermaid.to_mermaid(weighted, mst_opts))
+mst_opts = Yog.Render.Mermaid.mst_to_options(mst)
+Kino.Mermaid.new(Yog.Render.Mermaid.to_mermaid(weighted, mst_opts))
 ```
 
 ### `community_to_options/2` — Community Detection
 
 ```elixir
-sbm = Yog.Generator.Random.sbm([8, 8], [[0.8, 0.1], [0.1, 0.8]])
+sbm = Yog.Generator.Random.sbm(100, 4, 0.3, 0.05)
 comm = Yog.Community.Louvain.detect(sbm)
 comm_opts = Yog.Render.Mermaid.community_to_options(comm)
 IO.puts(Yog.Render.Mermaid.to_mermaid(sbm, comm_opts))
@@ -365,13 +427,12 @@ IO.puts(Yog.Render.Mermaid.to_mermaid(sbm, comm_opts))
 ### `cut_to_options/2` — Min-Cut Partitions
 
 ```elixir
-flow = Yog.directed()
-  |> Yog.add_edges!([{:s, :a, 10}, {:s, :b, 10}, {:a, :t, 10}, {:b, :t, 5}])
+flow = Yog.from_edges(:directed, [{:s, :a, 10}, {:s, :b, 10}, {:a, :t, 10}, {:b, :t, 5}])
 
 result = Yog.Flow.MaxFlow.dinic(flow, :s, :t)
 min_cut = Yog.Flow.MaxFlow.min_cut(result)
 cut_opts = Yog.Render.Mermaid.cut_to_options(min_cut)
-IO.puts(Yog.Render.Mermaid.to_mermaid(flow, cut_opts))
+Kino.Mermaid.new(Yog.Render.Mermaid.to_mermaid(flow, cut_opts))
 ```
 
 ### `matching_to_options/2` — Bipartite Matching
@@ -383,7 +444,7 @@ bipartite = Yog.from_edges(:undirected, [
 
 matching = Yog.Matching.hopcroft_karp(bipartite)
 match_opts = Yog.Render.Mermaid.matching_to_options(matching)
-IO.puts(Yog.Render.Mermaid.to_mermaid(bipartite, match_opts))
+Kino.Mermaid.new(Yog.Render.Mermaid.to_mermaid(bipartite, match_opts))
 ```
 
 ---
@@ -405,7 +466,7 @@ mg = Multi.undirected()
 {mg, _e2} = Multi.add_edge(mg, :london, :paris, 50)   # Train
 {mg, e3} = Multi.add_edge(mg, :london, :paris, 300)   # Ferry
 
-IO.puts(Yog.Multi.Mermaid.to_mermaid(mg))
+Kino.Mermaid.new(Yog.Multi.Mermaid.to_mermaid(mg))
 ```
 
 ### Per-Edge Styling with `edge_id`
@@ -428,7 +489,7 @@ opts = %{
     end
 }
 
-IO.puts(Yog.Multi.Mermaid.to_mermaid(mg, opts))
+Kino.Mermaid.new(Yog.Multi.Mermaid.to_mermaid(mg, opts))
 ```
 
 ### Subgraphs in Multigraphs
@@ -454,32 +515,32 @@ opts = %{
     ]
 }
 
-IO.puts(Yog.Multi.Mermaid.to_mermaid(mg, opts))
+Kino.Mermaid.new(Yog.Multi.Mermaid.to_mermaid(mg, opts))
 ```
 
 ---
 
 ## 📋 Summary
 
-| Capability | Module | Key Function / Option |
-|---|---|---|
-| Basic export | `Yog.Render.Mermaid` | `to_mermaid/2` |
-| Basic export (parallel edges) | `Yog.Multi.Mermaid` | `to_mermaid/2` |
-| Default options | Both | `default_options/0` |
-| Custom edge formatter | `Yog.Render.Mermaid` | `default_options_with_edge_formatter/1` |
-| Custom labels | `Yog.Render.Mermaid` | `default_options_with/2` |
-| Themes | `Yog.Render.Mermaid` | `theme/1` (`:default`, `:dark`, `:minimal`, `:presentation`) |
-| Direction | Both | `direction:` (`:td`, `:lr`, `:bt`, `:rl`) |
-| Node shapes | Both | `node_shape:` (e.g., `:cylinder`, `:rhombus`, `:hexagon`) |
-| Per-node styles | Both | `node_attributes:` callback |
-| Per-edge styles | `Yog.Render.Mermaid` | `edge_attributes: fn f, t, w -> ...` |
-| Per-edge styles (multi) | `Yog.Multi.Mermaid` | `edge_attributes: fn f, t, id, w -> ...` |
-| Subgraphs | Both | `subgraphs:` list |
-| Path highlighting | `Yog.Render.Mermaid` | `path_to_options/2` |
-| MST highlighting | `Yog.Render.Mermaid` | `mst_to_options/2` |
-| Community colors | `Yog.Render.Mermaid` | `community_to_options/2` |
-| Min-cut colors | `Yog.Render.Mermaid` | `cut_to_options/2` |
-| Matching highlight | `Yog.Render.Mermaid` | `matching_to_options/2` |
+| Capability                    | Module               | Key Function / Option                                        |
+| ----------------------------- | -------------------- | ------------------------------------------------------------ |
+| Basic export                  | `Yog.Render.Mermaid` | `to_mermaid/2`                                               |
+| Basic export (parallel edges) | `Yog.Multi.Mermaid`  | `to_mermaid/2`                                               |
+| Default options               | Both                 | `default_options/0`                                          |
+| Custom edge formatter         | `Yog.Render.Mermaid` | `default_options_with_edge_formatter/1`                      |
+| Custom labels                 | `Yog.Render.Mermaid` | `default_options_with/2`                                     |
+| Themes                        | `Yog.Render.Mermaid` | `theme/1` (`:default`, `:dark`, `:minimal`, `:presentation`) |
+| Direction                     | Both                 | `direction:` (`:td`, `:lr`, `:bt`, `:rl`)                    |
+| Node shapes                   | Both                 | `node_shape:` (e.g., `:cylinder`, `:rhombus`, `:hexagon`)    |
+| Per-node styles               | Both                 | `node_attributes:` callback                                  |
+| Per-edge styles               | `Yog.Render.Mermaid` | `edge_attributes: fn f, t, w -> ...`                         |
+| Per-edge styles (multi)       | `Yog.Multi.Mermaid`  | `edge_attributes: fn f, t, id, w -> ...`                     |
+| Subgraphs                     | Both                 | `subgraphs:` list                                            |
+| Path highlighting             | `Yog.Render.Mermaid` | `path_to_options/2`                                          |
+| MST highlighting              | `Yog.Render.Mermaid` | `mst_to_options/2`                                           |
+| Community colors              | `Yog.Render.Mermaid` | `community_to_options/2`                                     |
+| Min-cut colors                | `Yog.Render.Mermaid` | `cut_to_options/2`                                           |
+| Matching highlight            | `Yog.Render.Mermaid` | `matching_to_options/2`                                      |
 
 ---
 
