@@ -5,9 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.97.2] - Unreleased
+## [0.98.0] - 2026-05-16
 
 ### Added
+
+#### Multigraph Facade
+
+- **`Yog.Multi`** — Filled facade gaps and added multigraph-native algorithms:
+  - `has_edge/2` — Check if a specific `edge_id` exists.
+  - `edge_count/3` — Count parallel edges between a node pair.
+  - `degree/2` — Total degree (in + out for directed, out-degree for undirected).
+  - `has_cycle?/1` — Detect cycles without manual collapsing.
+  - `topological_sort/1` — Returns `{:ok, [node_id]}` or `{:error, :contains_cycle}`.
+  - `to_simple_graph/1` — Collapse keeping only the first edge between each pair.
+  - `to_simple_graph_min_edges/1` — Collapse parallel edges keeping the minimum weight.
+  - `to_simple_graph_sum_edges/2` — Collapse parallel edges summing weights via a custom function.
 
 #### Rendering
 
@@ -16,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `edge_id`-based callbacks (`edge_label/2`, `edge_attributes/4`) for per-edge customization.
   - Highlighting by `edge_id` or `{from, to}` tuple.
   - Subgraphs, per-node styling, and all node shapes/directions.
+  - `theme/1` with `:default`, `:dark`, `:minimal`, `:presentation` presets.
+  - Algorithm helpers: `path_to_options/2`, `mst_to_options/2`, `community_to_options/2`, `cut_to_options/2`, `matching_to_options/2`.
+  - `default_options_with_edge_formatter/1`, `default_options_with/1`, `default_options_without_labels/0`.
+- **`Yog.Multi.DOT`** — Feature parity with `Yog.Render.DOT`:
+  - `theme/1` with all presets.
+  - Algorithm helpers: `path_to_options/2`, `mst_to_options/2`, `community_to_options/2`, `cut_to_options/2`, `matching_to_options/2`.
+  - `default_options_with_edge_formatter/1`, `default_options_with/1`, `default_options_without_labels/0`.
 - **`Yog.Render.Mermaid` parity with `Yog.Render.DOT`**:
   - `node_attributes/2` callback for per-node inline styling (`style node_id fill:...,stroke:...`).
   - `edge_attributes/3` callback for per-edge styling via `linkStyle index ...`.
@@ -24,10 +43,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `mst_to_options/2`, `community_to_options/2`, `cut_to_options/2`, `matching_to_options/2`.
   - `default_options_with_edge_formatter/1` and `default_options_with/1`.
   - Internal `MapSet` conversion for O(1) highlight membership checks.
+- **`Yog.Utils`** — Extracted shared rendering helpers to eliminate Credo duplication:
+  - `generate_palette/1`, `hsl_to_hex/3`, `mst_highlights/1`, `matching_highlights/1`, `path_to_edges/1`.
 
 ### Fixed
 
+- **Mermaid themes** now apply globally to all nodes/edges via `classDef default` and `linkStyle` (previously only affected highlighted elements).
+- **Mermaid dark mode readability** — Added `default_font_color` option for white text on dark backgrounds.
+- **Mermaid undirected edge labels** — Fixed invalid `---|1|` syntax to correct `-- 1 ---`.
+- **Mermaid per-node shapes** — `node_shape` now accepts `(id, data) -> shape` function in addition to atom values.
 - Credo alias warnings in `Yog.Multi.Mermaid`.
+- Removed accidental `IO.puts` debug output from `test/yog/multi/dot_test.exs`.
 
 #### Builders
 
