@@ -129,4 +129,33 @@ defmodule Yog.Builder.ToroidalTest do
     # Should have 4 neighbors (up-wrap, down, left-wrap, right)
     assert length(neighbors) == 4
   end
+
+  describe "legacy format support" do
+    setup do
+      graph = Yog.directed() |> Yog.add_node(0, "A")
+
+      [
+        legacy: {:toroidal_grid, graph, 2, 2}
+      ]
+    end
+
+    test "to_graph support", %{legacy: l} do
+      assert Toroidal.to_graph(l).__struct__ == Yog.Graph
+    end
+
+    test "get_cell support", %{legacy: l} do
+      assert Toroidal.get_cell(l, 0, 0) == {:ok, "A"}
+      assert Toroidal.get_cell(l, 5, 5) == {:error, nil}
+    end
+
+    test "find_node support", %{legacy: l} do
+      assert Toroidal.find_node(l, fn x -> x == "A" end) == {:ok, 0}
+    end
+
+    test "to_graph with GridGraph", %{legacy: _} do
+      graph = Yog.directed()
+      grid = Yog.Builder.GridGraph.new(graph, 2, 2)
+      assert Toroidal.to_graph(grid) == graph
+    end
+  end
 end

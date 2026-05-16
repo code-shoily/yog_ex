@@ -313,4 +313,57 @@ defmodule Yog.Builder.GridTest do
     refute {0, 0} in successors
     refute {0, 2} in successors
   end
+
+  test "including_predicate_test" do
+    # Can move between A, B, and E only
+    can_move = Grid.including(["A", "B", "E"])
+    assert can_move.("A", "B")
+    assert can_move.("A", "E")
+    refute can_move.("A", "C")
+  end
+
+  test "chebyshev_distance_test" do
+    # Distance from (0,0) to (3,4) in 10-col grid
+    from = Grid.coord_to_id(0, 0, 10)
+    to = Grid.coord_to_id(3, 4, 10)
+    # max(3, 4) = 4
+    assert Grid.chebyshev_distance(from, to, 10) == 4
+  end
+
+  test "octile_distance_test" do
+    from = Grid.coord_to_id(0, 0, 10)
+    to = Grid.coord_to_id(1, 1, 10)
+    # sqrt(2) ≈ 1.414...
+    assert_in_delta Grid.octile_distance(from, to, 10), 1.414, 0.001
+
+    to2 = Grid.coord_to_id(0, 2, 10)
+    assert Grid.octile_distance(from, to2, 10) == 2.0
+  end
+
+  describe "legacy format support" do
+    setup do
+      graph = Yog.directed() |> Yog.add_node(0, "A")
+
+      [
+        builder: {:grid_builder, graph, 2, 2},
+        legacy: {:grid, graph, 2, 2}
+      ]
+    end
+
+    test "to_graph support", %{builder: b, legacy: l} do
+      assert Grid.to_graph(b).__struct__ == Yog.Graph
+      assert Grid.to_graph(l).__struct__ == Yog.Graph
+    end
+
+    test "get_cell support", %{builder: b, legacy: l} do
+      assert Grid.get_cell(b, 0, 0) == {:ok, "A"}
+      assert Grid.get_cell(l, 0, 0) == {:ok, "A"}
+      assert Grid.get_cell(b, 5, 5) == {:error, nil}
+    end
+
+    test "find_node support", %{builder: b, legacy: l} do
+      assert Grid.find_node(b, fn x -> x == "A" end) == {:ok, 0}
+      assert Grid.find_node(l, fn x -> x == "A" end) == {:ok, 0}
+    end
+  end
 end
