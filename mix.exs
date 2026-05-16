@@ -115,6 +115,8 @@ defmodule YogEx.MixProject do
          [filename: "import_export", title: "Importing & Exporting"]},
         {"livebooks/how_to/multigraphs_and_collapsing.livemd",
          [filename: "multigraphs_and_collapsing", title: "Multigraphs & Collapsing"]},
+        {"livebooks/how_to/mermaid_complete_guide.livemd",
+         [filename: "mermaid_complete_guide", title: "Mermaid Complete Guide"]},
         "ALGORITHMS.md",
         "PROPERTIES.md",
         "CHANGELOG.md"
@@ -172,27 +174,26 @@ defmodule YogEx.MixProject do
       ],
       groups_for_extras: [
         "Cheat Sheets": [
-          "cheat_sheet"
+          "lib/yog/CHEATSHEET.cheatmd"
+        ],
+        LIVEBOOK: [
+          "livebooks/guides/getting_started.livemd",
+          "livebooks/guides/traversals_and_pathfinding.livemd",
+          "livebooks/guides/network_analysis.livemd",
+          "livebooks/guides/network_flow.livemd",
+          "livebooks/guides/graph_properties.livemd",
+          "livebooks/guides/dag_analysis.livemd",
+          "livebooks/how_to/maze_generation.livemd",
+          "livebooks/how_to/customizing_visualizations.livemd",
+          "livebooks/how_to/import_export.livemd",
+          "livebooks/how_to/multigraphs_and_collapsing.livemd",
+          "livebooks/how_to/mermaid_complete_guide.livemd",
+          "livebooks/gallery/graph_catalog.livemd"
         ],
         Guides: [
           "README.md",
-          "examples_readme",
-          "functional_readme",
-          "getting_started",
-          "traversals_and_pathfinding",
-          "network_analysis",
-          "network_flow",
-          "graph_properties",
-          "dag_analysis"
-        ],
-        Gallery: [
-          "graph_catalog"
-        ],
-        "How-To": [
-          "maze_generation",
-          "customizing_visualizations",
-          "import_export",
-          "multigraphs_and_collapsing"
+          "examples/README.md",
+          "lib/yog/functional/README.md"
         ],
         Reference: [
           "ALGORITHMS.md",
