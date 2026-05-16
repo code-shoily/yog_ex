@@ -646,6 +646,83 @@ defmodule Yog.IO.GEXFTest do
     assert Yog.Model.node(graph, 1)["label"] =~ <<0x201C::utf8>>
   end
 
+  test "serialize viz attributes" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, %{
+        "label" => "A",
+        "viz:color" => %{r: 255, g: 0, b: 0, a: 0.8},
+        "viz:size" => 5.5,
+        "viz:position" => %{x: 1.0, y: 2.0, z: 3.0},
+        "viz:shape" => "disc"
+      })
+
+    node_attr = fn data -> data end
+    edge_attr = fn _ -> %{} end
+
+    xml = GEXF.serialize_with(node_attr, edge_attr, graph)
+
+    assert String.contains?(xml, "<viz:color r=\"255\" g=\"0\" b=\"0\" a=\"0.8\"")
+    assert String.contains?(xml, "<viz:size value=\"5.5\"")
+    assert String.contains?(xml, "<viz:position x=\"1.0\" y=\"2.0\" z=\"3.0\"")
+    assert String.contains?(xml, "<viz:shape value=\"disc\"")
+  end
+
+  test "deserialize viz attributes" do
+    xml = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <gexf xmlns="http://gexf.net/1.3" xmlns:viz="http://gexf.net/1.3/viz" version="1.3">
+      <graph mode="static" defaultedgetype="directed">
+        <nodes>
+          <node id="1" label="A">
+            <viz:color r="255" g="128" b="64" a="0.5"/>
+            <viz:size value="10.0"/>
+            <viz:position x="1.0" y="2.0" z="0.0"/>
+            <viz:shape value="square"/>
+          </node>
+        </nodes>
+        <edges></edges>
+      </graph>
+    </gexf>
+    """
+
+    {:ok, graph} = GEXF.deserialize(xml)
+    data = Yog.Model.node(graph, 1)
+
+    assert data["viz:color"].r == 255
+    assert data["viz:color"].g == 128
+    assert data["viz:color"].b == 64
+    assert data["viz:color"].a == 0.5
+    assert data["viz:size"] == 10.0
+    assert data["viz:position"].x == 1.0
+    assert data["viz:position"].y == 2.0
+    assert data["viz:shape"] == "square"
+  end
+
+  test "options_with creates custom formatters" do
+    node_fmt = &("n_" <> Integer.to_string(&1))
+    edge_fmt = &("e_" <> Integer.to_string(&1))
+    opts = GEXF.options_with(node_fmt, edge_fmt)
+    assert match?({:gexf_options, ^node_fmt, ^edge_fmt}, opts)
+  end
+
+  test "serialize_with_options uses custom options" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+
+    node_attr = fn _ -> %{} end
+    edge_attr = fn _ -> %{} end
+    opts = GEXF.options_with(&("n_" <> Integer.to_string(&1)), &("e_" <> Integer.to_string(&1)))
+
+    xml = GEXF.serialize_with_options(node_attr, edge_attr, opts, graph)
+
+    assert String.contains?(xml, "<node id=\"n_1\"")
+    assert String.contains?(xml, "<node id=\"n_2\"")
+  end
+
   test "deserialize returns error for malformed xml" do
     assert {:error, {:parse_error, _}} = GEXF.deserialize("<?xml version='1.0'?><gexf><graph>")
   end

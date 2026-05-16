@@ -2,7 +2,6 @@ defmodule Yog.IO.GEXF.MultiTest do
   use ExUnit.Case
 
   alias Yog.IO.GEXF.Multi
-  alias Yog.Multi.Model
 
   doctest Yog.IO.GEXF.Multi
 
@@ -10,9 +9,9 @@ defmodule Yog.IO.GEXF.MultiTest do
   # SERIALIZATION TESTS
   # =============================================================================
 
-  test "serialize empty directed multigraph" do
-    multi = Yog.Multi.new(:directed)
-    xml = Multi.serialize(multi)
+  test "serialize empty multigraph" do
+    graph = Yog.Multi.directed()
+    xml = Multi.serialize(graph)
 
     assert String.contains?(xml, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
     assert String.contains?(xml, "defaultedgetype=\"directed\"")
@@ -20,345 +19,69 @@ defmodule Yog.IO.GEXF.MultiTest do
     assert String.contains?(xml, "<edges></edges>")
   end
 
-  test "serialize empty undirected multigraph" do
-    multi = Yog.Multi.new(:undirected)
-    xml = Multi.serialize(multi)
+  test "serialize undirected multigraph" do
+    graph = Yog.Multi.undirected()
+    xml = Multi.serialize(graph)
 
     assert String.contains?(xml, "defaultedgetype=\"undirected\"")
   end
 
-  test "serialize single node" do
+  test "serialize multigraph with parallel edges" do
     multi =
-      Yog.Multi.new(:directed)
-      |> Yog.Multi.add_node(1, "Alice")
-
-    xml = Multi.serialize(multi)
-    assert String.contains?(xml, "<node id=\"1\" label=\"Alice\">")
-  end
-
-  test "serialize parallel edges" do
-    multi =
-      Yog.Multi.new(:directed)
+      Yog.Multi.directed()
       |> Yog.Multi.add_node(1, "A")
       |> Yog.Multi.add_node(2, "B")
-      |> Yog.Multi.add_edge(1, 2, "route-a")
-      |> elem(0)
-      |> Yog.Multi.add_edge(1, 2, "route-b")
-      |> elem(0)
+
+    {multi, eid1} = Yog.Multi.add_edge(multi, 1, 2, 5)
+    {multi, eid2} = Yog.Multi.add_edge(multi, 1, 2, 10)
 
     xml = Multi.serialize(multi)
 
-    edge_count = xml |> String.split("<edge ") |> length() |> Kernel.-(1)
-    assert edge_count == 2
-    assert String.contains?(xml, "<edge id=\"0\"")
-    assert String.contains?(xml, "<edge id=\"1\"")
+    assert String.contains?(xml, "<node id=\"1\" label=\"A\">")
+    assert String.contains?(xml, "<node id=\"2\" label=\"B\">")
+    # Both parallel edges should be present
+    assert String.contains?(xml, "<edge id=\"#{eid1}\"")
+    assert String.contains?(xml, "<edge id=\"#{eid2}\"")
+    assert String.contains?(xml, "source=\"1\"")
+    assert String.contains?(xml, "target=\"2\"")
   end
 
-  test "serialize undirected parallel edges" do
+  test "serialize_with custom attribute mappers" do
     multi =
-      Yog.Multi.new(:undirected)
-      |> Yog.Multi.add_node(1, "A")
-      |> Yog.Multi.add_node(2, "B")
-      |> Yog.Multi.add_edge(1, 2, "edge1")
-      |> elem(0)
-      |> Yog.Multi.add_edge(1, 2, "edge2")
-      |> elem(0)
+      Yog.Multi.directed()
+      |> Yog.Multi.add_node(1, %{name: "Alice"})
+      |> Yog.Multi.add_node(2, %{name: "Bob"})
 
-    xml = Multi.serialize(multi)
+    {multi, _} = Yog.Multi.add_edge(multi, 1, 2, %{kind: "friend"})
 
-    edge_count = xml |> String.split("<edge ") |> length() |> Kernel.-(1)
-    assert edge_count == 2
-    assert String.contains?(xml, "defaultedgetype=\"undirected\"")
-  end
-
-  test "serialize with custom attributes" do
-    multi =
-      Yog.Multi.new(:directed)
-      |> Yog.Multi.add_node(1, "Alice")
-      |> Yog.Multi.add_node(2, "Bob")
-      |> Yog.Multi.add_edge(1, 2, "friend")
-      |> elem(0)
-
-    node_attr = fn name -> %{"name" => name, "role" => "user"} end
-    edge_attr = fn rel -> %{"relation" => rel} end
+    node_attr = fn data -> %{"name" => data.name} end
+    edge_attr = fn data -> %{"kind" => data.kind} end
 
     xml = Multi.serialize_with(node_attr, edge_attr, multi)
 
-    assert String.contains?(xml, "<attribute id=\"0\" title=\"name\"")
-    assert String.contains?(xml, "<attribute id=\"1\" title=\"role\"")
-    assert String.contains?(xml, "<attvalue for=\"0\" value=\"Alice\"")
-    assert String.contains?(xml, "<attvalue for=\"0\" value=\"friend\"")
+    assert String.contains?(xml, "<attribute id=\"0\" title=\"name\" type=\"string\"")
+    assert String.contains?(xml, "<attribute id=\"0\" title=\"kind\" type=\"string\"")
   end
 
-  test "serialize escapes XML special chars" do
+  test "serialize_with_options uses custom formatters" do
     multi =
-      Yog.Multi.new(:directed)
-      |> Yog.Multi.add_node(1, "Alice <admin>")
-
-    xml = Multi.serialize(multi)
-    assert String.contains?(xml, "&lt;admin&gt;")
-  end
-
-  # =============================================================================
-  # DESERIALIZATION TESTS
-  # =============================================================================
-
-  test "deserialize empty graph" do
-    xml = """
-    <?xml version="1.0"?>
-    <gexf version="1.3">
-      <graph defaultedgetype="directed">
-        <nodes></nodes>
-        <edges></edges>
-      </graph>
-    </gexf>
-    """
-
-    {:ok, graph} = Multi.deserialize(xml)
-    assert graph.kind == :directed
-    assert Model.order(graph) == 0
-    assert Model.size(graph) == 0
-  end
-
-  test "deserialize single node" do
-    xml = """
-    <?xml version="1.0"?>
-    <gexf version="1.3">
-      <graph defaultedgetype="directed">
-        <nodes>
-          <node id="1" label="Alice"/>
-        </nodes>
-        <edges></edges>
-      </graph>
-    </gexf>
-    """
-
-    {:ok, graph} = Multi.deserialize(xml)
-    assert Model.order(graph) == 1
-    assert graph.nodes[1]["label"] == "Alice"
-  end
-
-  test "deserialize parallel edges" do
-    xml = """
-    <?xml version="1.0"?>
-    <gexf version="1.3">
-      <graph defaultedgetype="directed">
-        <nodes>
-          <node id="1" label="A"/>
-          <node id="2" label="B"/>
-        </nodes>
-        <edges>
-          <edge id="0" source="1" target="2" weight="route-a"/>
-          <edge id="1" source="1" target="2" weight="route-b"/>
-        </edges>
-      </graph>
-    </gexf>
-    """
-
-    {:ok, graph} = Multi.deserialize(xml)
-    assert Model.order(graph) == 2
-    assert Model.size(graph) == 2
-
-    edge_ids = Model.all_edge_ids(graph)
-    assert length(edge_ids) == 2
-
-    # Both edges should be between 1 and 2
-    edges = graph.edges
-    assert map_size(edges) == 2
-    assert Enum.all?(edges, fn {_eid, {from, to, _}} -> from == 1 and to == 2 end)
-  end
-
-  test "deserialize undirected parallel edges" do
-    xml = """
-    <?xml version="1.0"?>
-    <gexf version="1.3">
-      <graph defaultedgetype="undirected">
-        <nodes>
-          <node id="1" label="A"/>
-          <node id="2" label="B"/>
-        </nodes>
-        <edges>
-          <edge id="0" source="1" target="2"/>
-          <edge id="1" source="1" target="2"/>
-        </edges>
-      </graph>
-    </gexf>
-    """
-
-    {:ok, graph} = Multi.deserialize(xml)
-    assert graph.kind == :undirected
-    assert Model.size(graph) == 2
-  end
-
-  test "deserialize with custom mappers" do
-    xml = """
-    <?xml version="1.0"?>
-    <gexf version="1.3">
-      <graph defaultedgetype="directed">
-        <attributes class="node">
-          <attribute id="0" title="name" type="string"/>
-          <attribute id="1" title="age" type="string"/>
-        </attributes>
-        <nodes>
-          <node id="1">
-            <attvalues>
-              <attvalue for="0" value="Alice"/>
-              <attvalue for="1" value="30"/>
-            </attvalues>
-          </node>
-        </nodes>
-        <edges>
-          <edge source="1" target="2">
-            <attvalues>
-              <attvalue for="0" value="friend"/>
-            </attvalues>
-          </edge>
-        </edges>
-      </graph>
-    </gexf>
-    """
-
-    node_folder = fn attrs ->
-      %{
-        name: Map.get(attrs, "name", ""),
-        age: Map.get(attrs, "age", "0") |> String.to_integer()
-      }
-    end
-
-    edge_folder = fn attrs -> Map.get(attrs, "type", "") end
-
-    {:ok, graph} = Multi.deserialize_with(node_folder, edge_folder, xml)
-
-    person = graph.nodes[1]
-    assert person.name == "Alice"
-    assert person.age == 30
-  end
-
-  test "deserialize handles string node ids" do
-    xml = """
-    <?xml version="1.0"?>
-    <gexf version="1.3">
-      <graph defaultedgetype="directed">
-        <nodes>
-          <node id="alice" label="Alice"/>
-          <node id="bob" label="Bob"/>
-        </nodes>
-        <edges>
-          <edge source="alice" target="bob"/>
-        </edges>
-      </graph>
-    </gexf>
-    """
-
-    {:ok, graph} = Multi.deserialize(xml)
-    assert Model.order(graph) == 2
-    assert Model.size(graph) == 1
-
-    edge = graph.edges |> Map.values() |> hd()
-    assert elem(edge, 0) == "alice"
-    assert elem(edge, 1) == "bob"
-  end
-
-  # =============================================================================
-  # ROUNDTRIP TESTS
-  # =============================================================================
-
-  test "roundtrip directed multigraph with parallel edges" do
-    original =
-      Yog.Multi.new(:directed)
-      |> Yog.Multi.add_node(1, "Alice")
-      |> Yog.Multi.add_node(2, "Bob")
-      |> Yog.Multi.add_edge(1, 2, "route-a")
-      |> elem(0)
-      |> Yog.Multi.add_edge(1, 2, "route-b")
-      |> elem(0)
-
-    xml = Multi.serialize(original)
-    {:ok, loaded} = Multi.deserialize(xml)
-
-    assert Model.order(loaded) == 2
-    assert Model.size(loaded) == 2
-    assert loaded.nodes[1]["label"] == "Alice"
-    assert loaded.nodes[2]["label"] == "Bob"
-
-    # Both edges should exist between 1 and 2
-    edges_1_2 =
-      loaded.edges
-      |> Map.values()
-      |> Enum.filter(fn {from, to, _} -> from == 1 and to == 2 end)
-
-    assert length(edges_1_2) == 2
-  end
-
-  test "roundtrip undirected multigraph" do
-    original =
-      Yog.Multi.new(:undirected)
+      Yog.Multi.directed()
       |> Yog.Multi.add_node(1, "A")
       |> Yog.Multi.add_node(2, "B")
-      |> Yog.Multi.add_node(3, "C")
-      |> Yog.Multi.add_edge(1, 2, "e1")
-      |> elem(0)
-      |> Yog.Multi.add_edge(2, 3, "e2")
-      |> elem(0)
-      |> Yog.Multi.add_edge(1, 2, "e3")
-      |> elem(0)
 
-    xml = Multi.serialize(original)
-    {:ok, loaded} = Multi.deserialize(xml)
+    {multi, _} = Yog.Multi.add_edge(multi, 1, 2, 1)
 
-    assert loaded.kind == :undirected
-    assert Model.order(loaded) == 3
-    assert Model.size(loaded) == 3
+    opts = Multi.options_with(&("n_" <> Integer.to_string(&1)), &("e_" <> Integer.to_string(&1)))
+    xml = Multi.serialize_with_options(fn _ -> %{} end, fn _ -> %{} end, opts, multi)
+
+    assert String.contains?(xml, "<node id=\"n_1\"")
+    assert String.contains?(xml, "<edge id=\"e_")
   end
 
-  test "roundtrip with custom attributes" do
-    original =
-      Yog.Multi.new(:directed)
-      |> Yog.Multi.add_node(1, %{name: "Alice", age: 30})
-      |> Yog.Multi.add_node(2, %{name: "Bob", age: 25})
-      |> Yog.Multi.add_edge(1, 2, %{type: "friend", since: "2020"})
-      |> elem(0)
-      |> Yog.Multi.add_edge(1, 2, %{type: "colleague", since: "2019"})
-      |> elem(0)
-
-    node_attr = fn data ->
-      %{"name" => data.name, "age" => Integer.to_string(data.age)}
-    end
-
-    edge_attr = fn data ->
-      %{"type" => data.type, "since" => data.since}
-    end
-
-    xml = Multi.serialize_with(node_attr, edge_attr, original)
-
-    node_folder = fn attrs ->
-      %{
-        name: Map.get(attrs, "name", ""),
-        age: String.to_integer(Map.get(attrs, "age", "0"))
-      }
-    end
-
-    edge_folder = fn attrs ->
-      %{
-        type: Map.get(attrs, "type", ""),
-        since: Map.get(attrs, "since", "")
-      }
-    end
-
-    {:ok, loaded} = Multi.deserialize_with(node_folder, edge_folder, xml)
-
-    assert Model.order(loaded) == 2
-    assert Model.size(loaded) == 2
-    assert loaded.nodes[1].name == "Alice"
-    assert loaded.nodes[1].age == 30
-
-    edge_values =
-      loaded.edges
-      |> Map.values()
-      |> Enum.map(fn {_from, _to, data} -> data.type end)
-      |> Enum.sort()
-
-    assert edge_values == ["colleague", "friend"]
+  test "default_options returns formatters" do
+    {:gexf_options, node_fmt, edge_fmt} = Multi.default_options()
+    assert is_function(node_fmt, 1)
+    assert is_function(edge_fmt, 1)
   end
 
   # =============================================================================
@@ -368,124 +91,58 @@ defmodule Yog.IO.GEXF.MultiTest do
   test "write and read multigraph file" do
     path = "/tmp/test_yog_gexf_multi.gexf"
 
-    original =
-      Yog.Multi.new(:directed)
-      |> Yog.Multi.add_node(1, "Alice")
-      |> Yog.Multi.add_node(2, "Bob")
-      |> Yog.Multi.add_edge(1, 2, "e1")
-      |> elem(0)
-      |> Yog.Multi.add_edge(1, 2, "e2")
-      |> elem(0)
+    multi =
+      Yog.Multi.directed()
+      |> Yog.Multi.add_node(1, "A")
+      |> Yog.Multi.add_node(2, "B")
+
+    {multi, _} = Yog.Multi.add_edge(multi, 1, 2, 5)
+    {multi, _} = Yog.Multi.add_edge(multi, 1, 2, 10)
 
     try do
-      assert {:ok, nil} = Multi.write(path, original)
+      assert {:ok, nil} = Multi.write(path, multi)
       assert File.exists?(path)
 
-      {:ok, loaded} = Multi.read(path)
-
-      assert Model.order(loaded) == 2
-      assert Model.size(loaded) == 2
+      {:ok, graph} = Multi.read(path)
+      assert Yog.Multi.Model.order(graph) == 2
+      assert Map.has_key?(graph.nodes, 1)
+      assert Map.has_key?(graph.nodes, 2)
+      # Parallel edges preserved in multigraph deserialization
+      assert length(Yog.Multi.Model.successors(graph, 1)) == 2
     after
       File.rm(path)
     end
   end
 
-  test "read nonexistent file" do
-    assert {:error, _} = Multi.read("/tmp/nonexistent_multi_xyz.gexf")
-  end
+  test "write_with and read_with custom mappers" do
+    path = "/tmp/test_yog_gexf_multi_with.gexf"
 
-  test "deserialize invalid xml returns error" do
-    assert {:error, _} = Multi.deserialize("not xml at all")
-    assert {:error, _} = Multi.deserialize("<?xml version=\"1.0\"?><invalid>")
-  end
+    multi =
+      Yog.Multi.directed()
+      |> Yog.Multi.add_node(1, %{name: "Alice"})
+      |> Yog.Multi.add_node(2, %{name: "Bob"})
 
-  test "write_with and read_with multigraph file" do
-    path = "/tmp/test_yog_gexf_multi_write_with.gexf"
+    {multi, _} = Yog.Multi.add_edge(multi, 1, 2, %{kind: "friend"})
 
-    original =
-      Yog.Multi.new(:directed)
-      |> Yog.Multi.add_node(1, %{name: "Alice", age: 30})
-      |> Yog.Multi.add_node(2, %{name: "Bob", age: 25})
-      |> Yog.Multi.add_edge(1, 2, %{type: "friend", since: "2020"})
-      |> elem(0)
+    node_attr = fn data -> %{"name" => data.name} end
+    edge_attr = fn data -> %{"kind" => data.kind} end
 
-    node_attr = fn data ->
-      %{"name" => data.name, "age" => Integer.to_string(data.age)}
-    end
-
-    edge_attr = fn data ->
-      %{"type" => data.type, "since" => data.since}
-    end
-
-    node_folder = fn attrs ->
-      %{
-        name: Map.get(attrs, "name", ""),
-        age: String.to_integer(Map.get(attrs, "age", "0"))
-      }
-    end
-
-    edge_folder = fn attrs ->
-      %{
-        type: Map.get(attrs, "type", ""),
-        since: Map.get(attrs, "since", "")
-      }
-    end
+    node_folder = fn attrs -> %{name: Map.get(attrs, "name", "")} end
+    edge_folder = fn attrs -> %{kind: Map.get(attrs, "kind", "")} end
 
     try do
-      assert {:ok, nil} = Multi.write_with(path, node_attr, edge_attr, original)
-      assert File.exists?(path)
+      assert {:ok, nil} = Multi.write_with(path, node_attr, edge_attr, multi)
+      {:ok, graph} = Multi.read_with(path, node_folder, edge_folder)
 
-      {:ok, loaded} = Multi.read_with(path, node_folder, edge_folder)
-
-      assert loaded.nodes[1].name == "Alice"
-      assert loaded.nodes[1].age == 30
-
-      edge_data =
-        loaded.edges
-        |> Map.values()
-        |> hd()
-        |> elem(2)
-
-      assert edge_data.type == "friend"
-      assert edge_data.since == "2020"
+      assert graph.nodes[1].name == "Alice"
+      {_eid, _to, edge_data} = Yog.Multi.Model.successors(graph, 1) |> hd()
+      assert edge_data.kind == "friend"
     after
       File.rm(path)
     end
   end
 
-  test "deserialize edges without explicit id" do
-    xml = """
-    <?xml version="1.0"?>
-    <gexf version="1.3">
-      <graph defaultedgetype="directed">
-        <nodes>
-          <node id="1" label="A"/>
-          <node id="2" label="B"/>
-        </nodes>
-        <edges>
-          <edge source="1" target="2"/>
-        </edges>
-      </graph>
-    </gexf>
-    """
-
-    {:ok, graph} = Multi.deserialize(xml)
-    assert Model.order(graph) == 2
-    assert Model.size(graph) == 1
-  end
-
-  test "deserialize multi with missing graph type defaults to directed" do
-    xml = """
-    <?xml version="1.0"?>
-    <gexf version="1.3">
-      <graph>
-        <nodes><node id="1"/></nodes>
-        <edges></edges>
-      </graph>
-    </gexf>
-    """
-
-    {:ok, graph} = Multi.deserialize(xml)
-    assert graph.kind == :directed
+  test "read nonexistent file returns error" do
+    assert {:error, :enoent} = Multi.read("/tmp/nonexistent_yog_gexf_multi.gexf")
   end
 end

@@ -361,6 +361,15 @@ defmodule Yog.Multi.DOTTest do
       end
     end
 
+    test "renders custom node shape and layout" do
+      multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "A")
+
+      opts = %{DOT.default_options() | node_shape: {:custom, "myshape"}, layout: {:custom, "mylayout"}}
+      dot = DOT.to_dot(multi, opts)
+      assert String.contains?(dot, "shape=myshape")
+      assert String.contains?(dot, "layout=mylayout")
+    end
+
     test "renders various arrow styles" do
       multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "A") |> Yog.Multi.add_node(2, "B")
       {multi, _} = Yog.Multi.add_edge(multi, 1, 2, 1)
@@ -401,6 +410,28 @@ defmodule Yog.Multi.DOTTest do
       end
     end
 
+    test "renders graph attributes" do
+      multi = Yog.Multi.directed()
+
+      opts = %{
+        DOT.default_options()
+        | layout: :neato,
+          rankdir: :lr,
+          splines: :ortho,
+          overlap: false,
+          nodesep: 0.5,
+          ranksep: 1.2
+      }
+
+      dot = DOT.to_dot(multi, opts)
+      assert String.contains?(dot, "layout=neato")
+      assert String.contains?(dot, "rankdir=LR")
+      assert String.contains?(dot, "splines=ortho")
+      assert String.contains?(dot, "overlap=false")
+      assert String.contains?(dot, "nodesep=0.5")
+      assert String.contains?(dot, "ranksep=1.2")
+    end
+
     test "escapes special characters in labels" do
       multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "Line1\nLine2")
       {multi, _} = Yog.Multi.add_edge(multi, 1, 1, "Quote \" and backslash \\")
@@ -417,6 +448,102 @@ defmodule Yog.Multi.DOTTest do
       dot = DOT.to_dot(multi, opts)
       assert String.contains?(dot, "label=\"OVERRIDDEN\"")
       refute String.contains?(dot, "label=\"A\"")
+    end
+  end
+
+  describe "cut_to_options/2" do
+    test "colors source and sink sides" do
+      result = %Yog.Flow.MinCutResult{
+        cut_value: 10,
+        source_side_size: 2,
+        sink_side_size: 3,
+        source_side: MapSet.new([1, 2]),
+        sink_side: MapSet.new([3, 4, 5]),
+        algorithm: :stoer_wagner
+      }
+
+      opts = DOT.cut_to_options(result)
+      multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "A") |> Yog.Multi.add_node(3, "B")
+      {multi, _} = Yog.Multi.add_edge(multi, 1, 3, 1)
+
+      dot = DOT.to_dot(multi, opts)
+      assert String.contains?(dot, "fillcolor=\"#a8d8ea\"")
+      assert String.contains?(dot, "fillcolor=\"#f08080\"")
+    end
+  end
+
+  describe "subgraphs" do
+    test "renders nested subgraphs" do
+      multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "A") |> Yog.Multi.add_node(2, "B")
+      {multi, _} = Yog.Multi.add_edge(multi, 1, 2, 1)
+
+      opts = %{
+        DOT.default_options()
+        | subgraphs: [
+            %{
+              name: "cluster_outer",
+              label: "Outer",
+              node_ids: [1],
+              style: :dashed,
+              fillcolor: "#eeeeee",
+              color: "#333333",
+              subgraphs: [
+                %{
+                  name: "cluster_inner",
+                  label: "Inner",
+                  node_ids: [2],
+                  style: :solid,
+                  fillcolor: "#cccccc",
+                  color: nil
+                }
+              ]
+            }
+          ]
+      }
+
+      dot = DOT.to_dot(multi, opts)
+      assert String.contains?(dot, "subgraph cluster_outer")
+      assert String.contains?(dot, "subgraph cluster_inner")
+      assert String.contains?(dot, "label=\"Outer\"")
+      assert String.contains?(dot, "label=\"Inner\"")
+    end
+
+    test "renders subgraph with nil node_ids" do
+      multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "A")
+
+      opts = %{
+        DOT.default_options()
+        | subgraphs: [
+            %{
+              name: "cluster_empty",
+              label: "Empty",
+              node_ids: nil,
+              style: nil,
+              fillcolor: nil,
+              color: nil
+            }
+          ]
+      }
+
+      dot = DOT.to_dot(multi, opts)
+      assert String.contains?(dot, "subgraph cluster_empty")
+      assert String.contains?(dot, "label=\"Empty\"")
+    end
+  end
+
+  describe "undirected edge highlighting" do
+    test "highlights reversed edge tuple in undirected graph" do
+      multi = Yog.Multi.undirected() |> Yog.Multi.add_node(1, "A") |> Yog.Multi.add_node(2, "B")
+      {multi, _eid} = Yog.Multi.add_edge(multi, 1, 2, 5)
+
+      opts = %{
+        DOT.default_options()
+        | highlighted_edges: [{2, 1}]
+      }
+
+      dot = DOT.to_dot(multi, opts)
+      assert String.contains?(dot, "penwidth=\"2.0\"")
+      assert String.contains?(dot, "color=\"red\"")
     end
   end
 end
