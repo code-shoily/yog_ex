@@ -494,6 +494,325 @@ defmodule Yog.TraversalTest do
     assert Enum.sort(result) == [1, 2]
   end
 
+  test "implicit_fold_bfs_cycle_test" do
+    # 1 -> 2 -> 3 -> 1 (cycle)
+    successors = fn n ->
+      case n do
+        1 -> [2]
+        2 -> [3]
+        3 -> [1]
+        _ -> []
+      end
+    end
+
+    result =
+      Yog.Traversal.implicit_fold(
+        from: 1,
+        using: :breadth_first,
+        successors_of: successors,
+        initial: [],
+        with: fn acc, node, _meta -> {:continue, [node | acc]} end
+      )
+
+    assert Enum.sort(result) == [1, 2, 3]
+  end
+
+  test "implicit_fold_dfs_cycle_test" do
+    successors = fn n ->
+      case n do
+        1 -> [2, 3]
+        2 -> [1]
+        3 -> []
+        _ -> []
+      end
+    end
+
+    result =
+      Yog.Traversal.implicit_fold(
+        from: 1,
+        using: :depth_first,
+        successors_of: successors,
+        initial: [],
+        with: fn acc, node, _meta -> {:continue, [node | acc]} end
+      )
+
+    assert Enum.sort(result) == [1, 2, 3]
+  end
+
+  test "implicit_fold_depth_tracking_test" do
+    # Chain: 1 -> 2 -> 3 -> 4
+    successors = fn n -> if n < 4, do: [n + 1], else: [] end
+
+    result =
+      Yog.Traversal.implicit_fold(
+        from: 1,
+        using: :breadth_first,
+        successors_of: successors,
+        initial: %{},
+        with: fn acc, node, meta -> {:continue, Map.put(acc, node, meta.depth)} end
+      )
+
+    assert result[1] == 0
+    assert result[2] == 1
+    assert result[3] == 2
+    assert result[4] == 3
+  end
+
+  test "implicit_fold_parent_tracking_test" do
+    # Tree: 1 -> [2, 3], 2 -> [4], 3 -> [5]
+    successors = fn n ->
+      case n do
+        1 -> [2, 3]
+        2 -> [4]
+        3 -> [5]
+        _ -> []
+      end
+    end
+
+    result =
+      Yog.Traversal.implicit_fold(
+        from: 1,
+        using: :breadth_first,
+        successors_of: successors,
+        initial: %{},
+        with: fn acc, node, meta -> {:continue, Map.put(acc, node, meta.parent)} end
+      )
+
+    assert result[1] == nil
+    assert result[2] == 1
+    assert result[3] == 1
+    assert result[4] == 2
+    assert result[5] == 3
+  end
+
+  test "implicit_fold_path_reconstruction_test" do
+    # Chain: 1 -> 2 -> 3 -> 4
+    successors = fn n -> if n < 4, do: [n + 1], else: [] end
+
+    parents =
+      Yog.Traversal.implicit_fold(
+        from: 1,
+        using: :breadth_first,
+        successors_of: successors,
+        initial: %{},
+        with: fn acc, node, meta -> {:continue, Map.put(acc, node, meta.parent)} end
+      )
+
+    # Reconstruct path from 4 back to 1
+    path =
+      Stream.unfold(4, fn
+        nil -> nil
+        node -> {node, parents[node]}
+      end)
+      |> Enum.to_list()
+      |> Enum.reverse()
+
+    assert path == [1, 2, 3, 4]
+  end
+
+  test "implicit_fold_self_loop_test" do
+    successors = fn n ->
+      case n do
+        1 -> [1, 2]
+        _ -> []
+      end
+    end
+
+    result =
+      Yog.Traversal.implicit_fold(
+        from: 1,
+        using: :breadth_first,
+        successors_of: successors,
+        initial: [],
+        with: fn acc, node, _meta -> {:continue, [node | acc]} end
+      )
+
+    assert Enum.sort(result) == [1, 2]
+  end
+
+  test "implicit_fold_isolated_start_test" do
+    result =
+      Yog.Traversal.implicit_fold(
+        from: :lonely,
+        using: :breadth_first,
+        successors_of: fn _ -> [] end,
+        initial: [],
+        with: fn acc, node, _meta -> {:continue, [node | acc]} end
+      )
+
+    assert result == [:lonely]
+  end
+
+  test "implicit_fold_diamond_bfs_test" do
+    #     1
+    #    / \
+    #   2   3
+    #    \ /
+    #     4
+    successors = fn n ->
+      case n do
+        1 -> [2, 3]
+        2 -> [4]
+        3 -> [4]
+        _ -> []
+      end
+    end
+
+    result =
+      Yog.Traversal.implicit_fold(
+        from: 1,
+        using: :breadth_first,
+        successors_of: successors,
+        initial: [],
+        with: fn acc, node, _meta -> {:continue, [node | acc]} end
+      )
+      |> Enum.reverse()
+
+    assert length(result) == 4
+    assert Enum.sort(result) == [1, 2, 3, 4]
+    # BFS: 1 first, then 2 and 3, then 4
+    assert hd(result) == 1
+    assert List.last(result) == 4
+  end
+
+  test "implicit_fold_by_halt_test" do
+    successors = fn n ->
+      case n do
+        1 -> [2, 3]
+        2 -> [4]
+        3 -> [5]
+        _ -> []
+      end
+    end
+
+    result =
+      Yog.Traversal.implicit_fold_by(
+        from: 1,
+        using: :breadth_first,
+        successors_of: successors,
+        visited_by: & &1,
+        initial: [],
+        with: fn acc, node, _meta ->
+          if node == 2, do: {:halt, [node | acc]}, else: {:continue, [node | acc]}
+        end
+      )
+
+    assert Enum.sort(result) == [1, 2]
+  end
+
+  test "implicit_fold_by_stop_test" do
+    successors = fn n ->
+      case n do
+        1 -> [2, 3]
+        2 -> [4]
+        3 -> [5]
+        _ -> []
+      end
+    end
+
+    result =
+      Yog.Traversal.implicit_fold_by(
+        from: 1,
+        using: :breadth_first,
+        successors_of: successors,
+        visited_by: & &1,
+        initial: [],
+        with: fn acc, node, _meta ->
+          if node == 2, do: {:stop, [node | acc]}, else: {:continue, [node | acc]}
+        end
+      )
+
+    assert Enum.sort(result) == [1, 2, 3, 5]
+  end
+
+  test "implicit_fold_by_best_first_test" do
+    successors = fn n -> if n < 5, do: [n + 1, n + 2], else: [] end
+
+    result =
+      Yog.Traversal.implicit_fold_by(
+        from: 1,
+        using: :best_first,
+        successors_of: successors,
+        visited_by: & &1,
+        priority: fn id, _meta -> id end,
+        initial: [],
+        with: fn acc, node, _meta -> {:continue, [node | acc]} end
+      )
+
+    assert Enum.sort(result) == [1, 2, 3, 4, 5, 6]
+  end
+
+  test "implicit_fold_by_random_test" do
+    successors = fn n -> if n < 5, do: [n + 1], else: [] end
+
+    result =
+      Yog.Traversal.implicit_fold_by(
+        from: 1,
+        using: :random,
+        successors_of: successors,
+        visited_by: & &1,
+        initial: [],
+        with: fn acc, node, _meta -> {:continue, [node | acc]} end
+      )
+
+    assert Enum.sort(result) == [1, 2, 3, 4, 5]
+  end
+
+  test "implicit_fold_best_first_halt_test" do
+    successors = fn n -> if n < 5, do: [n + 1], else: [] end
+
+    result =
+      Yog.Traversal.implicit_fold(
+        from: 1,
+        using: :best_first,
+        successors_of: successors,
+        priority: fn id, _meta -> id end,
+        initial: [],
+        with: fn acc, node, _meta ->
+          if node == 3, do: {:halt, [node | acc]}, else: {:continue, [node | acc]}
+        end
+      )
+
+    assert Enum.sort(result) == [1, 2, 3]
+  end
+
+  test "implicit_fold_best_first_stop_test" do
+    successors = fn n -> if n < 5, do: [n + 1, n + 2], else: [] end
+
+    result =
+      Yog.Traversal.implicit_fold(
+        from: 1,
+        using: :best_first,
+        successors_of: successors,
+        priority: fn id, _meta -> id end,
+        initial: [],
+        with: fn acc, node, _meta ->
+          if node == 2, do: {:stop, [node | acc]}, else: {:continue, [node | acc]}
+        end
+      )
+
+    # 2 is stopped (not explored), but 3, 4, 5 are still reachable from 1
+    assert 2 in result
+    assert Enum.all?([3, 4, 5], &(&1 in result))
+  end
+
+  test "implicit_fold_dfs_parent_chain_test" do
+    # Deep chain: 1 -> 2 -> 3 -> 4 -> 5
+    successors = fn n -> if n < 5, do: [n + 1], else: [] end
+
+    result =
+      Yog.Traversal.implicit_fold(
+        from: 1,
+        using: :depth_first,
+        successors_of: successors,
+        initial: [],
+        with: fn acc, node, meta -> {:continue, [{node, meta.parent} | acc]} end
+      )
+
+    pairs = Enum.reverse(result)
+    assert pairs == [{1, nil}, {2, 1}, {3, 2}, {4, 3}, {5, 4}]
+  end
+
   # ============= Cycle Detection Tests =============
 
   test "cyclic_and_acyclic_test" do
