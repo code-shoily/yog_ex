@@ -176,6 +176,11 @@ defmodule YogEx.MixProject do
         "Cheat Sheets": [
           "lib/yog/CHEATSHEET.cheatmd"
         ],
+        Guides: [
+          "README.md",
+          "examples/README.md",
+          "lib/yog/functional/README.md"
+        ],
         LIVEBOOK: [
           "livebooks/guides/getting_started.livemd",
           "livebooks/guides/traversals_and_pathfinding.livemd",
@@ -189,11 +194,6 @@ defmodule YogEx.MixProject do
           "livebooks/how_to/multigraphs_and_collapsing.livemd",
           "livebooks/how_to/mermaid_complete_guide.livemd",
           "livebooks/gallery/graph_catalog.livemd"
-        ],
-        Guides: [
-          "README.md",
-          "examples/README.md",
-          "lib/yog/functional/README.md"
         ],
         Reference: [
           "ALGORITHMS.md",
