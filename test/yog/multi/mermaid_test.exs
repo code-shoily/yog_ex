@@ -54,8 +54,8 @@ defmodule Yog.Multi.MermaidTest do
       mermaid = Mermaid.to_mermaid(multi)
 
       assert String.contains?(mermaid, "graph TD")
-      assert String.contains?(mermaid, "1 ---|10| 2")
-      assert String.contains?(mermaid, "1 ---|20| 2")
+      assert String.contains?(mermaid, "1 -- 10 --- 2")
+      assert String.contains?(mermaid, "1 -- 20 --- 2")
       edge_lines = String.split(mermaid, "\n") |> Enum.filter(&String.contains?(&1, "---"))
       assert length(edge_lines) == 2
     end

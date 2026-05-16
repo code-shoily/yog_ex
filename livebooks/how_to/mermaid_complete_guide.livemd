@@ -418,10 +418,10 @@ Kino.Mermaid.new(Yog.Render.Mermaid.to_mermaid(weighted, mst_opts))
 ### `community_to_options/2` — Community Detection
 
 ```elixir
-sbm = Yog.Generator.Random.sbm(100, 4, 0.3, 0.05)
+sbm = Yog.Generator.Random.sbm(10, 2, 0.3, 0.5)
 comm = Yog.Community.Louvain.detect(sbm)
 comm_opts = Yog.Render.Mermaid.community_to_options(comm)
-IO.puts(Yog.Render.Mermaid.to_mermaid(sbm, comm_opts))
+Kino.Mermaid.new(Yog.Render.Mermaid.to_mermaid(sbm, comm_opts))
 ```
 
 ### `cut_to_options/2` — Min-Cut Partitions

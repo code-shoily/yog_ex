@@ -758,18 +758,22 @@ defmodule Yog.Render.Mermaid do
       flat_edges
       |> Enum.with_index()
       |> Enum.reduce({[], []}, fn {{from_id, to_id, weight}, idx}, {defs_acc, styles_acc} ->
-        # Choose arrow style based on graph type
-        arrow =
-          case kind do
-            :directed -> "-->"
-            :undirected -> "---"
-          end
-
         label = options.edge_label.(weight)
-        label_part = if label == "", do: "", else: "|#{label}|"
 
         edge_def =
-          "  #{Yog.Utils.safe_string(from_id)} #{arrow}#{label_part} #{Yog.Utils.safe_string(to_id)}"
+          case kind do
+            :directed ->
+              label_part = if label == "", do: "", else: "|#{label}|"
+
+              "  #{Yog.Utils.safe_string(from_id)} -->#{label_part} #{Yog.Utils.safe_string(to_id)}"
+
+            :undirected ->
+              if label == "" do
+                "  #{Yog.Utils.safe_string(from_id)} --- #{Yog.Utils.safe_string(to_id)}"
+              else
+                "  #{Yog.Utils.safe_string(from_id)} -- #{escape_label(label)} --- #{Yog.Utils.safe_string(to_id)}"
+              end
+          end
 
         # Check if this edge should be highlighted
         is_highlighted =
