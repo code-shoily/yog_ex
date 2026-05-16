@@ -368,6 +368,103 @@ Kino.Mermaid.new(Yog.Render.Mermaid.to_mermaid(g, opts))
 
 ---
 
+## 🏗️ Capstone: System Architecture Diagram
+
+Combine per-node shapes, per-edge styling, and subgraphs to model a real microservices architecture.
+
+```elixir
+system = Yog.directed()
+  # Users & entry points
+  |> Yog.add_node(:users, "Mobile / Web")
+  |> Yog.add_node(:cdn, "CDN")
+  |> Yog.add_node(:lb, "Load Balancer")
+  |> Yog.add_node(:api, "API Gateway")
+
+  # Domain services
+  |> Yog.add_node(:auth, "Auth Service")
+  |> Yog.add_node(:orders, "Order Service")
+  |> Yog.add_node(:payments, "Payment Service")
+  |> Yog.add_node(:inventory, "Inventory Service")
+  |> Yog.add_node(:notifications, "Notification Service")
+
+  # Data layer
+  |> Yog.add_node(:users_db, "Users DB")
+  |> Yog.add_node(:orders_db, "Orders DB")
+  |> Yog.add_node(:inventory_db, "Inventory DB")
+  |> Yog.add_node(:cache, "Redis Cache")
+  |> Yog.add_node(:queue, "Event Queue")
+
+  # Connections with protocol metadata
+  |> Yog.add_edge_ensure(:users, :cdn, %{protocol: :https, latency: 20})
+  |> Yog.add_edge_ensure(:cdn, :lb, %{protocol: :https, latency: 10})
+  |> Yog.add_edge_ensure(:lb, :api, %{protocol: :https, latency: 5})
+  |> Yog.add_edge_ensure(:api, :auth, %{protocol: :grpc, latency: 15})
+  |> Yog.add_edge_ensure(:api, :orders, %{protocol: :grpc, latency: 15})
+  |> Yog.add_edge_ensure(:api, :payments, %{protocol: :grpc, latency: 15})
+  |> Yog.add_edge_ensure(:orders, :inventory, %{protocol: :grpc, latency: 10})
+  |> Yog.add_edge_ensure(:orders, :payments, %{protocol: :grpc, latency: 10})
+  |> Yog.add_edge_ensure(:payments, :queue, %{protocol: :amqp, latency: 5})
+  |> Yog.add_edge_ensure(:queue, :notifications, %{protocol: :amqp, latency: 5})
+  |> Yog.add_edge_ensure(:auth, :users_db, %{protocol: :sql, latency: 5})
+  |> Yog.add_edge_ensure(:auth, :cache, %{protocol: :redis, latency: 2})
+  |> Yog.add_edge_ensure(:orders, :orders_db, %{protocol: :sql, latency: 5})
+  |> Yog.add_edge_ensure(:inventory, :inventory_db, %{protocol: :sql, latency: 5})
+
+# Per-node shapes: different shapes for different component types
+shape_fn = fn id, _data ->
+  case id do
+    :users -> :circle
+    :cdn -> :hexagon
+    :lb -> :rhombus
+    :api -> :asymmetric
+    n when n in [:auth, :orders, :payments, :inventory, :notifications] -> :rounded_rect
+    n when n in [:users_db, :orders_db, :inventory_db] -> :cylinder
+    :cache -> :stadium
+    :queue -> :subroutine
+    _ -> :rounded_rect
+  end
+end
+
+# Per-edge colors by protocol
+edge_attrs = fn _from, _to, weight ->
+  case weight.protocol do
+    :https -> [{:stroke, "#3b82f6"}]
+    :grpc -> [{:stroke, "#10b981"}]
+    :sql -> [{:stroke, "#f59e0b"}]
+    :redis -> [{:stroke, "#ef4444"}]
+    :amqp -> [{:stroke, "#8b5cf6"}]
+    _ -> []
+  end
+end
+
+# Edge labels show latency
+edge_label = fn weight -> "#{weight.latency} ms" end
+
+opts = %{
+  Yog.Render.Mermaid.default_options()
+  | direction: :lr,
+    node_shape: shape_fn,
+    node_attributes: fn _id, data ->
+      case data do
+        "Auth Service" -> [{:fill, "#dbeafe"}]
+        "Payment Service" -> [{:fill, "#dcfce7"}]
+        _ -> []
+      end
+    end,
+    edge_attributes: edge_attrs,
+    edge_label: edge_label,
+    subgraphs: [
+      %{name: "entry", label: "Edge Layer", node_ids: [:users, :cdn, :lb]},
+      %{name: "services", label: "Services", node_ids: [:api, :auth, :orders, :payments, :inventory, :notifications]},
+      %{name: "data", label: "Data Layer", node_ids: [:users_db, :orders_db, :inventory_db, :cache, :queue]}
+    ]
+}
+
+Kino.Mermaid.new(Yog.Render.Mermaid.to_mermaid(system, opts))
+```
+
+---
+
 ## ✨ Highlighting
 
 ### Manual Highlighting
