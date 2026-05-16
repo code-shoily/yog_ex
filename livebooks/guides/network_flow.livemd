@@ -13,7 +13,7 @@ Network Flow algorithms help solve optimization problems where something (water,
 
 The most famous result in this field is the **Max-Flow Min-Cut Theorem**, which states that the maximum flow through a network is equal to the capacity of the smallest bottleneck (the minimum cut).
 
-## 🚰 Maximum Flow
+## Maximum Flow
 
 How much "stuff" can we push from a Source to a Sink?
 
@@ -36,7 +36,7 @@ result = MaxFlow.dinic(g, :s, :t)
 IO.puts "Maximum Flow from S to T: #{result.max_flow}"
 ```
 
-## ✂️ Minimum Cut (Finding the Bottleneck)
+## Minimum Cut (Finding the Bottleneck)
 
 The minimum cut is the set of edges that, if removed, would completely disconnect the source from the sink with the minimum possible total capacity. These are your network's true bottlenecks.
 
@@ -55,7 +55,7 @@ dot = Yog.Render.DOT.to_dot(g, cut_opts)
 Kino.VizJS.render(dot)
 ```
 
-## 🌍 Global Min-Cut
+## Global Min-Cut
 
 Sometimes you want the minimum cut of the entire graph (not just between a specific source and sink). The Stoer-Wagner algorithm finds this efficiently.
 
@@ -75,7 +75,7 @@ IO.inspect(global_cut.source_side, label: "Source side")
 IO.inspect(global_cut.sink_side, label: "Sink side")
 ```
 
-## 🤝 Bipartite Matching
+## Bipartite Matching
 
 One of the most powerful applications of Max-Flow is solving **Matching Problems** (e.g., matching jobs to candidates). By adding a virtual source and sink, any matching problem becomes a flow problem.
 

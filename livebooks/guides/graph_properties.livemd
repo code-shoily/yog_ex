@@ -13,7 +13,7 @@ Graph properties help us understand the mathematical nature of a network. Can it
 
 `Yog` provides high-performance implementations for these classic graph theory problems.
 
-## 🌲 Minimum Spanning Tree (MST)
+## Minimum Spanning Tree (MST)
 
 An MST connects all nodes in a weighted graph with the minimum possible total edge weight and no cycles. This is the foundation of network design (e.g., laying fiber optic cables).
 
@@ -41,7 +41,7 @@ dot = Yog.Render.DOT.to_dot(g, mst_options)
 Kino.VizJS.render(dot, height: "400px")
 ```
 
-## 🌉 Eulerian Paths (Seven Bridges of Königsberg)
+## Eulerian Paths (Seven Bridges of Königsberg)
 
 An **Eulerian Path** visits every edge exactly once. An **Eulerian Circuit** starts and ends at the same node.
 
@@ -87,7 +87,7 @@ case Yog.Property.Eulerian.eulerian_circuit(square) do
 end
 ```
 
-## 🎨 Graph Coloring
+## Graph Coloring
 
 Graph coloring assigns a "color" to each node such that no two adjacent nodes share the same color. The goal is to use the minimum number of colors (**Chromatic Number**). This is often used for scheduling (nodes = tasks, edges = conflicts).
 
@@ -114,7 +114,7 @@ dot = Yog.Render.DOT.to_dot(g, Yog.Render.DOT.theme(:minimal) |> Map.put(:node_a
 Kino.VizJS.render(dot)
 ```
 
-## 🗺️ Planarity
+## Planarity
 
 A graph is **Planar** if it can be drawn in a plane without any edges crossing.
 

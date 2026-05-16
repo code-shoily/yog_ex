@@ -13,7 +13,7 @@ A **Multigraph** allows multiple (parallel) edges between the same pair of nodes
 
 While `Yog` supports multigraphs natively via `Yog.Multi`, many classic algorithms (like Dijkstra or Max-Flow) are optimized for **Simple Graphs**. To bridge this gap, `Yog` allows you to "collapse" parallel edges into a single edge using a custom strategy.
 
-## 🏗️ Creating a Multigraph
+## Creating a Multigraph
 
 ```elixir
 alias Yog.Multi
@@ -33,7 +33,7 @@ IO.puts "Total edges: #{Multi.size(mg)}"
 IO.inspect Multi.edges_between(mg, :london, :paris), label: "Edges between London and Paris"
 ```
 
-## 🎨 Visualizing Multigraphs
+## Visualizing Multigraphs
 
 `Yog` can render multigraphs with both DOT and Mermaid, showing parallel edges as distinct lines.
 
@@ -67,7 +67,7 @@ opts = %{
 Kino.VizJS.render(Yog.Multi.DOT.to_dot(mg, opts))
 ```
 
-## 🏗️ Building Multigraphs Incrementally
+## Building Multigraphs Incrementally
 
 Use `Yog.Builder.Live` with `sync_multi/2` to build multigraphs incrementally.
 
@@ -90,7 +90,7 @@ IO.puts("After second sync: #{Multi.order(multi)} nodes, #{Multi.size(multi)} ed
 IO.inspect Multi.edges_between(multi, 0, 1), label: "Edges A -> B"
 ```
 
-## 📉 Collapsing Strategies
+## Collapsing Strategies
 
 To run a shortest-path algorithm, we might only care about the *cheapest* or *fastest* option. We can collapse the multigraph into a simple graph.
 
@@ -125,7 +125,7 @@ IO.puts "Simple Graph Edge Weight: #{Yog.Model.edge_weight(g_sum, :london, :pari
 # Should be 450 (100 + 50 + 300)
 ```
 
-## 🚀 Running Algorithms
+## Running Algorithms
 
 Once collapsed, you can use any standard `Yog` algorithm.
 
@@ -151,7 +151,7 @@ IO.inspect(path.nodes, label: "Shortest Path Nodes")
 IO.puts "Total Weight: #{path.weight}" # Should be 7 (5 + 2)
 ```
 
-## 🔄 Multigraph Algorithms
+## Multigraph Algorithms
 
 Some algorithms work directly on multigraphs without collapsing.
 

@@ -11,7 +11,7 @@ Mix.install([
 
 `Yog` is designed to be a "good citizen" in the data ecosystem. It supports several industry-standard formats for importing and exporting graphs, ensuring that you can easily integrate `Yog` with other tools like Gephi, Cytoscape, or NetworkX.
 
-## 📁 GraphML (The Standard)
+## GraphML (The Standard)
 
 GraphML is an XML-based format that is the de-facto standard for graph interchange.
 
@@ -27,7 +27,7 @@ IO.puts String.slice(xml, 0, 200) <> "..."
 IO.puts("Imported graph has #{Yog.node_count(imported_g)} nodes and #{Yog.edge_count(imported_g)} edges")
 ```
 
-## 📄 JSON (For Web & Data)
+## JSON (For Web & Data)
 
 JSON is perfect for passing graph data to frontend libraries like Cytoscape.js or D3.js.
 
@@ -46,7 +46,7 @@ IO.puts json
 IO.puts("Imported: #{Yog.node_count(imported_g)} nodes")
 ```
 
-## 🗃️ GDF (GUESS Format)
+## GDF (GUESS Format)
 
 GDF is a simple CSV-like format used by the GUESS visualization tool and Gephi.
 
@@ -62,7 +62,7 @@ IO.puts gdf
 IO.puts("Imported: #{Yog.node_count(imported)} nodes, #{Yog.edge_count(imported)} edges")
 ```
 
-## 🔢 Graph6 (Compact Encoding)
+## Graph6 (Compact Encoding)
 
 Graph6 is a compact text format for encoding small graphs. It's popular in mathematics and competitions.
 
@@ -82,7 +82,7 @@ c5_g6 = Yog.IO.Graph6.encode_graph6(Yog.Generator.Classic.cycle(5))
 IO.puts("C5 in graph6: #{c5_g6}")
 ```
 
-## 🛠️ Interoperability with `libgraph`
+## Interoperability with `libgraph`
 
 If you are migrating from `libgraph` or need to use an algorithm only available there, `Yog` makes the transition seamless.
 
@@ -99,7 +99,7 @@ lg_back = Yog.IO.Libgraph.to_libgraph(yg)
 IO.puts("Back to libgraph: #{length(Graph.vertices(lg_back))} vertices")
 ```
 
-## 🖼️ DOT (For Visualization)
+## DOT (For Visualization)
 
 While DOT is primarily for visualization, it is also a valid interchange format.
 

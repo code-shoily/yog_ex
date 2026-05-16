@@ -13,7 +13,7 @@ A **perfect maze** is a spanning tree on a grid. Every cell is reachable from ev
 
 `Yog` provides a rich suite of maze generation algorithms, ranging from the extremely fast but biased (Binary Tree) to the perfectly uniform but slower (Wilson's).
 
-## 🎨 Comparing Textures
+## Comparing Textures
 
 Different algorithms produce mazes with different "textures." Some prefer long straight corridors, while others create twisty, winding passages.
 
@@ -46,7 +46,7 @@ IO.puts "\n--- Wilson's ---"
 IO.puts Yog.Render.ASCII.grid_to_string_unicode(wilson)
 ```
 
-## 🧠 Solving the Maze
+## Solving the Maze
 
 Because a maze is just a graph, we can use `Yog`'s pathfinding algorithms to find the exit.
 
@@ -77,7 +77,7 @@ case Yog.Pathfinding.Dijkstra.shortest_path(graph, from: start_node, to: end_nod
 end
 ```
 
-## 🎥 Visualizing with DOT
+## Visualizing with DOT
 
 If you want a more "premium" look, you can render the maze using Graphviz.
 
@@ -89,7 +89,7 @@ dot = Yog.Render.DOT.to_dot(Yog.Builder.GridGraph.to_graph(small_maze))
 Kino.VizJS.render(dot)
 ```
 
-## 🎲 Randomness and Seeds
+## Randomness and Seeds
 
 All generators accept a `:seed` option for reproducibility.
 
@@ -101,7 +101,7 @@ maze2 = Yog.Generator.Maze.recursive_backtracker(10, 10, seed: 123)
 Yog.Render.ASCII.grid_to_string(maze1) == Yog.Render.ASCII.grid_to_string(maze2) |> IO.inspect(label: "Identical?")
 ```
 
-## 🧪 Algorithm Properties
+## Algorithm Properties
 
 Different algorithms have different characteristics:
 

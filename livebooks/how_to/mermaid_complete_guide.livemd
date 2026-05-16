@@ -13,7 +13,7 @@ Mix.install([
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ```elixir
 g = Yog.directed()
@@ -34,7 +34,7 @@ Kino.Mermaid.new(mermaid)
 
 ---
 
-## ⚙️ Default Options & Helpers
+## Default Options & Helpers
 
 ### `default_options/0`
 
@@ -87,7 +87,7 @@ Kino.Mermaid.new(mermaid)
 
 ---
 
-## 🎨 Themes
+## Themes
 
 Pre-configured color palettes for different contexts.
 
@@ -131,7 +131,7 @@ Kino.Mermaid.new(mermaid)
 
 ---
 
-## 🧭 Directions
+## Directions
 
 Control the layout flow.
 
@@ -173,7 +173,7 @@ Kino.Mermaid.new(
 
 ---
 
-## 🔷 Node Shapes
+## Node Shapes
 
 ```elixir
 g = Yog.directed()
@@ -281,7 +281,7 @@ Kino.Mermaid.new(
 
 ---
 
-## 🎯 Per-Element Styling
+## Per-Element Styling
 
 ### Per-Node Styling (`node_attributes`)
 
@@ -335,7 +335,7 @@ Kino.Mermaid.new(Yog.Render.Mermaid.to_mermaid(g, opts))
 
 ---
 
-## 📦 Subgraphs
+## Subgraphs
 
 Group nodes visually into clusters.
 
@@ -368,7 +368,7 @@ Kino.Mermaid.new(Yog.Render.Mermaid.to_mermaid(g, opts))
 
 ---
 
-## 🏗️ Capstone: System Architecture Diagram
+## Capstone: System Architecture Diagram
 
 Combine per-node shapes, per-edge styling, and subgraphs to model a real microservices architecture.
 
@@ -465,7 +465,7 @@ Kino.Mermaid.new(Yog.Render.Mermaid.to_mermaid(system, opts))
 
 ---
 
-## ✨ Highlighting
+## Highlighting
 
 ### Manual Highlighting
 
@@ -496,7 +496,7 @@ Kino.Mermaid.new(Yog.Render.Mermaid.to_mermaid(g, opts))
 
 ---
 
-## 🔬 Algorithm Helper Options
+## Algorithm Helper Options
 
 ### `mst_to_options/2` — Minimum Spanning Tree
 
@@ -546,7 +546,7 @@ Kino.Mermaid.new(Yog.Render.Mermaid.to_mermaid(bipartite, match_opts))
 
 ---
 
-## 🔗 Multigraph Mermaid
+## Multigraph Mermaid
 
 `Yog.Multi.Mermaid` mirrors `Yog.Render.Mermaid` but supports parallel edges.
 
@@ -617,7 +617,7 @@ Kino.Mermaid.new(Yog.Multi.Mermaid.to_mermaid(mg, opts))
 
 ---
 
-## 📋 Summary
+## Summary
 
 | Capability                    | Module               | Key Function / Option                                        |
 | ----------------------------- | -------------------- | ------------------------------------------------------------ |

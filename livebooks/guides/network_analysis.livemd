@@ -13,7 +13,7 @@ Network analysis allows us to understand the underlying structure of a graph. Wh
 
 `Yog` provides professional-grade tools for these questions, used in everything from social network analysis to logistics.
 
-## 🌟 Centrality: Who is Important?
+## Centrality: Who is Important?
 
 Centrality measures tell us which nodes are the most "important," but "importance" can mean different things:
 
@@ -45,7 +45,7 @@ IO.inspect(Yog.Centrality.closeness(g), label: "Closeness")
 IO.inspect(Yog.Centrality.pagerank(g), label: "PageRank Scores")
 ```
 
-## 🏘️ Community Detection
+## Community Detection
 
 Community detection finds groups of nodes that are more densely connected to each other than to the rest of the network.
 
@@ -65,7 +65,7 @@ opts = Yog.Render.DOT.community_to_options(result)
 Kino.VizJS.render(Yog.Render.DOT.to_dot(g, opts))
 ```
 
-## 🏗️ Connectivity & Robustness
+## Connectivity & Robustness
 
 A network is only as strong as its weakest link. `Yog` can find **Articulation Points** (nodes whose removal increases the number of connected components) and **Bridges** (edges whose removal does the same).
 

@@ -11,7 +11,7 @@ Mix.install([
 
 Graph traversal and pathfinding are at the heart of graph theory. Whether you are searching for a specific node, ordering tasks by priority, or finding the fastest route between two cities, `Yog` provides optimized, idiomatic tools for the job.
 
-## 🚶 Basic Traversals: BFS and DFS
+## Basic Traversals: BFS and DFS
 
 Systematic exploration of a graph comes in two main flavors:
 
@@ -33,7 +33,7 @@ IO.inspect(Yog.Traversal.walk(g, 1, :breadth_first), label: "BFS Order")
 IO.inspect(Yog.Traversal.walk(g, 1, :depth_first), label: "DFS Order")
 ```
 
-## 🏗️ Topological Sort (Task Ordering)
+## Topological Sort (Task Ordering)
 
 Topological sort is used to order a Directed Acyclic Graph (DAG) such that for every directed edge $u \to v$, node $u$ comes before $v$. This is perfect for build systems or project management.
 
@@ -52,7 +52,7 @@ case Yog.Traversal.topological_sort(tasks) do
 end
 ```
 
-## 📍 Pathfinding: Dijkstra and A*
+## Pathfinding: Dijkstra and A*
 
 When your edges have weights (like distance, time, or cost), you need more sophisticated algorithms.
 
@@ -118,7 +118,7 @@ g = Yog.from_edges(:directed, [
 IO.inspect(distances, label: "Shortest distances from S")
 ```
 
-## 🗺️ All-Pairs Shortest Paths (Floyd-Warshall)
+## All-Pairs Shortest Paths (Floyd-Warshall)
 
 Sometimes you need to know the distance between *every* possible pair of nodes. Floyd-Warshall is the classic solution for this.
 
@@ -134,7 +134,7 @@ IO.inspect(distances[1][3], label: "Distance from 1 to 3")
 IO.inspect(distances[2][1], label: "Distance from 2 to 1 (no path = :infinity)")
 ```
 
-## 🎨 Visualizing the Result
+## Visualizing the Result
 
 Let's combine everything: find a path and visualize it using `Kino.VizJS`.
 

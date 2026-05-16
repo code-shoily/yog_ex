@@ -13,7 +13,7 @@ A **Directed Acyclic Graph (DAG)** is a directed graph with no cycles. DAGs are 
 
 Because they lack cycles, DAGs allow for specialized algorithms that are much faster or more robust than those for general graphs.
 
-## 🏗️ Topological Sorting
+## Topological Sorting
 
 Topological sorting orders nodes such that for every edge $u \to v$, node $u$ comes before $v$.
 
@@ -40,7 +40,7 @@ generations = Yog.DAG.Algorithm.topological_generations(dag)
 IO.inspect(generations, label: "Parallel Stages")
 ```
 
-## ⏱️ The Critical Path (Longest Path)
+## ⏱The Critical Path (Longest Path)
 
 In a general graph, the "Longest Path Problem" is NP-hard. However, in a DAG, it can be solved in linear time! This is the basis of the **Critical Path Method (CPM)** used in project management.
 
@@ -69,7 +69,7 @@ dot = Yog.Render.DOT.to_dot(tasks, path_opts)
 Kino.VizJS.render(dot)
 ```
 
-## 🔄 Cycle Detection
+## Cycle Detection
 
 Before treating a graph as a DAG, you should verify it has no cycles.
 
@@ -100,7 +100,7 @@ case Yog.DAG.Model.from_graph(cyclic) do
 end
 ```
 
-## ✂️ Transitive Reduction
+## Transitive Reduction
 
 Transitive reduction finds the "skeleton" of a DAG by removing redundant edges—edges that are implied by other paths. This is how Git computes its merge base.
 
@@ -121,7 +121,7 @@ IO.puts("Reduced edges:  #{Yog.edge_count(reduced)}")
 Kino.VizJS.render(Yog.Render.DOT.to_dot(reduced))
 ```
 
-## 🌳 Shared Dependencies (LCA)
+## Shared Dependencies (LCA)
 
 Finding the **Lowest Common Ancestor (LCA)** helps identify the most recent shared dependency between two nodes. This is how Git finds a "merge base."
 
@@ -143,7 +143,7 @@ lcas = Yog.DAG.Algorithm.lowest_common_ancestors(dag, "UserAuth", "Logging")
 IO.inspect(lcas, label: "Shared Ancestors")
 ```
 
-## 🌐 Mermaid Rendering
+## Mermaid Rendering
 
 DAGs are perfect for Mermaid diagrams since they naturally flow in one direction.
 

@@ -11,7 +11,7 @@ Mix.install([
 
 Visualizing a graph is often the first step in debugging or communicating a complex algorithm. `Yog` provides powerful `Yog.Render.DOT` and `Yog.Render.Mermaid` engines that transform your graphs into visual diagrams.
 
-## 🎨 Graphviz DOT Styling
+## Graphviz DOT Styling
 
 ### Basic Styling
 
@@ -134,7 +134,7 @@ dot_pres = Yog.Render.DOT.to_dot(g, Yog.Render.DOT.theme(:presentation))
 Kino.VizJS.render(dot_pres)
 ```
 
-## 🧜 Mermaid.js Rendering
+## Mermaid.js Rendering
 
 Mermaid is perfect for embedding diagrams in Markdown, GitHub, Notion, and documentation.
 
@@ -183,7 +183,7 @@ mermaid = Yog.Render.Mermaid.to_mermaid(g,
 IO.puts(mermaid)
 ```
 
-## 🎯 Algorithm Helper Options
+## Algorithm Helper Options
 
 `Yog` provides convenience functions to highlight algorithm results:
 

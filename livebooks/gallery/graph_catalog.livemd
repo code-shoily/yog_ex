@@ -11,7 +11,7 @@ Mix.install([
 
 This gallery showcases the wide variety of graph structures that `Yog` can generate out-of-the-box. Whether you need a standard deterministic structure for benchmarking or a complex random network for simulation, the `Yog.Generator` suite has you covered.
 
-## 🏛️ Classic Deterministic Graphs
+## Classic Deterministic Graphs
 
 These graphs are the building blocks of graph theory. They have predictable properties and are essential for testing algorithms.
 
@@ -70,7 +70,7 @@ IO.puts("Hypercube — Nodes: #{Yog.node_count(hypercube)}, Edges: #{Yog.edge_co
 Kino.VizJS.render(Yog.Render.DOT.to_dot(hypercube))
 ```
 
-## 🎲 Random Graph Models
+## Random Graph Models
 
 Random graphs are used to model real-world phenomena like social networks, the internet, or biological systems.
 
@@ -122,7 +122,7 @@ opts = Yog.Render.DOT.community_to_options(%Yog.Community.Result{
 Kino.VizJS.render(Yog.Render.DOT.to_dot(g, opts))
 ```
 
-## 🧪 Quick Property Checks
+## Quick Property Checks
 
 Every generated graph can be analyzed immediately.
 
@@ -140,7 +140,7 @@ IO.inspect([
 ], label: "Petersen Properties")
 ```
 
-## 🌐 Mermaid Rendering
+## Mermaid Rendering
 
 All graphs can also be rendered as Mermaid diagrams for embedding in Markdown documents.
 
