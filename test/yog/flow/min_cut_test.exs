@@ -653,6 +653,39 @@ defmodule Yog.Flow.MinCutTest do
       assert result.cut_value == 0
       assert MapSet.member?(result.source_side, 1)
     end
+
+    test "triggers recursive fast_cut on 8-node graph" do
+      # Two cliques of 4 connected by a single bridge.
+      # The recursive Karger-Stein path (fast_cut/2 → contract_until/3)
+      # is only reached when the graph has > 6 nodes.
+      {:ok, graph} =
+        Enum.reduce(1..8, Yog.undirected(), fn i, g ->
+          Yog.add_node(g, i, nil)
+        end)
+        |> Yog.add_edges([
+          # Clique A: nodes 1-4
+          {1, 2, 10},
+          {1, 3, 10},
+          {1, 4, 10},
+          {2, 3, 10},
+          {2, 4, 10},
+          {3, 4, 10},
+          # Clique B: nodes 5-8
+          {5, 6, 10},
+          {5, 7, 10},
+          {5, 8, 10},
+          {6, 7, 10},
+          {6, 8, 10},
+          {7, 8, 10},
+          # Bridge between cliques
+          {4, 5, 1}
+        ])
+
+      result = MinCut.karger_stein(graph, iterations: 30)
+      # The global min cut is the bridge weight
+      assert result.cut_value == 1
+      assert result.source_side_size + result.sink_side_size == 8
+    end
   end
 
   describe "edge cases" do

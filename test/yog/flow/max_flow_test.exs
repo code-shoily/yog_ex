@@ -857,6 +857,61 @@ defmodule Yog.Flow.MaxFlowTest do
     end
   end
 
+  describe "push_relabel edge cases" do
+    test "source with no outgoing edges returns zero flow" do
+      {:ok, graph} =
+        Yog.directed()
+        |> Yog.add_node(1, "source")
+        |> Yog.add_node(2, "sink")
+        # No edges from source
+        |> Yog.add_edge(2, 1, 10)
+
+      result = MaxFlow.push_relabel(graph, 1, 2)
+      assert result.max_flow == 0
+    end
+
+    test "source with self-loop is ignored during saturation" do
+      {:ok, graph} =
+        Yog.directed()
+        |> Yog.add_node(1, "source")
+        |> Yog.add_node(2, "sink")
+        |> Yog.add_edges([
+          {1, 1, 100},
+          {1, 2, 5}
+        ])
+
+      result = MaxFlow.push_relabel(graph, 1, 2)
+      assert result.max_flow == 5
+    end
+
+    test "dense network triggers gap heuristic and still converges" do
+      # A layered network where intermediate nodes must be relabeled,
+      # creating height gaps that exercise apply_gap_heuristic/4.
+      {:ok, graph} =
+        Yog.directed()
+        |> Yog.add_node(1, "s")
+        |> Yog.add_node(2, "a")
+        |> Yog.add_node(3, "b")
+        |> Yog.add_node(4, "c")
+        |> Yog.add_node(5, "t")
+        |> Yog.add_edges([
+          {1, 2, 3},
+          {1, 3, 3},
+          {1, 4, 3},
+          {2, 3, 1},
+          {3, 4, 1},
+          {4, 2, 1},
+          {2, 5, 2},
+          {3, 5, 2},
+          {4, 5, 2}
+        ])
+
+      pr_result = MaxFlow.push_relabel(graph, 1, 5)
+      ek_result = MaxFlow.edmonds_karp(graph, 1, 5)
+      assert pr_result.max_flow == ek_result.max_flow
+    end
+  end
+
   describe "push_relabel/8 with custom numeric types" do
     test "float capacities" do
       {:ok, graph} =
