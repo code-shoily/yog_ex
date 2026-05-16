@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### DAG Modules
+
+- **`Yog.DAG`** — Filled facade gaps and added DAG-native algorithms. The DAG modules are now feature-complete:
+  - **Query functions**: `has_node?/2`, `has_edge?/3`, `node_count/1`, `edge_count/1`, `nodes/1`, `successors/2`, `predecessors/2`, `in_degree/2`, `out_degree/2`, `reachable?/3`.
+  - **Convenience constructors**: `from_edges/1` and `from_edges/2` — create a DAG directly from edge tuples without manually building a `Yog.Graph` first.
+  - **`Yog.DAG.Algorithm.sources/1`** — Returns all source nodes (in-degree 0).
+  - **`Yog.DAG.Algorithm.sinks/1`** — Returns all sink nodes (out-degree 0).
+  - **`Yog.DAG.Algorithm.ancestors/2`** — Returns all ancestors of a node (includes the node itself).
+  - **`Yog.DAG.Algorithm.descendants/2`** — Returns all descendants of a node (includes the node itself).
+  - **`Yog.DAG.Algorithm.single_source_distances/2`** — O(V+E) single-source shortest distances (faster than Dijkstra for DAGs).
+  - **`Yog.DAG.Algorithm.longest_path/3`** — Longest path between two specific nodes.
+  - **`Yog.DAG.Algorithm.path_count/3`** — Counts distinct paths between two nodes via DP.
+  - **Safety fix**: `topological_sort/1` now raises `RuntimeError` if a cycle is somehow detected, instead of silently returning `[]`.
+
 #### Multigraph Facade
 
 - **`Yog.Multi`** — Filled facade gaps and added multigraph-native algorithms:

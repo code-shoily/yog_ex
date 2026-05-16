@@ -54,6 +54,45 @@ defmodule Yog.DAG.Model do
   end
 
   @doc """
+  Creates a DAG from a list of edges.
+
+  ## Example
+
+      iex> {:ok, dag} = Yog.DAG.Model.from_edges([{1, 2}, {2, 3}])
+      iex> Yog.DAG.Model.to_graph(dag) |> Yog.Model.has_edge?(1, 2)
+      true
+  """
+  @spec from_edges([{Yog.node_id(), Yog.node_id()} | {Yog.node_id(), Yog.node_id(), any()}]) ::
+          {:ok, t()} | {:error, :cycle_detected}
+  def from_edges(edges) do
+    edges
+    |> Enum.reduce(Yog.Graph.new(:directed), fn
+      {from, to}, g -> Yog.add_edge_ensure(g, from, to, 1)
+      {from, to, weight}, g -> Yog.add_edge_ensure(g, from, to, weight)
+    end)
+    |> from_graph()
+  end
+
+  @doc """
+  Creates a DAG from a list of edges with a default weight.
+
+  ## Example
+
+      iex> {:ok, dag} = Yog.DAG.Model.from_edges([{1, 2}, {2, 3}], 10)
+      iex> Yog.DAG.Model.to_graph(dag) |> Yog.Model.edge_data(1, 2)
+      10
+  """
+  @spec from_edges([{Yog.node_id(), Yog.node_id()}], any()) ::
+          {:ok, t()} | {:error, :cycle_detected}
+  def from_edges(edges, default_weight) do
+    edges
+    |> Enum.reduce(Yog.Graph.new(:directed), fn {from, to}, g ->
+      Yog.add_edge_ensure(g, from, to, default_weight)
+    end)
+    |> from_graph()
+  end
+
+  @doc """
   Attempts to create a `DAG` from a regular `Graph`.
 
   Validates that the graph contains no cycles. If validation passes, returns

@@ -78,6 +78,81 @@ defmodule Yog.DAG do
   def to_graph(%__MODULE__{graph: graph}), do: graph
 
   # ============================================================
+  # Construction Helpers
+  # ============================================================
+
+  @doc """
+  Creates a DAG from a list of edges.
+
+  Each edge is a tuple `{from, to}` or `{from, to, weight}`.
+  Returns `{:ok, dag}` if the graph is acyclic, otherwise `{:error, :cycle_detected}`.
+
+  ## Examples
+
+      iex> {:ok, dag} = Yog.DAG.from_edges([{:a, :b}, {:b, :c}])
+      iex> Yog.DAG.topological_sort(dag)
+      [:a, :b, :c]
+
+      iex> Yog.DAG.from_edges([{:a, :b}, {:b, :a}])
+      {:error, :cycle_detected}
+  """
+  @spec from_edges([{Yog.node_id(), Yog.node_id()} | {Yog.node_id(), Yog.node_id(), any()}]) ::
+          {:ok, t()} | {:error, :cycle_detected}
+  def from_edges(edges) do
+    Model.from_edges(edges)
+  end
+
+  @doc """
+  Creates a DAG from a list of edges with a default weight.
+
+  ## Examples
+
+      iex> {:ok, dag} = Yog.DAG.from_edges([{:a, :b}, {:b, :c}], 10)
+      iex> graph = Yog.DAG.to_graph(dag)
+      iex> Yog.Model.edge_data(graph, :a, :b)
+      10
+  """
+  @spec from_edges([{Yog.node_id(), Yog.node_id()}], any()) ::
+          {:ok, t()} | {:error, :cycle_detected}
+  def from_edges(edges, default_weight) do
+    Model.from_edges(edges, default_weight)
+  end
+
+  # ============================================================
+  # Query
+  # ============================================================
+
+  @doc "Checks if a node exists in the DAG."
+  def has_node?(dag, id), do: Yog.Model.has_node?(dag.graph, id)
+
+  @doc "Checks if an edge exists in the DAG."
+  def has_edge?(dag, from, to), do: Yog.Model.has_edge?(dag.graph, from, to)
+
+  @doc "Returns the number of nodes in the DAG."
+  def node_count(dag), do: Yog.Model.node_count(dag.graph)
+
+  @doc "Returns the number of edges in the DAG."
+  def edge_count(dag), do: Yog.Graph.edge_count(dag.graph)
+
+  @doc "Returns all node IDs in the DAG."
+  def nodes(dag), do: Yog.Model.all_nodes(dag.graph)
+
+  @doc "Returns all outgoing edges from a node as [{to, weight}]."
+  def successors(dag, id), do: Yog.Model.successors(dag.graph, id)
+
+  @doc "Returns all incoming edges to a node as [{from, weight}]."
+  def predecessors(dag, id), do: Yog.Model.predecessors(dag.graph, id)
+
+  @doc "Returns the in-degree of a node."
+  def in_degree(dag, id), do: Yog.Model.in_degree(dag.graph, id)
+
+  @doc "Returns the out-degree of a node."
+  def out_degree(dag, id), do: Yog.Model.out_degree(dag.graph, id)
+
+  @doc "Checks if `from` can reach `to` in the DAG."
+  def reachable?(dag, from, to), do: Yog.Traversal.reachable?(dag.graph, from, to)
+
+  # ============================================================
   # Modification
   # ============================================================
 
@@ -187,6 +262,27 @@ defmodule Yog.DAG do
       [3]
   """
   defdelegate lowest_common_ancestors(dag, node_a, node_b), to: Yog.DAG.Algorithm
+
+  @doc "Returns all source nodes (in-degree 0)."
+  defdelegate sources(dag), to: Yog.DAG.Algorithm
+
+  @doc "Returns all sink nodes (out-degree 0)."
+  defdelegate sinks(dag), to: Yog.DAG.Algorithm
+
+  @doc "Returns all ancestors of a node (includes the node itself)."
+  defdelegate ancestors(dag, node), to: Yog.DAG.Algorithm
+
+  @doc "Returns all descendants of a node (includes the node itself)."
+  defdelegate descendants(dag, node), to: Yog.DAG.Algorithm
+
+  @doc "Computes single-source shortest distances to all reachable nodes."
+  defdelegate single_source_distances(dag, from), to: Yog.DAG.Algorithm
+
+  @doc "Finds the longest path between two specific nodes."
+  defdelegate longest_path(dag, from, to), to: Yog.DAG.Algorithm
+
+  @doc "Counts the number of distinct paths between two nodes."
+  defdelegate path_count(dag, from, to), to: Yog.DAG.Algorithm
 end
 
 defimpl Enumerable, for: Yog.DAG do
