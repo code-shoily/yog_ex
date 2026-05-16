@@ -207,6 +207,31 @@ defmodule Yog.Multi.DOT do
   end
 
   @doc """
+  Creates default DOT options with a custom edge formatter.
+
+  Use this when your multigraph has non-String edge data.
+  """
+  @spec default_options_with_edge_formatter((any() -> String.t())) :: options()
+  def default_options_with_edge_formatter(edge_formatter) do
+    %{default_options() | edge_label: fn _edge_id, weight -> edge_formatter.(weight) end}
+  end
+
+  @doc """
+  Creates default DOT options with custom label formatters for both nodes and edges.
+  """
+  @spec default_options_with(
+          node_label: (Yog.Model.node_id(), any() -> String.t()),
+          edge_label: (any() -> String.t())
+        ) :: options()
+  def default_options_with(node_label: node_label, edge_label: edge_label) do
+    %{
+      default_options()
+      | node_label: node_label,
+        edge_label: fn _edge_id, weight -> edge_label.(weight) end
+    }
+  end
+
+  @doc """
   Returns a pre-configured theme as DOT options for multigraphs.
 
   Available themes:

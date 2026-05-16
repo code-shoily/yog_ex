@@ -168,6 +168,31 @@ defmodule Yog.Multi.Mermaid do
   end
 
   @doc """
+  Creates default Mermaid options with a custom edge formatter.
+
+  Use this when your multigraph has non-String edge data.
+  """
+  @spec default_options_with_edge_formatter((any() -> String.t())) :: options()
+  def default_options_with_edge_formatter(edge_formatter) do
+    %{default_options() | edge_label: fn _edge_id, weight -> edge_formatter.(weight) end}
+  end
+
+  @doc """
+  Creates default Mermaid options with custom label formatters for both nodes and edges.
+  """
+  @spec default_options_with(
+          node_label: (Yog.Model.node_id(), any() -> String.t()),
+          edge_label: (any() -> String.t())
+        ) :: options()
+  def default_options_with(node_label: node_label, edge_label: edge_label) do
+    %{
+      default_options()
+      | node_label: node_label,
+        edge_label: fn _edge_id, weight -> edge_label.(weight) end
+    }
+  end
+
+  @doc """
   Returns a pre-configured theme as Mermaid options for multigraphs.
 
   Available themes:
@@ -228,6 +253,92 @@ defmodule Yog.Multi.Mermaid do
         highlight_link_stroke: "#f72585",
         highlight_link_stroke_width: {:px, 4}
     }
+  end
+
+  @doc """
+  Converts a shortest path result to highlighted Mermaid options.
+
+  Creates a copy of the base options with the path's nodes and edges
+  set to be highlighted.
+  """
+  @spec path_to_options(map(), options()) :: options()
+  def path_to_options(path, base_options \\ default_options()) do
+    nodes = Map.get(path, :nodes, [])
+    edges = path_to_edges(nodes)
+
+    %{base_options | highlighted_nodes: nodes, highlighted_edges: edges}
+  end
+
+  @doc """
+  Creates Mermaid options that highlight an MST result.
+  """
+  @spec mst_to_options(Yog.MST.Result.t(), options()) :: options()
+  def mst_to_options(result, base_options \\ default_options()) do
+    {nodes, edges} = Yog.Utils.mst_highlights(result)
+    %{base_options | highlighted_nodes: nodes, highlighted_edges: edges}
+  end
+
+  @doc """
+  Creates Mermaid options that color nodes by community assignment.
+
+  Each community gets a distinct color from a generated palette.
+  """
+  @spec community_to_options(Yog.Community.Result.t(), options()) :: options()
+  def community_to_options(
+        %{assignments: assignments, num_communities: n},
+        base_options \\ default_options()
+      ) do
+    palette = Yog.Utils.generate_palette(n)
+
+    community_ids = assignments |> Map.values() |> Enum.uniq() |> Enum.sort()
+    color_map = Enum.zip(community_ids, palette) |> Map.new()
+
+    node_attrs = fn id, _data ->
+      case Map.get(assignments, id) do
+        nil -> []
+        cid -> [{:fill, Map.get(color_map, cid, "#eeeeee")}, {:stroke, "#333333"}]
+      end
+    end
+
+    %{base_options | node_attributes: node_attrs}
+  end
+
+  @doc """
+  Creates Mermaid options that color the source and sink sides of a min-cut.
+  """
+  @spec cut_to_options(Yog.Flow.MinCutResult.t(), options()) :: options()
+  def cut_to_options(%{source_side: source, sink_side: sink}, base_options \\ default_options()) do
+    source_set = if source, do: MapSet.new(source), else: MapSet.new()
+    sink_set = if sink, do: MapSet.new(sink), else: MapSet.new()
+
+    node_attrs = fn id, _data ->
+      cond do
+        MapSet.member?(source_set, id) -> [{:fill, "#a8d8ea"}, {:stroke, "#0288d1"}]
+        MapSet.member?(sink_set, id) -> [{:fill, "#f08080"}, {:stroke, "#c62828"}]
+        true -> []
+      end
+    end
+
+    %{base_options | node_attributes: node_attrs}
+  end
+
+  @doc """
+  Creates Mermaid options that highlight matched edges from a matching result.
+  """
+  @spec matching_to_options(%{Yog.Model.node_id() => Yog.Model.node_id()}, options()) :: options()
+  def matching_to_options(matching, base_options \\ default_options()) when is_map(matching) do
+    {nodes, edges} = Yog.Utils.matching_highlights(matching)
+    %{base_options | highlighted_nodes: nodes, highlighted_edges: edges}
+  end
+
+  # Helper to convert a list of nodes to a list of edges
+  defp path_to_edges(nodes), do: do_path_to_edges(nodes, [])
+
+  defp do_path_to_edges([], acc), do: Enum.reverse(acc)
+  defp do_path_to_edges([_], acc), do: Enum.reverse(acc)
+
+  defp do_path_to_edges([first, second | rest], acc) do
+    do_path_to_edges([second | rest], [{first, second} | acc])
   end
 
   @doc """
