@@ -105,6 +105,13 @@ defmodule Yog.Multi.Mermaid do
           direction: direction(),
           # Node styling
           node_shape: node_shape(),
+          # Default styling (applied to all nodes/edges)
+          default_fill: String.t() | nil,
+          default_stroke: String.t() | nil,
+          default_stroke_width: css_length() | nil,
+          default_font_color: String.t() | nil,
+          default_link_stroke: String.t() | nil,
+          # Highlight styling (applied to selected nodes/edges)
           highlight_fill: String.t(),
           highlight_stroke: String.t(),
           highlight_stroke_width: css_length(),
@@ -133,6 +140,13 @@ defmodule Yog.Multi.Mermaid do
       direction: :td,
       # Node styling
       node_shape: :rounded_rect,
+      # Default styling
+      default_fill: nil,
+      default_stroke: nil,
+      default_stroke_width: nil,
+      default_font_color: nil,
+      default_link_stroke: nil,
+      # Highlight styling
       highlight_fill: "#ffeb3b",
       highlight_stroke: "#f57c00",
       highlight_stroke_width: {:px, 3},
@@ -140,6 +154,69 @@ defmodule Yog.Multi.Mermaid do
       link_thickness: {:px, 2},
       highlight_link_stroke: "#f57c00",
       highlight_link_stroke_width: {:px, 3}
+    }
+  end
+
+  @doc """
+  Returns a pre-configured theme as Mermaid options for multigraphs.
+
+  Available themes:
+  - `:default` — Yellow highlight, orange stroke (same as `default_options/0`)
+  - `:dark` — Dark-friendly colors with neon accent colors
+  - `:minimal` — Clean wireframe look with no fills and thin lines
+  - `:presentation` — Large strokes and bold colors for slides and demos
+  """
+  @spec theme(atom()) :: options()
+  def theme(:default), do: default_options()
+
+  def theme(:dark) do
+    %{
+      default_options()
+      | default_fill: "#16213e",
+        default_stroke: "#e94560",
+        default_stroke_width: {:px, 2},
+        default_font_color: "#ffffff",
+        default_link_stroke: "#e94560",
+        highlight_fill: "#16213e",
+        highlight_stroke: "#e94560",
+        highlight_stroke_width: {:px, 3},
+        link_thickness: {:px, 2},
+        highlight_link_stroke: "#e94560",
+        highlight_link_stroke_width: {:px, 3}
+    }
+  end
+
+  def theme(:minimal) do
+    %{
+      default_options()
+      | default_fill: "#ffffff",
+        default_stroke: "#333333",
+        default_stroke_width: {:px, 1},
+        default_font_color: "#333333",
+        default_link_stroke: "#333333",
+        highlight_fill: "#ffffff",
+        highlight_stroke: "#333333",
+        highlight_stroke_width: {:px, 1},
+        link_thickness: {:px, 1},
+        highlight_link_stroke: "#333333",
+        highlight_link_stroke_width: {:px, 2}
+    }
+  end
+
+  def theme(:presentation) do
+    %{
+      default_options()
+      | default_fill: "#4361ee",
+        default_stroke: "#f72585",
+        default_stroke_width: {:px, 3},
+        default_font_color: "#ffffff",
+        default_link_stroke: "#f72585",
+        highlight_fill: "#4361ee",
+        highlight_stroke: "#f72585",
+        highlight_stroke_width: {:px, 4},
+        link_thickness: {:px, 3},
+        highlight_link_stroke: "#f72585",
+        highlight_link_stroke_width: {:px, 4}
     }
   end
 
@@ -169,6 +246,25 @@ defmodule Yog.Multi.Mermaid do
         ""
       end
 
+    # Default class definition for theming (applies to all nodes automatically)
+    default_class_parts =
+      [
+        if(options.default_fill, do: "fill:#{options.default_fill}"),
+        if(options.default_stroke, do: "stroke:#{options.default_stroke}"),
+        if(options.default_stroke_width,
+          do: "stroke-width:#{Mermaid.css_length_to_string(options.default_stroke_width)}"
+        ),
+        if(options.default_font_color, do: "color:#{options.default_font_color}")
+      ]
+      |> Enum.reject(&is_nil/1)
+
+    default_class =
+      if default_class_parts != [] do
+        "  classDef default #{Enum.join(default_class_parts, ",")}\n"
+      else
+        ""
+      end
+
     # Convert highlight lists to MapSets for O(1) membership checks
     hl_nodes = to_mapset(options.highlighted_nodes)
     hl_edges = to_mapset(options.highlighted_edges)
@@ -192,6 +288,7 @@ defmodule Yog.Multi.Mermaid do
     parts = [
       graph_type,
       styles,
+      default_class,
       nodes_str,
       if(node_styles_str != "", do: "\n" <> node_styles_str, else: ""),
       if(subgraphs_str != "", do: "\n" <> subgraphs_str, else: ""),
@@ -368,11 +465,16 @@ defmodule Yog.Multi.Mermaid do
 
             {attrs, true}
           else
-            if custom_attrs != [] do
+            base_attrs =
+              if options.default_link_stroke,
+                do: [{:stroke, options.default_link_stroke}],
+                else: []
+
+            if custom_attrs != [] or base_attrs != [] do
               base_width = Mermaid.css_length_to_string(options.link_thickness)
 
               attrs =
-                [{:stroke_width, base_width} | custom_attrs]
+                [{:stroke_width, base_width} | base_attrs ++ custom_attrs]
                 |> Enum.uniq_by(fn {k, _} -> k end)
 
               {attrs, true}
