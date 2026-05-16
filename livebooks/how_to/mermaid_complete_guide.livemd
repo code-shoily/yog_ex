@@ -1,0 +1,486 @@
+# How-To: Complete Mermaid.js Guide
+
+```elixir
+Mix.install([
+  {:yog_ex, path: "/home/mafinar/repos/elixir/yog_ex"},
+  {:kino_vizjs, "~> 0.8.0"}
+])
+```
+
+## Introduction
+
+`Yog.Render.Mermaid` and `Yog.Multi.Mermaid` export graphs to [Mermaid.js](https://mermaid.js.org/) syntax for embedding in Markdown, GitHub, Notion, and documentation. This guide demonstrates every customization option in one place.
+
+---
+
+## 🚀 Quick Start
+
+```elixir
+g = Yog.directed()
+  |> Yog.add_edges!([
+    {"Start", "Process", 1},
+    {"Process", "End", 1}
+  ])
+
+# Render with defaults
+mermaid = Yog.Render.Mermaid.to_mermaid(g)
+IO.puts(mermaid)
+```
+
+---
+
+## ⚙️ Default Options & Helpers
+
+### `default_options/0`
+
+```elixir
+opts = Yog.Render.Mermaid.default_options()
+IO.inspect(opts.direction, label: "Direction")
+IO.inspect(opts.node_shape, label: "Shape")
+IO.inspect(opts.highlight_fill, label: "Highlight Fill")
+```
+
+### `default_options_with_edge_formatter/1`
+
+Use this when edge data is not already a string (e.g., integers, structs).
+
+```elixir
+g = Yog.directed()
+  |> Yog.add_edges!([{:a, :b, 42}, {:b, :c, 99}])
+
+opts = Yog.Render.Mermaid.default_options_with_edge_formatter(fn weight ->
+  "#{weight} ms"
+end)
+
+IO.puts(Yog.Render.Mermaid.to_mermaid(g, opts))
+```
+
+### `default_options_with/2`
+
+Customize both node and edge labels at once.
+
+```elixir
+g = Yog.directed()
+  |> Yog.add_node(1, %{name: "Alice", role: "Admin"})
+  |> Yog.add_node(2, %{name: "Bob", role: "User"})
+  |> Yog.add_edge_ensure(1, 2, 100)
+
+opts = Yog.Render.Mermaid.default_options_with(
+  node_label: fn id, data -> "#{data.name} (#{data.role})" end,
+  edge_label: fn weight -> "#{weight} Mbps" end
+)
+
+IO.puts(Yog.Render.Mermaid.to_mermaid(g, opts))
+```
+
+---
+
+## 🎨 Themes
+
+Pre-configured color palettes for different contexts.
+
+```elixir
+g = Yog.Generator.Classic.binary_tree(3)
+```
+
+### Default Theme
+
+```elixir
+IO.puts(Yog.Render.Mermaid.to_mermaid(g, Yog.Render.Mermaid.theme(:default)))
+```
+
+### Dark Theme
+
+```elixir
+IO.puts(Yog.Render.Mermaid.to_mermaid(g, Yog.Render.Mermaid.theme(:dark)))
+```
+
+### Minimal Theme
+
+```elixir
+IO.puts(Yog.Render.Mermaid.to_mermaid(g, Yog.Render.Mermaid.theme(:minimal)))
+```
+
+### Presentation Theme
+
+```elixir
+IO.puts(Yog.Render.Mermaid.to_mermaid(g, Yog.Render.Mermaid.theme(:presentation)))
+```
+
+---
+
+## 🧭 Directions
+
+Control the layout flow.
+
+```elixir
+g = Yog.directed()
+  |> Yog.add_edges!([{:a, :b, 1}, {:b, :c, 1}])
+```
+
+### Top-Down (`:td`)
+
+```elixir
+IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | direction: :td}))
+```
+
+### Left-to-Right (`:lr`)
+
+```elixir
+IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | direction: :lr}))
+```
+
+### Bottom-to-Top (`:bt`)
+
+```elixir
+IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | direction: :bt}))
+```
+
+### Right-to-Left (`:rl`)
+
+```elixir
+IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | direction: :rl}))
+```
+
+---
+
+## 🔷 Node Shapes
+
+```elixir
+g = Yog.directed()
+  |> Yog.add_node(1, "Start")
+  |> Yog.add_node(2, "Process")
+  |> Yog.add_node(3, "Decision")
+  |> Yog.add_node(4, "Database")
+  |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}, {3, 4, 1}])
+```
+
+### Rounded Rectangle
+
+```elixir
+IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | node_shape: :rounded_rect}))
+```
+
+### Stadium (Pill)
+
+```elixir
+IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | node_shape: :stadium}))
+```
+
+### Subroutine
+
+```elixir
+IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | node_shape: :subroutine}))
+```
+
+### Cylinder (Database)
+
+```elixir
+IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | node_shape: :cylinder}))
+```
+
+### Circle
+
+```elixir
+IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | node_shape: :circle}))
+```
+
+### Asymmetric (Flag)
+
+```elixir
+IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | node_shape: :asymmetric}))
+```
+
+### Rhombus (Decision)
+
+```elixir
+IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | node_shape: :rhombus}))
+```
+
+### Hexagon
+
+```elixir
+IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | node_shape: :hexagon}))
+```
+
+### Parallelogram
+
+```elixir
+IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | node_shape: :parallelogram}))
+```
+
+### Trapezoid
+
+```elixir
+IO.puts(Yog.Render.Mermaid.to_mermaid(g, %{Yog.Render.Mermaid.default_options() | node_shape: :trapezoid}))
+```
+
+---
+
+## 🎯 Per-Element Styling
+
+### Per-Node Styling (`node_attributes`)
+
+```elixir
+g = Yog.directed()
+  |> Yog.add_node(1, %{name: "Alice", role: "Admin"})
+  |> Yog.add_node(2, %{name: "Bob", role: "User"})
+  |> Yog.add_node(3, %{name: "Carol", role: "Guest"})
+  |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}])
+
+node_attrs = fn id, data ->
+  case data.role do
+    "Admin" -> [{:fill, "#ef4444"}, {:stroke, "#991b1b"}]
+    "User" -> [{:fill, "#3b82f6"}, {:stroke, "#1e40af"}]
+    _ -> [{:fill, "#94a3b8"}, {:stroke, "#475569"}]
+  end
+end
+
+opts = %{
+  Yog.Render.Mermaid.default_options()
+  | node_attributes: node_attrs
+}
+
+IO.puts(Yog.Render.Mermaid.to_mermaid(g, opts))
+```
+
+### Per-Edge Styling (`edge_attributes`)
+
+```elixir
+g = Yog.directed()
+  |> Yog.add_edges!([
+    {:a, :b, %{priority: :high}},
+    {:b, :c, %{priority: :low}},
+    {:a, :c, %{priority: :medium}}
+  ])
+
+edge_attrs = fn _from, _to, weight ->
+  case weight.priority do
+    :high -> [{:stroke, "#ef4444"}, {:stroke_width, "3px"}]
+    :medium -> [{:stroke, "#f59e0b"}, {:stroke_width, "2px"}]
+    :low -> [{:stroke, "#94a3b8"}, {:stroke_width, "1px"}]
+  end
+end
+
+opts = %{
+  Yog.Render.Mermaid.default_options()
+  | edge_attributes: edge_attrs
+}
+
+IO.puts(Yog.Render.Mermaid.to_mermaid(g, opts))
+```
+
+---
+
+## 📦 Subgraphs
+
+Group nodes visually into clusters.
+
+```elixir
+g = Yog.directed()
+  |> Yog.add_node(:api, "API Gateway")
+  |> Yog.add_node(:auth, "Auth Service")
+  |> Yog.add_node(:db, "Database")
+  |> Yog.add_node(:cache, "Cache")
+  |> Yog.add_edges!([{:api, :auth, 1}, {:auth, :db, 1}, {:api, :cache, 1}])
+
+opts = %{
+  Yog.Render.Mermaid.default_options()
+  | subgraphs: [
+      %{
+        name: "backend",
+        label: "Backend Services",
+        node_ids: [:auth, :db]
+      },
+      %{
+        name: "infra",
+        label: "Infrastructure",
+        node_ids: [:cache]
+      }
+    ]
+}
+
+IO.puts(Yog.Render.Mermaid.to_mermaid(g, opts))
+```
+
+---
+
+## ✨ Highlighting
+
+### Manual Highlighting
+
+```elixir
+g = Yog.directed()
+  |> Yog.add_edges!([{:a, :b, 1}, {:b, :c, 1}, {:c, :d, 1}])
+
+opts = %{
+  Yog.Render.Mermaid.default_options()
+  | highlighted_nodes: [:a, :b, :c],
+    highlighted_edges: [{:a, :b}, {:b, :c}]
+}
+
+IO.puts(Yog.Render.Mermaid.to_mermaid(g, opts))
+```
+
+### `path_to_options/2` — Shortest Path Highlighting
+
+```elixir
+g = Yog.Generator.Classic.grid_2d(5, 5)
+source = 0
+target = 24
+
+{:ok, path} = Yog.Pathfinding.shortest_path(in: g, from: source, to: target)
+
+opts = Yog.Render.Mermaid.path_to_options(path, Yog.Render.Mermaid.theme(:presentation))
+IO.puts(Yog.Render.Mermaid.to_mermaid(g, opts))
+```
+
+---
+
+## 🔬 Algorithm Helper Options
+
+### `mst_to_options/2` — Minimum Spanning Tree
+
+```elixir
+weighted = Yog.from_edges(:undirected, [
+  {:a, :b, 4}, {:a, :h, 8}, {:b, :c, 8},
+  {:c, :d, 7}, {:c, :f, 4}, {:d, :e, 9},
+  {:e, :f, 10}, {:f, :g, 2}, {:g, :h, 1}
+])
+
+{:ok, mst} = Yog.MST.kruskal(in: weighted)
+mst_opts = Yog.Render.Mermaid.mst_to_options(mst, Yog.Render.Mermaid.theme(:minimal))
+IO.puts(Yog.Render.Mermaid.to_mermaid(weighted, mst_opts))
+```
+
+### `community_to_options/2` — Community Detection
+
+```elixir
+sbm = Yog.Generator.Random.sbm([8, 8], [[0.8, 0.1], [0.1, 0.8]])
+comm = Yog.Community.Louvain.detect(sbm)
+comm_opts = Yog.Render.Mermaid.community_to_options(comm)
+IO.puts(Yog.Render.Mermaid.to_mermaid(sbm, comm_opts))
+```
+
+### `cut_to_options/2` — Min-Cut Partitions
+
+```elixir
+flow = Yog.directed()
+  |> Yog.add_edges!([{:s, :a, 10}, {:s, :b, 10}, {:a, :t, 10}, {:b, :t, 5}])
+
+result = Yog.Flow.MaxFlow.dinic(flow, :s, :t)
+min_cut = Yog.Flow.MaxFlow.min_cut(result)
+cut_opts = Yog.Render.Mermaid.cut_to_options(min_cut)
+IO.puts(Yog.Render.Mermaid.to_mermaid(flow, cut_opts))
+```
+
+### `matching_to_options/2` — Bipartite Matching
+
+```elixir
+bipartite = Yog.from_edges(:undirected, [
+  {:a1, :b1, 1}, {:a1, :b2, 1}, {:a2, :b2, 1}, {:a2, :b3, 1}
+])
+
+matching = Yog.Matching.hopcroft_karp(bipartite)
+match_opts = Yog.Render.Mermaid.matching_to_options(matching)
+IO.puts(Yog.Render.Mermaid.to_mermaid(bipartite, match_opts))
+```
+
+---
+
+## 🔗 Multigraph Mermaid
+
+`Yog.Multi.Mermaid` mirrors `Yog.Render.Mermaid` but supports parallel edges.
+
+### Basic Multigraph Rendering
+
+```elixir
+alias Yog.Multi
+
+mg = Multi.undirected()
+  |> Multi.add_node(:london, nil)
+  |> Multi.add_node(:paris, nil)
+
+{mg, _e1} = Multi.add_edge(mg, :london, :paris, 100)  # Flight
+{mg, _e2} = Multi.add_edge(mg, :london, :paris, 50)   # Train
+{mg, e3} = Multi.add_edge(mg, :london, :paris, 300)   # Ferry
+
+IO.puts(Yog.Multi.Mermaid.to_mermaid(mg))
+```
+
+### Per-Edge Styling with `edge_id`
+
+Because multigraphs have parallel edges, the `edge_attributes` callback receives the unique `edge_id`.
+
+```elixir
+opts = %{
+  Yog.Multi.Mermaid.default_options()
+  | edge_attributes: fn _from, _to, edge_id, weight ->
+      color =
+        cond do
+          weight == 50 -> "#10b981"   # Train (fastest)
+          weight == 100 -> "#3b82f6"  # Flight
+          true -> "#f59e0b"           # Ferry
+        end
+
+      width = if edge_id == e3, do: "4px", else: "2px"
+      [{:stroke, color}, {:stroke_width, width}]
+    end
+}
+
+IO.puts(Yog.Multi.Mermaid.to_mermaid(mg, opts))
+```
+
+### Subgraphs in Multigraphs
+
+```elixir
+mg = Multi.directed()
+  |> Multi.add_node(:web, "Web Layer")
+  |> Multi.add_node(:api, "API Layer")
+  |> Multi.add_node(:db1, "Primary DB")
+  |> Multi.add_node(:db2, "Replica DB")
+  |> (fn g -> {g, _} = Multi.add_edge(g, :web, :api, 1); g end).()
+  |> (fn g -> {g, _} = Multi.add_edge(g, :api, :db1, 1); g end).()
+  |> (fn g -> {g, _} = Multi.add_edge(g, :api, :db2, 1); g end).()
+
+opts = %{
+  Yog.Multi.Mermaid.default_options()
+  | subgraphs: [
+      %{
+        name: "data_layer",
+        label: "Data Layer",
+        node_ids: [:db1, :db2]
+      }
+    ]
+}
+
+IO.puts(Yog.Multi.Mermaid.to_mermaid(mg, opts))
+```
+
+---
+
+## 📋 Summary
+
+| Capability | Module | Key Function / Option |
+|---|---|---|
+| Basic export | `Yog.Render.Mermaid` | `to_mermaid/2` |
+| Basic export (parallel edges) | `Yog.Multi.Mermaid` | `to_mermaid/2` |
+| Default options | Both | `default_options/0` |
+| Custom edge formatter | `Yog.Render.Mermaid` | `default_options_with_edge_formatter/1` |
+| Custom labels | `Yog.Render.Mermaid` | `default_options_with/2` |
+| Themes | `Yog.Render.Mermaid` | `theme/1` (`:default`, `:dark`, `:minimal`, `:presentation`) |
+| Direction | Both | `direction:` (`:td`, `:lr`, `:bt`, `:rl`) |
+| Node shapes | Both | `node_shape:` (e.g., `:cylinder`, `:rhombus`, `:hexagon`) |
+| Per-node styles | Both | `node_attributes:` callback |
+| Per-edge styles | `Yog.Render.Mermaid` | `edge_attributes: fn f, t, w -> ...` |
+| Per-edge styles (multi) | `Yog.Multi.Mermaid` | `edge_attributes: fn f, t, id, w -> ...` |
+| Subgraphs | Both | `subgraphs:` list |
+| Path highlighting | `Yog.Render.Mermaid` | `path_to_options/2` |
+| MST highlighting | `Yog.Render.Mermaid` | `mst_to_options/2` |
+| Community colors | `Yog.Render.Mermaid` | `community_to_options/2` |
+| Min-cut colors | `Yog.Render.Mermaid` | `cut_to_options/2` |
+| Matching highlight | `Yog.Render.Mermaid` | `matching_to_options/2` |
+
+---
+
+Next, explore **Customizing Visualizations** for a side-by-side comparison with Graphviz DOT, or **Multigraphs & Edge Collapsing** for more on parallel-edge workflows.
