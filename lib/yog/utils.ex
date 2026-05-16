@@ -313,4 +313,68 @@ defmodule Yog.Utils do
       v -> inspect(v)
     end
   end
+
+  # =============================================================================
+  # RENDERER SHARED HELPERS
+  # =============================================================================
+
+  @doc false
+  @spec mst_highlights(map()) :: {[any()], [{any(), any()}]}
+  def mst_highlights(%{edges: edges}) do
+    mst_edges = Enum.map(edges, fn %{from: f, to: t} -> {f, t} end)
+    mst_nodes = Enum.flat_map(edges, fn %{from: f, to: t} -> [f, t] end) |> Enum.uniq()
+    {mst_nodes, mst_edges}
+  end
+
+  @doc false
+  @spec matching_highlights(%{any() => any()}) :: {[any()], [{any(), any()}]}
+  def matching_highlights(matching) when is_map(matching) do
+    edges =
+      matching
+      |> Enum.map(fn {u, v} -> if u <= v, do: {u, v}, else: {v, u} end)
+      |> Enum.uniq()
+
+    nodes = Map.keys(matching)
+    {nodes, edges}
+  end
+
+  @doc false
+  @spec generate_palette(non_neg_integer()) :: [String.t()]
+  def generate_palette(n) when n <= 0, do: []
+
+  def generate_palette(n) do
+    Enum.map(0..(n - 1), fn i ->
+      hue = rem(i * 137, 360)
+      hsl_to_hex(hue, 70, 60)
+    end)
+  end
+
+  @doc false
+  @spec hsl_to_hex(number(), number(), number()) :: String.t()
+  def hsl_to_hex(h, s, l) do
+    s = s / 100
+    l = l / 100
+    c = (1 - abs(2 * l - 1)) * s
+    x = c * (1 - abs(Float.round(:math.fmod(h / 60, 2), 10) - 1))
+    m = l - c / 2
+
+    {r1, g1, b1} =
+      cond do
+        h < 60 -> {c, x, 0.0}
+        h < 120 -> {x, c, 0.0}
+        h < 180 -> {0.0, c, x}
+        h < 240 -> {0.0, x, c}
+        h < 300 -> {x, 0.0, c}
+        true -> {c, 0.0, x}
+      end
+
+    r = round((r1 + m) * 255)
+    g = round((g1 + m) * 255)
+    b = round((b1 + m) * 255)
+
+    "#" <>
+      String.pad_leading(Integer.to_string(r, 16), 2, "0") <>
+      String.pad_leading(Integer.to_string(g, 16), 2, "0") <>
+      String.pad_leading(Integer.to_string(b, 16), 2, "0")
+  end
 end

@@ -529,10 +529,9 @@ defmodule Yog.Render.Mermaid do
       mermaid = Yog.Render.Mermaid.to_mermaid(graph, options)
   """
   @spec mst_to_options(Yog.MST.Result.t(), options()) :: options()
-  def mst_to_options(%{edges: edges}, base_options \\ default_options()) do
-    mst_edges = Enum.map(edges, fn %{from: f, to: t} -> {f, t} end)
-    mst_nodes = Enum.flat_map(edges, fn %{from: f, to: t} -> [f, t] end) |> Enum.uniq()
-    %{base_options | highlighted_edges: mst_edges, highlighted_nodes: mst_nodes}
+  def mst_to_options(result, base_options \\ default_options()) do
+    {nodes, edges} = Yog.Utils.mst_highlights(result)
+    %{base_options | highlighted_nodes: nodes, highlighted_edges: edges}
   end
 
   @doc """
@@ -552,7 +551,7 @@ defmodule Yog.Render.Mermaid do
         %{assignments: assignments, num_communities: n},
         base_options \\ default_options()
       ) do
-    palette = generate_palette(n)
+    palette = Yog.Utils.generate_palette(n)
 
     # Build community -> color mapping
     community_ids = assignments |> Map.values() |> Enum.uniq() |> Enum.sort()
@@ -613,14 +612,8 @@ defmodule Yog.Render.Mermaid do
   """
   @spec matching_to_options(%{Yog.node_id() => Yog.node_id()}, options()) :: options()
   def matching_to_options(matching, base_options \\ default_options()) when is_map(matching) do
-    # Deduplicate bidirectional pairs
-    edges =
-      matching
-      |> Enum.map(fn {u, v} -> if u <= v, do: {u, v}, else: {v, u} end)
-      |> Enum.uniq()
-
-    nodes = Map.keys(matching)
-    %{base_options | highlighted_edges: edges, highlighted_nodes: nodes}
+    {nodes, edges} = Yog.Utils.matching_highlights(matching)
+    %{base_options | highlighted_nodes: nodes, highlighted_edges: edges}
   end
 
   # =============================================================================
@@ -885,43 +878,6 @@ defmodule Yog.Render.Mermaid do
 
   defp do_path_to_edges([first, second | rest], acc) do
     do_path_to_edges([second | rest], [{first, second} | acc])
-  end
-
-  # Generate a palette of n visually distinct colors using HSL with fixed S=70%, L=60%
-  defp generate_palette(n) when n <= 0, do: []
-
-  defp generate_palette(n) do
-    Enum.map(0..(n - 1), fn i ->
-      hue = rem(i * 137, 360)
-      hsl_to_hex(hue, 70, 60)
-    end)
-  end
-
-  defp hsl_to_hex(h, s, l) do
-    s = s / 100
-    l = l / 100
-    c = (1 - abs(2 * l - 1)) * s
-    x = c * (1 - abs(Float.round(:math.fmod(h / 60, 2), 10) - 1))
-    m = l - c / 2
-
-    {r1, g1, b1} =
-      cond do
-        h < 60 -> {c, x, 0.0}
-        h < 120 -> {x, c, 0.0}
-        h < 180 -> {0.0, c, x}
-        h < 240 -> {0.0, x, c}
-        h < 300 -> {x, 0.0, c}
-        true -> {c, 0.0, x}
-      end
-
-    r = round((r1 + m) * 255)
-    g = round((g1 + m) * 255)
-    b = round((b1 + m) * 255)
-
-    "#" <>
-      String.pad_leading(Integer.to_string(r, 16), 2, "0") <>
-      String.pad_leading(Integer.to_string(g, 16), 2, "0") <>
-      String.pad_leading(Integer.to_string(b, 16), 2, "0")
   end
 
   # =============================================================================

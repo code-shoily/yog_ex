@@ -197,6 +197,163 @@ defmodule Yog.Multi.DOT do
   end
 
   @doc """
+  Creates default DOT options with all edge labels hidden.
+
+  Use this when you want a clean diagram without edge annotations.
+  """
+  @spec default_options_without_labels() :: options()
+  def default_options_without_labels do
+    %{default_options() | edge_label: fn _edge_id, _weight -> "" end}
+  end
+
+  @doc """
+  Returns a pre-configured theme as DOT options for multigraphs.
+
+  Available themes:
+  - `:default` — Light blue nodes, black edges (same as `default_options/0`)
+  - `:dark` — Dark background with neon accent colors
+  - `:minimal` — Clean wireframe look with no fills and thin lines
+  - `:presentation` — Large fonts and bold colors for slides and demos
+  """
+  @spec theme(atom()) :: options()
+  def theme(:default), do: default_options()
+
+  def theme(:dark) do
+    %{
+      default_options()
+      | bgcolor: "#1a1a2e",
+        node_color: "#16213e",
+        node_fontcolor: "#e0e0e0",
+        node_style: :filled,
+        node_shape: :box,
+        edge_color: "#4a4a6a",
+        edge_fontname: "Courier",
+        highlight_color: "#e94560",
+        highlight_penwidth: 2.5
+    }
+  end
+
+  def theme(:minimal) do
+    %{
+      default_options()
+      | node_color: "white",
+        node_style: :solid,
+        node_shape: :circle,
+        node_fontsize: 10,
+        edge_color: "#666666",
+        edge_penwidth: 0.5,
+        edge_fontsize: 8,
+        highlight_color: "#333333",
+        highlight_penwidth: 1.5
+    }
+  end
+
+  def theme(:presentation) do
+    %{
+      default_options()
+      | node_shape: :box,
+        node_style: :filled,
+        node_color: "#4361ee",
+        node_fontname: "Helvetica-Bold",
+        node_fontsize: 18,
+        node_fontcolor: "white",
+        edge_color: "#3a0ca3",
+        edge_fontsize: 14,
+        edge_penwidth: 2.0,
+        highlight_color: "#f72585",
+        highlight_penwidth: 3.5,
+        nodesep: 0.8,
+        ranksep: 1.0
+    }
+  end
+
+  @doc """
+  Converts a shortest path result to highlighted DOT options.
+
+  Creates a copy of the base options with the path's nodes and edges
+  set to be highlighted.
+  """
+  @spec path_to_options(map(), options()) :: options()
+  def path_to_options(path, base_options \\ default_options()) do
+    nodes = Map.get(path, :nodes, [])
+    edges = path_to_edges(nodes)
+
+    %{base_options | highlighted_nodes: nodes, highlighted_edges: edges}
+  end
+
+  # Helper to convert a list of nodes to a list of edges
+  defp path_to_edges(nodes), do: do_path_to_edges(nodes, [])
+
+  defp do_path_to_edges([], acc), do: Enum.reverse(acc)
+  defp do_path_to_edges([_], acc), do: Enum.reverse(acc)
+
+  defp do_path_to_edges([first, second | rest], acc) do
+    do_path_to_edges([second | rest], [{first, second} | acc])
+  end
+
+  @doc """
+  Creates DOT options that highlight an MST result.
+  """
+  @spec mst_to_options(Yog.MST.Result.t(), options()) :: options()
+  def mst_to_options(result, base_options \\ default_options()) do
+    {nodes, edges} = Yog.Utils.mst_highlights(result)
+    %{base_options | highlighted_nodes: nodes, highlighted_edges: edges}
+  end
+
+  @doc """
+  Creates DOT options that color nodes by community assignment.
+
+  Each community gets a distinct color from a generated palette.
+  """
+  @spec community_to_options(Yog.Community.Result.t(), options()) :: options()
+  def community_to_options(
+        %{assignments: assignments, num_communities: n},
+        base_options \\ default_options()
+      ) do
+    palette = Yog.Utils.generate_palette(n)
+
+    community_ids = assignments |> Map.values() |> Enum.uniq() |> Enum.sort()
+    color_map = Enum.zip(community_ids, palette) |> Map.new()
+
+    node_attrs = fn id, _data ->
+      case Map.get(assignments, id) do
+        nil -> []
+        cid -> [{:fillcolor, Map.get(color_map, cid, "lightgrey")}, {:style, "filled"}]
+      end
+    end
+
+    %{base_options | node_attributes: node_attrs}
+  end
+
+  @doc """
+  Creates DOT options that color the source and sink sides of a min-cut.
+  """
+  @spec cut_to_options(Yog.Flow.MinCutResult.t(), options()) :: options()
+  def cut_to_options(%{source_side: source, sink_side: sink}, base_options \\ default_options()) do
+    source_set = if source, do: MapSet.new(source), else: MapSet.new()
+    sink_set = if sink, do: MapSet.new(sink), else: MapSet.new()
+
+    node_attrs = fn id, _data ->
+      cond do
+        MapSet.member?(source_set, id) -> [{:fillcolor, "#a8d8ea"}, {:style, "filled"}]
+        MapSet.member?(sink_set, id) -> [{:fillcolor, "#f08080"}, {:style, "filled"}]
+        true -> []
+      end
+    end
+
+    %{base_options | node_attributes: node_attrs}
+  end
+
+  @doc """
+  Creates DOT options that highlight matched edges from a matching result.
+  """
+  @spec matching_to_options(%{Yog.Model.node_id() => Yog.Model.node_id()}, options()) :: options()
+  def matching_to_options(matching, base_options \\ default_options()) when is_map(matching) do
+    {nodes, edges} = Yog.Utils.matching_highlights(matching)
+    %{base_options | highlighted_nodes: nodes, highlighted_edges: edges}
+  end
+
+  @doc """
   Converts a multigraph (`Yog.Multi.Graph`) to DOT syntax.
   """
   @spec to_dot(Yog.Multi.Graph.t(), options()) :: String.t()

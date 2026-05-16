@@ -200,11 +200,6 @@ defmodule Yog.Multi.DOTTest do
       assert String.contains?(dot, "shape=\"cylinder\"")
       assert String.contains?(dot, "fillcolor=\"#4a90e2\"")
       assert String.contains?(dot, "Token Refresh")
-
-      # Large string ready for livebook
-      IO.puts("\n--- Copy this into Livebook Graphviz output: ---\n")
-      IO.puts(dot)
-      IO.puts("-----------------------------------------------\n")
     end
   end
 end
