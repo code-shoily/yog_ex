@@ -421,6 +421,23 @@ defmodule Yog.Builder.Live do
   def all_labels(%__MODULE__{registry: registry}), do: Map.keys(registry)
 
   @doc """
+  Checks if a label has been registered in the builder.
+
+  ## Examples
+
+      iex> builder = Yog.Builder.Live.new()
+      ...> |> Yog.Builder.Live.add_edge("A", "B", 10)
+      iex> Yog.Builder.Live.has_label?(builder, "A")
+      true
+      iex> Yog.Builder.Live.has_label?(builder, "Z")
+      false
+  """
+  @spec has_label?(t(), label()) :: boolean()
+  def has_label?(%__MODULE__{registry: registry}, label) do
+    Map.has_key?(registry, label)
+  end
+
+  @doc """
   Returns the number of registered nodes.
 
   ## Examples

@@ -60,5 +60,42 @@ defmodule Yog.Builder.LabeledTest do
       # Same label returns same ID
       assert id1 == id2
     end
+
+    test "has_label?/2 returns true for registered labels" do
+      builder =
+        Labeled.directed()
+        |> Labeled.add_node("A")
+
+      assert Labeled.has_label?(builder, "A")
+      refute Labeled.has_label?(builder, "B")
+    end
+
+    test "has_edge?/3 checks edge existence between labels" do
+      builder =
+        Labeled.directed()
+        |> Labeled.add_edge("A", "B", 10)
+
+      assert Labeled.has_edge?(builder, "A", "B")
+      refute Labeled.has_edge?(builder, "B", "A")
+      refute Labeled.has_edge?(builder, "A", "C")
+    end
+
+    test "node_count/1 returns number of registered nodes" do
+      builder =
+        Labeled.directed()
+        |> Labeled.add_node("A")
+        |> Labeled.add_node("B")
+
+      assert Labeled.node_count(builder) == 2
+    end
+
+    test "edge_count/1 returns number of edges" do
+      builder =
+        Labeled.directed()
+        |> Labeled.add_edge("A", "B", 10)
+        |> Labeled.add_edge("B", "C", 5)
+
+      assert Labeled.edge_count(builder) == 2
+    end
   end
 end

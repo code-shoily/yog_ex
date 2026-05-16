@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Builder Modules
+
+- **`Yog.Builder.Labeled`** — Added convenience query functions:
+  - `has_label?/2` — Check if a label is registered.
+  - `has_edge?/3` — Check if an edge exists between two labels.
+  - `node_count/1` — Number of registered nodes.
+  - `edge_count/1` — Number of edges in the underlying graph.
+- **`Yog.Builder.Live`** — Added `has_label?/2` for registry membership checks.
+
 #### DAG Modules
 
 - **`Yog.DAG`** — Filled facade gaps and added DAG-native algorithms. The DAG modules are now feature-complete:

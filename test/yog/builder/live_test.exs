@@ -110,6 +110,16 @@ defmodule Yog.Builder.LiveTest do
     assert Enum.sort(labels) == ["A", "B"]
   end
 
+  test "live_builder_has_label_test" do
+    builder =
+      Live.new()
+      |> Live.add_edge("A", "B", 10)
+
+    assert Live.has_label?(builder, "A")
+    assert Live.has_label?(builder, "B")
+    refute Live.has_label?(builder, "Z")
+  end
+
   test "live_builder_incremental_sync_test" do
     # Build base graph
     builder =

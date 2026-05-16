@@ -322,6 +322,71 @@ defmodule Yog.Builder.Labeled do
   def all_labels(%__MODULE__{label_to_id: label_to_id}), do: Map.keys(label_to_id)
 
   @doc """
+  Checks if a label has been registered in the builder.
+
+  ## Examples
+
+      iex> builder = Yog.Builder.Labeled.directed()
+      ...> |> Yog.Builder.Labeled.add_node("A")
+      iex> Yog.Builder.Labeled.has_label?(builder, "A")
+      true
+      iex> Yog.Builder.Labeled.has_label?(builder, "B")
+      false
+  """
+  @spec has_label?(t(), label()) :: boolean()
+  def has_label?(%__MODULE__{label_to_id: label_to_id}, label) do
+    Map.has_key?(label_to_id, label)
+  end
+
+  @doc """
+  Checks if an edge exists between two labeled nodes.
+
+  ## Examples
+
+      iex> builder = Yog.Builder.Labeled.directed()
+      ...> |> Yog.Builder.Labeled.add_edge("A", "B", 10)
+      iex> Yog.Builder.Labeled.has_edge?(builder, "A", "B")
+      true
+      iex> Yog.Builder.Labeled.has_edge?(builder, "B", "A")
+      false
+  """
+  @spec has_edge?(t(), label(), label()) :: boolean()
+  def has_edge?(%__MODULE__{graph: graph, label_to_id: label_to_id}, from, to) do
+    case {Map.fetch(label_to_id, from), Map.fetch(label_to_id, to)} do
+      {{:ok, from_id}, {:ok, to_id}} -> Model.has_edge?(graph, from_id, to_id)
+      _ -> false
+    end
+  end
+
+  @doc """
+  Returns the number of registered nodes.
+
+  ## Examples
+
+      iex> builder = Yog.Builder.Labeled.directed()
+      ...> |> Yog.Builder.Labeled.add_node("A")
+      ...> |> Yog.Builder.Labeled.add_node("B")
+      iex> Yog.Builder.Labeled.node_count(builder)
+      2
+  """
+  @spec node_count(t()) :: non_neg_integer()
+  def node_count(%__MODULE__{label_to_id: label_to_id}), do: map_size(label_to_id)
+
+  @doc """
+  Returns the number of edges in the graph.
+
+  ## Examples
+
+      iex> builder = Yog.Builder.Labeled.directed()
+      ...> |> Yog.Builder.Labeled.add_edge("A", "B", 10)
+      ...> |> Yog.Builder.Labeled.add_edge("B", "C", 5)
+      iex> Yog.Builder.Labeled.edge_count(builder)
+      2
+  """
+  @spec edge_count(t()) :: non_neg_integer()
+  def edge_count(%__MODULE__{graph: graph}), do: Model.edge_count(graph)
+
+  @doc """
   Gets the next available node ID.
 
   This is the ID that would be assigned to the next new node.
