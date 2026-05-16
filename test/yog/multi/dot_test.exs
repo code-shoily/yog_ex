@@ -337,4 +337,86 @@ defmodule Yog.Multi.DOTTest do
       assert String.contains?(dot, "Token Refresh")
     end
   end
+
+  describe "attribute mapping and escaping" do
+    test "renders various node shapes" do
+      multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "A")
+
+      shapes = [
+        :cylinder,
+        :doublecircle,
+        :diamond,
+        :hexagon,
+        :note,
+        :box3d,
+        :component,
+        :folder,
+        :invtriangle
+      ]
+
+      for shape <- shapes do
+        opts = %{DOT.default_options() | node_shape: shape}
+        dot = DOT.to_dot(multi, opts)
+        assert String.contains?(dot, "shape=#{shape}")
+      end
+    end
+
+    test "renders various arrow styles" do
+      multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "A") |> Yog.Multi.add_node(2, "B")
+      {multi, _} = Yog.Multi.add_edge(multi, 1, 2, 1)
+
+      styles = [:dot, :diamond, :box, :crow, :vee, :tee, :odiamond, :inv, :none]
+
+      for style <- styles do
+        opts = %{DOT.default_options() | arrowhead: style, arrowtail: style}
+        dot = DOT.to_dot(multi, opts)
+        assert String.contains?(dot, "arrowhead=#{style}")
+        assert String.contains?(dot, "arrowtail=#{style}")
+      end
+    end
+
+    test "renders various overlap and spline modes" do
+      multi = Yog.Multi.directed()
+
+      for overlap <- [true, false, :scale, :scalexy, :prism] do
+        opts = %{DOT.default_options() | overlap: overlap}
+        dot = DOT.to_dot(multi, opts)
+
+        expected =
+          case overlap do
+            true -> "overlap=true"
+            false -> "overlap=false"
+            :scale -> "overlap=scale"
+            :scalexy -> "overlap=scalexy"
+            :prism -> "overlap=prism"
+          end
+
+        assert String.contains?(dot, expected)
+      end
+
+      for spline <- [:line, :polyline, :curved, :ortho, :spline, :none] do
+        opts = %{DOT.default_options() | splines: spline}
+        dot = DOT.to_dot(multi, opts)
+        assert String.contains?(dot, "splines=#{spline}")
+      end
+    end
+
+    test "escapes special characters in labels" do
+      multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "Line1\nLine2")
+      {multi, _} = Yog.Multi.add_edge(multi, 1, 1, "Quote \" and backslash \\")
+
+      dot = DOT.to_dot(multi)
+      assert String.contains?(dot, "label=\"Line1\\nLine2\"")
+      assert String.contains?(dot, "label=\"Quote \\\" and backslash \\\\\"")
+    end
+
+    test "merge_attributes_list overrides defaults" do
+      multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "A")
+      # Override label via node_attributes callback
+      opts = %{DOT.default_options() | node_attributes: fn _, _ -> [{:label, "OVERRIDDEN"}] end}
+      dot = DOT.to_dot(multi, opts)
+      assert String.contains?(dot, "label=\"OVERRIDDEN\"")
+      refute String.contains?(dot, "label=\"A\"")
+    end
+  end
 end

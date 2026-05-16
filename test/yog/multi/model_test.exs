@@ -455,6 +455,31 @@ defmodule Yog.Multi.ModelTest do
       assert e3 in edge_ids
     end
 
+    test "remove_node/2 handles self-loops correctly" do
+      {multi, e1} =
+        Yog.Multi.directed() |> Yog.Multi.add_node(1, "A") |> Yog.Multi.add_edge(1, 1, 10)
+
+      assert Yog.Multi.Model.has_edge(multi, e1)
+
+      multi = Yog.Multi.Model.remove_node(multi, 1)
+      refute Yog.Multi.Model.has_edge(multi, e1)
+      assert Yog.Multi.Model.all_nodes(multi) == []
+    end
+
+    test "map conversion (from_map/to_map)" do
+      multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "A")
+      {multi, _} = Yog.Multi.add_edge(multi, 1, 2, 10)
+
+      map = Yog.Multi.Model.to_map(multi)
+      assert map.kind == :directed
+      assert map.nodes[1] == "A"
+
+      multi2 = Yog.Multi.Model.from_map(map)
+      assert multi2.kind == :directed
+      assert multi2.nodes[1] == "A"
+      assert Yog.Multi.Model.size(multi2) == 1
+    end
+
     test "mixed parallel and single edges" do
       {multi, _e1} =
         Model.directed()

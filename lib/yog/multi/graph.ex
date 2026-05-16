@@ -112,7 +112,7 @@ defimpl Enumerable, for: Yog.Multi.Graph do
 
   def slice(%Yog.Multi.Graph{nodes: nodes}) do
     {:ok, map_size(nodes),
-     fn start, length ->
+     fn start, length, _step ->
        nodes |> Map.to_list() |> Enum.slice(start, length)
      end}
   end
