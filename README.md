@@ -185,7 +185,7 @@ See all Advent of Code solutions tagged with `graph` that demonstrate usage of Y
 
 ## Projects Using Yog
 
-Yog powers several open-source libraries that build domain-specific abstractions on top of its graph engine:
+Yog powers the following open-source libraries that build domain-specific abstractions on top of its graph engine:
 
 ### [Choreo](https://github.com/code-shoily/choreo) — Domain-Specific Diagram Builders
 
