@@ -935,6 +935,59 @@ defmodule Yog.MultiTest do
     end
   end
 
+  describe "to_simple_graph_sum_edges/1 delegation" do
+    test "sums weights using Kernel.+/2 by default" do
+      {graph, _} =
+        Multi.directed()
+        |> Multi.add_node(1, "A")
+        |> Multi.add_node(2, "B")
+        |> Multi.add_edge(1, 2, 10)
+
+      {graph, _} = Multi.add_edge(graph, 1, 2, 20)
+      {graph, _} = Multi.add_edge(graph, 1, 2, 30)
+
+      simple = Multi.to_simple_graph_sum_edges(graph)
+
+      assert Yog.Model.edge_data(simple, 1, 2) == 60
+    end
+  end
+
+  describe "to_simple_graph_max_edges/1 delegation" do
+    test "keeps maximum weight among parallel edges" do
+      {graph, _} =
+        Multi.directed()
+        |> Multi.add_node(1, "A")
+        |> Multi.add_node(2, "B")
+        |> Multi.add_edge(1, 2, 30)
+
+      {graph, _} = Multi.add_edge(graph, 1, 2, 10)
+      {graph, _} = Multi.add_edge(graph, 1, 2, 20)
+
+      simple = Multi.to_simple_graph_max_edges(graph)
+
+      assert Yog.Model.edge_data(simple, 1, 2) == 30
+    end
+  end
+
+  describe "to_simple_graph/1 determinism" do
+    test "keeps the earliest added edge (lowest edge_id)" do
+      {graph, e1} =
+        Multi.directed()
+        |> Multi.add_node(1, "A")
+        |> Multi.add_node(2, "B")
+        |> Multi.add_edge(1, 2, :first)
+
+      assert e1 == 0
+
+      {graph, e2} = Multi.add_edge(graph, 1, 2, :second)
+      assert e2 == 1
+
+      simple = Multi.to_simple_graph(graph)
+
+      assert Yog.Model.edge_data(simple, 1, 2) == :first
+    end
+  end
+
   # =============================================================================
   # Integration Tests
   # =============================================================================

@@ -281,7 +281,9 @@ defmodule Yog.Multi.Model do
 
   @doc """
   Converts the multigraph to a simple graph.
-  When there are parallel edges, only the first edge is kept.
+
+  When there are parallel edges, the edge with the lowest `edge_id` is kept
+  (i.e. the edge that was added first). This guarantees deterministic output.
   """
   @spec to_simple_graph(t()) :: Yog.graph()
   def to_simple_graph(graph) do
@@ -292,7 +294,9 @@ defmodule Yog.Multi.Model do
 
     seen = MapSet.new()
 
-    Enum.reduce(graph.edges, {base_graph, seen}, fn {_eid, {src, dst, data}}, {g, seen_acc} ->
+    graph.edges
+    |> Enum.sort_by(fn {eid, _} -> eid end)
+    |> Enum.reduce({base_graph, seen}, fn {_eid, {src, dst, data}}, {g, seen_acc} ->
       key = if graph.kind == :undirected and src > dst, do: {dst, src}, else: {src, dst}
 
       if MapSet.member?(seen_acc, key) do
@@ -317,10 +321,30 @@ defmodule Yog.Multi.Model do
 
   @doc """
   Collapses parallel edges, summing weights.
+
+  Uses `&Kernel.+/2` as the combining function.
+  """
+  @spec to_simple_graph_sum_edges(t()) :: Yog.graph()
+  def to_simple_graph_sum_edges(graph) do
+    to_simple_graph(graph, &Kernel.+/2)
+  end
+
+  @doc """
+  Collapses parallel edges, combining weights with the provided function.
   """
   @spec to_simple_graph_sum_edges(t(), (any(), any() -> any())) :: Yog.graph()
   def to_simple_graph_sum_edges(graph, add) do
     to_simple_graph(graph, add)
+  end
+
+  @doc """
+  Collapses parallel edges, keeping the maximum weight.
+  """
+  @spec to_simple_graph_max_edges(t()) :: Yog.graph()
+  def to_simple_graph_max_edges(graph) do
+    to_simple_graph(graph, fn a, b ->
+      if is_number(a) and is_number(b), do: max(a, b), else: a
+    end)
   end
 
   @doc """

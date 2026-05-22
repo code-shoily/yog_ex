@@ -133,6 +133,12 @@ defmodule Yog.Multi do
   @doc "Collapses parallel edges, keeping the minimum weight."
   defdelegate to_simple_graph_min_edges(graph), to: Model
 
-  @doc "Collapses parallel edges, summing weights with the provided function."
+  @doc "Collapses parallel edges, keeping the maximum weight."
+  defdelegate to_simple_graph_max_edges(graph), to: Model
+
+  @doc "Collapses parallel edges, summing weights."
+  defdelegate to_simple_graph_sum_edges(graph), to: Model
+
+  @doc "Collapses parallel edges, combining weights with the provided function."
   defdelegate to_simple_graph_sum_edges(graph, add), to: Model
 end

@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+#### Multigraph Collapse Helpers
+
+- **`Yog.Multi.Model.to_simple_graph_max_edges/1`** — New helper that collapses parallel edges keeping the maximum weight. Useful for widest-path and bottleneck algorithms.
+- **`Yog.Multi.Model.to_simple_graph_sum_edges/1`** — New zero-argument helper that sums parallel edge weights using `&Kernel.+/2`. Complements the existing `to_simple_graph_sum_edges/2` which accepts a custom combine function.
+- **`Yog.Multi`** — Added facade delegations for `to_simple_graph_max_edges/1` and `to_simple_graph_sum_edges/1`.
+
+#### Documentation
+
+- **`ALGORITHMS.md`** — Comprehensive audit and update:
+  - Added missing algorithms: Brandes SSSP, Chinese Postman, Path Utilities, Distance Matrix, Hungarian matching, Blossom matching, Graph Coloring, Tree Decomposition, and maze generators (Kruskal's, Prim's simplified/true, Eller's, Growing Tree, Recursive Division).
+  - Added missing categories: Random Graph Generation, Graph Builders, Functional Graphs (FGL-style), and Rendering.
+  - Fixed incorrect module names: `Yog.PriorityQueue` → `Yog.PairingHeap`, `Yog.Connectivity.Bridge` / `Articulation` → `Yog.Connectivity.Analysis`.
+  - Removed ghost algorithms: Capacity Scaling, Network Simplex.
+  - Removed duplicate `Dinic's` entry in Flow & Cuts.
+  - Moved maze generation algorithms out of Approximation Algorithms into Maze Generation.
+
+### Fixed
+
+- **`Yog.Multi.Model.to_simple_graph/1`** — Now deterministic. Edges are sorted by `edge_id` before collapsing, guaranteeing that the earliest-added edge is always kept. Previously, iteration order over the `edges` map was undefined, making the result non-deterministic.
+
 ## [0.98.0] - 2026-05-16
 
 ### Added

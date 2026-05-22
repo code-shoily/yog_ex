@@ -422,6 +422,38 @@ defmodule Yog.Multi.ModelTest do
       assert simple.__struct__ == Yog.Graph
       assert simple.kind == :directed
     end
+
+    test "to_simple_graph_max_edges/1 returns a valid graph" do
+      {multi, _e1} =
+        Model.directed()
+        |> Model.add_node(1, "A")
+        |> Model.add_node(2, "B")
+        |> Model.add_edge(1, 2, 10)
+
+      {multi, _e2} = Model.add_edge(multi, 1, 2, 20)
+
+      simple = Model.to_simple_graph_max_edges(multi)
+
+      assert simple.__struct__ == Yog.Graph
+      assert simple.kind == :directed
+      assert Yog.Model.edge_data(simple, 1, 2) == 20
+    end
+
+    test "to_simple_graph_sum_edges/1 returns a valid graph" do
+      {multi, _e1} =
+        Model.directed()
+        |> Model.add_node(1, "A")
+        |> Model.add_node(2, "B")
+        |> Model.add_edge(1, 2, 10)
+
+      {multi, _e2} = Model.add_edge(multi, 1, 2, 20)
+
+      simple = Model.to_simple_graph_sum_edges(multi)
+
+      assert simple.__struct__ == Yog.Graph
+      assert simple.kind == :directed
+      assert Yog.Model.edge_data(simple, 1, 2) == 30
+    end
   end
 
   # ============================================================
