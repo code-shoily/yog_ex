@@ -217,4 +217,78 @@ defmodule Yog.Property.ColoringTest do
     graph = Classic.complete(20)
     assert {:ok, 20, _colors} = Coloring.coloring_exact(graph, 100)
   end
+
+  test "exact coloring times out with negative timeout" do
+    # Negative timeout makes deadline in the past, triggering immediate timeout
+    graph = Classic.complete(3)
+    assert {:timeout, {upper, colors}} = Coloring.coloring_exact(graph, -1)
+    assert is_integer(upper)
+    assert is_map(colors)
+    assert map_size(colors) == 3
+  end
+
+  test "exact coloring on single node" do
+    graph = Classic.complete(1)
+    assert {:ok, 1, colors} = Coloring.coloring_exact(graph)
+    assert colors == %{0 => 1}
+  end
+
+  test "exact coloring finds better coloring than dsatur" do
+    # This graph has chromatic number 3 but DSatur uses 4 colors.
+    # Backtracking should find the optimal 3-coloring.
+    edges = [
+      {0, 2, 1},
+      {0, 3, 1},
+      {0, 7, 1},
+      {1, 2, 1},
+      {1, 4, 1},
+      {2, 4, 1},
+      {3, 5, 1},
+      {3, 6, 1},
+      {4, 5, 1},
+      {4, 6, 1},
+      {5, 6, 1}
+    ]
+
+    graph = Yog.from_edges(:undirected, edges)
+    {dsatur_upper, _} = Coloring.coloring_dsatur(graph)
+    assert dsatur_upper == 4
+
+    assert {:ok, chi, colors} = Coloring.coloring_exact(graph)
+    assert chi == 3
+    assert valid_coloring?(graph, colors)
+  end
+
+  test "greedy and dsatur on directed graph" do
+    # Coloring algorithms treat directed graphs by ignoring edge direction
+    graph =
+      Yog.directed()
+      |> Yog.add_edge_ensure(1, 2, 1, nil)
+      |> Yog.add_edge_ensure(2, 3, 1, nil)
+
+    {greedy_upper, greedy_colors} = Coloring.coloring_greedy(graph)
+    assert greedy_upper == 2
+    assert valid_coloring?(graph, greedy_colors)
+
+    {dsatur_upper, dsatur_colors} = Coloring.coloring_dsatur(graph)
+    assert dsatur_upper == 2
+    assert valid_coloring?(graph, dsatur_colors)
+  end
+
+  test "exact coloring on directed path" do
+    graph =
+      Yog.directed()
+      |> Yog.add_edge_ensure(1, 2, 1, nil)
+      |> Yog.add_edge_ensure(2, 3, 1, nil)
+
+    assert {:ok, 2, colors} = Coloring.coloring_exact(graph)
+    assert valid_coloring?(graph, colors)
+  end
+
+  test "exact coloring on disconnected components" do
+    # Two isolated nodes
+    graph = Yog.undirected() |> Yog.add_node(1, nil) |> Yog.add_node(2, nil)
+    assert {:ok, 1, colors} = Coloring.coloring_exact(graph)
+    assert valid_coloring?(graph, colors)
+  end
 end
