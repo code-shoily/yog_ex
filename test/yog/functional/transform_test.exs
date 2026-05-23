@@ -75,6 +75,18 @@ defmodule Yog.Functional.TransformTest do
     end
   end
 
+  describe "reverse on undirected" do
+    test "reverse on undirected graph is identity" do
+      ug =
+        Model.new(:undirected)
+        |> Model.put_node(1, "A")
+        |> Model.put_node(2, "B")
+        |> Model.add_edge!(1, 2)
+
+      assert Transform.reverse(ug) == ug
+    end
+  end
+
   describe "to_directed/1 and to_undirected/1" do
     test "converts between directions correctly" do
       dg =
@@ -93,6 +105,16 @@ defmodule Yog.Functional.TransformTest do
       # But since the edges were physically added symmetric, this might still have 2,1
       # Note: Transform.to_directed/1 only changes direction currently as an interpretation
       assert Model.has_edge?(back_dg, 2, 1)
+    end
+
+    test "to_undirected on already undirected graph is identity" do
+      ug =
+        Model.new(:undirected)
+        |> Model.put_node(1, "A")
+        |> Model.put_node(2, "B")
+        |> Model.add_edge!(1, 2)
+
+      assert Transform.to_undirected(ug) == ug
     end
   end
 end

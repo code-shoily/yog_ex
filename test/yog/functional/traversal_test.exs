@@ -97,4 +97,26 @@ defmodule Yog.Functional.TraversalTest do
       assert Traversal.reachable(graph, 5) == [5]
     end
   end
+
+  describe "dfs edge cases" do
+    test "dfs with duplicate start nodes skips already visited" do
+      g =
+        Model.empty()
+        |> Model.put_node(1, "A")
+        |> Model.put_node(2, "B")
+        |> Model.add_edge!(1, 2)
+
+      # Start with both 1 and 2 in the stack
+      visited = Traversal.dfs(g, [1, 2])
+      ids = Enum.map(visited, & &1.id)
+      assert length(ids) == 2
+      assert MapSet.new(ids) == MapSet.new([1, 2])
+    end
+
+    test "dfs from non-existent node" do
+      g = Model.empty() |> Model.put_node(1, "A")
+      visited = Traversal.dfs(g, 99)
+      assert visited == []
+    end
+  end
 end

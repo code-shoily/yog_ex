@@ -95,6 +95,63 @@ defmodule Yog.Functional.AnalysisTest do
     end
   end
 
+  describe "analyze_connectivity root articulation" do
+    test "root with multiple children is articulation point" do
+      # Star graph: root 1 connects to 2, 3, 4. No other edges.
+      g =
+        Model.new(:undirected)
+        |> Model.put_node(1, "root")
+        |> Model.put_node(2, "A")
+        |> Model.put_node(3, "B")
+        |> Model.put_node(4, "C")
+        |> Model.add_edge!(1, 2)
+        |> Model.add_edge!(1, 3)
+        |> Model.add_edge!(1, 4)
+
+      result = Analysis.analyze_connectivity(g)
+      # Root 1 is an articulation point (removing it disconnects 2,3,4)
+      assert 1 in result.points
+      # All edges are bridges in a tree
+      assert length(result.bridges) == 3
+    end
+  end
+
+  describe "connected_components edge cases" do
+    test "triangle graph component extraction" do
+      g =
+        Model.new(:undirected)
+        |> Model.put_node(1, "A")
+        |> Model.put_node(2, "B")
+        |> Model.put_node(3, "C")
+        |> Model.add_edge!(1, 2)
+        |> Model.add_edge!(2, 3)
+        |> Model.add_edge!(3, 1)
+
+      components = Analysis.connected_components(g)
+      assert length(components) == 1
+      assert Enum.sort(hd(components)) == [1, 2, 3]
+    end
+  end
+
+  describe "biconnected_components edge cases" do
+    test "single edge graph" do
+      g =
+        Model.new(:undirected)
+        |> Model.put_node(1, "A")
+        |> Model.put_node(2, "B")
+        |> Model.add_edge!(1, 2)
+
+      bccs = Analysis.biconnected_components(g)
+      assert length(bccs) == 1
+      assert hd(bccs) == [{1, 2}]
+    end
+
+    test "single node graph" do
+      g = Model.new(:undirected) |> Model.put_node(1, "A")
+      assert Analysis.biconnected_components(g) == []
+    end
+  end
+
   describe "dominators" do
     test "finds dominator sets" do
       g =
@@ -124,6 +181,40 @@ defmodule Yog.Functional.AnalysisTest do
       assert doms[6] == 1
       # Node 5 has predecessors 3 and 4 (both dominated by 2), so idom is 2
       assert doms[5] == 2
+    end
+
+    test "dominators on simple chain" do
+      g =
+        Model.empty()
+        |> Model.put_node(1, "A")
+        |> Model.put_node(2, "B")
+        |> Model.put_node(3, "C")
+        |> Model.add_edge!(1, 2)
+        |> Model.add_edge!(2, 3)
+
+      doms = Analysis.dominators(g, 1)
+      assert doms[1] == 1
+      assert doms[2] == 1
+      assert doms[3] == 2
+    end
+
+    test "dominators on diamond graph" do
+      g =
+        Model.empty()
+        |> Model.put_node(1, "A")
+        |> Model.put_node(2, "B")
+        |> Model.put_node(3, "C")
+        |> Model.put_node(4, "D")
+        |> Model.add_edge!(1, 2)
+        |> Model.add_edge!(1, 3)
+        |> Model.add_edge!(2, 4)
+        |> Model.add_edge!(3, 4)
+
+      doms = Analysis.dominators(g, 1)
+      assert doms[1] == 1
+      assert doms[2] == 1
+      assert doms[3] == 1
+      assert doms[4] == 1
     end
   end
 end
