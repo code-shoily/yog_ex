@@ -183,7 +183,8 @@ defmodule Yog.IO.GEXF.Multi do
     end
   end
 
-  defp parse_gexf_multi_xmerl(xml, node_folder, edge_folder) do
+  @doc false
+  def parse_gexf_multi_xmerl(xml, node_folder, edge_folder) do
     case XMLUtils.try_parse_xml(xml) do
       {:ok, doc} ->
         Common.build_graph_from_doc(doc, node_folder, edge_folder, Model, true)

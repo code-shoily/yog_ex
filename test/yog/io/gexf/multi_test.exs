@@ -145,4 +145,94 @@ defmodule Yog.IO.GEXF.MultiTest do
   test "read nonexistent file returns error" do
     assert {:error, :enoent} = Multi.read("/tmp/nonexistent_yog_gexf_multi.gexf")
   end
+
+  test "read_with nonexistent file returns error" do
+    assert {:error, :enoent} =
+             Multi.read_with(
+               "/tmp/nonexistent_yog_gexf_multi.gexf",
+               fn attrs -> attrs end,
+               fn attrs -> attrs end
+             )
+  end
+
+  test "write returns error for invalid path" do
+    assert {:error, _} = Multi.write("/nonexistent_dir/test.gexf", Yog.Multi.directed())
+  end
+
+  test "write_with returns error for invalid path" do
+    multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "A")
+
+    assert {:error, _} =
+             Multi.write_with(
+               "/nonexistent_dir/test.gexf",
+               fn _ -> %{} end,
+               fn _ -> %{} end,
+               multi
+             )
+  end
+
+  test "deserialize returns error for malformed xml" do
+    assert {:error, {:parse_error, _}} = Multi.deserialize("<?xml version='1.0'?><gexf><graph>")
+  end
+
+  test "parse_gexf_multi_xmerl with valid xml" do
+    xml = """
+    <?xml version="1.0"?>
+    <gexf version="1.3">
+      <graph defaultedgetype="directed">
+        <nodes>
+          <node id="1" label="A"/>
+          <node id="2" label="B"/>
+        </nodes>
+        <edges>
+          <edge source="1" target="2" weight="10"/>
+        </edges>
+      </graph>
+    </gexf>
+    """
+
+    {:ok, graph} = Multi.parse_gexf_multi_xmerl(xml, fn attrs -> attrs end, fn attrs -> attrs end)
+    assert Yog.Multi.Model.order(graph) == 2
+    assert length(Yog.Multi.Model.successors(graph, 1)) == 1
+  end
+
+  test "parse_gexf_multi_xmerl with undirected graph" do
+    xml = """
+    <?xml version="1.0"?>
+    <gexf version="1.3">
+      <graph defaultedgetype="undirected">
+        <nodes>
+          <node id="1" label="A"/>
+          <node id="2" label="B"/>
+        </nodes>
+        <edges>
+          <edge source="1" target="2"/>
+        </edges>
+      </graph>
+    </gexf>
+    """
+
+    {:ok, graph} = Multi.parse_gexf_multi_xmerl(xml, fn attrs -> attrs end, fn attrs -> attrs end)
+    assert graph.kind == :undirected
+  end
+
+  test "parse_gexf_multi_xmerl sanitizes bad characters" do
+    xml =
+      "<?xml version=\"1.0\"?><gexf><graph><nodes><node id=\"1\">Alice\b</node></nodes></graph></gexf>"
+
+    {:ok, graph} = Multi.parse_gexf_multi_xmerl(xml, fn attrs -> attrs end, fn attrs -> attrs end)
+    assert Map.has_key?(graph.nodes, 1)
+  end
+
+  test "parse_gexf_multi_xmerl returns error for malformed xml" do
+    assert {:error, {:parse_error, _}} =
+             Multi.parse_gexf_multi_xmerl("not xml", fn _ -> %{} end, fn _ -> %{} end)
+  end
+
+  test "parse_gexf_multi_xmerl returns error when sanitization still fails" do
+    xml = "<?xml version=\"1.0\"?><gexf><graph><nodes><node id=\"1\">Alice\b</node>"
+
+    assert {:error, {:parse_error, _}} =
+             Multi.parse_gexf_multi_xmerl(xml, fn _ -> %{} end, fn _ -> %{} end)
+  end
 end
