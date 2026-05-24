@@ -25,6 +25,11 @@ jobs:
         elixir-version: ${{ matrix.elixir }}
         otp-version: ${{ matrix.otp }}
         
+    - name: Set up Zig
+      uses: goto-bus-stop/setup-zig@v2
+      with:
+        zig-version: 0.15.2
+        
     - name: Restore dependencies cache
       uses: actions/cache@v3
       with:
