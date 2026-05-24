@@ -18,6 +18,7 @@ pub const flow = struct {
 pub const community = struct {
     pub const metrics = @import("community/metrics.zig");
     pub const louvain = @import("community/louvain.zig");
+    pub const leiden = @import("community/leiden.zig");
 };
 
 test {
@@ -34,4 +35,5 @@ test {
     _ = @import("property.zig");
     _ = @import("community/metrics.zig");
     _ = @import("community/louvain.zig");
+    _ = @import("community/leiden.zig");
 }

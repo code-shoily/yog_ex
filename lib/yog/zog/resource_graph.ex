@@ -51,6 +51,7 @@ defmodule Yog.Zog.ResourceGraph do
         katz: [concurrency: :dirty_cpu],
         alpha_centrality: [concurrency: :dirty_cpu],
         louvain: [concurrency: :dirty_cpu],
+        leiden: [concurrency: :dirty_cpu],
         modularity_f64: [concurrency: :dirty_cpu],
         nif_floyd_warshall: [concurrency: :dirty_cpu],
         nif_johnsons: [concurrency: :dirty_cpu],
@@ -212,6 +213,29 @@ defmodule Yog.Zog.ResourceGraph do
                 .min_modularity_gain = min_modularity_gain,
                 .max_iterations = max_iterations,
                 .seed = seed,
+            },
+            zog.utils.identityF64,
+        );
+        defer result.deinit();
+        return extractAssignments(result, g.nodeCapacity());
+    }
+
+    pub fn leiden(
+        res: GraphRes,
+        min_modularity_gain: f64,
+        max_iterations: usize,
+        seed: u64,
+        theta: f64,
+    ) ![]usize {
+        const g = res.unpack().graph;
+        var result = try zog.community.leiden.detectWeightedWithOptions(
+            beam.allocator,
+            g,
+            .{
+                .min_modularity_gain = min_modularity_gain,
+                .max_iterations = max_iterations,
+                .seed = seed,
+                .theta = theta,
             },
             zog.utils.identityF64,
         );
@@ -584,6 +608,27 @@ defmodule Yog.Zog.ResourceGraph do
       seed = Keyword.get(opts, :seed, 42)
 
       assignments = louvain(res, min_modularity_gain, max_iterations, seed)
+      map_assignments(builder, assignments)
+    end
+
+    @doc """
+    Leiden community detection.
+
+    ## Options
+
+    - `:min_modularity_gain` — Stop threshold (default: `0.000001`).
+    - `:max_iterations` — Maximum iterations per phase (default: `100`).
+    - `:seed` — Random seed for node shuffling and probabilistic moves (default: `42`).
+    - `:theta` — Temperature parameter for the probabilistic refinement phase (default: `1.0`).
+    """
+    @spec leiden(t(), keyword()) :: %{Zog.label() => non_neg_integer()}
+    def leiden(%{resource: res, builder: builder}, opts \\ []) do
+      min_modularity_gain = Keyword.get(opts, :min_modularity_gain, 0.000001)
+      max_iterations = Keyword.get(opts, :max_iterations, 100)
+      seed = Keyword.get(opts, :seed, 42)
+      theta = Keyword.get(opts, :theta, 1.0)
+
+      assignments = leiden(res, min_modularity_gain, max_iterations, seed, theta)
       map_assignments(builder, assignments)
     end
 

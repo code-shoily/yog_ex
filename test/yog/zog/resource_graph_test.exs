@@ -174,6 +174,31 @@ defmodule Yog.Zog.ResourceGraphTest do
     end
   end
 
+  describe "leiden/1" do
+    test "two triangles" do
+      builder =
+        Zog.undirected()
+        |> Zog.add_edge("A", "B", 1.0)
+        |> Zog.add_edge("B", "C", 1.0)
+        |> Zog.add_edge("C", "A", 1.0)
+        |> Zog.add_edge("D", "E", 1.0)
+        |> Zog.add_edge("E", "F", 1.0)
+        |> Zog.add_edge("F", "D", 1.0)
+
+      graph = ResourceGraph.new(builder)
+      communities = ResourceGraph.leiden(graph)
+
+      # Each triangle should be its own community
+      assert Map.get(communities, "A") == Map.get(communities, "B")
+      assert Map.get(communities, "A") == Map.get(communities, "C")
+      assert Map.get(communities, "D") == Map.get(communities, "E")
+      assert Map.get(communities, "D") == Map.get(communities, "F")
+      assert Map.get(communities, "A") != Map.get(communities, "D")
+
+      ResourceGraph.destroy(graph)
+    end
+  end
+
   describe "metrics" do
     test "density of complete graph" do
       builder =

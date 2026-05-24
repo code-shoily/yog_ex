@@ -59,6 +59,58 @@ defmodule Yog.Zog.CommunityTest do
     end
   end
 
+  describe "leiden/2" do
+    test "triangle forms a single community" do
+      builder =
+        Zog.undirected()
+        |> Zog.add_edge("A", "B", 1.0)
+        |> Zog.add_edge("B", "C", 1.0)
+        |> Zog.add_edge("C", "A", 1.0)
+
+      assignments = Community.leiden(builder)
+
+      assert map_size(assignments) == 3
+      assert assignments["A"] == assignments["B"]
+      assert assignments["B"] == assignments["C"]
+    end
+
+    test "two disconnected triangles form two communities" do
+      builder =
+        Zog.undirected()
+        |> Zog.add_edge("A", "B", 1.0)
+        |> Zog.add_edge("B", "C", 1.0)
+        |> Zog.add_edge("C", "A", 1.0)
+        |> Zog.add_edge("D", "E", 1.0)
+        |> Zog.add_edge("E", "F", 1.0)
+        |> Zog.add_edge("F", "D", 1.0)
+
+      assignments = Community.leiden(builder)
+
+      # Nodes in the first triangle share a community
+      assert assignments["A"] == assignments["B"]
+      assert assignments["B"] == assignments["C"]
+
+      # Nodes in the second triangle share a community
+      assert assignments["D"] == assignments["E"]
+      assert assignments["E"] == assignments["F"]
+
+      # The two communities are different
+      refute assignments["A"] == assignments["D"]
+    end
+
+    test "empty graph returns empty map" do
+      builder = Zog.undirected()
+      assignments = Community.leiden(builder)
+      assert assignments == %{}
+    end
+
+    test "single node returns single community" do
+      builder = Zog.undirected() |> Zog.add_node("A")
+      assignments = Community.leiden(builder)
+      assert assignments == %{"A" => 0}
+    end
+  end
+
   describe "modularity/2" do
     test "perfect partition has positive modularity" do
       builder =

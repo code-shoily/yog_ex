@@ -38,6 +38,7 @@ defmodule Yog.Zog.Community do
       nifs: [
         ...,
         louvain: [concurrency: :dirty_cpu],
+        leiden: [concurrency: :dirty_cpu],
         modularity_f64: [concurrency: :dirty_cpu]
       ]
 
@@ -118,6 +119,40 @@ defmodule Yog.Zog.Community do
     }
 
     // =============================================================================
+    // Leiden
+    // =============================================================================
+
+    /// Leiden community detection for weighted graphs.
+    pub fn leiden(
+        node_count: usize,
+        from: []u32,
+        to: []u32,
+        weight: []f64,
+        min_modularity_gain: f64,
+        max_iterations: usize,
+        seed: u64,
+        theta: f64,
+    ) ![]usize {
+        var g = try buildGraph(node_count, from, to, weight);
+        defer g.deinit();
+
+        var result = try zog.community.leiden.detectWeightedWithOptions(
+            beam.allocator,
+            g,
+            .{
+                .min_modularity_gain = min_modularity_gain,
+                .max_iterations = max_iterations,
+                .seed = seed,
+                .theta = theta,
+            },
+            zog.utils.identityF64,
+        );
+        defer result.deinit();
+
+        return extractAssignments(result, node_count);
+    }
+
+    // =============================================================================
     // Modularity
     // =============================================================================
 
@@ -172,6 +207,37 @@ defmodule Yog.Zog.Community do
 
       assignments =
         louvain(node_count, from, to, weights, min_modularity_gain, max_iterations, seed)
+
+      map_assignments(builder, assignments)
+    end
+
+    @doc """
+    Detects communities using the Leiden algorithm.
+
+    ## Options
+
+    - `:min_modularity_gain` — Stop moving nodes when the best modularity gain
+      is below this threshold (default: `0.000001`).
+    - `:max_iterations` — Maximum iterations per phase (default: `100`).
+    - `:seed` — Random seed for node shuffling and probabilistic moves (default: `42`).
+    - `:theta` — Temperature parameter for the probabilistic refinement phase (default: `1.0`).
+
+    Returns a map of `label => community_id`.
+    """
+    @spec leiden(Zog.t(), keyword()) :: %{
+            Zog.label() => non_neg_integer()
+          }
+    def leiden(%Yog.Builder.Zog{} = builder, opts \\ []) do
+      node_count = Zog.node_count(builder)
+      {from, to, weights} = Zog.to_edge_arrays(builder)
+
+      min_modularity_gain = Keyword.get(opts, :min_modularity_gain, 0.000001)
+      max_iterations = Keyword.get(opts, :max_iterations, 100)
+      seed = Keyword.get(opts, :seed, 42)
+      theta = Keyword.get(opts, :theta, 1.0)
+
+      assignments =
+        leiden(node_count, from, to, weights, min_modularity_gain, max_iterations, seed, theta)
 
       map_assignments(builder, assignments)
     end
