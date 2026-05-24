@@ -26,7 +26,7 @@ jobs:
         otp-version: ${{ matrix.otp }}
         
     - name: Set up Zig
-      uses: goto-bus-stop/setup-zig@v2
+      uses: mlugg/setup-zig@v1
       with:
         zig-version: 0.15.2
         
