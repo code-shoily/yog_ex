@@ -265,7 +265,8 @@ defmodule Yog.Zog.Centrality do
     def betweenness_unweighted(%Yog.Builder.Zog{} = builder) do
       node_count = Zog.node_count(builder)
       {from, to, _weights} = Zog.to_edge_arrays(builder)
-      scores = betweenness_unweighted(node_count, from, to)
+      raw_scores = betweenness_unweighted(node_count, from, to)
+      scores = maybe_scale_undirected(builder, raw_scores)
       map_scores(builder, scores)
     end
 
@@ -279,7 +280,8 @@ defmodule Yog.Zog.Centrality do
     def betweenness_f64(%Yog.Builder.Zog{} = builder) do
       node_count = Zog.node_count(builder)
       {from, to, weights} = Zog.to_edge_arrays(builder)
-      scores = betweenness_f64(node_count, from, to, weights)
+      raw_scores = betweenness_f64(node_count, from, to, weights)
+      scores = maybe_scale_undirected(builder, raw_scores)
       map_scores(builder, scores)
     end
 
@@ -426,6 +428,12 @@ defmodule Yog.Zog.Centrality do
       |> Enum.zip(scores)
       |> Map.new()
     end
+
+    defp maybe_scale_undirected(%Yog.Builder.Zog{kind: :undirected}, scores) do
+      Enum.map(scores, fn score -> score * 0.5 end)
+    end
+
+    defp maybe_scale_undirected(_, scores), do: scores
   else
     @moduledoc """
     Native centrality algorithms backed by Zog (Zig) via Zigler.

@@ -42,6 +42,18 @@ defmodule Yog.Generators do
     end
   end
 
+  @doc """
+  Generates a random undirected graph with strictly positive weights (1..100).
+  """
+  def positive_undirected_graph_gen do
+    gen all(
+          nodes <- node_list_gen(),
+          weights <- weight_list_gen(length(nodes), 1..100)
+        ) do
+      build_graph(:undirected, nodes, weights)
+    end
+  end
+
   # --- Private Generators ---
 
   defp kind_gen do
@@ -187,7 +199,7 @@ defmodule Yog.Generators do
       from = Map.get(node_map, from_idx)
       to = Map.get(node_map, to_idx)
 
-      if from != nil and to != nil do
+      if from != nil and to != nil and from != to do
         case Yog.add_edge(g, from, to, weight) do
           {:ok, new_g} -> new_g
           {:error, _} -> g

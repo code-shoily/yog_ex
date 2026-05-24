@@ -518,7 +518,8 @@ defmodule Yog.Zog.ResourceGraph do
     """
     @spec betweenness_unweighted(t()) :: %{Zog.label() => float()}
     def betweenness_unweighted(%{resource: res, builder: builder}) do
-      scores = nif_betweenness_unweighted(res)
+      raw_scores = nif_betweenness_unweighted(res)
+      scores = maybe_scale_undirected(builder, raw_scores)
       map_scores(builder, scores)
     end
 
@@ -527,7 +528,8 @@ defmodule Yog.Zog.ResourceGraph do
     """
     @spec betweenness_f64(t()) :: %{Zog.label() => float()}
     def betweenness_f64(%{resource: res, builder: builder}) do
-      scores = nif_betweenness_f64(res)
+      raw_scores = nif_betweenness_f64(res)
+      scores = maybe_scale_undirected(builder, raw_scores)
       map_scores(builder, scores)
     end
 
@@ -908,6 +910,12 @@ defmodule Yog.Zog.ResourceGraph do
       |> Enum.zip(assignments)
       |> Map.new()
     end
+
+    defp maybe_scale_undirected(%Yog.Builder.Zog{kind: :undirected}, scores) do
+      Enum.map(scores, fn score -> score * 0.5 end)
+    end
+
+    defp maybe_scale_undirected(_, scores), do: scores
   else
     @moduledoc """
     Native graph resource backed by Zog (Zig) via Zigler.
