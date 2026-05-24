@@ -2,35 +2,50 @@
 
 Complete reference of all algorithms implemented in YogEx, organized by category.
 
+---
+
+## ⚡ Zigler-Native Acceleration (Zog Engine)
+
+YogEx features a high-performance native backend powered by **Zigler** and written in modern, memory-safe **Zig 0.15.x**. This native engine features two high-efficiency execution modes:
+
+1. **Copy-In / Copy-Out**: Transparently serializes Elixir graph structures into flat, cache-friendly array/SoA layouts, offloads heavy processing to dirty CPU NIF threads, and restores original labels on return.
+2. **Zero-Copy Native Resources (`ResourceGraph`)**: Keeps the graph memory alive inside the BEAM VM as an opaque native C resource. This completely bypasses Elixir graph serialization overhead on repeated runs—achieving **5x to 50x speedups**!
+
+Look for the **Zog Backend** column in the tables below to see which algorithms support native acceleration.
+
+---
+
 ## Pathfinding
 
-| Algorithm | Module | Purpose | Time Complexity | Space Complexity |
-|-----------|--------|---------|-----------------|------------------|
-| Dijkstra | `Yog.Pathfinding.Dijkstra` | Single-source shortest path (non-negative weights) | O((V+E) log V) | O(V) |
-| A* | `Yog.Pathfinding.AStar` | Heuristic-guided shortest path | O((V+E) log V) | O(V) |
-| Bellman-Ford | `Yog.Pathfinding.BellmanFord` | Shortest path with negative weights, cycle detection | O(VE) | O(V) |
-| Floyd-Warshall | `Yog.Pathfinding.FloydWarshall` | All-pairs shortest paths | O(V³) | O(V²) |
-| Johnson's | `Yog.Pathfinding.Johnson` | All-pairs shortest paths in sparse graphs | O(V² log V + VE) | O(V²) |
-| Bidirectional Dijkstra | `Yog.Pathfinding.Bidirectional` | Faster single-pair shortest path | O((V+E) log V) | O(V) |
-| Bidirectional BFS | `Yog.Pathfinding.Bidirectional` | Unweighted shortest path | O(V+E) | O(V) |
-| Yen's K-Shortest | `Yog.Pathfinding.Yen` | k shortest loopless paths | O(k·N·(E+V log V)) | O(kV) |
-| Widest Path | `Yog.Pathfinding` | Maximum bottleneck capacity path | O((V+E) log V) | O(V) |
-| Unweighted SSSP | `Yog.Pathfinding` | BFS shortest path (no heap) | O(V+E) | O(V) |
-| Brandes SSSP | `Yog.Pathfinding.Brandes` | Single-source dependency accumulation | O(VE) | O(V²) |
-| Chinese Postman | `Yog.Pathfinding.ChinesePostman` | Shortest route visiting every edge | O(V³) | O(V²) |
-| LCA (Binary Lifting) | `Yog.Pathfinding.LCA` | Lowest common ancestor in trees | O(V log V) preprocess, O(log V) query | O(V log V) |
-| Path Utilities | `Yog.Pathfinding.Path` | Path reconstruction and manipulation | O(V) | O(V) |
-| Distance Matrix | `Yog.Pathfinding.Matrix` | Matrix-based distance operations | O(V²) | O(V²) |
-| All-Pairs Unweighted | `Yog.Pathfinding` | Parallel BFS all-pairs shortest paths | O(V(V+E)) | O(V²) |
+| Algorithm | Module | Zog Backend | Purpose | Time Complexity | Space Complexity |
+|-----------|--------|-------------|---------|-----------------|------------------|
+| Dijkstra | `Yog.Pathfinding.Dijkstra` | - | Single-source shortest path (non-negative weights) | O((V+E) log V) | O(V) |
+| A* | `Yog.Pathfinding.AStar` | - | Heuristic-guided shortest path | O((V+E) log V) | O(V) |
+| Bellman-Ford | `Yog.Pathfinding.BellmanFord` | - | Shortest path with negative weights, cycle detection | O(VE) | O(V) |
+| Floyd-Warshall | `Yog.Pathfinding.FloydWarshall` | `Yog.Zog.Pathfinding` <br> `ResourceGraph` | All-pairs shortest paths | O(V³) | O(V²) |
+| Johnson's | `Yog.Pathfinding.Johnson` | `Yog.Zog.Pathfinding` <br> `ResourceGraph` | All-pairs shortest paths in sparse graphs | O(V² log V + VE) | O(V²) |
+| Bidirectional Dijkstra | `Yog.Pathfinding.Bidirectional` | - | Faster single-pair shortest path | O((V+E) log V) | O(V) |
+| Bidirectional BFS | `Yog.Pathfinding.Bidirectional` | - | Unweighted shortest path | O(V+E) | O(V) |
+| Yen's K-Shortest | `Yog.Pathfinding.Yen` | - | k shortest loopless paths | O(k·N·(E+V log V)) | O(kV) |
+| Widest Path | `Yog.Pathfinding` | - | Maximum bottleneck capacity path | O((V+E) log V) | O(V) |
+| Unweighted SSSP | `Yog.Pathfinding` | - | BFS shortest path (no heap) | O(V+E) | O(V) |
+| Brandes SSSP | `Yog.Pathfinding.Brandes` | - | Single-source dependency accumulation | O(VE) | O(V²) |
+| Chinese Postman | `Yog.Pathfinding.ChinesePostman` | - | Shortest route visiting every edge | O(V³) | O(V²) |
+| LCA (Binary Lifting) | `Yog.Pathfinding.LCA` | - | Lowest common ancestor in trees | O(V log V) preprocess, O(log V) query | O(V log V) |
+| Path Utilities | `Yog.Pathfinding.Path` | - | Path reconstruction and manipulation | O(V) | O(V) |
+| Distance Matrix | `Yog.Pathfinding.Matrix` | - | Matrix-based distance operations | O(V²) | O(V²) |
+| All-Pairs Unweighted | `Yog.Pathfinding` | - | Parallel BFS all-pairs shortest paths | O(V(V+E)) | O(V²) |
 
 ## Flow & Cuts
 
-| Algorithm | Module | Purpose | Time Complexity | Space Complexity |
-|-----------|--------|---------|-----------------|------------------|
-| Edmonds-Karp | `Yog.Flow.MaxFlow` | Maximum flow (BFS augmenting paths) | O(VE²) | O(V+E) |
-| Dinic's | `Yog.Flow.MaxFlow` | Maximum flow (blocking flow) | O(V²E) | O(V+E) |
-| Successive Shortest Path | `Yog.Flow.SuccessiveShortestPath` | Min-cost max-flow | O(F · E log V) | O(V+E) |
-| Stoer-Wagner | `Yog.Flow.MinCut` | Global minimum cut | O(V³) | O(V²) |
+| Algorithm | Module | Zog Backend | Purpose | Time Complexity | Space Complexity |
+|-----------|--------|-------------|---------|-----------------|------------------|
+| Edmonds-Karp | `Yog.Flow.MaxFlow` | `Yog.Zog.Flow` <br> `ResourceGraph` | Maximum flow (BFS augmenting paths) | O(VE²) | O(V+E) |
+| Dinic's | `Yog.Flow.MaxFlow` | - | Maximum flow (blocking flow) | O(V²E) | O(V+E) |
+| Push-Relabel | - | `Yog.Zog.Flow` <br> `ResourceGraph` | Maximum flow (Highest-Label push-relabel) | O(V² √E) | O(V+E) |
+| Successive Shortest Path | `Yog.Flow.SuccessiveShortestPath` | - | Min-cost max-flow | O(F · E log V) | O(V+E) |
+| Stoer-Wagner | `Yog.Flow.MinCut` | `Yog.Zog.Flow` <br> `ResourceGraph` | Global minimum cut | O(V³) | O(V²) |
+| Min s-t Cut | `Yog.Flow.MinCut` | `Yog.Zog.Flow` <br> `ResourceGraph` | Minimum capacity s-t cut partition | O(VE²) | O(V+E) |
 
 ## Spanning Tree
 
@@ -67,42 +82,42 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 
 ## Centrality Measures
 
-| Algorithm | Module | Purpose | Time Complexity | Space Complexity |
-|-----------|--------|---------|-----------------|------------------|
-| Degree Centrality | `Yog.Centrality` | Simple connectivity importance | O(V+E) | O(V) |
-| Closeness Centrality | `Yog.Centrality` | Distance-based importance | O(VE + V² log V) | O(V) |
-| Harmonic Centrality | `Yog.Centrality` | Distance-based (handles infinite) | O(VE + V² log V) | O(V) |
-| Betweenness Centrality | `Yog.Centrality` | Bridge/gatekeeper detection | O(VE) or O(V³) | O(V²) |
-| PageRank | `Yog.Centrality` | Link-quality importance | O(k(V+E)) | O(V) |
-| HITS | `Yog.Centrality` | Hub and authority scores | O(k(V+E)) | O(V) |
-| Eigenvector Centrality | `Yog.Centrality` | Influence from neighbors | O(k(V+E)) | O(V) |
-| Katz Centrality | `Yog.Centrality` | Attenuated influence propagation | O(k(V+E)) | O(V) |
-| Alpha Centrality | `Yog.Centrality` | External influence model | O(k(V+E)) | O(V) |
+| Algorithm | Module | Zog Backend | Purpose | Time Complexity | Space Complexity |
+|-----------|--------|-------------|---------|-----------------|------------------|
+| Degree Centrality | `Yog.Centrality` | `Yog.Zog.Centrality` | Simple connectivity importance | O(V+E) | O(V) |
+| Closeness Centrality | `Yog.Centrality` | `Yog.Zog.Centrality` <br> `ResourceGraph` | Distance-based importance | O(VE + V² log V) | O(V) |
+| Harmonic Centrality | `Yog.Centrality` | `Yog.Zog.Centrality` <br> `ResourceGraph` | Distance-based (handles infinite) | O(VE + V² log V) | O(V) |
+| Betweenness Centrality | `Yog.Centrality` | `Yog.Zog.Centrality` <br> `ResourceGraph` | Bridge/gatekeeper detection | O(VE) or O(V³) | O(V²) |
+| PageRank | `Yog.Centrality` | `Yog.Zog.Centrality` <br> `ResourceGraph` | Link-quality importance | O(k(V+E)) | O(V) |
+| HITS | `Yog.Centrality` | - | Hub and authority scores | O(k(V+E)) | O(V) |
+| Eigenvector Centrality | `Yog.Centrality` | `Yog.Zog.Centrality` <br> `ResourceGraph` | Influence from neighbors | O(k(V+E)) | O(V) |
+| Katz Centrality | `Yog.Centrality` | `Yog.Zog.Centrality` <br> `ResourceGraph` | Attenuated influence propagation | O(k(V+E)) | O(V) |
+| Alpha Centrality | `Yog.Centrality` | `Yog.Zog.ResourceGraph` | External influence model | O(k(V+E)) | O(V) |
 
 ## Community Detection
 
-| Algorithm | Module | Purpose | Time Complexity | Space Complexity |
-|-----------|--------|---------|-----------------|------------------|
-| Louvain | `Yog.Community.Louvain` | Modularity optimization | O(E log V) | O(V) |
-| Leiden | `Yog.Community.Leiden` | Quality-guaranteed communities | O(E log V) | O(V) |
-| Label Propagation | `Yog.Community.LabelPropagation` | Very large graphs, speed | O(kE) | O(V) |
-| Walktrap | `Yog.Community.Walktrap` | Random-walk communities | O(V² log V) | O(V²) |
-| Infomap | `Yog.Community.Infomap` | Information-theoretic | O(kE) | O(V) |
-| Girvan-Newman | `Yog.Community.GirvanNewman` | Hierarchical edge betweenness | O(E²V) | O(V²) |
-| Clique Percolation | `Yog.Community.CliquePercolation` | Overlapping communities | O(3^(V/3)) | O(V²) |
-| Fluid Communities | `Yog.Community.FluidCommunities` | Exact k partitions | O(kE) | O(V) |
-| Local Community | `Yog.Community.LocalCommunity` | Seed expansion | O(S × E_S) | O(S) |
+| Algorithm | Module | Zog Backend | Purpose | Time Complexity | Space Complexity |
+|-----------|--------|-------------|---------|-----------------|------------------|
+| Louvain | `Yog.Community.Louvain` | `Yog.Zog.Community` <br> `ResourceGraph` | Modularity optimization | O(E log V) | O(V) |
+| Leiden | `Yog.Community.Leiden` | - | Quality-guaranteed communities | O(E log V) | O(V) |
+| Label Propagation | `Yog.Community.LabelPropagation` | - | Very large graphs, speed | O(kE) | O(V) |
+| Walktrap | `Yog.Community.Walktrap` | - | Random-walk communities | O(V² log V) | O(V²) |
+| Infomap | `Yog.Community.Infomap` | - | Information-theoretic | O(kE) | O(V) |
+| Girvan-Newman | `Yog.Community.GirvanNewman` | - | Hierarchical edge betweenness | O(E²V) | O(V²) |
+| Clique Percolation | `Yog.Community.CliquePercolation` | - | Overlapping communities | O(3^(V/3)) | O(V²) |
+| Fluid Communities | `Yog.Community.FluidCommunities` | - | Exact k partitions | O(kE) | O(V) |
+| Local Community | `Yog.Community.LocalCommunity` | - | Seed expansion | O(S × E_S) | O(S) |
 
 ## Community Metrics
 
-| Algorithm | Module | Purpose | Time Complexity | Space Complexity |
-|-----------|--------|---------|-----------------|------------------|
-| Transitivity | `Yog.Community.Metrics` | Global clustering coefficient | O(Δ²E) | O(V) |
-| Local Clustering Coefficient | `Yog.Community` | Per-node clustering coefficient | O(Δ²E) | O(V) |
-| Average Clustering Coefficient | `Yog.Community` | Global average clustering | O(Δ²E) | O(V) |
-| Triangle Count | `Yog.Community` | Global or per-node triangles | O(Δ²E) | O(V) |
-| Community Density | `Yog.Community` | Per-community edge density | O(E) | O(V) |
-| Modularity | `Yog.Community` | Partition quality score | O(E) | O(V) |
+| Algorithm | Module | Zog Backend | Purpose | Time Complexity | Space Complexity |
+|-----------|--------|-------------|---------|-----------------|------------------|
+| Modularity | `Yog.Community` | `Yog.Zog.Community` <br> `ResourceGraph` | Partition quality score | O(E) | O(V) |
+| Transitivity | `Yog.Community.Metrics` | - | Global clustering coefficient | O(Δ²E) | O(V) |
+| Local Clustering Coefficient | `Yog.Community` | `Yog.Zog.Metrics` <br> `ResourceGraph` | Per-node clustering coefficient | O(Δ²E) | O(V) |
+| Average Clustering Coefficient | `Yog.Community` | `Yog.Zog.Metrics` <br> `ResourceGraph` | Global average clustering | O(Δ²E) | O(V) |
+| Triangle Count | `Yog.Community` | `Yog.Zog.Metrics` <br> `ResourceGraph` | Global or per-node triangles | O(Δ²E) | O(V) |
+| Community Density | `Yog.Community` | `Yog.Zog.Metrics` <br> `ResourceGraph` | Per-community edge density | O(E) | O(V) |
 
 ## Traversal & Search
 
@@ -135,29 +150,29 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 
 ## Graph Properties
 
-| Algorithm | Module | Purpose | Time Complexity | Space Complexity |
-|-----------|--------|---------|-----------------|------------------|
-| Bipartite Check | `Yog.Property.Bipartite` | 2-colorability test | O(V+E) | O(V) |
-| Bipartite Partition | `Yog.Property.Bipartite` | Two-color assignment | O(V+E) | O(V) |
-| Max Bipartite Matching | `Yog.Property.Bipartite` | Maximum matching | O(VE) | O(V) |
-| Stable Marriage | `Yog.Property.Bipartite` | Gale-Shapley stable matching | O(V²) | O(V) |
-| Acyclicity Test | `Yog.Property.Cyclicity` | Cycle detection | O(V+E) | O(V) |
-| Eulerian Circuit | `Yog.Property.Eulerian` | Eulerian cycle existence | O(V+E) | O(V) |
-| Eulerian Path | `Yog.Property.Eulerian` | Eulerian path existence | O(V+E) | O(V) |
-| Bron-Kerbosch | `Yog.Property.Clique` | All maximal cliques | O(3^(V/3)) | O(V) |
-| Max Clique | `Yog.Property.Clique` | Largest clique | O(3^(V/3)) | O(V) |
-| Complete Graph | `Yog.Property.Structure` | Kₙ detection | O(V²) | O(1) |
-| Tree Check | `Yog.Property.Structure` | Tree verification | O(V+E) | O(V) |
-| Forest Check | `Yog.Property.Structure` | Disjoint trees | O(V+E) | O(V) |
-| Branching Check | `Yog.Property.Structure` | Directed forest | O(V+E) | O(V) |
-| Planarity Test | `Yog.Property.Structure` | Exact LR-test planarity | O(V²) | O(V) |
-| Planar Embedding | `Yog.Property.Structure` | Combinatorial embedding | O(V²) | O(V) |
-| Kuratowski Witness | `Yog.Property.Structure` | Non-planar subgraph | O(V²) | O(V) |
-| Chordality Test | `Yog.Property.Structure` | Chordal graph verification | O(V+E) | O(V) |
-| Graph Coloring | `Yog.Property.Coloring` | Greedy and exact coloring | O(V²)–O(V!) | O(V) |
-| Tree Decomposition | `Yog.Property.TreeDecomposition` | Validity checking and construction | O(V²)–O(V³) | O(V²) |
-| Isomorphism | `Yog.Property` | Weisfeiler-Lehman equality | O(k(V+E)) | O(V) |
-| Graph Hash | `Yog.Property` | Structural fingerprint | O(k(V+E)) | O(V) |
+| Algorithm | Module | Zog Backend | Purpose | Time Complexity | Space Complexity |
+|-----------|--------|-------------|---------|-----------------|------------------|
+| Bipartite Check | `Yog.Property.Bipartite` | - | 2-colorability test | O(V+E) | O(V) |
+| Bipartite Partition | `Yog.Property.Bipartite` | - | Two-color assignment | O(V+E) | O(V) |
+| Max Bipartite Matching | `Yog.Property.Bipartite` | - | Maximum matching | O(VE) | O(V) |
+| Stable Marriage | `Yog.Property.Bipartite` | - | Gale-Shapley stable matching | O(V²) | O(V) |
+| Acyclicity Test | `Yog.Property.Cyclicity` | - | Cycle detection | O(V+E) | O(V) |
+| Eulerian Circuit | `Yog.Property.Eulerian` | - | Eulerian cycle existence | O(V+E) | O(V) |
+| Eulerian Path | `Yog.Property.Eulerian` | - | Eulerian path existence | O(V+E) | O(V) |
+| Bron-Kerbosch | `Yog.Property.Clique` | `Yog.Zog.Property` | All maximal cliques | O(3^(V/3)) | O(V) |
+| Max Clique | `Yog.Property.Clique` | `Yog.Zog.Property` | Largest clique | O(3^(V/3)) | O(V) |
+| Complete Graph | `Yog.Property.Structure` | - | Kₙ detection | O(V²) | O(1) |
+| Tree Check | `Yog.Property.Structure` | - | Tree verification | O(V+E) | O(V) |
+| Forest Check | `Yog.Property.Structure` | - | Disjoint trees | O(V+E) | O(V) |
+| Branching Check | `Yog.Property.Structure` | - | Directed forest | O(V+E) | O(V) |
+| Planarity Test | `Yog.Property.Structure` | - | Exact LR-test planarity | O(V²) | O(V) |
+| Planar Embedding | `Yog.Property.Structure` | - | Combinatorial embedding | O(V²) | O(V) |
+| Kuratowski Witness | `Yog.Property.Structure` | - | Non-planar subgraph | O(V²) | O(V) |
+| Chordality Test | `Yog.Property.Structure` | - | Chordal graph verification | O(V+E) | O(V) |
+| Graph Coloring | `Yog.Property.Coloring` | - | Greedy and exact coloring | O(V²)–O(V!) | O(V) |
+| Tree Decomposition | `Yog.Property.TreeDecomposition` | - | Validity checking and construction | O(V²)–O(V³) | O(V²) |
+| Isomorphism | `Yog.Property` | - | Weisfeiler-Lehman equality | O(k(V+E)) | O(V) |
+| Graph Hash | `Yog.Property` | - | Structural fingerprint | O(k(V+E)) | O(V) |
 
 ## DAG Algorithms
 
@@ -213,17 +228,21 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | Topological Sort | `Yog.Multi` | Multigraph topological ordering | O(V+E) | O(V) |
 | To Simple Graph | `Yog.Multi` | Collapse parallel edges | O(V+E) | O(V+E) |
 
-## Health Metrics
+## Structural & Health Metrics
 
-| Algorithm | Module | Purpose | Time Complexity | Space Complexity |
-|-----------|--------|---------|-----------------|------------------|
-| Diameter | `Yog.Health` | Longest shortest path | O(V(V+E)) | O(V) |
-| Radius | `Yog.Health` | Minimum eccentricity | O(V(V+E)) | O(V) |
-| Eccentricity | `Yog.Health` | Max distance from node | O(V+E) | O(V) |
-| Assortativity | `Yog.Health` | Degree correlation | O(E) | O(1) |
-| APL | `Yog.Health` | Average path length | O(V(V+E)) | O(V) |
-| Global Efficiency | `Yog.Health` | Inverse mean distance | O(V(V+E)) | O(V) |
-| Local Efficiency | `Yog.Health` | Neighborhood efficiency | O(V(V+E)) | O(V) |
+| Algorithm | Module | Zog Backend | Purpose | Time Complexity | Space Complexity |
+|-----------|--------|-------------|---------|-----------------|------------------|
+| Density | `Yog.Health` | `Yog.Zog.Metrics` <br> `ResourceGraph` | Ratio of actual edges to possible edges | O(V+E) | O(1) |
+| Triangle Count | `Yog.Health` | `Yog.Zog.Metrics` <br> `ResourceGraph` | Number of triangles (3-cliques) in graph | O(V³) | O(V) |
+| Average Clustering | `Yog.Health` | `Yog.Zog.Metrics` <br> `ResourceGraph` | Mean local clustering coefficient | O(V · deg(v)²) | O(V) |
+| Local Clustering | `Yog.Health` | `Yog.Zog.Metrics` <br> `ResourceGraph` | Fraction of pairs of neighbors that are connected | O(deg(v)²) | O(V) |
+| Diameter | `Yog.Health` | - | Longest shortest path | O(V(V+E)) | O(V) |
+| Radius | `Yog.Health` | - | Minimum eccentricity | O(V(V+E)) | O(V) |
+| Eccentricity | `Yog.Health` | - | Max distance from node | O(V+E) | O(V) |
+| Assortativity | `Yog.Health` | `Yog.Zog.Metrics` <br> `ResourceGraph` | Degree correlation coefficient | O(E) | O(1) |
+| APL | `Yog.Health` | - | Average path length | O(V(V+E)) | O(V) |
+| Global Efficiency | `Yog.Health` | - | Inverse mean distance | O(V(V+E)) | O(V) |
+| Local Efficiency | `Yog.Health` | - | Neighborhood efficiency | O(V(V+E)) | O(V) |
 
 ## Random Graph Generation
 
