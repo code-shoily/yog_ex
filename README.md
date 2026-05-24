@@ -134,6 +134,103 @@ libgraph = Yog.IO.Libgraph.to_libgraph(graph)
 {:ok, yog_graph} = Yog.IO.Libgraph.from_libgraph(libgraph)
 ```
 
+### Native Acceleration with Zig (Optional)
+
+YogEx ships with an optional **Zig** native backend (via [`zigler`](https://hex.pm/packages/zigler)) that accelerates performance-critical graph algorithms. When enabled, centrality measures, community detection, and graph metrics run as compiled NIFs with `:dirty_cpu` scheduling.
+
+> **Requirements**
+> - Zig compiler **0.15.x** (required by zigler 0.15.2)
+> - `zigler` added as a dependency
+
+Add both to your `mix.exs`:
+
+```elixir
+def deps do
+  [
+    {:yog_ex, "~> 0.98.0"},
+    {:zigler, "~> 0.15.2", runtime: false}
+  ]
+end
+```
+
+Ensure Zig 0.15.x is active (e.g. via [`mise`](https://mise.jdx.dev/)):
+
+```bash
+mise use zig@0.15.2
+# or if using mise.toml in the project:
+eval "$(mise activate bash)"
+```
+
+Build a graph with the dense `Zog` builder and call a native algorithm:
+
+```elixir
+alias Yog.Builder.Zog
+alias Yog.Zog.Centrality
+
+builder =
+  Zog.directed()
+  |> Zog.add_edge("A", "B", 1.0)
+  |> Zog.add_edge("B", "C", 1.0)
+  |> Zog.add_edge("A", "C", 10.0)
+
+# Unweighted betweenness (Brandes' algorithm)
+Centrality.betweenness_unweighted(builder)
+# => %{"A" => 0.0, "B" => 1.0, "C" => 0.0}
+
+# Weighted betweenness
+Centrality.betweenness_f64(builder)
+
+# PageRank
+Centrality.pagerank(builder, damping: 0.85)
+
+# Eigenvector, Katz, Alpha centrality, closeness, harmonic centrality
+Centrality.eigenvector(builder)
+Centrality.katz(builder, alpha: 0.1, beta: 1.0)
+Centrality.closeness_f64(builder)
+
+# Community detection
+alias Yog.Zog.Community
+
+builder =
+  Zog.undirected()
+  |> Zog.add_edge("A", "B", 1.0)
+  |> Zog.add_edge("B", "C", 1.0)
+  |> Zog.add_edge("C", "A", 1.0)
+  |> Zog.add_edge("D", "E", 1.0)
+  |> Zog.add_edge("E", "F", 1.0)
+  |> Zog.add_edge("F", "D", 1.0)
+
+# Louvain (modularity optimization)
+communities = Community.louvain(builder)
+# => %{"A" => 0, "B" => 0, "C" => 0, "D" => 1, "E" => 1, "F" => 1}
+
+# Label Propagation
+Community.label_propagation(builder)
+
+# Modularity of a partition
+Community.modularity(builder, communities)
+# => 0.357...
+
+# Graph metrics
+alias Yog.Zog.Metrics
+
+Metrics.density(builder)
+# => 1.0
+
+Metrics.triangle_count(builder)
+# => 1
+
+Metrics.average_clustering_coefficient(builder)
+# => 1.0
+
+Metrics.assortativity(builder)
+# => -0.333...
+```
+
+The `Yog.Builder.Zog` module mirrors the labeled builder API but produces flat `u32` arrays that are serialized efficiently across the NIF boundary—no intermediate term copying.
+
+If `zigler` is not installed, the `Yog.Zog.Centrality`, `Yog.Zog.Community`, and `Yog.Zog.Metrics` modules will raise a helpful runtime error directing you to add the dependency.
+
 ### Livebook
 
 For livebook, add the following:
