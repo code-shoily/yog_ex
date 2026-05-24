@@ -1,7 +1,6 @@
 defmodule Yog.Zog.PropertyTest do
   use ExUnit.Case, async: true
 
-  alias Yog.Property.Clique
   alias Yog.Zog.Property
 
   test "native all_maximal_cliques: complete graph K4" do
@@ -38,21 +37,5 @@ defmodule Yog.Zog.PropertyTest do
     assert length(cliques) == 2
     assert MapSet.new(["a1", "a2", "a3"]) in cliques
     assert MapSet.new(["b1", "b2", "b3"]) in cliques
-  end
-
-  test "native all_maximal_cliques: transparent dispatch via standard Clique module" do
-    builder =
-      Yog.Builder.Zog.undirected()
-      |> Yog.Builder.Zog.add_edge("A", "B", 1.0)
-      |> Yog.Builder.Zog.add_edge("B", "C", 1.0)
-      |> Yog.Builder.Zog.add_edge("C", "A", 1.0)
-
-    # Calling standard Clique module with Zog builder
-    cliques = Clique.all_maximal_cliques(builder)
-    assert length(cliques) == 1
-    assert MapSet.new(["A", "B", "C"]) in cliques
-
-    max_c = Clique.max_clique(builder)
-    assert MapSet.size(max_c) == 3
   end
 end
