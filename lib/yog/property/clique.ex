@@ -117,9 +117,7 @@ defmodule Yog.Property.Clique do
   - [CP-Algorithms: Finding Cliques](https://cp-algorithms.com/graph/search_for_connected_components.html)
   """
 
-  alias Yog.Builder.Zog
   alias Yog.Model
-  alias Yog.Zog.Property, as: ZogProperty
 
   @doc """
   Finds the maximum clique in an undirected graph.
@@ -158,11 +156,7 @@ defmodule Yog.Property.Clique do
 
   O(3^(n/3)) worst case
   """
-  @spec max_clique(Yog.graph() | Zog.t()) ::
-          MapSet.t(Yog.node_id() | Zog.label()) | {:error, :undirected_only}
-  def max_clique(%Yog.Builder.Zog{} = builder) do
-    ZogProperty.max_clique(builder)
-  end
+  @spec max_clique(Yog.graph()) :: MapSet.t(Yog.node_id()) | {:error, :undirected_only}
   def max_clique(graph) do
     if Model.type(graph) == :directed do
       {:error, :undirected_only}
@@ -219,11 +213,7 @@ defmodule Yog.Property.Clique do
 
   O(3^(n/3)) worst case
   """
-  @spec all_maximal_cliques(Yog.graph() | Zog.t()) ::
-          [MapSet.t(Yog.node_id() | Zog.label())] | {:error, :undirected_only}
-  def all_maximal_cliques(%Yog.Builder.Zog{} = builder) do
-    ZogProperty.all_maximal_cliques(builder)
-  end
+  @spec all_maximal_cliques(Yog.graph()) :: [MapSet.t(Yog.node_id())] | {:error, :undirected_only}
   def all_maximal_cliques(graph) do
     if Model.type(graph) == :directed do
       {:error, :undirected_only}
