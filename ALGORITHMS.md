@@ -99,7 +99,7 @@ Look for the **Zog Backend** column in the tables below to see which algorithms 
 | Algorithm | Module | Zog Backend | Purpose | Time Complexity | Space Complexity |
 |-----------|--------|-------------|---------|-----------------|------------------|
 | Louvain | `Yog.Community.Louvain` | `Yog.Zog.Community` <br> `ResourceGraph` | Modularity optimization | O(E log V) | O(V) |
-| Leiden | `Yog.Community.Leiden` | - | Quality-guaranteed communities | O(E log V) | O(V) |
+| Leiden | `Yog.Community.Leiden` | `Yog.Zog.Community` <br> `ResourceGraph` | Quality-guaranteed communities | O(E log V) | O(V) |
 | Label Propagation | `Yog.Community.LabelPropagation` | - | Very large graphs, speed | O(kE) | O(V) |
 | Walktrap | `Yog.Community.Walktrap` | - | Random-walk communities | O(V² log V) | O(V²) |
 | Infomap | `Yog.Community.Infomap` | - | Information-theoretic | O(kE) | O(V) |
