@@ -97,6 +97,10 @@ defmodule Yog.Community.Leiden do
   @doc """
   Detects communities using the Leiden algorithm with default options.
 
+  > [!TIP]
+  > For a much faster native implementation (providing up to 19x speedup on large networks),
+  > see `Yog.Zog.Community.leiden/2`.
+
   ## Example
 
       communities = Yog.Community.Leiden.detect(graph)
@@ -117,6 +121,10 @@ defmodule Yog.Community.Leiden do
   - `:refinement_iterations` - Refinement step iterations (default: 5)
   - `:resolution` - Resolution parameter (gamma) (default: 1.0)
   - `:seed` - Random seed for tie-breaking (default: 42)
+
+  > [!TIP]
+  > For a much faster native implementation (providing up to 19x speedup on large networks),
+  > see `Yog.Zog.Community.leiden/2`.
 
   ## Example
 

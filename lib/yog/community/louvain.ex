@@ -81,6 +81,10 @@ defmodule Yog.Community.Louvain do
 
   @doc """
   Detects communities using the Louvain algorithm with default options.
+
+  > [!TIP]
+  > For a much faster native implementation (providing up to 19x speedup on large networks),
+  > see `Yog.Zog.Community.louvain/2`.
   """
   @spec detect(Yog.graph()) :: Result.t()
   def detect(graph) do
@@ -96,6 +100,10 @@ defmodule Yog.Community.Louvain do
     * `:max_iterations` - Maximum iterations per phase (default: 100)
     * `:resolution` - Resolution parameter (gamma) (default: 1.0)
     * `:seed` - Random seed for tie-breaking (default: 42)
+
+  > [!TIP]
+  > For a much faster native implementation (providing up to 19x speedup on large networks),
+  > see `Yog.Zog.Community.louvain/2`.
   """
   @spec detect_with_options(Yog.graph(), keyword()) :: Result.t()
   def detect_with_options(graph, opts) do

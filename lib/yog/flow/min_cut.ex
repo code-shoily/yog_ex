@@ -99,6 +99,10 @@ defmodule Yog.Flow.MinCut do
 
   **Time Complexity:** O(V³) (O(V² log V) with priority queue optimization)
 
+  > [!TIP]
+  > For a much faster native implementation (providing up to 19x speedup on large networks),
+  > see `Yog.Zog.Flow.global_min_cut/1` (Stoer-Wagner) or `Yog.Zog.Flow.karger_stein/2` (randomized Karger-Stein).
+
   ## Examples
 
   Simple triangle graph:
@@ -218,6 +222,10 @@ defmodule Yog.Flow.MinCut do
   - `source` - Source node ID
   - `sink` - Sink node ID
   - `algorithm` - Algorithm to use: `:edmonds_karp` (default), `:dinic`, or `:push_relabel`
+
+  > [!TIP]
+  > For a much faster native implementation (providing up to 19x speedup on large networks),
+  > see `Yog.Zog.Flow.s_t_min_cut/4`.
 
   ## Examples
 

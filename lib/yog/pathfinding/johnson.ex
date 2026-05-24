@@ -89,6 +89,10 @@ defmodule Yog.Pathfinding.Johnson do
 
   **Time Complexity:** O(V² log V + VE)
 
+  > [!TIP]
+  > For a much faster native implementation (providing up to 19x speedup on large networks),
+  > see `Yog.Zog.Pathfinding.johnsons/1`.
+
   Returns `{:ok, distance_matrix}` on success, or `{:error, :negative_cycle}`
   if a negative cycle is detected.
 

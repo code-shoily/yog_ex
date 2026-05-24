@@ -180,10 +180,11 @@ defmodule Yog.Zog.Flow do
     """
 
     @doc """
-    Computes the maximum flow and minimum cut from source to sink in the network.
+    Computes the maximum flow and minimum cut from source to sink in the network using the native Zog backend.
 
-    Accepts a `Yog.Builder.Zog` struct representing the flow network with edge capacities
-    as weights.
+    Supports `:edmonds_karp` and `:push_relabel` algorithms.
+
+    **Time Complexity:** O(VE²) for Edmonds-Karp, O(V²E) for Push-Relabel.
 
     ## Returns
 
@@ -192,6 +193,20 @@ defmodule Yog.Zog.Flow do
     - `:residual_graph` — A directed `Yog.Graph` representing the remaining edge capacities.
     - `:source_side` — List of original user node labels reachable from the source in the residual graph.
     - `:sink_side` — List of original user node labels not reachable from the source.
+
+    ## Example
+
+        iex> alias Yog.Builder.Zog
+        iex> builder = Zog.directed()
+        ...>   |> Zog.add_edge("s", "a", 10.0)
+        ...>   |> Zog.add_edge("a", "t", 5.0)
+        iex> result = Yog.Zog.Flow.max_flow(builder, "s", "t", :push_relabel)
+        iex> result.max_flow
+        5.0
+        iex> "s" in result.source_side
+        true
+        iex> "t" in result.sink_side
+        true
     """
     @spec max_flow(Zog.t(), Zog.label(), Zog.label(), atom()) ::
             %{
@@ -240,9 +255,9 @@ defmodule Yog.Zog.Flow do
     end
 
     @doc """
-    Computes the global minimum cut of the undirected network using the Stoer-Wagner algorithm.
+    Computes the global minimum cut of an undirected weighted network using the Stoer-Wagner algorithm via the native Zog backend.
 
-    Accepts a `Yog.Builder.Zog` struct.
+    **Time Complexity:** O(V³) (with priority queue optimizations)
 
     ## Returns
 
@@ -250,6 +265,17 @@ defmodule Yog.Zog.Flow do
     - `:cut_value` — The total weight of the minimum cut.
     - `:source_side` — List of original user node labels in the first partition.
     - `:sink_side` — List of original user node labels in the second partition.
+
+    ## Example
+
+        iex> alias Yog.Builder.Zog
+        iex> builder = Zog.undirected()
+        ...>   |> Zog.add_edge("a1", "a2", 10.0)
+        ...>   |> Zog.add_edge("b1", "b2", 10.0)
+        ...>   |> Zog.add_edge("a2", "b1", 2.0)
+        iex> result = Yog.Zog.Flow.global_min_cut(builder)
+        iex> result.cut_value
+        2.0
     """
     @spec global_min_cut(Zog.t()) :: %{
             cut_value: float(),

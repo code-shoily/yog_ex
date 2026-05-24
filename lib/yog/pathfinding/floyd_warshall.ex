@@ -76,6 +76,10 @@ defmodule Yog.Pathfinding.FloydWarshall do
 
   **Time Complexity:** O(V³)
 
+  > [!TIP]
+  > For a much faster native implementation (providing up to 19x speedup on large networks),
+  > see `Yog.Zog.Pathfinding.floyd_warshall/1`.
+
   Returns `{:ok, distance_matrix}` on success, or `{:error, :negative_cycle}`
   if a negative cycle is detected.
 

@@ -6,6 +6,8 @@ defmodule Yog.Zog.CentralityTest do
 
   @moduletag :zigler
 
+  doctest Yog.Zog.Centrality
+
   describe "betweenness_unweighted/1" do
     test "bridge node has highest score" do
       builder =

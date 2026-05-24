@@ -6,6 +6,8 @@ defmodule Yog.Zog.PathfindingTest do
 
   @moduletag :zigler
 
+  doctest Yog.Zog.Pathfinding
+
   describe "floyd_warshall/1" do
     test "triangle graph" do
       builder =

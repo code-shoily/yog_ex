@@ -5,6 +5,10 @@ defmodule Yog.Zog.FlowTest do
   alias Yog.Zog.Flow
   alias Yog.Zog.ResourceGraph
 
+  @moduletag :zigler
+
+  doctest Yog.Zog.Flow
+
   setup do
     # Build a classic CLRS-style max flow network.
     # Max flow from "s" to "t" is 23.

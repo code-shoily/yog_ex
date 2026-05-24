@@ -142,18 +142,30 @@ defmodule Yog.Zog.Pathfinding do
     # ============================================================================
 
     @doc """
-    Computes all-pairs shortest paths using the Floyd-Warshall algorithm.
+    Computes all-pairs shortest paths using the Floyd-Warshall algorithm via the native Zog backend.
 
-    Returns `{:ok, distance_matrix}` where `distance_matrix` is a list of
-    lists of floats. Unreachable pairs are represented as `Inf`. If the
-    graph contains a negative cycle, returns `{:error, :negative_cycle}`.
+    The Floyd-Warshall algorithm computes shortest paths between all pairs of nodes
+    in a single execution using dynamic programming.
 
-    ## Complexity
+    **Time Complexity:** O(V³)
 
-    O(V³) time, O(V²) space.
+    ## Interpreting All-Pairs Shortest Paths
+
+    The result is returned as `{:ok, distance_matrix}` where the matrix is structured as
+    a list of lists. Unreachable pairs are represented as `:infinity`.
+
+    ## Example
+
+        iex> alias Yog.Builder.Zog
+        iex> builder = Zog.directed()
+        ...>   |> Zog.add_edge("A", "B", 1.0)
+        ...>   |> Zog.add_edge("B", "C", 2.0)
+        iex> {:ok, matrix} = Yog.Zog.Pathfinding.floyd_warshall(builder)
+        iex> matrix
+        [[0.0, 1.0, 3.0], [:infinity, 0.0, 2.0], [:infinity, :infinity, 0.0]]
     """
     @spec floyd_warshall(Zog.t()) ::
-            {:ok, [[float()]]} | {:error, :negative_cycle}
+            {:ok, [[float() | :infinity]]} | {:error, :negative_cycle}
     def floyd_warshall(%Yog.Builder.Zog{} = builder) do
       node_count = Zog.node_count(builder)
       {from, to, weights} = Zog.to_edge_arrays(builder)
@@ -177,17 +189,30 @@ defmodule Yog.Zog.Pathfinding do
     end
 
     @doc """
-    Computes all-pairs shortest paths using Johnson's Algorithm.
+    Computes all-pairs shortest paths using Johnson's Algorithm via the native Zog backend.
 
-    More efficient than Floyd-Warshall for sparse graphs.
-    Returns `{:ok, distance_matrix}` or `{:error, :negative_cycle}`.
+    More efficient than Floyd-Warshall for sparse graphs. Combines Bellman-Ford
+    and Dijkstra's algorithms with a reweighting technique to handle negative edge weights.
 
-    ## Complexity
+    **Time Complexity:** O(V² log V + VE)
 
-    O(V² log V + VE) time, O(V²) space.
+    ## Interpreting All-Pairs Shortest Paths
+
+    The result is returned as `{:ok, distance_matrix}` where the matrix is structured as
+    a list of lists. Unreachable pairs are represented as `:infinity`.
+
+    ## Example
+
+        iex> alias Yog.Builder.Zog
+        iex> builder = Zog.directed()
+        ...>   |> Zog.add_edge("A", "B", 1.0)
+        ...>   |> Zog.add_edge("B", "C", 2.0)
+        iex> {:ok, matrix} = Yog.Zog.Pathfinding.johnsons(builder)
+        iex> matrix
+        [[0.0, 1.0, 3.0], [:infinity, 0.0, 2.0], [:infinity, :infinity, 0.0]]
     """
     @spec johnsons(Zog.t()) ::
-            {:ok, [[float()]]} | {:error, :negative_cycle}
+            {:ok, [[float() | :infinity]]} | {:error, :negative_cycle}
     def johnsons(%Yog.Builder.Zog{} = builder) do
       node_count = Zog.node_count(builder)
       {from, to, weights} = Zog.to_edge_arrays(builder)

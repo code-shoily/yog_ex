@@ -165,6 +165,10 @@ defmodule Yog.Centrality do
 
   **Time Complexity:** O(V * (V + E) log V) using Dijkstra from each node
 
+  > [!TIP]
+  > For a much faster native implementation (providing up to 19x speedup on large networks),
+  > see `Yog.Zog.Centrality.closeness_f64/1`.
+
   ## Interpreting Closeness Centrality
 
   | Value | Meaning |
@@ -260,6 +264,10 @@ defmodule Yog.Centrality do
   Formula: H(v) = Σ (1 / d(v, u)) / (n - 1) for all u ≠ v
 
   **Time Complexity:** O(V * (V + E) log V)
+
+  > [!TIP]
+  > For a much faster native implementation (providing up to 19x speedup on large networks),
+  > see `Yog.Zog.Centrality.harmonic_centrality_f64/1`.
 
   ## Interpreting Harmonic Centrality
 
@@ -363,6 +371,10 @@ defmodule Yog.Centrality do
 
   **Time Complexity:** O(VE) for unweighted, O(VE + V²logV) for weighted.
 
+  > [!TIP]
+  > For a much faster native implementation (providing up to 19x speedup on large networks),
+  > see `Yog.Zog.Centrality.betweenness_unweighted/1` (unweighted) or `Yog.Zog.Centrality.betweenness_f64/1` (weighted).
+
   ## Interpreting Betweenness Centrality
 
   | Value | Meaning |
@@ -458,6 +470,10 @@ defmodule Yog.Centrality do
   random node.
 
   **Time Complexity:** O(max_iterations × (V + E))
+
+  > [!TIP]
+  > For a much faster native implementation (providing up to 19x speedup on large networks),
+  > see `Yog.Zog.Centrality.pagerank/2`.
 
   ## Interpreting PageRank
 
@@ -761,6 +777,10 @@ defmodule Yog.Centrality do
 
   **Time Complexity:** O(max_iterations * (V + E))
 
+  > [!TIP]
+  > For a much faster native implementation (providing up to 19x speedup on large networks),
+  > see `Yog.Zog.Centrality.eigenvector/2`.
+
   ## Interpreting Eigenvector Centrality
 
   | Value | Meaning |
@@ -843,6 +863,10 @@ defmodule Yog.Centrality do
 
   **Time Complexity:** O(max_iterations * (V + E))
 
+  > [!TIP]
+  > For a much faster native implementation (providing up to 19x speedup on large networks),
+  > see `Yog.Zog.Centrality.katz/2`.
+
   ## Interpreting Katz Centrality
 
   | Value | Meaning |
@@ -897,6 +921,10 @@ defmodule Yog.Centrality do
   and is particularly useful for analyzing influence in directed networks.
 
   **Time Complexity:** O(max_iterations * (V + E))
+
+  > [!TIP]
+  > For a much faster native implementation (providing up to 19x speedup on large networks),
+  > see `Yog.Zog.Centrality.alpha_centrality/2`.
 
   ## Interpreting Alpha Centrality
 

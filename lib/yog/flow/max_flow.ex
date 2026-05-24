@@ -153,6 +153,10 @@ defmodule Yog.Flow.MaxFlow do
   - `sink` - Sink node ID where flow terminates
   - `algorithm` - Algorithm to use: `:edmonds_karp` (default), `:dinic`, or `:push_relabel`
 
+  > [!TIP]
+  > For a much faster native implementation (providing up to 19x speedup on large networks),
+  > see `Yog.Zog.Flow.max_flow/4`.
+
   ## Examples
 
       iex> {:ok, graph} = Yog.directed()
