@@ -1,0 +1,3 @@
+[tools]
+elixir = "latest"
+zig = "0.15.2"
