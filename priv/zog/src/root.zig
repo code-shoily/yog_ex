@@ -20,8 +20,7 @@ pub const pathfinding = struct {
     pub const apsp = @import("pathfinding/apsp.zig");
 };
 
-pub const disjoint_set = @import("disjoint_set.zig");
-pub const mst = @import("mst.zig");
+pub const property = @import("property.zig");
 pub const connectivity = @import("connectivity.zig");
 pub const metrics = @import("metrics.zig");
 pub const centrality = @import("centrality.zig");
@@ -32,10 +31,7 @@ pub const flow = struct {
     pub const min_cut = @import("flow/min_cut.zig");
 };
 
-pub const property = @import("property.zig");
-
 pub const community = struct {
-    pub const label_propagation = @import("community/label_propagation.zig");
     pub const metrics = @import("community/metrics.zig");
     pub const louvain = @import("community/louvain.zig");
 };
@@ -49,8 +45,6 @@ test {
     _ = @import("traversal.zig");
     _ = @import("pathfinding/sssp.zig");
     _ = @import("pathfinding/apsp.zig");
-    _ = @import("disjoint_set.zig");
-    _ = @import("mst.zig");
     _ = @import("connectivity.zig");
     _ = @import("metrics.zig");
     _ = @import("centrality.zig");
@@ -58,7 +52,6 @@ test {
     _ = @import("flow/max_flow.zig");
     _ = @import("flow/min_cut.zig");
     _ = @import("property.zig");
-    _ = @import("community/label_propagation.zig");
     _ = @import("community/metrics.zig");
     _ = @import("community/louvain.zig");
 }
