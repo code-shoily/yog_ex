@@ -28,7 +28,7 @@ jobs:
     - name: Set up Zig
       uses: mlugg/setup-zig@v1
       with:
-        zig-version: 0.15.2
+        version: 0.15.2
         
     - name: Restore dependencies cache
       uses: actions/cache@v3
