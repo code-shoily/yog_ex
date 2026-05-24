@@ -647,5 +647,19 @@ defmodule Yog.Zog.Flow do
         sink_side: sink_side
       }
     end
+  else
+    @moduledoc """
+    Native network flow and cut algorithms backed by Zog (Zig) via Zigler.
+
+    **Not available** — zigler is not installed. All functions will raise at runtime.
+    """
+
+    def max_flow(_builder, _source, _sink, _algorithm \\ :edmonds_karp) do
+      raise "zigler is not installed. Add {:zigler, \"~> 0.15.2\", runtime: false} to your deps and run mix deps.get."
+    end
+
+    def global_min_cut(_builder) do
+      raise "zigler is not installed. Add {:zigler, \"~> 0.15.2\", runtime: false} to your deps and run mix deps.get."
+    end
   end
 end

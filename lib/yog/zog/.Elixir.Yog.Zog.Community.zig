@@ -30,24 +30,7 @@ fn buildGraph(node_count: usize, from: []u32, to: []u32, weight: []f64) !ArrayGr
     return g;
 }
 
-fn buildUnweightedGraph(node_count: usize, from: []u32, to: []u32) !ArrayGraph(void, f64) {
-    const allocator = beam.allocator;
-    var g = ArrayGraph(void, f64).init(allocator);
-    errdefer g.deinit();
 
-    try g.nodes.ensureTotalCapacity(allocator, node_count);
-    try g.edges.ensureTotalCapacity(allocator, from.len);
-
-    for (0..node_count) |_| {
-        _ = try g.addNode({});
-    }
-
-    for (from, to) |f, t| {
-        _ = try g.addEdge(f, t, 1.0);
-    }
-
-    return g;
-}
 
 fn extractAssignments(result: anytype, node_count: usize) ![]usize {
     const allocator = beam.allocator;
