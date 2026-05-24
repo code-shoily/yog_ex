@@ -55,7 +55,7 @@ pub fn floyd_warshall(node_count: usize, from: []u32, to: []u32, weight: []f64) 
     var g = try buildGraph(node_count, from, to, weight);
     defer g.deinit();
 
-    var result = zog.pathfinding.apsp.floydWarshall(beam.allocator, g) catch |err| {
+    var result = zog.pathfinding.floydWarshall(beam.allocator, g) catch |err| {
         if (err == error.NegativeCycle) {
             return beam.make(.{.@"error", .negative_cycle}, .{});
         }
@@ -76,7 +76,7 @@ pub fn johnsons(node_count: usize, from: []u32, to: []u32, weight: []f64) !beam.
     var g = try buildGraph(node_count, from, to, weight);
     defer g.deinit();
 
-    var result = zog.pathfinding.apsp.johnsonsGeneric(
+    var result = zog.pathfinding.johnsonsGeneric(
         beam.allocator,
         g,
         f64,

@@ -247,7 +247,7 @@ defmodule Yog.Zog.ResourceGraph do
     pub fn nif_floyd_warshall(res: GraphRes) !beam.term {
         const g = res.unpack().graph;
         const node_count = g.nodeCapacity();
-        var result = zog.pathfinding.apsp.floydWarshall(beam.allocator, g) catch |err| {
+        var result = zog.pathfinding.floydWarshall(beam.allocator, g) catch |err| {
             if (err == error.NegativeCycle) {
                 return beam.make(.{.@"error", .negative_cycle}, .{});
             }
@@ -260,7 +260,7 @@ defmodule Yog.Zog.ResourceGraph do
     pub fn nif_johnsons(res: GraphRes) !beam.term {
         const g = res.unpack().graph;
         const node_count = g.nodeCapacity();
-        var result = zog.pathfinding.apsp.johnsonsGeneric(
+        var result = zog.pathfinding.johnsonsGeneric(
             beam.allocator, g, f64, 0.0,
             zog.utils.addF64, zog.utils.subF64, zog.utils.compareF64,
         ) catch |err| {

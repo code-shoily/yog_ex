@@ -1,6 +1,6 @@
 const std = @import("std");
 const utils = @import("utils.zig");
-const sssp = @import("pathfinding/sssp.zig");
+const sssp = @import("pathfinding.zig");
 
 /// Specifies which edges to consider for degree centrality.
 pub const DegreeMode = enum {

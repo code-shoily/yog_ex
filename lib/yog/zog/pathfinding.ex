@@ -96,7 +96,7 @@ defmodule Yog.Zog.Pathfinding do
         var g = try buildGraph(node_count, from, to, weight);
         defer g.deinit();
 
-        var result = zog.pathfinding.apsp.floydWarshall(beam.allocator, g) catch |err| {
+        var result = zog.pathfinding.floydWarshall(beam.allocator, g) catch |err| {
             if (err == error.NegativeCycle) {
                 return beam.make(.{.@"error", .negative_cycle}, .{});
             }
@@ -117,7 +117,7 @@ defmodule Yog.Zog.Pathfinding do
         var g = try buildGraph(node_count, from, to, weight);
         defer g.deinit();
 
-        var result = zog.pathfinding.apsp.johnsonsGeneric(
+        var result = zog.pathfinding.johnsonsGeneric(
             beam.allocator,
             g,
             f64,

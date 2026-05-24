@@ -422,7 +422,7 @@ pub fn singleSourceShortestPathCounts(
 // --- Tests ---
 
 test "singleSourceDistances: all reachable nodes" {
-    const models = @import("../root.zig").models;
+    const models = @import("root.zig").models;
     const allocator = std.testing.allocator;
 
     var g = models.ArrayGraph(void, f64).init(allocator);
@@ -940,7 +940,7 @@ pub fn johnsonsGeneric(
 
 test "floydWarshall on triangle" {
     const allocator = std.testing.allocator;
-    const AG = @import("../models/array_graph.zig").ArrayGraph;
+    const AG = @import("models/array_graph.zig").ArrayGraph;
     var g = AG(void, f64).init(allocator);
     defer g.deinit();
 
@@ -963,7 +963,7 @@ test "floydWarshall on triangle" {
 
 test "floydWarshall detects negative cycle" {
     const allocator = std.testing.allocator;
-    const AG = @import("../models/array_graph.zig").ArrayGraph;
+    const AG = @import("models/array_graph.zig").ArrayGraph;
     var g = AG(void, f64).init(allocator);
     defer g.deinit();
 
@@ -980,7 +980,7 @@ test "floydWarshall detects negative cycle" {
 }
 
 test "Johnson's Algorithm: Simple graph with negative weights" {
-    const models = @import("../root.zig").models;
+    const models = @import("root.zig").models;
     const allocator = std.testing.allocator;
     var g = models.ArrayGraph(void, f64).init(allocator);
     defer g.deinit();
