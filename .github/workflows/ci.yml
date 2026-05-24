@@ -25,10 +25,11 @@ jobs:
         elixir-version: ${{ matrix.elixir }}
         otp-version: ${{ matrix.otp }}
         
-    - name: Set up Zig
-      uses: mlugg/setup-zig@v1
-      with:
-        version: 0.15.1
+    - name: Set up Zig 0.15.2
+      run: |
+        curl -L https://ziglang.org/download/0.15.2/zig-x86_64-linux-0.15.2.tar.xz -o zig.tar.xz
+        tar -xf zig.tar.xz
+        echo "$GITHUB_WORKSPACE/zig-x86_64-linux-0.15.2" >> $GITHUB_PATH
         
     - name: Restore dependencies cache
       uses: actions/cache@v3
