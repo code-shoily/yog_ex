@@ -84,16 +84,4 @@ pub fn freeInNeighbors(
     in_neighbors.deinit();
 }
 
-/// Simple iterator over a slice of nodes, matching the SuccessorIterator pattern.
-pub fn SliceIterator(comptime T: type) type {
-    return struct {
-        items: []const T,
-        idx: usize = 0,
-        pub fn next(self: *@This()) ?struct { to: T } {
-            if (self.idx >= self.items.len) return null;
-            const res = self.items[self.idx];
-            self.idx += 1;
-            return .{ .to = res };
-        }
-    };
-}
+
