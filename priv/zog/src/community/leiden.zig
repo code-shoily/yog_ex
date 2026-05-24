@@ -21,6 +21,24 @@ pub fn Communities(comptime NodeId: type) type {
     };
 }
 
+/// Result of hierarchical community detection.
+pub fn HierarchicalCommunities(comptime NodeId: type) type {
+    _ = NodeId;
+    return struct {
+        const Self = @This();
+        allocator: std.mem.Allocator,
+        levels: [][]usize,
+        num_nodes: usize,
+
+        pub fn deinit(self: *Self) void {
+            for (self.levels) |level| {
+                self.allocator.free(level);
+            }
+            self.allocator.free(self.levels);
+        }
+    };
+}
+
 /// Options for the Leiden algorithm.
 pub const LeidenOptions = struct {
     /// Stop moving nodes when the best modularity gain is below this threshold.
@@ -749,6 +767,318 @@ pub fn detectWeightedWithOptions(
     };
 }
 
+fn runLeidenHierarchicalLoop(
+    allocator: std.mem.Allocator,
+    graph: anytype,
+    node_list: []const utils.NodeId(@TypeOf(graph)),
+    node_map: anytype,
+    weightFn: fn (@TypeOf(@as(@TypeOf(graph).Edge, undefined).data)) f64,
+    options: LeidenOptions,
+    levels_list: *std.ArrayListUnmanaged([]usize),
+    original_to_current: []usize,
+) !void {
+    const num_nodes = node_list.len;
+    const num_original = original_to_current.len;
+
+    // 1. Local move phase starting from singleton
+    var state = try LeidenState(utils.NodeId(@TypeOf(graph))).init(allocator, num_nodes, graph, weightFn, node_list, null);
+    defer state.deinit();
+
+    const improved = try phase1LocalOptimize(allocator, graph, &state, options, weightFn, node_list, node_map);
+
+    var refined_partition: []usize = undefined;
+    var num_refined_comms: usize = 0;
+
+    if (improved and state.numCommunities() > 1) {
+        refined_partition = try phase1Refine(
+            allocator,
+            graph,
+            &state,
+            options,
+            weightFn,
+            node_list,
+            node_map,
+        );
+        errdefer allocator.free(refined_partition);
+
+        // Normalize refined assignments
+        var refined_remap = try allocator.alloc(usize, num_nodes);
+        defer allocator.free(refined_remap);
+        @memset(refined_remap, std.math.maxInt(usize));
+
+        for (refined_partition) |comm| {
+            if (refined_remap[comm] == std.math.maxInt(usize)) {
+                refined_remap[comm] = num_refined_comms;
+                num_refined_comms += 1;
+            }
+        }
+
+        for (refined_partition) |*comm| {
+            comm.* = refined_remap[comm.*];
+        }
+    } else {
+        refined_partition = try allocator.alloc(usize, num_nodes);
+        errdefer allocator.free(refined_partition);
+        @memcpy(refined_partition, state.assignments);
+        num_refined_comms = state.numCommunities();
+    }
+
+    // Save current level projected to original nodes
+    const level_copy = try allocator.alloc(usize, num_original);
+    errdefer allocator.free(level_copy);
+
+    for (0..num_original) |i| {
+        level_copy[i] = refined_partition[original_to_current[i]];
+    }
+    try levels_list.append(allocator, level_copy);
+
+    // Stop if converged
+    if (!improved or state.numCommunities() <= 1 or num_refined_comms == num_nodes) {
+        allocator.free(refined_partition);
+        return;
+    }
+
+    const parent_comm_map = try allocator.alloc(usize, num_refined_comms);
+    defer allocator.free(parent_comm_map);
+
+    for (0..num_nodes) |i| {
+        const refined_c = refined_partition[i];
+        parent_comm_map[refined_c] = state.assignments[i];
+    }
+
+    var parent_remap = try allocator.alloc(usize, num_nodes);
+    defer allocator.free(parent_remap);
+    @memset(parent_remap, std.math.maxInt(usize));
+
+    var num_parent_comms: usize = 0;
+    for (parent_comm_map) |p_comm| {
+        if (parent_remap[p_comm] == std.math.maxInt(usize)) {
+            parent_remap[p_comm] = num_parent_comms;
+            num_parent_comms += 1;
+        }
+    }
+
+    for (parent_comm_map) |*p_comm| {
+        p_comm.* = parent_remap[p_comm.*];
+    }
+
+    // Update original_to_current
+    for (0..num_original) |i| {
+        original_to_current[i] = refined_partition[original_to_current[i]];
+    }
+
+    var agg_graph = try aggregateGraphLeiden(allocator, graph, refined_partition, num_refined_comms, weightFn, node_map);
+    defer agg_graph.deinit();
+
+    allocator.free(refined_partition);
+
+    try runLeidenHierarchicalLoopArrayGraph(
+        allocator,
+        agg_graph,
+        options,
+        parent_comm_map,
+        levels_list,
+        original_to_current,
+    );
+}
+
+fn runLeidenHierarchicalLoopArrayGraph(
+    allocator: std.mem.Allocator,
+    graph: anytype,
+    options: LeidenOptions,
+    initial_assignments: []const usize,
+    levels_list: *std.ArrayListUnmanaged([]usize),
+    original_to_current: []usize,
+) !void {
+    const num_nodes = graph.nodeCount();
+    const num_original = original_to_current.len;
+
+    var nodes = try allocator.alloc(u32, num_nodes);
+    defer allocator.free(nodes);
+    for (0..num_nodes) |i| nodes[i] = @intCast(i);
+
+    const Identity = struct {
+        fn weight(w: f64) f64 {
+            return w;
+        }
+    };
+
+    var state = try LeidenState(u32).init(allocator, num_nodes, graph, Identity.weight, nodes, initial_assignments);
+    defer state.deinit();
+
+    const improved = try phase1LocalOptimize(allocator, graph, &state, options, Identity.weight, nodes, null);
+
+    var refined_partition: []usize = undefined;
+    var num_refined_comms: usize = 0;
+
+    if (improved and state.numCommunities() > 1) {
+        refined_partition = try phase1Refine(
+            allocator,
+            graph,
+            &state,
+            options,
+            Identity.weight,
+            nodes,
+            null,
+        );
+        errdefer allocator.free(refined_partition);
+
+        var refined_remap = try allocator.alloc(usize, num_nodes);
+        defer allocator.free(refined_remap);
+        @memset(refined_remap, std.math.maxInt(usize));
+
+        for (refined_partition) |comm| {
+            if (refined_remap[comm] == std.math.maxInt(usize)) {
+                refined_remap[comm] = num_refined_comms;
+                num_refined_comms += 1;
+            }
+        }
+
+        for (refined_partition) |*comm| {
+            comm.* = refined_remap[comm.*];
+        }
+    } else {
+        refined_partition = try allocator.alloc(usize, num_nodes);
+        errdefer allocator.free(refined_partition);
+        @memcpy(refined_partition, state.assignments);
+        num_refined_comms = state.numCommunities();
+    }
+
+    const level_copy = try allocator.alloc(usize, num_original);
+    errdefer allocator.free(level_copy);
+
+    for (0..num_original) |i| {
+        level_copy[i] = refined_partition[original_to_current[i]];
+    }
+    try levels_list.append(allocator, level_copy);
+
+    if (!improved or state.numCommunities() <= 1 or num_refined_comms == num_nodes) {
+        allocator.free(refined_partition);
+        return;
+    }
+
+    const parent_comm_map = try allocator.alloc(usize, num_refined_comms);
+    defer allocator.free(parent_comm_map);
+
+    for (0..num_nodes) |i| {
+        const refined_c = refined_partition[i];
+        parent_comm_map[refined_c] = state.assignments[i];
+    }
+
+    var parent_remap = try allocator.alloc(usize, num_nodes);
+    defer allocator.free(parent_remap);
+    @memset(parent_remap, std.math.maxInt(usize));
+
+    var num_parent_comms: usize = 0;
+    for (parent_comm_map) |p_comm| {
+        if (parent_remap[p_comm] == std.math.maxInt(usize)) {
+            parent_remap[p_comm] = num_parent_comms;
+            num_parent_comms += 1;
+        }
+    }
+
+    for (parent_comm_map) |*p_comm| {
+        p_comm.* = parent_remap[p_comm.*];
+    }
+
+    for (0..num_original) |i| {
+        original_to_current[i] = refined_partition[original_to_current[i]];
+    }
+
+    var agg_graph = try aggregateGraphLeiden(allocator, graph, refined_partition, num_refined_comms, Identity.weight, null);
+    defer agg_graph.deinit();
+
+    allocator.free(refined_partition);
+
+    try runLeidenHierarchicalLoopArrayGraph(
+        allocator,
+        agg_graph,
+        options,
+        parent_comm_map,
+        levels_list,
+        original_to_current,
+    );
+}
+
+pub fn detectHierarchical(allocator: std.mem.Allocator, graph: anytype) !HierarchicalCommunities(utils.NodeId(@TypeOf(graph))) {
+    return detectHierarchicalWithOptions(allocator, graph, .{});
+}
+
+pub fn detectHierarchicalWithOptions(
+    allocator: std.mem.Allocator,
+    graph: anytype,
+    options: LeidenOptions,
+) !HierarchicalCommunities(utils.NodeId(@TypeOf(graph))) {
+    const EdgeData = @TypeOf(@as(@TypeOf(graph).Edge, undefined).data);
+    const S = struct {
+        fn weight(_: EdgeData) f64 {
+            return 1.0;
+        }
+    };
+    return detectHierarchicalWeightedWithOptions(allocator, graph, options, S.weight);
+}
+
+pub fn detectHierarchicalWeighted(
+    allocator: std.mem.Allocator,
+    graph: anytype,
+    weightFn: fn (@TypeOf(@as(@TypeOf(graph).Edge, undefined).data)) f64,
+) !HierarchicalCommunities(utils.NodeId(@TypeOf(graph))) {
+    return detectHierarchicalWeightedWithOptions(allocator, graph, .{}, weightFn);
+}
+
+pub fn detectHierarchicalWeightedWithOptions(
+    allocator: std.mem.Allocator,
+    graph: anytype,
+    options: LeidenOptions,
+    weightFn: fn (@TypeOf(@as(@TypeOf(graph).Edge, undefined).data)) f64,
+) !HierarchicalCommunities(utils.NodeId(@TypeOf(graph))) {
+    const NodeId = utils.NodeId(@TypeOf(graph));
+
+    var nodes = try utils.collectNodes(allocator, graph);
+    defer nodes.deinit(allocator);
+
+    if (nodes.items.len == 0) {
+        const empty = try allocator.alloc([]usize, 0);
+        return .{ .levels = empty, .num_nodes = 0, .allocator = allocator };
+    }
+
+    var node_map: ?std.AutoHashMap(NodeId, usize) = null;
+    if (NodeId != u32 and NodeId != usize) {
+        node_map = std.AutoHashMap(NodeId, usize).init(allocator);
+        for (nodes.items, 0..) |node, i| {
+            try node_map.?.put(node, i);
+        }
+    }
+    defer if (node_map) |*m| m.deinit();
+
+    var levels_list = std.ArrayListUnmanaged([]usize).empty;
+    errdefer {
+        for (levels_list.items) |level| allocator.free(level);
+        levels_list.deinit(allocator);
+    }
+
+    var original_to_current = try allocator.alloc(usize, nodes.items.len);
+    defer allocator.free(original_to_current);
+    for (0..nodes.items.len) |i| original_to_current[i] = i;
+
+    try runLeidenHierarchicalLoop(
+        allocator,
+        graph,
+        nodes.items,
+        node_map,
+        weightFn,
+        options,
+        &levels_list,
+        original_to_current,
+    );
+
+    return .{
+        .levels = try levels_list.toOwnedSlice(allocator),
+        .num_nodes = nodes.items.len,
+        .allocator = allocator,
+    };
+}
+
 // =============================================================================
 // Tests
 // =============================================================================
@@ -888,4 +1218,34 @@ test "leiden: single node" {
 
     try std.testing.expectEqual(@as(usize, 1), result.num_communities);
     try std.testing.expectEqual(@as(usize, 1), result.assignments.count());
+}
+
+test "leiden: hierarchical" {
+    const allocator = std.testing.allocator;
+    const AG = @import("../models/array_graph.zig").ArrayGraph;
+
+    var g = AG(void, void).init(allocator);
+    defer g.deinit();
+
+    var i: u32 = 0;
+    while (i < 4) : (i += 1) _ = try g.addNode({});
+
+    // Path graph 0-1-2-3 (bidirectional edges).
+    _ = try g.addEdge(0, 1, {});
+    _ = try g.addEdge(1, 0, {});
+    _ = try g.addEdge(1, 2, {});
+    _ = try g.addEdge(2, 1, {});
+    _ = try g.addEdge(2, 3, {});
+    _ = try g.addEdge(3, 2, {});
+
+    var result = try detectHierarchical(allocator, g);
+    defer result.deinit();
+
+    try std.testing.expect(result.levels.len > 0);
+    try std.testing.expectEqual(@as(usize, 4), result.num_nodes);
+    
+    // Each level must have assignments for 4 nodes
+    for (result.levels) |level| {
+        try std.testing.expectEqual(@as(usize, 4), level.len);
+    }
 }

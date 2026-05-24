@@ -199,6 +199,33 @@ defmodule Yog.Zog.ResourceGraphTest do
     end
   end
 
+  describe "leiden_hierarchical/1" do
+    test "two triangles returns valid Dendrogram" do
+      builder =
+        Zog.undirected()
+        |> Zog.add_edge("A", "B", 1.0)
+        |> Zog.add_edge("B", "C", 1.0)
+        |> Zog.add_edge("C", "A", 1.0)
+        |> Zog.add_edge("D", "E", 1.0)
+        |> Zog.add_edge("E", "F", 1.0)
+        |> Zog.add_edge("F", "D", 1.0)
+        |> Zog.add_edge("C", "D", 1.0)
+
+      graph = ResourceGraph.new(builder)
+      dend = ResourceGraph.leiden_hierarchical(graph)
+
+      assert %Yog.Community.Dendrogram{} = dend
+      assert length(dend.levels) > 0
+
+      for level <- dend.levels do
+        assert %Yog.Community.Result{} = level
+        assert map_size(level.assignments) == 6
+      end
+
+      ResourceGraph.destroy(graph)
+    end
+  end
+
   describe "metrics" do
     test "density of complete graph" do
       builder =

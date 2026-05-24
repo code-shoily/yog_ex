@@ -32,6 +32,8 @@ defmodule Yog.Zog.ResourceGraph do
   than pure Elixir because it eliminates per-call graph reconstruction.
   """
   alias Yog.Builder.Zog
+  alias Yog.Community.Dendrogram
+  alias Yog.Community.Result
 
   if Code.ensure_loaded?(Zig) do
     use Zig,
@@ -52,6 +54,7 @@ defmodule Yog.Zog.ResourceGraph do
         alpha_centrality: [concurrency: :dirty_cpu],
         louvain: [concurrency: :dirty_cpu],
         leiden: [concurrency: :dirty_cpu],
+        leiden_hierarchical: [concurrency: :dirty_cpu],
         modularity_f64: [concurrency: :dirty_cpu],
         nif_floyd_warshall: [concurrency: :dirty_cpu],
         nif_johnsons: [concurrency: :dirty_cpu],
@@ -241,6 +244,42 @@ defmodule Yog.Zog.ResourceGraph do
         );
         defer result.deinit();
         return extractAssignments(result, g.nodeCapacity());
+    }
+
+    pub fn leiden_hierarchical(
+        res: GraphRes,
+        min_modularity_gain: f64,
+        max_iterations: usize,
+        seed: u64,
+        theta: f64,
+    ) ![][]usize {
+        const g = res.unpack().graph;
+        var result = try zog.community.leiden.detectHierarchicalWeightedWithOptions(
+            beam.allocator,
+            g,
+            .{
+                .min_modularity_gain = min_modularity_gain,
+                .max_iterations = max_iterations,
+                .seed = seed,
+                .theta = theta,
+            },
+            zog.utils.identityF64,
+        );
+        defer result.deinit();
+
+        const allocator = beam.allocator;
+        const node_count = g.nodeCapacity();
+        const outer = try allocator.alloc([]usize, result.levels.len);
+        errdefer allocator.free(outer);
+
+        for (result.levels, 0..) |level, i| {
+            const level_copy = try allocator.alloc(usize, node_count);
+            errdefer allocator.free(level_copy);
+            @memcpy(level_copy, level);
+            outer[i] = level_copy;
+        }
+
+        return outer;
     }
 
     pub fn modularity_f64(res: GraphRes, assignments: []usize) !f64 {
@@ -633,6 +672,34 @@ defmodule Yog.Zog.ResourceGraph do
     end
 
     @doc """
+    Leiden hierarchical community detection.
+
+    ## Options
+
+    - `:min_modularity_gain` — Stop threshold (default: `0.000001`).
+    - `:max_iterations` — Maximum iterations per phase (default: `100`).
+    - `:seed` — Random seed (default: `42`).
+    - `:theta` — Temperature parameter (default: `1.0`).
+    """
+    @spec leiden_hierarchical(t(), keyword()) :: Dendrogram.t()
+    def leiden_hierarchical(%{resource: res, builder: builder}, opts \\ []) do
+      min_modularity_gain = Keyword.get(opts, :min_modularity_gain, 0.000001)
+      max_iterations = Keyword.get(opts, :max_iterations, 100)
+      seed = Keyword.get(opts, :seed, 42)
+      theta = Keyword.get(opts, :theta, 1.0)
+
+      levels_arrays = leiden_hierarchical(res, min_modularity_gain, max_iterations, seed, theta)
+
+      levels =
+        Enum.map(levels_arrays, fn assignments ->
+          mapped = map_assignments(builder, assignments)
+          Result.new(mapped)
+        end)
+
+      Dendrogram.new(levels, [])
+    end
+
+    @doc """
     Computes modularity for a given community partition.
     """
     @spec modularity(t(), %{Zog.label() => non_neg_integer()}) :: float()
@@ -866,6 +933,8 @@ defmodule Yog.Zog.ResourceGraph do
           :katz,
           :alpha_centrality,
           :louvain,
+          :leiden,
+          :leiden_hierarchical,
           :modularity,
           :floyd_warshall,
           :johnsons,

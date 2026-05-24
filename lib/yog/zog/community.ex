@@ -30,6 +30,8 @@ defmodule Yog.Zog.Community do
 
   """
   alias Yog.Builder.Zog
+  alias Yog.Community.Dendrogram
+  alias Yog.Community.Result
 
   if Code.ensure_loaded?(Zig) do
     use Zig,
@@ -39,6 +41,7 @@ defmodule Yog.Zog.Community do
         ...,
         louvain: [concurrency: :dirty_cpu],
         leiden: [concurrency: :dirty_cpu],
+        leiden_hierarchical: [concurrency: :dirty_cpu],
         modularity_f64: [concurrency: :dirty_cpu]
       ]
 
@@ -153,6 +156,51 @@ defmodule Yog.Zog.Community do
     }
 
     // =============================================================================
+    // Hierarchical Leiden
+    // =============================================================================
+
+    /// Leiden community detection for weighted graphs returning multiple hierarchical levels.
+    pub fn leiden_hierarchical(
+        node_count: usize,
+        from: []u32,
+        to: []u32,
+        weight: []f64,
+        min_modularity_gain: f64,
+        max_iterations: usize,
+        seed: u64,
+        theta: f64,
+    ) ![][]usize {
+        var g = try buildGraph(node_count, from, to, weight);
+        defer g.deinit();
+
+        var result = try zog.community.leiden.detectHierarchicalWeightedWithOptions(
+            beam.allocator,
+            g,
+            .{
+                .min_modularity_gain = min_modularity_gain,
+                .max_iterations = max_iterations,
+                .seed = seed,
+                .theta = theta,
+            },
+            zog.utils.identityF64,
+        );
+        defer result.deinit();
+
+        const allocator = beam.allocator;
+        const outer = try allocator.alloc([]usize, result.levels.len);
+        errdefer allocator.free(outer);
+
+        for (result.levels, 0..) |level, i| {
+            const level_copy = try allocator.alloc(usize, node_count);
+            errdefer allocator.free(level_copy);
+            @memcpy(level_copy, level);
+            outer[i] = level_copy;
+        }
+
+        return outer;
+    }
+
+    // =============================================================================
     // Modularity
     // =============================================================================
 
@@ -243,6 +291,50 @@ defmodule Yog.Zog.Community do
     end
 
     @doc """
+    Full hierarchical Leiden detection returning a Dendrogram.
+
+    ## Options
+
+    - `:min_modularity_gain` — Stop moving nodes when the best modularity gain
+      is below this threshold (default: `0.000001`).
+    - `:max_iterations` — Maximum iterations per phase (default: `100`).
+    - `:seed` — Random seed for node shuffling and probabilistic moves (default: `42`).
+    - `:theta` — Temperature parameter for the probabilistic refinement phase (default: `1.0`).
+
+    Returns a `Yog.Community.Dendrogram`.
+    """
+    @spec leiden_hierarchical(Zog.t(), keyword()) :: Yog.Community.Dendrogram.t()
+    def leiden_hierarchical(%Yog.Builder.Zog{} = builder, opts \\ []) do
+      node_count = Zog.node_count(builder)
+      {from, to, weights} = Zog.to_edge_arrays(builder)
+
+      min_modularity_gain = Keyword.get(opts, :min_modularity_gain, 0.000001)
+      max_iterations = Keyword.get(opts, :max_iterations, 100)
+      seed = Keyword.get(opts, :seed, 42)
+      theta = Keyword.get(opts, :theta, 1.0)
+
+      levels_arrays =
+        leiden_hierarchical(
+          node_count,
+          from,
+          to,
+          weights,
+          min_modularity_gain,
+          max_iterations,
+          seed,
+          theta
+        )
+
+      levels =
+        Enum.map(levels_arrays, fn assignments ->
+          mapped = map_assignments(builder, assignments)
+          Result.new(mapped)
+        end)
+
+      Dendrogram.new(levels, [])
+    end
+
+    @doc """
     Computes the modularity of a given community partition.
 
     Accepts a builder and a map of `label => community_id` (as returned by
@@ -286,6 +378,8 @@ defmodule Yog.Zog.Community do
 
     for fun <- [
           :louvain,
+          :leiden,
+          :leiden_hierarchical,
           :modularity
         ] do
       def unquote(fun)(_builder, _opts \\ []) do
