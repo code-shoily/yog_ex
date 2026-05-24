@@ -4,15 +4,7 @@ pub const models = struct {
     pub const ArrayGraph = @import("models/array_graph.zig").ArrayGraph;
 };
 
-pub const traversal = struct {
-    pub const topologicalSort = @import("traversal.zig").topologicalSort;
-};
-
-pub const pathfinding = struct {
-    pub const sssp = @import("pathfinding/sssp.zig");
-    pub const apsp = @import("pathfinding/apsp.zig");
-};
-
+pub const pathfinding = @import("pathfinding.zig");
 pub const property = @import("property.zig");
 pub const metrics = @import("metrics.zig");
 pub const centrality = @import("centrality.zig");
@@ -32,12 +24,8 @@ test {
     std.testing.refAllDecls(@This());
 
     // Explicitly reference all submodules so their tests are discovered.
-
     _ = @import("models/array_graph.zig");
-    _ = @import("traversal.zig");
-    _ = @import("pathfinding/sssp.zig");
-    _ = @import("pathfinding/apsp.zig");
-
+    _ = @import("pathfinding.zig");
     _ = @import("metrics.zig");
     _ = @import("centrality.zig");
     _ = @import("utils.zig");
