@@ -256,532 +256,72 @@ const FlowNifResult = struct {
     sink_side: []u32,
 };
 
-fn edmondsKarpCSR(
-    node_count: usize,
-    from: []u32,
-    to: []u32,
-    capacity: []f64,
-    source: u32,
-    sink: u32,
+fn toFlowNifResult(
+    allocator: std.mem.Allocator,
+    max_flow: f64,
+    residual: anytype,
+    source_side: []u32,
+    sink_side: []u32,
 ) !FlowNifResult {
-    const allocator = beam.allocator;
-    const V = node_count;
-    const E = from.len;
-    const num_caps = E * 2;
-
-    // Pre-allocate CSR representation.
-    var head = try allocator.alloc(?u32, V);
-    @memset(head, null);
-    defer allocator.free(head);
-
-    var to_nodes = try allocator.alloc(u32, num_caps);
-    defer allocator.free(to_nodes);
-
-    var cap = try allocator.alloc(f64, num_caps);
-    defer allocator.free(cap);
-
-    var next_edge = try allocator.alloc(?u32, num_caps);
-    defer allocator.free(next_edge);
-
-    // Ingest edges in pairs.
-    for (from, to, capacity, 0..) |u, v, c, i| {
-        const e_idx = @as(u32, @intCast(i * 2));
-
-        // Forward edge (u -> v)
-        to_nodes[e_idx] = v;
-        cap[e_idx] = c;
-        next_edge[e_idx] = head[u];
-        head[u] = e_idx;
-
-        // Backward edge (v -> u)
-        to_nodes[e_idx + 1] = u;
-        cap[e_idx + 1] = 0.0;
-        next_edge[e_idx + 1] = head[v];
-        head[v] = e_idx + 1;
-    }
-
-    var total_flow: f64 = 0.0;
-
-    // Pre-allocate BFS workspace.
-    var parent_edge = try allocator.alloc(u32, V);
-    defer allocator.free(parent_edge);
-
-    var parent_node = try allocator.alloc(u32, V);
-    defer allocator.free(parent_node);
-
-    var path_cap = try allocator.alloc(f64, V);
-    defer allocator.free(path_cap);
-
-    var queue = try allocator.alloc(u32, V);
-    defer allocator.free(queue);
-
-    var visited = try allocator.alloc(bool, V);
-    defer allocator.free(visited);
-
-    // Ford-Fulkerson with BFS (Edmonds-Karp).
-    while (true) {
-        @memset(visited, false);
-
-        var q_head: usize = 0;
-        var q_tail: usize = 0;
-
-        queue[q_tail] = source;
-        q_tail += 1;
-        visited[source] = true;
-        path_cap[source] = 0.0;
-
-        var found = false;
-
-        while (q_head < q_tail) {
-            const u = queue[q_head];
-            q_head += 1;
-
-            var opt_e = head[u];
-            while (opt_e) |edge_idx| {
-                const v = to_nodes[edge_idx];
-                const c = cap[edge_idx];
-
-                if (!visited[v] and c > 0.0) {
-                    const new_cap = if (u == source)
-                        c
-                    else
-                        @min(path_cap[u], c);
-
-                    parent_node[v] = u;
-                    parent_edge[v] = edge_idx;
-                    path_cap[v] = new_cap;
-                    visited[v] = true;
-
-                    if (v == sink) {
-                        found = true;
-                        break;
-                    }
-                    queue[q_tail] = v;
-                    q_tail += 1;
-                }
-                opt_e = next_edge[edge_idx];
-            }
-            if (found) break;
-        }
-
-        if (!found) break;
-
-        const bottleneck = path_cap[sink];
-
-        // Augment path.
-        var curr = sink;
-        while (curr != source) {
-            const edge_idx = parent_edge[curr];
-            cap[edge_idx] -= bottleneck;
-            cap[edge_idx ^ 1] += bottleneck;
-            curr = parent_node[curr];
-        }
-
-        total_flow += bottleneck;
-    }
-
-    // --- Min-Cut Reachability DFS/BFS ---
-    @memset(visited, false);
-    var mc_head: usize = 0;
-    var mc_tail: usize = 0;
-
-    queue[mc_tail] = source;
-    mc_tail += 1;
-    visited[source] = true;
-
-    while (mc_head < mc_tail) {
-        const u = queue[mc_head];
-        mc_head += 1;
-
-        var opt_e = head[u];
-        while (opt_e) |edge_idx| {
-            const v = to_nodes[edge_idx];
-            const c = cap[edge_idx];
-            if (!visited[v] and c > 0.0) {
-                visited[v] = true;
-                queue[mc_tail] = v;
-                mc_tail += 1;
-            }
-            opt_e = next_edge[edge_idx];
-        }
-    }
-
-    // Split source-side and sink-side nodes.
-    var source_side_list = std.ArrayList(u32).empty;
-    errdefer source_side_list.deinit(allocator);
-    var sink_side_list = std.ArrayList(u32).empty;
-    errdefer sink_side_list.deinit(allocator);
-
-    for (0..V) |u| {
-        if (visited[u]) {
-            try source_side_list.append(allocator, @intCast(u));
-        } else {
-            try sink_side_list.append(allocator, @intCast(u));
-        }
-    }
-
-    // Flatten residual capacities.
-    var res_from = try allocator.alloc(u32, num_caps);
+    const res_count = residual.count();
+    var res_from = try allocator.alloc(u32, res_count);
     errdefer allocator.free(res_from);
-    var res_to = try allocator.alloc(u32, num_caps);
+    var res_to = try allocator.alloc(u32, res_count);
     errdefer allocator.free(res_to);
-    var res_cap = try allocator.alloc(f64, num_caps);
+    var res_cap = try allocator.alloc(f64, res_count);
     errdefer allocator.free(res_cap);
 
-    for (0..num_caps) |edge_idx| {
-        res_from[edge_idx] = to_nodes[edge_idx ^ 1];
-        res_to[edge_idx] = to_nodes[edge_idx];
-        res_cap[edge_idx] = cap[edge_idx];
+    var it = residual.iterator();
+    var idx: usize = 0;
+    while (it.next()) |entry| {
+        res_from[idx] = entry.key_ptr.from;
+        res_to[idx] = entry.key_ptr.to;
+        res_cap[idx] = entry.value_ptr.*;
+        idx += 1;
     }
 
+    const ss = try allocator.alloc(u32, source_side.len);
+    errdefer allocator.free(ss);
+    @memcpy(ss, source_side);
+
+    const sk = try allocator.alloc(u32, sink_side.len);
+    errdefer allocator.free(sk);
+    @memcpy(sk, sink_side);
+
     return .{
-        .max_flow = total_flow,
+        .max_flow = max_flow,
         .residual_from = res_from,
         .residual_to = res_to,
         .residual_cap = res_cap,
-        .source_side = try source_side_list.toOwnedSlice(allocator),
-        .sink_side = try sink_side_list.toOwnedSlice(allocator),
+        .source_side = ss,
+        .sink_side = sk,
     };
 }
 
 pub fn nif_max_flow(res: GraphRes, source: u32, sink: u32) !FlowNifResult {
-    const g = res.unpack().graph;
-    const V = g.nodes.len;
-
-    var from_list = std.ArrayList(u32).empty;
-    defer from_list.deinit(beam.allocator);
-    var to_list = std.ArrayList(u32).empty;
-    defer to_list.deinit(beam.allocator);
-    var cap_list = std.ArrayList(f64).empty;
-    defer cap_list.deinit(beam.allocator);
-
-    for (0..V) |u| {
-        var opt_e = g.nodes.items(.first_edge)[u];
-        while (opt_e) |edge_idx| {
-            const edge = g.edges.get(edge_idx);
-            if (!edge.is_deleted) {
-                try from_list.append(beam.allocator, @intCast(u));
-                try to_list.append(beam.allocator, edge.to);
-                try cap_list.append(beam.allocator, edge.data);
-            }
-            opt_e = edge.next_edge;
-        }
-    }
-
-    return try edmondsKarpCSR(V, from_list.items, to_list.items, cap_list.items, source, sink);
-}
-
-fn pushRelabelCSR(
-    node_count: usize,
-    from: []u32,
-    to: []u32,
-    capacity: []f64,
-    source: u32,
-    sink: u32,
-) !FlowNifResult {
     const allocator = beam.allocator;
-    const V = node_count;
-    const E = from.len;
-    const num_caps = E * 2;
+    const g = res.unpack().graph;
 
-    const head = try allocator.alloc(?u32, V);
-    @memset(head, null);
-    defer allocator.free(head);
+    var result = try zog.flow.max_flow.edmondsKarpF64(allocator, g, source, sink);
+    defer result.deinit(allocator);
 
-    const to_nodes = try allocator.alloc(u32, num_caps);
-    defer allocator.free(to_nodes);
+    var cut = try zog.flow.max_flow.minCut(allocator, result, f64, 0.0, zog.utils.compareF64);
+    defer cut.deinit(allocator);
 
-    const cap = try allocator.alloc(f64, num_caps);
-    defer allocator.free(cap);
-
-    const next_edge = try allocator.alloc(?u32, num_caps);
-    defer allocator.free(next_edge);
-
-    for (from, to, capacity, 0..) |u, v, c, i| {
-        const e_idx = @as(u32, @intCast(i * 2));
-
-        to_nodes[e_idx] = v;
-        cap[e_idx] = c;
-        next_edge[e_idx] = head[u];
-        head[u] = e_idx;
-
-        to_nodes[e_idx + 1] = u;
-        cap[e_idx + 1] = 0.0;
-        next_edge[e_idx + 1] = head[v];
-        head[v] = e_idx + 1;
-    }
-
-    const height = try allocator.alloc(u32, V);
-    @memset(height, 0);
-    defer allocator.free(height);
-
-    const excess = try allocator.alloc(f64, V);
-    @memset(excess, 0.0);
-    defer allocator.free(excess);
-
-    const current_edge = try allocator.alloc(?u32, V);
-    defer allocator.free(current_edge);
-    for (0..V) |i| current_edge[i] = head[i];
-
-    const height_count = try allocator.alloc(u32, V);
-    @memset(height_count, 0);
-    defer allocator.free(height_count);
-
-    const max_buckets = 2 * V;
-    const bucket_head = try allocator.alloc(?u32, max_buckets);
-    @memset(bucket_head, null);
-    defer allocator.free(bucket_head);
-
-    const bucket_next = try allocator.alloc(?u32, V);
-    @memset(bucket_next, null);
-    defer allocator.free(bucket_next);
-
-    const in_bucket = try allocator.alloc(bool, V);
-    @memset(in_bucket, false);
-    defer allocator.free(in_bucket);
-
-    var max_height: usize = 0;
-
-    const helpers = struct {
-        inline fn pushActive(
-            u: u32,
-            h: u32,
-            b_head: []?u32,
-            b_next: []?u32,
-            in_b: []bool,
-            max_h: *usize,
-            src: u32,
-            snk: u32,
-        ) void {
-            if (u != src and u != snk and !in_b[u]) {
-                b_next[u] = b_head[h];
-                b_head[h] = u;
-                in_b[u] = true;
-                max_h.* = @max(max_h.*, h);
-            }
-        }
-    };
-
-    {
-        var queue = try allocator.alloc(u32, V);
-        defer allocator.free(queue);
-
-        var visited = try allocator.alloc(bool, V);
-        @memset(visited, false);
-        defer allocator.free(visited);
-
-        var q_head: usize = 0;
-        var q_tail: usize = 0;
-
-        queue[q_tail] = sink;
-        q_tail += 1;
-        visited[sink] = true;
-        height[sink] = 0;
-
-        while (q_head < q_tail) {
-            const v = queue[q_head];
-            q_head += 1;
-
-            var opt_e = head[v];
-            while (opt_e) |edge_idx| {
-                const u = to_nodes[edge_idx];
-                if (!visited[u] and cap[edge_idx ^ 1] > 0.0) {
-                    height[u] = height[v] + 1;
-                    visited[u] = true;
-                    queue[q_tail] = u;
-                    q_tail += 1;
-                }
-                opt_e = next_edge[edge_idx];
-            }
-        }
-
-        for (0..V) |i| {
-            if (!visited[i]) {
-                height[i] = @as(u32, @intCast(V));
-            }
-            if (height[i] < V) {
-                height_count[height[i]] += 1;
-            }
-        }
-    }
-
-    height[source] = @as(u32, @intCast(V));
-
-    var opt_se = head[source];
-    while (opt_se) |edge_idx| {
-        const v = to_nodes[edge_idx];
-        const c = cap[edge_idx];
-        if (c > 0.0) {
-            cap[edge_idx] = 0.0;
-            cap[edge_idx ^ 1] += c;
-            excess[source] -= c;
-            excess[v] += c;
-            helpers.pushActive(v, height[v], bucket_head, bucket_next, in_bucket, &max_height, source, sink);
-        }
-        opt_se = next_edge[edge_idx];
-    }
-
-    while (true) {
-        var opt_active: ?u32 = null;
-        while (max_height >= 0) {
-            if (bucket_head[max_height]) |u| {
-                bucket_head[max_height] = bucket_next[u];
-                in_bucket[u] = false;
-                opt_active = u;
-                break;
-            }
-            if (max_height == 0) break;
-            max_height -= 1;
-        }
-
-        const u = opt_active orelse break;
-
-        while (excess[u] > 0.0) {
-            const opt_e = current_edge[u];
-            if (opt_e) |edge_idx| {
-                const v = to_nodes[edge_idx];
-                const c = cap[edge_idx];
-                if (c > 0.0 and height[u] == height[v] + 1) {
-                    const flow_to_push = @min(excess[u], c);
-                    cap[edge_idx] -= flow_to_push;
-                    cap[edge_idx ^ 1] += flow_to_push;
-                    excess[u] -= flow_to_push;
-                    excess[v] += flow_to_push;
-                    helpers.pushActive(v, height[v], bucket_head, bucket_next, in_bucket, &max_height, source, sink);
-                } else {
-                    current_edge[u] = next_edge[edge_idx];
-                }
-            } else {
-                const old_h = height[u];
-                var min_h: u32 = std.math.maxInt(u32);
-
-                var opt_re = head[u];
-                while (opt_re) |re| {
-                    const v = to_nodes[re];
-                    const rc = cap[re];
-                    if (rc > 0.0) {
-                        min_h = @min(min_h, height[v]);
-                    }
-                    opt_re = next_edge[re];
-                }
-
-                if (min_h != std.math.maxInt(u32)) {
-                    height[u] = min_h + 1;
-                    current_edge[u] = head[u];
-                    max_height = @max(max_height, height[u]);
-
-                    if (old_h < V) {
-                        height_count[old_h] -= 1;
-                        if (height_count[old_h] == 0) {
-                            for (0..V) |w| {
-                                if (w != source and height[w] > old_h and height[w] < V) {
-                                    height[w] = @as(u32, @intCast(V + 1));
-                                    current_edge[w] = head[w];
-                                }
-                            }
-                        }
-                    }
-
-                    if (height[u] < V) {
-                        height_count[height[u]] += 1;
-                    }
-                }
-            }
-        }
-    }
-
-    var visited = try allocator.alloc(bool, V);
-    @memset(visited, false);
-    defer allocator.free(visited);
-
-    var queue = try allocator.alloc(u32, V);
-    defer allocator.free(queue);
-
-    var mc_head: usize = 0;
-    var mc_tail: usize = 0;
-
-    queue[mc_tail] = source;
-    mc_tail += 1;
-    visited[source] = true;
-
-    while (mc_head < mc_tail) {
-        const u = queue[mc_head];
-        mc_head += 1;
-
-        var opt_e = head[u];
-        while (opt_e) |edge_idx| {
-            const v = to_nodes[edge_idx];
-            const c = cap[edge_idx];
-            if (!visited[v] and c > 0.0) {
-                visited[v] = true;
-                queue[mc_tail] = v;
-                mc_tail += 1;
-            }
-            opt_e = next_edge[edge_idx];
-        }
-    }
-
-    var source_side_list = std.ArrayList(u32).empty;
-    errdefer source_side_list.deinit(allocator);
-    var sink_side_list = std.ArrayList(u32).empty;
-    errdefer sink_side_list.deinit(allocator);
-
-    for (0..V) |u| {
-        if (visited[u]) {
-            try source_side_list.append(allocator, @intCast(u));
-        } else {
-            try sink_side_list.append(allocator, @intCast(u));
-        }
-    }
-
-    var res_from = try allocator.alloc(u32, num_caps);
-    errdefer allocator.free(res_from);
-    var res_to = try allocator.alloc(u32, num_caps);
-    errdefer allocator.free(res_to);
-    var res_cap = try allocator.alloc(f64, num_caps);
-    errdefer allocator.free(res_cap);
-
-    for (0..num_caps) |edge_idx| {
-        res_from[edge_idx] = to_nodes[edge_idx ^ 1];
-        res_to[edge_idx] = to_nodes[edge_idx];
-        res_cap[edge_idx] = cap[edge_idx];
-    }
-
-    return .{
-        .max_flow = excess[sink],
-        .residual_from = res_from,
-        .residual_to = res_to,
-        .residual_cap = res_cap,
-        .source_side = try source_side_list.toOwnedSlice(allocator),
-        .sink_side = try sink_side_list.toOwnedSlice(allocator),
-    };
+    return try toFlowNifResult(allocator, result.max_flow, result.residual, cut.source_side, cut.sink_side);
 }
 
 pub fn nif_push_relabel(res: GraphRes, source: u32, sink: u32) !FlowNifResult {
+    const allocator = beam.allocator;
     const g = res.unpack().graph;
-    const V = g.nodes.len;
 
-    var from_list = std.ArrayList(u32).empty;
-    defer from_list.deinit(beam.allocator);
-    var to_list = std.ArrayList(u32).empty;
-    defer to_list.deinit(beam.allocator);
-    var cap_list = std.ArrayList(f64).empty;
-    defer cap_list.deinit(beam.allocator);
+    var result = try zog.flow.max_flow.pushRelabelF64(allocator, g, source, sink);
+    defer result.deinit(allocator);
 
-    for (0..V) |u| {
-        var opt_e = g.nodes.items(.first_edge)[u];
-        while (opt_e) |edge_idx| {
-            const edge = g.edges.get(edge_idx);
-            if (!edge.is_deleted) {
-                try from_list.append(beam.allocator, @intCast(u));
-                try to_list.append(beam.allocator, edge.to);
-                try cap_list.append(beam.allocator, edge.data);
-            }
-            opt_e = edge.next_edge;
-        }
-    }
+    var cut = try zog.flow.max_flow.minCut(allocator, result, f64, 0.0, zog.utils.compareF64);
+    defer cut.deinit(allocator);
 
-    return try pushRelabelCSR(V, from_list.items, to_list.items, cap_list.items, source, sink);
+    return try toFlowNifResult(allocator, result.max_flow, result.residual, cut.source_side, cut.sink_side);
 }
 
 const MinCutNifResult = struct {

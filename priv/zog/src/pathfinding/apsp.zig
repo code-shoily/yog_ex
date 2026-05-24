@@ -1,14 +1,6 @@
 const std = @import("std");
 const utils = @import("../utils.zig");
 
-/// A pair of node IDs used as a key in the distance matrix.
-pub fn Pair(comptime T: type) type {
-    return struct {
-        from: T,
-        to: T,
-    };
-}
-
 /// Result of an all-pairs shortest path computation using a flat matrix.
 pub fn AllPairsShortestPathResult(comptime NId: type, comptime Weight: type) type {
     return struct {
@@ -548,24 +540,21 @@ test "floydWarshall detects negative cycle" {
 test "Johnson's Algorithm: Simple graph with negative weights" {
     const models = @import("../root.zig").models;
     const allocator = std.testing.allocator;
-    var g = models.GraphMap(u32, void, f64, .directed, .single).init(allocator);
+    var g = models.ArrayGraph(void, f64).init(allocator);
     defer g.deinit();
 
-    try g.addNode(1, {});
-    try g.addNode(2, {});
-    try g.addNode(3, {});
-    try g.addNode(4, {});
-    try g.addNode(5, {});
+    // Nodes: 0, 1, 2, 3, 4
+    for (0..5) |_| _ = try g.addNode({});
 
-    try g.addEdge(1, 2, 3.0);
-    try g.addEdge(1, 3, 8.0);
-    try g.addEdge(1, 5, -4.0);
-    try g.addEdge(2, 4, 1.0);
-    try g.addEdge(2, 5, 7.0);
-    try g.addEdge(3, 2, 4.0);
-    try g.addEdge(4, 1, 2.0);
-    try g.addEdge(4, 3, -5.0);
-    try g.addEdge(5, 4, 6.0);
+    _ = try g.addEdge(0, 1, 3.0);
+    _ = try g.addEdge(0, 2, 8.0);
+    _ = try g.addEdge(0, 4, -4.0);
+    _ = try g.addEdge(1, 3, 1.0);
+    _ = try g.addEdge(1, 4, 7.0);
+    _ = try g.addEdge(2, 1, 4.0);
+    _ = try g.addEdge(3, 0, 2.0);
+    _ = try g.addEdge(3, 2, -5.0);
+    _ = try g.addEdge(4, 3, 6.0);
 
     var result = try johnsonsGeneric(
         allocator,
@@ -578,10 +567,10 @@ test "Johnson's Algorithm: Simple graph with negative weights" {
     );
     defer result.deinit();
 
-    try std.testing.expectEqual(@as(f64, 0.0), result.get(1, 1).?);
-    try std.testing.expectEqual(@as(f64, 1.0), result.get(1, 2).?);
-    try std.testing.expectEqual(@as(f64, -3.0), result.get(1, 3).?);
-    try std.testing.expectEqual(@as(f64, 2.0), result.get(1, 4).?);
-    try std.testing.expectEqual(@as(f64, -4.0), result.get(1, 5).?);
-    try std.testing.expectEqual(@as(f64, 8.0), result.get(5, 1).?);
+    try std.testing.expectEqual(@as(f64, 0.0), result.get(0, 0).?);
+    try std.testing.expectEqual(@as(f64, 1.0), result.get(0, 1).?);
+    try std.testing.expectEqual(@as(f64, -3.0), result.get(0, 2).?);
+    try std.testing.expectEqual(@as(f64, 2.0), result.get(0, 3).?);
+    try std.testing.expectEqual(@as(f64, -4.0), result.get(0, 4).?);
+    try std.testing.expectEqual(@as(f64, 8.0), result.get(4, 0).?);
 }

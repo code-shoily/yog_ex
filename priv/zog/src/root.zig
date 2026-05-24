@@ -1,17 +1,10 @@
 const std = @import("std");
 
 pub const models = struct {
-    pub const GraphMap = @import("models/graph_map.zig").GraphMap;
     pub const ArrayGraph = @import("models/array_graph.zig").ArrayGraph;
-    pub const Direction = @import("models/graph_map.zig").Direction;
-    pub const Storage = @import("models/graph_map.zig").Storage;
 };
 
 pub const traversal = struct {
-    pub const bfs = @import("traversal.zig").bfs;
-    pub const dfs = @import("traversal.zig").dfs;
-    pub const bestFirstSearch = @import("traversal.zig").bestFirstSearch;
-    pub const randomWalk = @import("traversal.zig").randomWalk;
     pub const topologicalSort = @import("traversal.zig").topologicalSort;
 };
 
@@ -21,7 +14,6 @@ pub const pathfinding = struct {
 };
 
 pub const property = @import("property.zig");
-pub const connectivity = @import("connectivity.zig");
 pub const metrics = @import("metrics.zig");
 pub const centrality = @import("centrality.zig");
 pub const utils = @import("utils.zig");
@@ -40,12 +32,12 @@ test {
     std.testing.refAllDecls(@This());
 
     // Explicitly reference all submodules so their tests are discovered.
-    _ = @import("models/graph_map.zig");
+
     _ = @import("models/array_graph.zig");
     _ = @import("traversal.zig");
     _ = @import("pathfinding/sssp.zig");
     _ = @import("pathfinding/apsp.zig");
-    _ = @import("connectivity.zig");
+
     _ = @import("metrics.zig");
     _ = @import("centrality.zig");
     _ = @import("utils.zig");

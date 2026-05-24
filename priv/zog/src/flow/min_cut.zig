@@ -297,25 +297,3 @@ test "Stoer-Wagner on empty graph" {
     try std.testing.expectApproxEqAbs(@as(f64, 0.0), result.weight, 0.001);
 }
 
-test "Stoer-Wagner on GraphMap (u32 nodes)" {
-    const allocator = std.testing.allocator;
-    const GM = @import("../models/graph_map.zig").GraphMap;
-    const Direction = @import("../models/graph_map.zig").Direction;
-    const Storage = @import("../models/graph_map.zig").Storage;
-
-    var g = GM(u32, void, f64, Direction.undirected, Storage.single).init(allocator);
-    defer g.deinit();
-
-    try g.addNode(0, {});
-    try g.addNode(1, {});
-    try g.addNode(2, {});
-
-    try g.addEdge(0, 1, 1.0);
-    try g.addEdge(1, 2, 2.0);
-    try g.addEdge(0, 2, 3.0);
-
-    var result = try globalMinCutF64(allocator, g);
-    defer result.deinit(allocator);
-
-    try std.testing.expectApproxEqAbs(@as(f64, 3.0), result.weight, 0.001);
-}
