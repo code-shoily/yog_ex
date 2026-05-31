@@ -21,6 +21,7 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | LCA (Binary Lifting) | `Yog.Pathfinding.LCA` | Lowest common ancestor in trees | O(V log V) preprocess, O(log V) query | O(V log V) |
 | Path Utilities | `Yog.Pathfinding.Path` | Path reconstruction and manipulation | O(V) | O(V) |
 | Distance Matrix | `Yog.Pathfinding.Matrix` | Matrix-based distance operations | O(V²) | O(V²) |
+| All-Pairs Unweighted | `Yog.Pathfinding` | Parallel BFS all-pairs shortest paths | O(V(V+E)) | O(V²) |
 
 ## Flow & Cuts
 
@@ -57,6 +58,7 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | Tarjan's SCC | `Yog.Connectivity` | Strongly connected components | O(V+E) | O(V) |
 | Kosaraju's SCC | `Yog.Connectivity` | Strongly connected components (two-pass) | O(V+E) | O(V) |
 | Connected Components | `Yog.Connectivity` | Undirected connected components | O(V+E) | O(V) |
+| Weakly Connected Components | `Yog.Connectivity.Components` | Directed graph components (ignore direction) | O(V+E) | O(V) |
 | Tarjan's Bridges | `Yog.Connectivity.Analysis` | Bridge edges | O(V+E) | O(V) |
 | Tarjan's Articulation | `Yog.Connectivity.Analysis` | Articulation points | O(V+E) | O(V) |
 | K-Core | `Yog.Connectivity.KCore` | Core decomposition | O(V+E) | O(V) |
@@ -72,6 +74,7 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | Harmonic Centrality | `Yog.Centrality` | Distance-based (handles infinite) | O(VE + V² log V) | O(V) |
 | Betweenness Centrality | `Yog.Centrality` | Bridge/gatekeeper detection | O(VE) or O(V³) | O(V²) |
 | PageRank | `Yog.Centrality` | Link-quality importance | O(k(V+E)) | O(V) |
+| HITS | `Yog.Centrality` | Hub and authority scores | O(k(V+E)) | O(V) |
 | Eigenvector Centrality | `Yog.Centrality` | Influence from neighbors | O(k(V+E)) | O(V) |
 | Katz Centrality | `Yog.Centrality` | Attenuated influence propagation | O(k(V+E)) | O(V) |
 | Alpha Centrality | `Yog.Centrality` | External influence model | O(k(V+E)) | O(V) |
@@ -95,6 +98,11 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | Algorithm | Module | Purpose | Time Complexity | Space Complexity |
 |-----------|--------|---------|-----------------|------------------|
 | Transitivity | `Yog.Community.Metrics` | Global clustering coefficient | O(Δ²E) | O(V) |
+| Local Clustering Coefficient | `Yog.Community` | Per-node clustering coefficient | O(Δ²E) | O(V) |
+| Average Clustering Coefficient | `Yog.Community` | Global average clustering | O(Δ²E) | O(V) |
+| Triangle Count | `Yog.Community` | Global or per-node triangles | O(Δ²E) | O(V) |
+| Community Density | `Yog.Community` | Per-community edge density | O(E) | O(V) |
+| Modularity | `Yog.Community` | Partition quality score | O(E) | O(V) |
 
 ## Traversal & Search
 
@@ -105,6 +113,11 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | Topological Sort | `Yog.Traversal` | DAG vertex ordering | O(V+E) | O(V) |
 | Find Path | `Yog.Traversal` | Any path between nodes | O(V+E) | O(V) |
 | Implicit Search | `Yog.Traversal.Implicit` | On-demand graph traversal | O((V+E) log V) | O(V) |
+| Kahn's Algorithm | `Yog.Traversal.Sort` | Topological sort (BFS-based) | O(V+E) | O(V) |
+| Lexicographical TopSort | `Yog.Traversal.Sort` | Deterministic topological ordering | O((V+E) log V) | O(V) |
+| Best-First Walk | `Yog.Traversal.Walk` | Priority-guided traversal | O((V+E) log V) | O(V) |
+| Random Walk | `Yog.Traversal.Walk` | Stochastic path exploration | O(k) | O(1) |
+| BFS Path | `Yog.Traversal.Walk` | BFS shortest path between nodes | O(V+E) | O(V) |
 
 ## Graph Transformations
 
@@ -155,6 +168,13 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | Transitive Closure | `Yog.Transform` | Reachability matrix | O(V³) | O(V²) |
 | Transitive Reduction | `Yog.Transform` | Minimal equivalent DAG | O(V³) | O(V²) |
 | LCA | `Yog.Pathfinding.LCA` | Lowest common ancestors | O(V log V) preprocess, O(log V) query | O(V log V) |
+| Topological Generations | `Yog.DAG` | Layer-by-layer ordering | O(V+E) | O(V) |
+| Sources | `Yog.DAG` | In-degree 0 nodes | O(V+E) | O(V) |
+| Sinks | `Yog.DAG` | Out-degree 0 nodes | O(V+E) | O(V) |
+| Ancestors | `Yog.DAG` | All ancestors of a node | O(V+E) | O(V) |
+| Descendants | `Yog.DAG` | All descendants of a node | O(V+E) | O(V) |
+| Single-Source Distances | `Yog.DAG` | SSSP in DAG | O(V+E) | O(V) |
+| Path Count | `Yog.DAG` | Number of distinct paths | O(V+E) | O(V) |
 
 ## Graph Operations
 
@@ -171,6 +191,14 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | Isomorphism | `Yog.Operation` | Graph equality | O(V!) worst | O(V) |
 | Subgraph | `Yog.Operation` | Induced subgraph | O(V+E) | O(V+E) |
 | Subgraph Check | `Yog.Operation` | Subgraph relationship | O(V+E) | O(V+E) |
+| Graph Composition | `Yog.Operation` | Relational graph composition | O(V₁E₂ + V₂E₁) | O(V₁V₂) |
+| Graph Complement | `Yog.Operation` | Inverse edge set | O(V²) | O(V²) |
+| Disjoint Union | `Yog.Operation` | Union with re-indexing | O(V+E) | O(V+E) |
+| Map Nodes | `Yog.Operation` | Transform node data | O(V) | O(V) |
+| Map Edges | `Yog.Operation` | Transform edge weights | O(E) | O(E) |
+| Filter Nodes | `Yog.Operation` | Predicate-based node removal | O(V+E) | O(V+E) |
+| Filter Edges | `Yog.Operation` | Predicate-based edge removal | O(E) | O(E) |
+| Relabel Nodes | `Yog.Operation` | Rename node IDs | O(V+E) | O(V+E) |
 
 ## Multigraph
 
@@ -181,6 +209,9 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | BFS | `Yog.Multi.Traversal` | Edge-ID aware BFS | O(V+E) | O(V) |
 | DFS | `Yog.Multi.Traversal` | Edge-ID aware DFS | O(V+E) | O(V) |
 | Fold Walk | `Yog.Multi.Traversal` | Stateful traversal | O(V+E) | O(V) |
+| Cycle Check | `Yog.Multi` | Multigraph cycle detection | O(V+E) | O(V) |
+| Topological Sort | `Yog.Multi` | Multigraph topological ordering | O(V+E) | O(V) |
+| To Simple Graph | `Yog.Multi` | Collapse parallel edges | O(V+E) | O(V+E) |
 
 ## Health Metrics
 
@@ -203,6 +234,44 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | Barabási-Albert | `Yog.Generator.Random` | Preferential attachment | O(VE) | O(V+E) |
 | Watts-Strogatz | `Yog.Generator.Random` | Small-world networks | O(V²) | O(V+E) |
 | Random Tree | `Yog.Generator.Random` | Uniform random tree | O(V) | O(V) |
+| Random Regular | `Yog.Generator.Random` | Fixed-degree random graph | O(VD) | O(V+E) |
+| SBM | `Yog.Generator.Random` | Stochastic Block Model | O(V²) | O(V+E) |
+| DCSBM | `Yog.Generator.Random` | Degree-Corrected SBM | O(V²) | O(V+E) |
+| HSBM | `Yog.Generator.Random` | Hierarchical SBM | O(V²) | O(V+E) |
+| Configuration Model | `Yog.Generator.Random` | Given degree sequence | O(V+E) | O(V+E) |
+| Power Law Graph | `Yog.Generator.Random` | Scale-free network | O(VE) | O(V+E) |
+| Kronecker | `Yog.Generator.Random` | Recursive matrix product | O(V+E) | O(V+E) |
+| R-MAT | `Yog.Generator.Random` | Recursive matrix model | O(E log V) | O(V+E) |
+| Geometric | `Yog.Generator.Random` | Distance-threshold graph | O(V²) | O(V²) |
+| Waxman | `Yog.Generator.Random` | Probabilistic distance graph | O(V²) | O(V²) |
+
+## Classic Graph Generators
+
+| Algorithm | Module | Purpose | Time Complexity | Space Complexity |
+|-----------|--------|---------|-----------------|------------------|
+| Complete Graph | `Yog.Generator.Classic` | Kₙ generator | O(V²) | O(V²) |
+| Cycle Graph | `Yog.Generator.Classic` | Cₙ generator | O(V) | O(V) |
+| Path Graph | `Yog.Generator.Classic` | Pₙ generator | O(V) | O(V) |
+| Star Graph | `Yog.Generator.Classic` | Sₙ generator | O(V) | O(V) |
+| Wheel Graph | `Yog.Generator.Classic` | Wₙ generator | O(V) | O(V) |
+| Complete Bipartite | `Yog.Generator.Classic` | Kₘ,ₙ generator | O(m·n) | O(m+n) |
+| Binary Tree | `Yog.Generator.Classic` | Full binary tree | O(V) | O(V) |
+| K-ary Tree | `Yog.Generator.Classic` | Full k-ary tree | O(V) | O(V) |
+| Complete K-ary | `Yog.Generator.Classic` | Complete k-ary tree | O(V) | O(V) |
+| Caterpillar | `Yog.Generator.Classic` | Spine with leaves | O(V) | O(V) |
+| Grid 2D | `Yog.Generator.Classic` | Rectangular lattice | O(V) | O(V) |
+| Petersen Graph | `Yog.Generator.Classic` | Famous 10-node graph | O(1) | O(1) |
+| Empty Graph | `Yog.Generator.Classic` | N isolated nodes | O(V) | O(V) |
+| Hypercube | `Yog.Generator.Classic` | Qₙ generator | O(V log V) | O(V log V) |
+| Ladder | `Yog.Generator.Classic` | Ladder graph | O(V) | O(V) |
+| Circular Ladder | `Yog.Generator.Classic` | Prism graph | O(V) | O(V) |
+| Möbius Ladder | `Yog.Generator.Classic` | Möbius-Kantor variant | O(V) | O(V) |
+| Friendship | `Yog.Generator.Classic` | Windmill Fₙ | O(V) | O(V) |
+| Windmill | `Yog.Generator.Classic` | Generalized windmill | O(V) | O(V) |
+| Book Graph | `Yog.Generator.Classic` | Stacked triangles | O(V) | O(V) |
+| Crown Graph | `Yog.Generator.Classic` | Sₙ⁻ generator | O(V²) | O(V²) |
+| Turán Graph | `Yog.Generator.Classic` | T(n,r) extremal graph | O(V²) | O(V²) |
+| Platonic Solids | `Yog.Generator.Classic` | Tetrahedron, Cube, Octahedron, Dodecahedron, Icosahedron | O(1) | O(1) |
 
 ## Graph Builders
 
@@ -224,6 +293,11 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | Distances | `Yog.Functional.Algorithms` | All distances from source | O(V+E) | O(V) |
 | Prim MST | `Yog.Functional.Algorithms` | Inductive MST | O(E log V) | O(V) |
 | SCC | `Yog.Functional.Algorithms` | Inductive strongly connected components | O(V+E) | O(V) |
+| Biconnected Components | `Yog.Functional.Analysis` | Maximal non-separable subgraphs | O(V+E) | O(V) |
+| Dominators | `Yog.Functional.Analysis` | Immediate dominators (flow graphs) | O(V²) | O(V²) |
+| Preorder | `Yog.Functional.Traversal` | Visit-order node IDs | O(V+E) | O(V) |
+| Postorder | `Yog.Functional.Traversal` | Finish-order node IDs | O(V+E) | O(V) |
+| Reachable | `Yog.Functional.Traversal` | All reachable node IDs | O(V+E) | O(V) |
 | Match | `Yog.Functional.Model` | Decompose node + context | O(1) | O(1) |
 | Embed | `Yog.Functional.Model` | Insert node context | O(1) | O(1) |
 
@@ -295,6 +369,24 @@ Beyond graph algorithms, YogEx implements several fundamental computer science t
 | **:queue (Erlang)** | BFS in `MaxFlow`, `Reachability` | O(1) enqueue/dequeue for FIFO operations |
 | **Binary-based HLL** | `Reachability` | 1024-byte fixed-size registers for cardinality estimation |
 
+## I/O & Serialization
+
+| Format | Module | Purpose | Direction |
+|--------|--------|---------|-----------|
+| GDF | `Yog.IO.GDF` | GUESS / Gephi format | Read/Write |
+| GEXF | `Yog.IO.GEXF` | Graph Exchange XML Format | Read/Write |
+| GraphML | `Yog.IO.GraphML` | Graph Markup Language | Read/Write |
+| Graph6 | `Yog.IO.Graph6` | Compact undirected graph encoding | Read/Write |
+| Sparse6 | `Yog.IO.Sparse6` | Compact sparse graph encoding | Read/Write |
+| JSON | `Yog.IO.JSON` | Multiple JSON variants (D3, Cytoscape, VisJs, NetworkX) | Read/Write |
+| LEDA | `Yog.IO.LEDA` | Library of Efficient Data types and Algorithms format | Read/Write |
+| Pajek | `Yog.IO.Pajek` | Social network analysis .net format | Read/Write |
+| TGF | `Yog.IO.TGF` | Trivial Graph Format | Read/Write |
+| Matrix Market | `Yog.IO.MatrixMarket` | Scientific sparse matrix exchange | Read/Write |
+| Adjacency List | `Yog.IO.List` | Text-based adjacency list | Read/Write |
+| Adjacency Matrix | `Yog.IO.Matrix` | Dense matrix representation | Read/Write |
+| Libgraph | `Yog.IO.Libgraph` | Interop with libgraph library | Convert |
+
 ## Legend
 
 - **V**: Number of vertices/nodes
@@ -343,3 +435,4 @@ Beyond graph algorithms, YogEx implements several fundamental computer science t
 | Distance-based | Closeness or Harmonic |
 | Bridge detection | Betweenness |
 | Link quality | PageRank |
+| Hub/authority | HITS |
