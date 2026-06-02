@@ -8,6 +8,11 @@ defmodule Yog.Multi.GraphTest do
     assert Yog.Multi.Graph.undirected().kind == :undirected
   end
 
+  test "add_node defaults data to nil" do
+    multi = Yog.Multi.directed() |> Yog.Multi.add_node(1)
+    assert Map.get(multi.nodes, 1) == nil
+  end
+
   test "edge_count/1 returns total edges" do
     multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "A") |> Yog.Multi.add_node(2, "B")
     {multi, _} = Yog.Multi.add_edge(multi, 1, 2, 10)

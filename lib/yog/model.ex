@@ -89,7 +89,7 @@ defmodule Yog.Model do
       2
   """
   @spec add_node(graph(), node_id(), term()) :: graph()
-  def add_node(%Graph{} = graph, id, data) do
+  def add_node(%Graph{} = graph, id, data \\ nil) do
     %{graph | nodes: Map.put(graph.nodes, id, data)}
   end
 

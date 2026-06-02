@@ -25,7 +25,7 @@ defmodule Yog.Multi do
   # ============= Modification =============
 
   @doc "Adds a node to the multigraph."
-  defdelegate add_node(graph, id, data), to: Model
+  defdelegate add_node(graph, id, data \\ nil), to: Model
 
   @doc "Removes a node and all edges connected to it."
   defdelegate remove_node(graph, id), to: Model

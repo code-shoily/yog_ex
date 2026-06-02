@@ -35,6 +35,16 @@ defmodule YogTest do
       assert Map.get(nodes, 1) == "Node A"
     end
 
+    test "add_node_default_nil_test" do
+      graph =
+        Yog.directed()
+        |> Yog.add_node(1)
+
+      nodes = graph.nodes
+      assert map_size(nodes) == 1
+      assert Map.get(nodes, 1) == nil
+    end
+
     # Test adding multiple nodes
     test "add_multiple_nodes_test" do
       graph =

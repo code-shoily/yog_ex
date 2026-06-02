@@ -49,7 +49,7 @@ defmodule Yog.Multi.Model do
   If the node already exists, its data is replaced (edges are unaffected).
   """
   @spec add_node(t(), Yog.Model.node_id(), any()) :: t()
-  def add_node(graph, id, data) do
+  def add_node(graph, id, data \\ nil) do
     %{graph | nodes: Map.put(graph.nodes, id, data)}
   end
 

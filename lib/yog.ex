@@ -267,7 +267,7 @@ defmodule Yog do
       [1, 2]
   """
   @spec add_node(graph(), node_id(), any()) :: graph()
-  defdelegate add_node(graph, id, data), to: Model
+  defdelegate add_node(graph, id, data \\ nil), to: Model
 
   @doc """
   Adds multiple nodes to the graph from an iterable.
