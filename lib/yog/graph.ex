@@ -67,9 +67,13 @@ defmodule Yog.Graph do
       6
   """
 
+  @typedoc "Type representing the unique identifier for a node."
   @type node_id :: term()
+
+  @typedoc "Type representing whether a graph is directed or undirected."
   @type kind :: :directed | :undirected
 
+  @typedoc "Type representing the Yog.Graph structure."
   @type t :: %__MODULE__{
           kind: kind(),
           nodes: %{node_id() => any()},

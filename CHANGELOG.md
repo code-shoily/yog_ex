@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
 ### Changed
 
 - **`Yog.Model.add_node/3`** — Defaulted the `data` parameter to `nil`, allowing nodes to be added to graphs and multigraphs without a data payload (e.g., `Yog.add_node(graph, id)`). Updated delegations in `Yog.add_node/3` and `Yog.Multi.add_node/3`.
