@@ -227,4 +227,47 @@ defmodule Yog.PairingHeapTest do
     assert min2 == 1
     assert min3 == 5
   end
+
+  # ============================================================
+  # Merge Tests
+  # ============================================================
+
+  test "merge with empty heaps" do
+    pq1 = PQ.new()
+    pq2 = PQ.new()
+    assert PQ.empty?(PQ.merge(pq1, pq2))
+  end
+
+  test "merge empty and non-empty heap" do
+    pq1 = PQ.new()
+    pq2 = PQ.new() |> PQ.push(4) |> PQ.push(2)
+
+    merged = PQ.merge(pq1, pq2)
+    assert PQ.size(merged) == 2
+    assert PQ.to_list(merged) == [2, 4]
+
+    merged_rev = PQ.merge(pq2, pq1)
+    assert PQ.size(merged_rev) == 2
+    assert PQ.to_list(merged_rev) == [2, 4]
+  end
+
+  test "merge two non-empty heaps" do
+    pq1 = PQ.new() |> PQ.push(5) |> PQ.push(3)
+    pq2 = PQ.new() |> PQ.push(8) |> PQ.push(2) |> PQ.push(6)
+
+    merged = PQ.merge(pq1, pq2)
+    assert PQ.size(merged) == 5
+    assert PQ.to_list(merged) == [2, 3, 5, 6, 8]
+  end
+
+  # ============================================================
+  # Inspect Tests
+  # ============================================================
+
+  test "inspect returns a clean representation" do
+    assert inspect(PQ.new()) == "#Yog.PairingHeap<empty>"
+
+    pq = PQ.new() |> PQ.push(5) |> PQ.push(3)
+    assert inspect(pq) == "#Yog.PairingHeap<size: 2, peek: 3>"
+  end
 end

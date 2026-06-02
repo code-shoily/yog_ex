@@ -245,6 +245,27 @@ defmodule Yog.PairingHeap do
   def size(%Empty{size: s}), do: s
   def size(%Node{size: s}), do: s
 
+  @doc """
+  Merges two priority queues.
+
+  The combined queue will use the comparison function of the first queue.
+
+  ## Examples
+
+      iex> pq1 = Yog.PairingHeap.new() |> Yog.PairingHeap.push(3)
+      iex> pq2 = Yog.PairingHeap.new() |> Yog.PairingHeap.push(1) |> Yog.PairingHeap.push(5)
+      iex> pq = Yog.PairingHeap.merge(pq1, pq2)
+      iex> Yog.PairingHeap.to_list(pq)
+      [1, 3, 5]
+  """
+  @spec merge(t(), t()) :: t()
+  def merge(%Empty{}, h2), do: h2
+  def merge(h1, %Empty{}), do: h1
+
+  def merge(%Node{compare_fn: cmp} = h1, %Node{} = h2) do
+    merge(h1, h2, cmp)
+  end
+
   # =============================================================================
   # Private Helper Functions
   # =============================================================================
@@ -268,8 +289,31 @@ defmodule Yog.PairingHeap do
 
   defp combine([], cmp), do: %Empty{compare_fn: cmp, size: 0}
   defp combine([h], _cmp), do: h
+  defp combine([h1, h2], cmp), do: merge(h1, h2, cmp)
 
   defp combine([h1, h2 | rest], cmp) do
     merge(merge(h1, h2, cmp), combine(rest, cmp), cmp)
+  end
+end
+
+defimpl Inspect, for: Yog.PairingHeap.Node do
+  import Inspect.Algebra
+
+  def inspect(heap, opts) do
+    {:ok, val} = Yog.PairingHeap.peek(heap)
+
+    concat([
+      "#Yog.PairingHeap<size: ",
+      to_string(Yog.PairingHeap.size(heap)),
+      ", peek: ",
+      to_doc(val, opts),
+      ">"
+    ])
+  end
+end
+
+defimpl Inspect, for: Yog.PairingHeap.Empty do
+  def inspect(_heap, _opts) do
+    "#Yog.PairingHeap<empty>"
   end
 end
