@@ -71,6 +71,7 @@ defmodule Yog.Operation do
   """
 
   alias Yog.Graph
+  alias Yog.Utils
 
   # =============================================================================
   # SET-THEORETIC OPERATIONS
@@ -256,6 +257,12 @@ defmodule Yog.Operation do
   input graphs. Useful for generating grids, hypercubes, and other
   complex structures.
 
+  > [!WARNING]
+  > **Performance Warning:** The size of the resulting Cartesian product graph grows
+  > quadratically. The output graph contains $V_1 \times V_2$ nodes and
+  > $E_1 \times V_2 + E_2 \times V_1$ edges. For larger graphs (e.g., $V_1, V_2 > 1,000$),
+  > this operation can consume substantial CPU time and memory.
+
   **Time Complexity:** O(V₁ × V₂ + E₁ × V₂ + E₂ × V₁)
 
   ## Parameters
@@ -340,6 +347,12 @@ defmodule Yog.Operation do
   the tuple follows the same ordering convention as `Yog.Model.all_edges/1`
   (`u <= v` using Erlang term ordering).
 
+  > [!WARNING]
+  > **Performance Warning:** Since each edge in the original graph becomes a node
+  > in the line graph, the line graph can grow extremely large. Specifically, it
+  > will have $E$ nodes and can have up to $O(E^2)$ edges in dense graphs.
+  > This operation has $O(E^2)$ time complexity and is not recommended for very dense or large graphs.
+
   **Time Complexity:** O(E²) where E is the number of edges in the original graph
 
   ## Parameters
@@ -382,6 +395,11 @@ defmodule Yog.Operation do
 
   Self-loops are never added.
 
+  > [!WARNING]
+  > **Performance Warning:** Computing the $k$-th power of a graph requires running BFS
+  > from every node. For larger $k$ or dense graphs, the resulting graph can approach
+  > a complete graph ($O(V^2)$ edges), causing high CPU and memory utilization.
+
   **Time Complexity:** O(V × (V + E)) in the worst case
 
   ## Parameters
@@ -411,10 +429,10 @@ defmodule Yog.Operation do
     else
       nodes = Map.keys(graph.nodes)
 
-      Enum.reduce(nodes, graph, fn src, acc_graph ->
+      List.foldl(nodes, graph, fn src, acc_graph ->
         reachable = nodes_within_distance(acc_graph, src, k)
 
-        Enum.reduce(reachable, acc_graph, fn dst, g ->
+        List.foldl(reachable, acc_graph, fn dst, g ->
           maybe_add_power_edge(g, src, dst, default_weight)
         end)
       end)
@@ -476,6 +494,13 @@ defmodule Yog.Operation do
   Two graphs are isomorphic if there exists a bijection between their node sets
   that preserves adjacency. This implementation uses degree sequence comparison
   and backtracking to test for isomorphism.
+
+  > [!WARNING]
+  > **Performance Warning:** Graph isomorphism is a computationally hard problem.
+  > While this function includes fast heuristics (degree sequence matching), the worst-case
+  > backtracking complexity is exponential. It should not be used on graphs with more
+  > than a few dozen nodes, especially highly symmetric graphs (like strongly regular graphs)
+  > where degree heuristics fail.
 
   **Time Complexity:** O(V log V + E) for the fast checks; exponential in the
   worst case due to backtracking (not recommended for large graphs).
@@ -557,27 +582,32 @@ defmodule Yog.Operation do
 
   # Reindex edges with a tag to avoid ID collisions
   defp add_tagged_component(target_graph, source_graph, tag) do
+    # First pass: add all nodes
     target_graph =
-      Enum.reduce(source_graph.nodes, target_graph, fn {node_id, data}, acc ->
+      Utils.map_fold(source_graph.nodes, target_graph, fn node_id, data, acc ->
         Yog.add_node(acc, {tag, node_id}, data)
       end)
 
-    edges =
-      Enum.flat_map(source_graph.out_edges, fn {u, inner} ->
-        Enum.map(inner, fn {v, data} -> {u, v, data} end)
-      end)
+    # Second pass: add all edges
+    is_directed = source_graph.kind == :directed
 
-    Enum.reduce(edges, target_graph, fn {u, v, data}, acc ->
-      {:ok, new_g} = Yog.add_edge(acc, {tag, u}, {tag, v}, data)
-      new_g
+    Utils.map_fold(source_graph.out_edges, target_graph, fn u, dests, acc_outer ->
+      Utils.map_fold(dests, acc_outer, fn v, data, acc ->
+        if is_directed or u <= v do
+          {:ok, new_g} = Yog.add_edge(acc, {tag, u}, {tag, v}, data)
+          new_g
+        else
+          acc
+        end
+      end)
     end)
   end
 
   defp add_product_nodes(init_graph, first, second, u_map, v_map, second_order) do
-    Enum.reduce(first.nodes, init_graph, fn {u, u_data}, g_acc ->
+    Utils.map_fold(first.nodes, init_graph, fn u, u_data, g_acc ->
       u_idx = Map.fetch!(u_map, u)
 
-      Enum.reduce(second.nodes, g_acc, fn {v, v_data}, g ->
+      Utils.map_fold(second.nodes, g_acc, fn v, v_data, g ->
         v_idx = Map.fetch!(v_map, v)
         new_id = u_idx * second_order + v_idx
         Yog.add_node(g, new_id, {u_data, v_data})
@@ -594,13 +624,13 @@ defmodule Yog.Operation do
          second_order,
          default_second
        ) do
-    Enum.reduce(Map.keys(first.nodes), graph, fn u, g_acc ->
+    List.foldl(Map.keys(first.nodes), graph, fn u, g_acc ->
       u_idx = Map.fetch!(u_map, u)
 
-      Enum.reduce(second.out_edges, g_acc, fn {v, edges}, g ->
+      Utils.map_fold(second.out_edges, g_acc, fn v, edges, g ->
         v_idx = Map.fetch!(v_map, v)
 
-        Enum.reduce(edges, g, fn {v_succ, weight}, g_inner ->
+        Utils.map_fold(edges, g, fn v_succ, weight, g_inner ->
           v_succ_idx = Map.fetch!(v_map, v_succ)
           src_id = u_idx * second_order + v_idx
           dst_id = u_idx * second_order + v_succ_idx
@@ -620,13 +650,13 @@ defmodule Yog.Operation do
          second_order,
          default_first
        ) do
-    Enum.reduce(Map.keys(second.nodes), graph, fn v, g_acc ->
+    List.foldl(Map.keys(second.nodes), graph, fn v, g_acc ->
       v_idx = Map.fetch!(v_map, v)
 
-      Enum.reduce(first.out_edges, g_acc, fn {u, edges}, g ->
+      Utils.map_fold(first.out_edges, g_acc, fn u, edges, g ->
         u_idx = Map.fetch!(u_map, u)
 
-        Enum.reduce(edges, g, fn {u_succ, weight}, g_inner ->
+        Utils.map_fold(edges, g, fn u_succ, weight, g_inner ->
           u_succ_idx = Map.fetch!(u_map, u_succ)
           src_id = u_idx * second_order + v_idx
           dst_id = u_succ_idx * second_order + v_idx
@@ -638,25 +668,30 @@ defmodule Yog.Operation do
   end
 
   defp extract_edges_for_line_graph(graph) do
-    edges_i =
-      Enum.flat_map(graph.out_edges, fn {u, inner} ->
-        Enum.map(inner, fn {v, w} -> {u, v, w} end)
-      end)
-
     if graph.kind == :undirected do
-      edges_i
-      |> Enum.map(fn {u, v, w} -> if u <= v, do: {u, v, w}, else: {v, u, w} end)
-      |> Enum.uniq_by(fn {u, v, _} -> {u, v} end)
+      Utils.map_fold(graph.out_edges, [], fn u, inner, acc ->
+        Utils.map_fold(inner, acc, fn v, w, inner_acc ->
+          if u <= v do
+            [{u, v, w} | inner_acc]
+          else
+            inner_acc
+          end
+        end)
+      end)
     else
-      edges_i
+      Utils.map_fold(graph.out_edges, [], fn u, inner, acc ->
+        Utils.map_fold(inner, acc, fn v, w, inner_acc ->
+          [{u, v, w} | inner_acc]
+        end)
+      end)
     end
   end
 
   defp connect_line_graph(lg, graph, edges, :directed, default_weight) do
-    Enum.reduce(edges, lg, fn {u, v, _w}, acc ->
+    List.foldl(edges, lg, fn {u, v, _w}, acc ->
       v_successors = Yog.successors(graph, v)
 
-      Enum.reduce(v_successors, acc, fn {y, _w2}, inner_acc ->
+      List.foldl(v_successors, acc, fn {y, _w2}, inner_acc ->
         if {u, v} != {v, y} do
           {:ok, new_g} = Yog.add_edge(inner_acc, {u, v}, {v, y}, default_weight)
           new_g
@@ -670,12 +705,13 @@ defmodule Yog.Operation do
   defp connect_line_graph(lg, graph, _edges, :undirected, default_weight) do
     nodes = Map.keys(graph.nodes)
 
-    Enum.reduce(nodes, lg, fn node, acc ->
+    List.foldl(nodes, lg, fn node, acc ->
       neighbors = Yog.neighbors(graph, node)
 
       incident_edges =
-        Enum.map(neighbors, fn {succ, _weight} ->
-          if node <= succ, do: {node, succ}, else: {succ, node}
+        List.foldl(neighbors, [], fn {succ, _weight}, acc_edges ->
+          edge = if node <= succ, do: {node, succ}, else: {succ, node}
+          [edge | acc_edges]
         end)
         |> Enum.sort()
 
@@ -687,7 +723,7 @@ defmodule Yog.Operation do
 
   defp connect_incident_pairs([e1 | rest], acc, weight) do
     new_acc =
-      Enum.reduce(rest, acc, fn e2, inner_acc ->
+      List.foldl(rest, acc, fn e2, inner_acc ->
         if e1 != e2 do
           {:ok, new_g} = Yog.add_edge(inner_acc, e1, e2, weight)
           new_g
