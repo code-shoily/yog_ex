@@ -113,7 +113,7 @@ defmodule Yog.PBT.OperationTest do
 
     property "line_graph edge count for simple undirected graphs" do
       check all(graph <- undirected_graph_gen()) do
-        graph = Yog.filter_edges(graph, fn u, v, _ -> u != v end)
+        graph = Yog.remove_self_loops(graph)
         lg = Yog.Operation.line_graph(graph, 1)
 
         expected_edges =
@@ -128,7 +128,7 @@ defmodule Yog.PBT.OperationTest do
 
     property "line_graph edge count for simple directed graphs (line digraph)" do
       check all(graph <- directed_graph_gen()) do
-        graph = Yog.filter_edges(graph, fn u, v, _ -> u != v end)
+        graph = Yog.remove_self_loops(graph)
         lg = Yog.Operation.line_graph(graph, 1)
 
         expected_edges =

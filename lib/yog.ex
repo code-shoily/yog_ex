@@ -986,6 +986,35 @@ defmodule Yog do
   defdelegate transpose(graph), to: Transform
 
   @doc """
+  Adds self-loops (edges from a node to itself) to all nodes in the graph.
+
+  Existing self-loops are kept as-is. New self-loops are created with the
+  supplied `default_weight`.
+
+  ## Examples
+
+      iex> graph = Yog.directed() |> Yog.add_node(1, nil) |> Yog.add_node(2, nil)
+      iex> graph = Yog.add_self_loops(graph, 1)
+      iex> Yog.successors(graph, 1)
+      [{1, 1}]
+  """
+  @spec add_self_loops(graph(), term()) :: graph()
+  defdelegate add_self_loops(graph, default_weight \\ 1), to: Transform
+
+  @doc """
+  Removes all self-loops (edges from a node to itself) from the graph.
+
+  ## Examples
+
+      iex> graph = Yog.directed() |> Yog.add_node(1, nil) |> Yog.add_edge_ensure(1, 1, 5)
+      iex> no_loops = Yog.remove_self_loops(graph)
+      iex> Yog.has_edge?(no_loops, 1, 1)
+      false
+  """
+  @spec remove_self_loops(graph()) :: graph()
+  defdelegate remove_self_loops(graph), to: Transform
+
+  @doc """
   Creates a new graph where node labels are transformed.
 
   ## Example

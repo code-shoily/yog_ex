@@ -1530,4 +1530,36 @@ defmodule Yog.TransformTest do
     assert normalized.nodes == %{}
     assert normalized.out_edges == %{}
   end
+
+  # ============= Self-loops Tests =============
+
+  test "add_self_loops adds loops to all nodes" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_edge_ensure(from: 1, to: 1, with: 5)
+
+    graph_with_loops = Yog.Transform.add_self_loops(graph, 10)
+
+    # 1 already had a self-loop with weight 5 (preserved)
+    assert Yog.successors(graph_with_loops, 1) == [{1, 5}]
+    # 2 gets a new self-loop with weight 10
+    assert Yog.successors(graph_with_loops, 2) == [{2, 10}]
+  end
+
+  test "remove_self_loops removes self-loops but keeps regular edges" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+      |> Yog.add_edge_ensure(from: 1, to: 1, with: 5)
+      |> Yog.add_edge_ensure(from: 2, to: 2, with: 5)
+
+    graph_no_loops = Yog.Transform.remove_self_loops(graph)
+
+    assert Yog.successors(graph_no_loops, 1) == [{2, 10}]
+    assert Yog.successors(graph_no_loops, 2) == []
+  end
 end

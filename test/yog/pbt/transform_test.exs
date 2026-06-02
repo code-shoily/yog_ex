@@ -117,7 +117,7 @@ defmodule Yog.PBT.TransformTest do
           graph
           |> Yog.map_edges(fn _ -> :default end)
           # self-loops are lost in complement, so strip them from normalized_graph
-          |> Yog.filter_edges(fn u, v, _ -> u != v end)
+          |> Yog.remove_self_loops()
 
         assert Yog.all_edges(comp_of_comp) |> MapSet.new() ==
                  Yog.all_edges(normalized_graph) |> MapSet.new()

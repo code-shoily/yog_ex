@@ -96,6 +96,51 @@ defmodule Yog.Transform do
   end
 
   @doc """
+  Adds self-loops (edges from a node to itself) to all nodes in the graph.
+
+  Existing self-loops are kept as-is. New self-loops are created with the
+  supplied `default_weight`.
+
+  **Time Complexity:** O(V)
+
+  ## Examples
+
+      iex> graph = Yog.directed() |> Yog.add_node(1, nil) |> Yog.add_node(2, nil)
+      iex> graph = Yog.Transform.add_self_loops(graph, 1)
+      iex> Yog.successors(graph, 1)
+      [{1, 1}]
+      iex> Yog.successors(graph, 2)
+      [{2, 1}]
+  """
+  @spec add_self_loops(Graph.t(), term()) :: Graph.t()
+  def add_self_loops(%Graph{} = graph, default_weight \\ 1) do
+    Utils.map_fold(graph.nodes, graph, fn node_id, _data, g_acc ->
+      if Model.has_edge?(g_acc, node_id, node_id) do
+        g_acc
+      else
+        Model.add_edge!(g_acc, node_id, node_id, default_weight)
+      end
+    end)
+  end
+
+  @doc """
+  Removes all self-loops (edges from a node to itself) from the graph.
+
+  **Time Complexity:** O(E)
+
+  ## Examples
+
+      iex> graph = Yog.directed() |> Yog.add_node(1, nil) |> Yog.add_edge_ensure(1, 1, 5)
+      iex> no_loops = Yog.Transform.remove_self_loops(graph)
+      iex> Yog.Model.has_edge?(no_loops, 1, 1)
+      false
+  """
+  @spec remove_self_loops(Graph.t()) :: Graph.t()
+  def remove_self_loops(%Graph{} = graph) do
+    filter_edges(graph, fn u, v, _w -> u != v end)
+  end
+
+  @doc """
   Converts an undirected graph to a directed graph.
 
   Since yog internally stores undirected edges as bidirectional directed edges,

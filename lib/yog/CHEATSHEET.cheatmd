@@ -133,7 +133,7 @@ Yog.Transform.map_edges(graph, fn w -> w * 2 end)
 
 # Prune structure
 Yog.Transform.filter_nodes(graph, fn data -> data.active? end)
-Yog.Transform.filter_edges(graph, fn u, v, _w -> u != v end)
+Yog.Transform.filter_edges(graph, fn _u, _v, w -> w > 5 end)
 ```
 
 ### Graph Transformations
@@ -142,6 +142,10 @@ Topological mutations and re-orientations.
 ```elixir
 # Reverse edge directions (O(1))
 Yog.Transform.transpose(graph)
+
+# Manage self-loops
+Yog.Transform.remove_self_loops(graph)
+Yog.Transform.add_self_loops(graph, 1)
 
 # Convert directionality
 Yog.Transform.to_undirected(graph, &min/2)
