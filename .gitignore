@@ -39,3 +39,7 @@ yog_ex-*.tar
 /priv/zog/.zig-cache/
 /priv/zog/zig-out/
 *.so
+/priv/zog/
+
+# Benchmark results
+/benchmarks/results/
