@@ -54,6 +54,7 @@ defmodule Yog.Transform do
 
   alias Yog.Graph
   alias Yog.Model
+  alias Yog.Utils
 
   # =============================================================================
   # STRUCTURE TRANSFORMATIONS
@@ -169,8 +170,8 @@ defmodule Yog.Transform do
     out_edges = graph.out_edges
 
     symmetric_out =
-      List.foldl(Map.to_list(out_edges), out_edges, fn {src, inner}, acc_outer ->
-        List.foldl(Map.to_list(inner), acc_outer, fn {dst, weight}, acc ->
+      Utils.map_fold(out_edges, out_edges, fn src, inner, acc_outer ->
+        Utils.map_fold(inner, acc_outer, fn dst, weight, acc ->
           dst_inner = Map.get(acc, dst, %{})
 
           updated_inner =
@@ -294,13 +295,21 @@ defmodule Yog.Transform do
 
     # First pass: add all relabeled nodes
     graph_with_nodes =
-      Enum.reduce(graph.nodes, base, fn {id, data}, acc ->
+      Utils.map_fold(graph.nodes, base, fn id, data, acc ->
         Model.add_node(acc, fun.(id), data)
       end)
 
     # Second pass: add all relabeled edges
-    Enum.reduce(Model.all_edges(graph), graph_with_nodes, fn {u, v, w}, acc ->
-      Model.add_edge!(acc, fun.(u), fun.(v), w)
+    is_directed = graph.kind == :directed
+
+    Utils.map_fold(graph.out_edges, graph_with_nodes, fn u, dests, acc_outer ->
+      Utils.map_fold(dests, acc_outer, fn v, w, acc ->
+        if is_directed or u <= v do
+          Model.add_edge!(acc, fun.(u), fun.(v), w)
+        else
+          acc
+        end
+      end)
     end)
   end
 
@@ -904,13 +913,20 @@ defmodule Yog.Transform do
   end
 
   @doc """
-  Creates the complement of a graph.
+  Returns the complement of a graph.
 
-  The complement contains the same nodes but connects all pairs of nodes
-  that are **not** connected in the original graph, and removes all edges
-  that **are** present. Each new edge gets the supplied `default_weight`.
+  The complement graph has the exact same nodes as the original graph.
+  An edge exists in the complement graph if and only if it does not exist
+  in the original graph.
 
-  Self-loops are never added in the complement.
+  Each new edge gets the supplied `default_weight`. Self-loops are never
+  added in the complement.
+
+  > [!WARNING]
+  > **Performance Warning:** Since a complement graph can contain up to
+  > $O(V^2)$ edges, this operation has a time and memory complexity of
+  > $O(V^2 + E)$. For very large graphs (e.g., $V > 10,000$), this can consume
+  > significant memory and CPU time. Use with caution on large datasets.
 
   **Time Complexity:** O(V² + E)
 
@@ -939,38 +955,33 @@ defmodule Yog.Transform do
     node_ids = Map.keys(graph.nodes)
 
     out_edges =
-      for src <- node_ids, reduce: %{} do
-        acc_outer ->
-          inner =
-            for dst <- node_ids, src != dst, reduce: %{} do
-              acc_inner ->
-                has_edge =
-                  case Map.fetch(graph.out_edges, src) do
-                    {:ok, old_inner} -> Map.has_key?(old_inner, dst)
-                    :error -> false
-                  end
+      List.foldl(node_ids, %{}, fn src, acc_outer ->
+        old_inner = Map.get(graph.out_edges, src, %{})
 
-                if has_edge do
-                  acc_inner
-                else
-                  Map.put(acc_inner, dst, default_weight)
-                end
+        inner =
+          List.foldl(node_ids, %{}, fn dst, acc_inner ->
+            cond do
+              src == dst -> acc_inner
+              Map.has_key?(old_inner, dst) -> acc_inner
+              true -> Map.put(acc_inner, dst, default_weight)
             end
+          end)
 
-          if map_size(inner) > 0 do
-            Map.put(acc_outer, src, inner)
-          else
-            acc_outer
-          end
-      end
+        if map_size(inner) > 0 do
+          Map.put(acc_outer, src, inner)
+        else
+          acc_outer
+        end
+      end)
 
     in_edges =
       if kind == :directed do
-        for {src, inners} <- out_edges, {dst, weight} <- inners, reduce: %{} do
-          acc_in ->
-            inner = Map.get(acc_in, dst, %{}) |> Map.put(src, weight)
-            Map.put(acc_in, dst, inner)
-        end
+        Utils.map_fold(out_edges, %{}, fn src, inners, acc_in ->
+          Utils.map_fold(inners, acc_in, fn dst, weight, acc_in_inner ->
+            inner = Map.get(acc_in_inner, dst, %{}) |> Map.put(src, weight)
+            Map.put(acc_in_inner, dst, inner)
+          end)
+        end)
       else
         out_edges
       end
@@ -1327,7 +1338,7 @@ defmodule Yog.Transform do
       {:ok, sorted} ->
         reachability_map = solve_transitive_reachability(graph, Enum.reverse(sorted))
 
-        List.foldl(Map.to_list(reachability_map), graph, fn {node, targets}, g ->
+        Utils.map_fold(reachability_map, graph, fn node, targets, g ->
           add_closure_edges(g, node, targets)
         end)
 
@@ -1442,9 +1453,8 @@ defmodule Yog.Transform do
     |> Map.delete(b)
   end
 
-  # Redirects edges pointing to b so they point to a instead
   defp redirect_neighbors(adj_map, edges_to_redirect, a, b, combine_weight) do
-    List.foldl(Map.to_list(edges_to_redirect), adj_map, fn {nb, w}, acc ->
+    Utils.map_fold(edges_to_redirect, adj_map, fn nb, w, acc ->
       if nb == a or nb == b do
         acc
       else
@@ -1505,7 +1515,7 @@ defmodule Yog.Transform do
           successors = Map.keys(edges)
 
           reachable_from_successors =
-            Enum.reduce(successors, MapSet.new(), fn succ, set ->
+            List.foldl(successors, MapSet.new(), fn succ, set ->
               succ_reachable = Map.get(acc, succ, MapSet.new())
               MapSet.union(set, succ_reachable)
             end)
