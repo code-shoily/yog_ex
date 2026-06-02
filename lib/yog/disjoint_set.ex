@@ -109,7 +109,7 @@ defmodule Yog.DisjointSet do
       1
   """
   @spec find(t(), term()) :: {t(), term()}
-  def find(%__MODULE__{parents: parents, ranks: ranks} = dsu, element) do
+  def find(%__MODULE__{parents: parents} = dsu, element) do
     case Map.fetch(parents, element) do
       :error ->
         new_dsu = add(dsu, element)
@@ -119,12 +119,7 @@ defmodule Yog.DisjointSet do
         {dsu, element}
 
       {:ok, parent} ->
-        {updated_dsu, root} =
-          find(
-            %__MODULE__{parents: parents, ranks: ranks},
-            parent
-          )
-
+        {updated_dsu, root} = find(dsu, parent)
         new_parents = Map.put(updated_dsu.parents, element, root)
 
         {
@@ -239,10 +234,10 @@ defmodule Yog.DisjointSet do
       2
   """
   @spec count_sets(t()) :: non_neg_integer()
-  def count_sets(%__MODULE__{parents: parents} = dsu) do
+  def count_sets(%__MODULE__{parents: parents}) do
     roots =
       List.foldl(Map.keys(parents), %{}, fn element, acc ->
-        root = find_root_readonly(dsu, element)
+        root = find_root_readonly(parents, element)
         Map.put(acc, root, true)
       end)
 
@@ -266,10 +261,10 @@ defmodule Yog.DisjointSet do
       3
   """
   @spec to_lists(t()) :: [[term()]]
-  def to_lists(%__MODULE__{parents: parents} = dsu) do
+  def to_lists(%__MODULE__{parents: parents}) do
     groups =
       List.foldl(Map.keys(parents), %{}, fn element, acc ->
-        root = find_root_readonly(dsu, element)
+        root = find_root_readonly(parents, element)
         Map.update(acc, root, [element], fn members -> [element | members] end)
       end)
 
@@ -311,7 +306,7 @@ defmodule Yog.DisjointSet do
 
   # Finds root without path compression (read-only operation).
   # Used by count_sets and to_lists to avoid modifying structure.
-  defp find_root_readonly(%__MODULE__{parents: parents}, element) do
+  defp find_root_readonly(parents, element) do
     case Map.fetch(parents, element) do
       :error ->
         element
@@ -320,7 +315,7 @@ defmodule Yog.DisjointSet do
         element
 
       {:ok, parent} ->
-        find_root_readonly(%__MODULE__{parents: parents, ranks: %{}}, parent)
+        find_root_readonly(parents, parent)
     end
   end
 end
