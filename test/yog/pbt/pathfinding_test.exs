@@ -9,9 +9,9 @@ defmodule Yog.PBT.PathfindingTest do
       check all(
               nodes <- node_list_gen(2, 12),
               weights <- weight_list_gen(length(nodes)),
-              graph = build_graph(:directed, nodes, weights),
-              [s, t] <- StreamData.uniq_list_of(StreamData.member_of(nodes), length: 2)
+              graph = build_graph(:directed, nodes, weights)
             ) do
+        [s, t | _] = nodes
         # Create unweighted version (all weights = 1)
         unweighted =
           Enum.reduce(Yog.all_edges(graph), Yog.new(graph.kind), fn {u, v, _}, g ->
@@ -44,9 +44,9 @@ defmodule Yog.PBT.PathfindingTest do
       check all(
               nodes <- node_list_gen(2, 20),
               # Non-negative weights
-              weights <- weight_list_gen(length(nodes), 0..100),
-              [s, t] <- StreamData.uniq_list_of(StreamData.member_of(nodes), length: 2)
+              weights <- weight_list_gen(length(nodes), 0..100)
             ) do
+        [s, t | _] = nodes
         graph = build_graph(:directed, nodes, weights)
 
         d_res = Yog.Pathfinding.Dijkstra.shortest_path(graph, s, t)
@@ -73,9 +73,9 @@ defmodule Yog.PBT.PathfindingTest do
       check all(
               nodes <- node_list_gen(3, 10),
               # Small weights to create controllable cycles
-              weights <- weight_list_gen(length(nodes), -10..10),
-              [s, t] <- StreamData.uniq_list_of(StreamData.member_of(nodes), length: 2)
+              weights <- weight_list_gen(length(nodes), -10..10)
             ) do
+        [s, t | _] = nodes
         graph = build_graph(:directed, nodes, weights)
 
         # If FW detects it, BF should too
@@ -102,9 +102,9 @@ defmodule Yog.PBT.PathfindingTest do
       check all(
               nodes <- node_list_gen(2, 12),
               weights <- weight_list_gen(length(nodes), 1..100),
-              graph = build_graph(:undirected, nodes, weights),
-              [s, t] <- StreamData.uniq_list_of(StreamData.member_of(nodes), length: 2)
+              graph = build_graph(:undirected, nodes, weights)
             ) do
+        [s, t | _] = nodes
         # Use unweighted for simplicity initially
         # Let's force all weights to 1 for this comparison
         unweighted =
@@ -215,9 +215,9 @@ defmodule Yog.PBT.PathfindingTest do
       check all(
               nodes <- node_list_gen(2, 12),
               weights <- weight_list_gen(length(nodes)),
-              graph = build_unweighted_graph(nodes, weights),
-              s <- StreamData.member_of(nodes)
+              graph = build_unweighted_graph(nodes, weights)
             ) do
+        s = hd(nodes)
         # Get all-pairs result
         all_pairs = Yog.Pathfinding.all_pairs_shortest_paths_unweighted(graph)
 
@@ -312,9 +312,9 @@ defmodule Yog.PBT.PathfindingTest do
       check all(
               nodes <- node_list_gen(2, 15),
               weights <- weight_list_gen(length(nodes)),
-              graph = build_unweighted_graph(nodes, weights),
-              [s, t] <- StreamData.uniq_list_of(StreamData.member_of(nodes), length: 2)
+              graph = build_unweighted_graph(nodes, weights)
             ) do
+        [s, t | _] = nodes
         # Single-pair BFS result
         sp_result = Yog.Pathfinding.shortest_path_unweighted(graph, s, t)
 
@@ -342,9 +342,9 @@ defmodule Yog.PBT.PathfindingTest do
       check all(
               nodes <- node_list_gen(2, 12),
               weights <- weight_list_gen(length(nodes)),
-              graph = build_unweighted_graph(nodes, weights),
-              [s, t] <- StreamData.uniq_list_of(StreamData.member_of(nodes), length: 2)
+              graph = build_unweighted_graph(nodes, weights)
             ) do
+        [s, t | _] = nodes
         bfs_result = Yog.Pathfinding.shortest_path_unweighted(graph, s, t)
         dijkstra_result = Yog.Pathfinding.Dijkstra.shortest_path(graph, s, t)
 
@@ -368,9 +368,9 @@ defmodule Yog.PBT.PathfindingTest do
       check all(
               nodes <- node_list_gen(2, 12),
               edges <- weight_list_gen(length(nodes)),
-              graph = build_unweighted_graph_undirected(nodes, edges),
-              [s, t] <- StreamData.uniq_list_of(StreamData.member_of(nodes), length: 2)
+              graph = build_unweighted_graph_undirected(nodes, edges)
             ) do
+        [s, t | _] = nodes
         st_result = Yog.Pathfinding.shortest_path_unweighted(graph, s, t)
         ts_result = Yog.Pathfinding.shortest_path_unweighted(graph, t, s)
 
@@ -429,9 +429,9 @@ defmodule Yog.PBT.PathfindingTest do
       check all(
               nodes <- node_list_gen(2, 15),
               weights <- weight_list_gen(length(nodes)),
-              graph = build_unweighted_graph(nodes, weights),
-              [s, t] <- StreamData.uniq_list_of(StreamData.member_of(nodes), length: 2)
+              graph = build_unweighted_graph(nodes, weights)
             ) do
+        [s, t | _] = nodes
         result = Yog.Pathfinding.shortest_path_unweighted(graph, s, t)
         num_nodes = length(nodes)
 

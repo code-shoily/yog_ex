@@ -95,9 +95,9 @@ defmodule Yog.PBT.FlowTest do
       check all(
               nodes <- node_list_gen(2, 20),
               weights <- weight_list_gen(length(nodes), 1..100),
-              graph = build_graph(:directed, nodes, weights),
-              [s, t] <- StreamData.uniq_list_of(StreamData.member_of(nodes), length: 2)
+              graph = build_graph(:directed, nodes, weights)
             ) do
+        [s, t | _] = nodes
         result = Yog.Flow.MaxFlow.edmonds_karp(graph, s, t)
 
         # Max flow should be an integer for integer capacities

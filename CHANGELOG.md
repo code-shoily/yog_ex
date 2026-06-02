@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`Yog.Model.add_node/3`** — Defaulted the `data` parameter to `nil`, allowing nodes to be added to graphs and multigraphs without a data payload (e.g., `Yog.add_node(graph, id)`). Updated delegations in `Yog.add_node/3` and `Yog.Multi.add_node/3`.
 - **`Yog.DisjointSet`** — Optimized `find/2` and `find_root_readonly/2` to eliminate redundant struct allocations during recursion. `find_root_readonly/2` now operates directly on the `parents` map.
 
+### Fixed
+
+- **Property Tests** — Resolved flaky `StreamData.TooManyDuplicatesError` failures in `Yog.PBT.FlowTest` and `Yog.PBT.PathfindingTest` properties by pattern-matching directly on the generated node list to obtain distinct source/target nodes, instead of using `uniq_list_of/2` on `StreamData.member_of/1`.
+
 ## [0.98.1] - 2026-05-23
 
 ### Added
