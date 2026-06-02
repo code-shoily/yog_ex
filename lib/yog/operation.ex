@@ -303,6 +303,163 @@ defmodule Yog.Operation do
   end
 
   @doc """
+  Returns the Tensor product (also known as Kronecker or direct product) of two graphs.
+
+  The Tensor product $G_1 \\times G_2$ is a graph where the node set is the Cartesian product
+  $V(G_1) \\times V(G_2)$, and an edge exists between $(u_1, u_2)$ and $(v_1, v_2)$ if and only if
+  $u_1 \\to v_1$ is an edge in $G_1$ and $u_2 \\to v_2$ is an edge in $G_2$.
+
+  Edge weights in the resulting graph are tuples of `{weight_first, weight_second}`.
+
+  > [!WARNING]
+  > **Performance Warning:** The size of the resulting Tensor product graph grows
+  > quadratically. The output graph contains $V_1 \\times V_2$ nodes and $E_1 \\times E_2$ edges
+  > (or $2 \\times E_1 \\times E_2$ for undirected graphs). For larger or dense graphs,
+  > this operation can consume substantial CPU time and memory.
+
+  **Time Complexity:** O(V₁ × V₂ + E₁ × E₂)
+
+  ## Examples
+
+      iex> g1 = Yog.undirected()
+      ...> |> Yog.add_node(0, nil)
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_edge_ensure(from: 0, to: 1, with: 10)
+      iex> g2 = Yog.undirected()
+      ...> |> Yog.add_node(0, nil)
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_edge_ensure(from: 0, to: 1, with: 20)
+      iex> product = Yog.Operation.tensor_product(g1, g2)
+      iex> Yog.Model.order(product)
+      4
+      iex> Yog.Model.edge_count(product)
+      2
+  """
+  @spec tensor_product(Graph.t(), Graph.t()) :: Graph.t()
+  def tensor_product(first, second) do
+    first_nodes = Map.keys(first.nodes)
+    second_nodes = Map.keys(second.nodes)
+    second_order = map_size(second.nodes)
+
+    u_map = Enum.with_index(first_nodes) |> Enum.into(%{})
+    v_map = Enum.with_index(second_nodes) |> Enum.into(%{})
+
+    Yog.Graph.new(first.kind)
+    |> add_product_nodes(first, second, u_map, v_map, second_order)
+    |> add_tensor_edges(first, second, u_map, v_map, second_order)
+  end
+
+  @doc """
+  Returns the Strong product of two graphs.
+
+  The Strong product $G_1 \\boxtimes G_2$ is a graph where the node set is the Cartesian product
+  $V(G_1) \\times V(G_2)$. An edge exists between $(u_1, u_2)$ and $(v_1, v_2)$ if and only if:
+  - $u_1 = v_1$ and $u_2 \\to v_2$ in $G_2$ (vertical Cartesian edge)
+  - $u_2 = v_2$ and $u_1 \\to v_1$ in $G_1$ (horizontal Cartesian edge)
+  - $u_1 \\to v_1$ in $G_1$ and $u_2 \\to v_2$ in $G_2$ (Tensor edge)
+
+  Edge weights are tuples:
+  - `{default_second, weight_second}` for vertical edges
+  - `{weight_first, default_first}` for horizontal edges
+  - `{weight_first, weight_second}` for tensor edges
+
+  > [!WARNING]
+  > **Performance Warning:** The size of the resulting Strong product graph grows
+  > quadratically. For larger or dense graphs, this operation can consume substantial CPU
+  > time and memory.
+
+  **Time Complexity:** O(V₁ × V₂ + E₁ × V₂ + E₂ × V₁ + E₁ × E₂)
+
+  ## Examples
+
+      iex> g1 = Yog.undirected()
+      ...> |> Yog.add_node(0, nil)
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_edge_ensure(from: 0, to: 1, with: 10)
+      iex> g2 = Yog.undirected()
+      ...> |> Yog.add_node(0, nil)
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_edge_ensure(from: 0, to: 1, with: 20)
+      iex> product = Yog.Operation.strong_product(g1, g2, 0, 0)
+      iex> Yog.Model.order(product)
+      4
+      iex> Yog.Model.edge_count(product)
+      6
+  """
+  @spec strong_product(Graph.t(), Graph.t(), any(), any()) :: Graph.t()
+  def strong_product(first, second, default_first, default_second) do
+    first_nodes = Map.keys(first.nodes)
+    second_nodes = Map.keys(second.nodes)
+    second_order = map_size(second.nodes)
+
+    u_map = Enum.with_index(first_nodes) |> Enum.into(%{})
+    v_map = Enum.with_index(second_nodes) |> Enum.into(%{})
+
+    Yog.Graph.new(first.kind)
+    |> add_product_nodes(first, second, u_map, v_map, second_order)
+    |> add_product_vertical_edges(first, second, u_map, v_map, second_order, default_second)
+    |> add_product_horizontal_edges(first, second, u_map, v_map, second_order, default_first)
+    |> add_tensor_edges(first, second, u_map, v_map, second_order)
+  end
+
+  @doc """
+  Returns the Lexicographic product (composition) of two graphs.
+
+  The Lexicographic product $G_1[G_2]$ is a graph where the node set is the Cartesian product
+  $V(G_1) \\times V(G_2)$. An edge exists between $(u_1, u_2)$ and $(v_1, v_2)$ if and only if:
+  - $u_1 \\to v_1$ in $G_1$ (for all $u_2, v_2 \\in V(G_2)$)
+  - $u_1 = v_1$ and $u_2 \\to v_2$ in $G_2$
+
+  Edge weights are tuples:
+  - `{weight_first, default_first}` for edges derived from $G_1$
+  - `{default_second, weight_second}` for edges derived from $G_2$
+
+  > [!WARNING]
+  > **Performance Warning:** The size of the resulting Lexicographic product graph grows
+  > quadratically. The output graph contains $V_1 \\times V_2$ nodes and $V_1 \\times E_2 + E_1 \\times V_2^2$
+  > edges. For larger or dense graphs, this operation can consume substantial CPU time and memory.
+
+  **Time Complexity:** O(V₁ × V₂ + E₁ × V₂² + V₁ × E₂)
+
+  ## Examples
+
+      iex> g1 = Yog.undirected()
+      ...> |> Yog.add_node(0, nil)
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_edge_ensure(from: 0, to: 1, with: 10)
+      iex> g2 = Yog.undirected()
+      ...> |> Yog.add_node(0, nil)
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_edge_ensure(from: 0, to: 1, with: 20)
+      iex> product = Yog.Operation.lexicographic_product(g1, g2, 0, 0)
+      iex> Yog.Model.order(product)
+      4
+      iex> Yog.Model.edge_count(product)
+      6
+  """
+  @spec lexicographic_product(Graph.t(), Graph.t(), any(), any()) :: Graph.t()
+  def lexicographic_product(first, second, default_first, default_second) do
+    first_nodes = Map.keys(first.nodes)
+    second_nodes = Map.keys(second.nodes)
+    second_order = map_size(second.nodes)
+
+    u_map = Enum.with_index(first_nodes) |> Enum.into(%{})
+    v_map = Enum.with_index(second_nodes) |> Enum.into(%{})
+
+    Yog.Graph.new(first.kind)
+    |> add_product_nodes(first, second, u_map, v_map, second_order)
+    |> add_product_vertical_edges(first, second, u_map, v_map, second_order, default_second)
+    |> add_lexicographic_horizontal_edges(
+      first,
+      second,
+      u_map,
+      v_map,
+      second_order,
+      default_first
+    )
+  end
+
+  @doc """
   Composes two graphs by merging overlapping nodes and combining their edges.
 
   This is equivalent to `union/2` - both graphs are merged together with
@@ -663,6 +820,73 @@ defmodule Yog.Operation do
           {:ok, new_g} = Yog.add_edge(g_inner, src_id, dst_id, {weight, default_first})
           new_g
         end)
+      end)
+    end)
+  end
+
+  defp add_tensor_edges(graph, first, second, u_map, v_map, second_order) do
+    is_directed = first.kind == :directed
+
+    Utils.map_fold(first.out_edges, graph, fn u, u_edges, g_acc ->
+      u_idx = Map.fetch!(u_map, u)
+
+      Utils.map_fold(u_edges, g_acc, fn u_succ, w_first, g ->
+        u_succ_idx = Map.fetch!(u_map, u_succ)
+
+        if is_directed or u <= u_succ do
+          Utils.map_fold(second.out_edges, g, fn v, v_edges, g_inner ->
+            v_idx = Map.fetch!(v_map, v)
+
+            Utils.map_fold(v_edges, g_inner, fn v_succ, w_second, g_edge ->
+              v_succ_idx = Map.fetch!(v_map, v_succ)
+              src_id = u_idx * second_order + v_idx
+              dst_id = u_succ_idx * second_order + v_succ_idx
+
+              {:ok, new_g} = Yog.add_edge(g_edge, src_id, dst_id, {w_first, w_second})
+              new_g
+            end)
+          end)
+        else
+          g
+        end
+      end)
+    end)
+  end
+
+  defp add_lexicographic_horizontal_edges(
+         graph,
+         first,
+         second,
+         u_map,
+         v_map,
+         second_order,
+         default_first
+       ) do
+    is_directed = first.kind == :directed
+    second_nodes = Map.keys(second.nodes)
+
+    Utils.map_fold(first.out_edges, graph, fn u, u_edges, g_acc ->
+      u_idx = Map.fetch!(u_map, u)
+
+      Utils.map_fold(u_edges, g_acc, fn u_succ, w_first, g ->
+        u_succ_idx = Map.fetch!(u_map, u_succ)
+
+        if is_directed or u <= u_succ do
+          List.foldl(second_nodes, g, fn u2, g_inner ->
+            u2_idx = Map.fetch!(v_map, u2)
+            src_id = u_idx * second_order + u2_idx
+
+            List.foldl(second_nodes, g_inner, fn v2, g_edge ->
+              v2_idx = Map.fetch!(v_map, v2)
+              dst_id = u_succ_idx * second_order + v2_idx
+
+              {:ok, new_g} = Yog.add_edge(g_edge, src_id, dst_id, {w_first, default_first})
+              new_g
+            end)
+          end)
+        else
+          g
+        end
       end)
     end)
   end

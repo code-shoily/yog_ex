@@ -647,4 +647,66 @@ defmodule Yog.OperationTest do
       assert Operation.isomorphic?(g1, g2) == true
     end
   end
+
+  describe "tensor_product/2" do
+    test "directed tensor product" do
+      g1 =
+        Yog.directed()
+        |> Yog.add_node(0, nil)
+        |> Yog.add_node(1, nil)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 10)
+
+      g2 =
+        Yog.directed()
+        |> Yog.add_node(0, nil)
+        |> Yog.add_node(1, nil)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 20)
+
+      result = Operation.tensor_product(g1, g2)
+      assert Yog.Model.order(result) == 4
+      assert Yog.Model.edge_count(result) == 1
+    end
+  end
+
+  describe "strong_product/4" do
+    test "directed strong product" do
+      g1 =
+        Yog.directed()
+        |> Yog.add_node(0, nil)
+        |> Yog.add_node(1, nil)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 10)
+
+      g2 =
+        Yog.directed()
+        |> Yog.add_node(0, nil)
+        |> Yog.add_node(1, nil)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 20)
+
+      result = Operation.strong_product(g1, g2, 0, 0)
+      assert Yog.Model.order(result) == 4
+      # 2 vertical + 2 horizontal + 1 tensor = 5 edges
+      assert Yog.Model.edge_count(result) == 5
+    end
+  end
+
+  describe "lexicographic_product/4" do
+    test "directed lexicographic product" do
+      g1 =
+        Yog.directed()
+        |> Yog.add_node(0, nil)
+        |> Yog.add_node(1, nil)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 10)
+
+      g2 =
+        Yog.directed()
+        |> Yog.add_node(0, nil)
+        |> Yog.add_node(1, nil)
+        |> Yog.add_edge_ensure(from: 0, to: 1, with: 20)
+
+      result = Operation.lexicographic_product(g1, g2, 0, 0)
+      assert Yog.Model.order(result) == 4
+      # 2 vertical + 4 horizontal = 6 edges
+      assert Yog.Model.edge_count(result) == 6
+    end
+  end
 end

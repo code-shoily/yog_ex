@@ -9,10 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`Yog.Operation.tensor_product/2`, `Yog.Operation.strong_product/4`, & `Yog.Operation.lexicographic_product/4`** — Added three standard graph product operations with optimized private helpers and performance complexity warning alerts.
 - **`Yog.Transform.add_self_loops/2` & `Yog.Transform.remove_self_loops/1`** — Added convenience functions for managing self-loops in graphs, along with delegations in `Yog.add_self_loops/2` and `Yog.remove_self_loops/1`.
 - **`Yog.PairingHeap.merge/2`** — Exposed the $O(1)$ priority queue merge operation as a public API.
 - **`Yog.PairingHeap` Inspect Protocol** — Implemented the `Inspect` protocol for pairing heaps (`%Yog.PairingHeap.Node{}` and `%Yog.PairingHeap.Empty{}`), showing size and peek elements cleanly.
 - **`Yog.Operation` Performance Warnings** — Added warning docstrings to potentially slow and scale-sensitive operations (`cartesian_product/4`, `line_graph/2`, `power/3`, and `isomorphic?/2`) to detail growth, space/time complexities, and caution users on large graphs.
+
 
 ### Changed
 
