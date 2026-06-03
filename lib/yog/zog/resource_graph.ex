@@ -342,7 +342,7 @@ defmodule Yog.Zog.ResourceGraph do
 
     pub fn nif_density(res: GraphRes) !f64 {
         const g = res.unpack().graph;
-        const n = g.nodeCapacity();
+        const n = g.nodeCount();
         if (n <= 1) return 0.0;
         const possible_edges = @as(f64, @floatFromInt(n * (n - 1)));
         return @as(f64, @floatFromInt(g.edgeCount())) / possible_edges;

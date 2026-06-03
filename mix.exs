@@ -76,7 +76,7 @@ defmodule YogEx.MixProject do
     [
       name: "yog_ex",
       files:
-        ~w(lib .formatter.exs mix.exs README.md ALGORITHMS.md PROPERTIES.md LICENSE CHANGELOG.md livebooks),
+        ~w(lib priv/zog/src priv/zog/build.zig priv/zog/build.zig.zon .formatter.exs mix.exs README.md ALGORITHMS.md PROPERTIES.md LICENSE CHANGELOG.md livebooks),
       licenses: ["Apache-2.0"],
       links: %{
         "GitHub" => @source_url,
