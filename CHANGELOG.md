@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`Yog.Builder.Labeled.get_label/2` & `Yog.Builder.Live.get_label/2`** — Added reverse registry lookup to query the label of a given node ID.
+- **`Yog.Builder.Live.add_node/2`** — Added support for registering standalone nodes during incremental live graph building.
+- **`Yog.Approximate.closeness/2`** — Implemented closeness centrality approximation using Eppstein-Wang pivot sampling on the transposed graph.
+- **`Yog.Approximate.harmonic/2`** — Implemented harmonic centrality approximation using Eppstein-Wang pivot sampling on the transposed graph.
 - **`Yog.Operation.tensor_product/2`, `Yog.Operation.strong_product/4`, & `Yog.Operation.lexicographic_product/4`** — Added three standard graph product operations with optimized private helpers and performance complexity warning alerts.
 - **`Yog.Operation` Property-Based Tests** — Added recursive mathematical invariants and edge/node count verification checks for all newly implemented graph products to the PBT suite.
 - **`Yog.Transform.add_self_loops/2` & `Yog.Transform.remove_self_loops/1`** — Added convenience functions for managing self-loops in graphs, along with delegations in `Yog.add_self_loops/2` and `Yog.remove_self_loops/1`.
@@ -18,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Changed
+
+- **`Yog.Approximate` & `Yog.Health` Option Documentation** — Normalized `:to_float` documentation to match the parsed `:with_to_float` option key.
+- **`Yog.Health` & `Yog.Approximate` Option Parsing** — DRYed up option parsing by sharing the internal `parse_metric_opts/1` helper.
+- **`Yog.Builder.Grid` & `Yog.Builder.Toroidal`** — Extracted `add_grid_edge/5` helper to comply with Credo nesting rules and avoid deep function nesting.
 
 - **`Yog.Utils` Optimizations** — Refactored `norm_diff/3` to be completely allocation-free by using direct map folds, eliminating intermediate key list concatenations and temporary map allocations.
 - **`Yog.Transform` Optimizations** — Overhauled multiple transformer functions to eliminate dynamic protocol dispatch and intermediate list/tuple allocations during graph folding:
@@ -37,6 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`Yog.Builder.Grid` & `Yog.Builder.Toroidal` Nil-cell Handling** — Replaced direct `to_data != nil` checks with `Model.has_node?/2` to support jagged grids while correctly handling nodes with `nil` payloads.
+- **`Yog.Builder.Grid` & `Yog.Builder.Toroidal` Connection Topology** — Added `detect_topology/1` to dynamically identify and populate connection topology instead of always hardcoding `:rook`.
 - **Property Tests** — Resolved flaky `StreamData.TooManyDuplicatesError` failures in `Yog.PBT.FlowTest` and `Yog.PBT.PathfindingTest` properties by pattern-matching directly on the generated node list to obtain distinct source/target nodes, instead of using `uniq_list_of/2` on `StreamData.member_of/1`.
 
 ## [0.98.1] - 2026-05-23
