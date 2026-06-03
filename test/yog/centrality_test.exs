@@ -459,6 +459,30 @@ defmodule Yog.CentralityTest do
     assert_in_delta scores[1], 1.0, 0.01
   end
 
+  test "pagerank_empty_graph_test" do
+    graph = Yog.directed()
+    scores = Yog.Centrality.pagerank(graph)
+    assert scores == %{}
+  end
+
+  test "closeness_empty_graph_test" do
+    graph = Yog.directed()
+    scores = Yog.Centrality.closeness(graph)
+    assert scores == %{}
+  end
+
+  test "eigenvector_empty_graph_test" do
+    graph = Yog.directed()
+    scores = Yog.Centrality.eigenvector(graph)
+    assert scores == %{}
+  end
+
+  test "katz_empty_graph_test" do
+    graph = Yog.directed()
+    scores = Yog.Centrality.katz(graph, alpha: 0.1)
+    assert scores == %{}
+  end
+
   # ============= Helper Functions =============
 
   defp compare_int(a, b) when a < b, do: :lt

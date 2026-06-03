@@ -511,53 +511,62 @@ defmodule Yog.Centrality do
     nodes = Map.keys(graph.nodes)
     n = length(nodes)
 
-    %Yog.Graph{kind: kind, out_edges: out_edges, in_edges: in_edges} = graph
+    cond do
+      n == 0 ->
+        %{}
 
-    out_degrees_map =
-      List.foldl(nodes, %{}, fn id, acc ->
-        Map.put(acc, id, get_out_degree_fast(kind, out_edges, id))
-      end)
+      n == 1 ->
+        Map.new(nodes, fn node -> {node, 1.0} end)
 
-    in_neighbors_map =
-      List.foldl(nodes, %{}, fn id, acc ->
-        in_nodes = get_in_neighbor_ids_fast(kind, out_edges, in_edges, id)
+      true ->
+        %Yog.Graph{kind: kind, out_edges: out_edges, in_edges: in_edges} = graph
 
-        factored =
-          Enum.map(in_nodes, fn neighbor ->
-            out_deg = Map.get(out_degrees_map, neighbor, 0)
-
-            if out_deg > 0 do
-              {neighbor, 1.0 / out_deg}
-            else
-              {neighbor, 0.0}
-            end
+        out_degrees_map =
+          List.foldl(nodes, %{}, fn id, acc ->
+            Map.put(acc, id, get_out_degree_fast(kind, out_edges, id))
           end)
 
-        Map.put(acc, id, factored)
-      end)
+        in_neighbors_map =
+          List.foldl(nodes, %{}, fn id, acc ->
+            in_nodes = get_in_neighbor_ids_fast(kind, out_edges, in_edges, id)
 
-    sinks =
-      Enum.filter(nodes, fn id -> out_degrees_map[id] == 0 end)
+            factored =
+              Enum.map(in_nodes, fn neighbor ->
+                out_deg = Map.get(out_degrees_map, neighbor, 0)
 
-    initial_rank = 1.0 / n
+                if out_deg > 0 do
+                  {neighbor, 1.0 / out_deg}
+                else
+                  {neighbor, 0.0}
+                end
+              end)
 
-    ranks =
-      List.foldl(nodes, %{}, fn id, acc ->
-        Map.put(acc, id, initial_rank)
-      end)
+            Map.put(acc, id, factored)
+          end)
 
-    iterate_pagerank(
-      ranks,
-      nodes,
-      n,
-      damping,
-      max_iterations,
-      tolerance,
-      0,
-      in_neighbors_map,
-      out_degrees_map,
-      sinks
-    )
+        sinks =
+          Enum.filter(nodes, fn id -> out_degrees_map[id] == 0 end)
+
+        initial_rank = 1.0 / n
+
+        ranks =
+          List.foldl(nodes, %{}, fn id, acc ->
+            Map.put(acc, id, initial_rank)
+          end)
+
+        iterate_pagerank(
+          ranks,
+          nodes,
+          n,
+          damping,
+          max_iterations,
+          tolerance,
+          0,
+          in_neighbors_map,
+          out_degrees_map,
+          sinks
+        )
+    end
   end
 
   # =============================================================================

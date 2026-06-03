@@ -45,6 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`Yog.Centrality.pagerank/2`** — Fixed `ArithmeticError` (division by zero) crash on empty and single-node graphs.
+- **`Yog.Health.average_path_length/2`** — Added $O(V+E)$ connectivity fast-path check to avoid running parallel Dijkstra computations on disconnected graphs.
+- **`Yog.Health.eccentricity/3`** — Replaced linear key list sizing checks with constant-time `$O(1)$` BIF `map_size/1`.
 - **`Yog.Builder.Grid` & `Yog.Builder.Toroidal` Nil-cell Handling** — Replaced direct `to_data != nil` checks with `Model.has_node?/2` to support jagged grids while correctly handling nodes with `nil` payloads.
 - **`Yog.Builder.Grid` & `Yog.Builder.Toroidal` Connection Topology** — Added `detect_topology/1` to dynamically identify and populate connection topology instead of always hardcoding `:rook`.
 - **Property Tests** — Resolved flaky `StreamData.TooManyDuplicatesError` failures in `Yog.PBT.FlowTest` and `Yog.PBT.PathfindingTest` properties by pattern-matching directly on the generated node list to obtain distinct source/target nodes, instead of using `uniq_list_of/2` on `StreamData.member_of/1`.
