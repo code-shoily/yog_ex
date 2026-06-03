@@ -211,7 +211,7 @@ defmodule Yog.Operation do
       0
   """
   @spec symmetric_difference(Graph.t(), Graph.t()) :: Graph.t()
-  def symmetric_difference(first, second) do
+  def symmetric_difference(%Graph{} = first, second) do
     set1 = MapSet.new(Map.keys(first.nodes))
     set2 = MapSet.new(Map.keys(second.nodes))
 
