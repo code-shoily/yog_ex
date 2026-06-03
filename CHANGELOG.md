@@ -34,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **`relabel_nodes/2`**: Folds over nodes and out-edges directly via `Utils.map_fold/3`, avoiding full edge list allocations (`Model.all_edges/1`).
   - **`transitive_closure/1` & `redirect_neighbors/5`**: Updated to fold over adjacency and reachability maps using `Utils.map_fold/3` in-place.
 - **`Yog.Operation` Optimizations** — Upgraded several core graph join and product builders to completely bypass dynamic enumerable dispatch and intermediate lists:
+  - **`symmetric_difference/2`**: Rewritten as a single-pass edge collection on the symmetric difference of nodes, completely removing three intermediate subgraph copy and union allocations.
+  - **`isomorphic?/2` (`mapping_valid?/5`)**: Replaced linear-time list search checks (`s in Map.keys(...)`) with $O(1)$ constant-time `Map.has_key?/2` lookups.
   - **`disjoint_union/2`**: Avoids flat-mapping/rebuilding intermediate edge lists by folding over out-edges directly via `Utils.map_fold/3`.
   - **`cartesian_product/4`**: Rewrote vertical, horizontal, and node product helpers to fold with `Utils.map_fold/3` and `List.foldl/3` instead of nested `Enum.reduce/3` on maps.
   - **`line_graph/2`**: Optimized unique undirected edge extraction to filter in $O(E)$ during fold, eliminating expensive `Enum.uniq_by/2` and `Enum.map/2` stages. Bypassed enumerable reduction in edge-incident traversals.

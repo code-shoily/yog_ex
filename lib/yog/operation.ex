@@ -212,9 +212,46 @@ defmodule Yog.Operation do
   """
   @spec symmetric_difference(Graph.t(), Graph.t()) :: Graph.t()
   def symmetric_difference(first, second) do
-    first_only = difference(first, second)
-    second_only = difference(second, first)
-    union(first_only, second_only)
+    set1 = MapSet.new(Map.keys(first.nodes))
+    set2 = MapSet.new(Map.keys(second.nodes))
+
+    v1_minus_v2 = MapSet.difference(set1, set2)
+    v2_minus_v1 = MapSet.difference(set2, set1)
+
+    merged_nodes =
+      Map.merge(
+        Map.take(first.nodes, MapSet.to_list(v1_minus_v2)),
+        Map.take(second.nodes, MapSet.to_list(v2_minus_v1))
+      )
+
+    base_graph = %Yog.Graph{first | nodes: merged_nodes, out_edges: %{}, in_edges: %{}}
+    is_directed = first.kind == :directed
+
+    edges1 =
+      Enum.flat_map(MapSet.to_list(v1_minus_v2), fn u ->
+        first_successors = Map.get(first.out_edges, u, %{})
+
+        for {v, w} <- first_successors,
+            MapSet.member?(v1_minus_v2, v),
+            is_directed or u <= v do
+          {u, v, w}
+        end
+      end)
+
+    edges2 =
+      Enum.flat_map(MapSet.to_list(v2_minus_v1), fn u ->
+        second_successors = Map.get(second.out_edges, u, %{})
+
+        for {v, w} <- second_successors,
+            MapSet.member?(v2_minus_v1, v),
+            is_directed or u <= v do
+          {u, v, w}
+        end
+      end)
+
+    Enum.reduce(edges1 ++ edges2, base_graph, fn {u, v, w}, acc ->
+      Yog.add_edge_ensure(acc, u, v, w)
+    end)
   end
 
   # =============================================================================
@@ -1033,7 +1070,7 @@ defmodule Yog.Operation do
 
     consistent_out =
       Enum.all?(mapping, fn {s, c} ->
-        s in Map.keys(src_succs) == c in Map.keys(cand_succs)
+        Map.has_key?(src_succs, s) == Map.has_key?(cand_succs, c)
       end)
 
     src_preds = Map.get(first.in_edges, src, %{})
@@ -1041,7 +1078,7 @@ defmodule Yog.Operation do
 
     consistent_in =
       Enum.all?(mapping, fn {s, c} ->
-        s in Map.keys(src_preds) == c in Map.keys(cand_preds)
+        Map.has_key?(src_preds, s) == Map.has_key?(cand_preds, c)
       end)
 
     consistent_out and consistent_in
