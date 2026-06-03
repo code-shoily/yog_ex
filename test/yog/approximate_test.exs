@@ -94,6 +94,76 @@ defmodule Yog.ApproximateTest do
     assert scores1 == scores2
   end
 
+  # ============= Closeness Centrality Approximation =============
+
+  test "approximate_closeness_empty_graph_test" do
+    graph = Yog.undirected()
+    assert Approximate.closeness(graph) == %{}
+  end
+
+  test "approximate_closeness_triangle_test" do
+    graph = Yog.from_edges(:undirected, [{1, 2, 1}, {2, 3, 1}, {3, 1, 1}])
+    scores = Approximate.closeness(graph, samples: 2, seed: 1)
+
+    assert map_size(scores) == 3
+    # Expectation should be reasonably close to 1.0 (exact closeness of triangle)
+    assert scores[1] > 0.0 and scores[1] <= 2.0
+  end
+
+  test "approximate_closeness_star_graph_test" do
+    # Center node 1 connected to 2, 3, 4, 5
+    graph = Yog.from_edges(:undirected, [{1, 2, 1}, {1, 3, 1}, {1, 4, 1}, {1, 5, 1}])
+    scores = Approximate.closeness(graph, samples: 3, seed: 42)
+
+    assert map_size(scores) == 5
+    # Center (1) should typically have a higher centrality estimate than leaf nodes
+    assert scores[1] > scores[2]
+  end
+
+  test "approximate_closeness_seed_reproducibility_test" do
+    graph = Yog.from_edges(:undirected, [{1, 2, 1}, {2, 3, 1}, {3, 4, 1}])
+
+    scores1 = Approximate.closeness(graph, samples: 2, seed: 99)
+    scores2 = Approximate.closeness(graph, samples: 2, seed: 99)
+
+    assert scores1 == scores2
+  end
+
+  # ============= Harmonic Centrality Approximation =============
+
+  test "approximate_harmonic_empty_graph_test" do
+    graph = Yog.undirected()
+    assert Approximate.harmonic(graph) == %{}
+  end
+
+  test "approximate_harmonic_triangle_test" do
+    graph = Yog.from_edges(:undirected, [{1, 2, 1}, {2, 3, 1}, {3, 1, 1}])
+    scores = Approximate.harmonic(graph, samples: 2, seed: 1)
+
+    assert map_size(scores) == 3
+    # Expectation should be close to 1.0 (exact harmonic centrality of triangle is 1.0)
+    assert scores[1] > 0.0 and scores[1] <= 2.0
+  end
+
+  test "approximate_harmonic_path_graph_test" do
+    # Path 1-2-3-4, middle nodes (2, 3) should have higher harmonic centrality
+    graph = Yog.from_edges(:undirected, [{1, 2, 1}, {2, 3, 1}, {3, 4, 1}])
+    scores = Approximate.harmonic(graph, samples: 3, seed: 42)
+
+    assert map_size(scores) == 4
+    assert scores[2] > scores[1]
+    assert scores[3] > scores[4]
+  end
+
+  test "approximate_harmonic_seed_reproducibility_test" do
+    graph = Yog.from_edges(:undirected, [{1, 2, 1}, {2, 3, 1}, {3, 4, 1}])
+
+    scores1 = Approximate.harmonic(graph, samples: 2, seed: 99)
+    scores2 = Approximate.harmonic(graph, samples: 2, seed: 99)
+
+    assert scores1 == scores2
+  end
+
   # ============= Average Path Length Approximation =============
 
   test "approximate_average_path_length_empty_test" do

@@ -12,6 +12,8 @@ defmodule Yog.Approximate do
   |----------|----------|------------------|------------------------|
   | Diameter | `diameter/2` | O(V × (V+E)) or O(V³) | O(k × (V+E)) |
   | Betweenness | `betweenness/2` | O(VE) | O(k(V+E)) |
+  | Closeness | `closeness/2` | O(V × (E + V log V)) | O(k × (E + V log V)) |
+  | Harmonic | `harmonic/2` | O(V × (E + V log V)) | O(k × (E + V log V)) |
   | Avg Path Length | `average_path_length/2` | O(V²E) or O(V³) | O(k(V+E)) |
   | Global Efficiency | `global_efficiency/2` | O(V²E) or O(V³) | O(k(V+E)) |
   | Transitivity | `transitivity/2` | O(V³) or O(Δ²E) | O(k) |
@@ -27,6 +29,9 @@ defmodule Yog.Approximate do
     `samples: 10` for tighter bounds.
   - **Betweenness**: Sampled Brandes algorithm. Scores are unbiased when
     scaled by the sampling ratio.
+  - **Closeness / Harmonic**: Eppstein-Wang pivot sampling runs shortest-path
+    searches from a random subset of pivot nodes on the transposed graph.
+    Estimates are unbiased when scaled appropriately.
   - **Path metrics**: Pivot sampling averages shortest paths from a random
     subset of source nodes.
   - **Transitivity**: Wedge sampling estimates the global clustering coefficient
@@ -84,10 +89,7 @@ defmodule Yog.Approximate do
   def diameter(%Graph{} = graph, opts \\ []) do
     samples = Keyword.get(opts, :samples, 4)
 
-    zero = opts[:with_zero] || 0
-    add = opts[:with_add] || (&Kernel.+/2)
-    compare = opts[:with_compare] || (&Yog.Utils.compare/2)
-    weight_fn = opts[:with] || (&Function.identity/1)
+    %{zero: zero, add: add, compare: compare, weight_fn: weight_fn} = parse_metric_opts(opts)
 
     reweighted_graph =
       if weight_fn != (&Function.identity/1),
@@ -214,6 +216,198 @@ defmodule Yog.Approximate do
   defp apply_undirected_scaling(scores, %Graph{kind: :directed}), do: scores
 
   # =============================================================================
+  # Closeness Centrality Approximation
+  # =============================================================================
+
+  @doc """
+  Approximates closeness centrality for all nodes using Eppstein-Wang pivot sampling.
+
+  Instead of computing shortest paths from all nodes, it runs shortest-path
+  searches from a random subset of pivot nodes on the transposed graph.
+  This allows estimating the closeness centrality of ALL nodes in the graph
+  in O(k × (E + V log V)) time.
+
+  ## Options
+
+  - `:samples` - Number of pivot nodes to sample (default: `sqrt(V)`)
+  - `:seed` - Random seed for reproducibility
+  - `:with_zero`, `:with_add`, `:with_compare`, `:with`, `:with_to_float` -
+    Weight options (same as `Yog.Health.diameter/2`)
+
+  ## Examples
+
+      iex> graph = Yog.from_edges(:undirected, [{1, 2, 1}, {2, 3, 1}, {3, 1, 1}])
+      iex> scores = Yog.Approximate.closeness(graph, samples: 2, seed: 1)
+      iex> is_map(scores) and map_size(scores) == 3
+      true
+
+  ## Time Complexity
+
+  O(k × (E + V log V)) where k is the sample count.
+  """
+  @spec closeness(Graph.t(), keyword()) :: %{Yog.node_id() => float()}
+  def closeness(%Graph{} = graph, opts \\ []) do
+    %{zero: zero, add: add, compare: compare, weight_fn: weight_fn, to_float: to_float} =
+      parse_metric_opts(opts)
+
+    reweighted_graph =
+      if Keyword.has_key?(opts, :with),
+        do: Transform.map_edges(graph, weight_fn),
+        else: graph
+
+    nodes = Model.all_nodes(reweighted_graph)
+    n = length(nodes)
+
+    if n <= 1 do
+      Map.new(nodes, fn id -> {id, 0.0} end)
+    else
+      samples = Keyword.get(opts, :samples, trunc(:math.sqrt(n)))
+      seed = Keyword.get(opts, :seed)
+      sampled = sample_nodes(nodes, min(samples, n), seed)
+      k = length(sampled)
+
+      # Transpose the graph so Dijkstra from pivot p on the transposed graph
+      # yields the distance from all nodes v to p in the original graph.
+      transposed = Transform.transpose(reweighted_graph)
+
+      parallel_opts = [
+        max_concurrency: System.schedulers_online(),
+        timeout: :infinity
+      ]
+
+      pivot_distances =
+        sampled
+        |> Task.async_stream(
+          fn pivot ->
+            Dijkstra.single_source_distances(transposed, pivot, zero, add, compare)
+          end,
+          parallel_opts
+        )
+        |> Enum.map(fn {:ok, distances} -> distances end)
+
+      Map.new(nodes, fn v ->
+        result =
+          Enum.reduce_while(pivot_distances, 0.0, fn dist_map, sum_acc ->
+            case Map.fetch(dist_map, v) do
+              {:ok, dist} -> {:cont, sum_acc + to_float.(dist)}
+              :error -> {:halt, :disconnected}
+            end
+          end)
+
+        score =
+          case result do
+            :disconnected ->
+              0.0
+
+            sum when sum > 0.0 ->
+              k * (n - 1) / (n * sum)
+
+            _sum ->
+              0.0
+          end
+
+        {v, score}
+      end)
+    end
+  end
+
+  # =============================================================================
+  # Harmonic Centrality Approximation
+  # =============================================================================
+
+  @doc """
+  Approximates harmonic centrality for all nodes using pivot sampling.
+
+  Instead of computing shortest paths from all nodes, it runs shortest-path
+  searches from a random subset of pivot nodes on the transposed graph.
+  This allows estimating the harmonic centrality of ALL nodes in the graph
+  in O(k × (E + V log V)) time.
+
+  ## Options
+
+  - `:samples` - Number of pivot nodes to sample (default: `sqrt(V)`)
+  - `:seed` - Random seed for reproducibility
+  - `:with_zero`, `:with_add`, `:with_compare`, `:with`, `:with_to_float` -
+    Weight options (same as `Yog.Health.diameter/2`)
+
+  ## Examples
+
+      iex> graph = Yog.from_edges(:undirected, [{1, 2, 1}, {2, 3, 1}, {3, 1, 1}])
+      iex> scores = Yog.Approximate.harmonic(graph, samples: 2, seed: 1)
+      iex> is_map(scores) and map_size(scores) == 3
+      true
+
+  ## Time Complexity
+
+  O(k × (E + V log V)) where k is the sample count.
+  """
+  @spec harmonic(Graph.t(), keyword()) :: %{Yog.node_id() => float()}
+  def harmonic(%Graph{} = graph, opts \\ []) do
+    %{zero: zero, add: add, compare: compare, weight_fn: weight_fn, to_float: to_float} =
+      parse_metric_opts(opts)
+
+    reweighted_graph =
+      if Keyword.has_key?(opts, :with),
+        do: Transform.map_edges(graph, weight_fn),
+        else: graph
+
+    nodes = Model.all_nodes(reweighted_graph)
+    n = length(nodes)
+
+    if n <= 1 do
+      Map.new(nodes, fn id -> {id, 0.0} end)
+    else
+      samples = Keyword.get(opts, :samples, trunc(:math.sqrt(n)))
+      seed = Keyword.get(opts, :seed)
+      sampled = sample_nodes(nodes, min(samples, n), seed)
+      k = length(sampled)
+
+      # Transpose the graph so Dijkstra from pivot p on the transposed graph
+      # yields the distance from all nodes v to p in the original graph.
+      transposed = Transform.transpose(reweighted_graph)
+
+      parallel_opts = [
+        max_concurrency: System.schedulers_online(),
+        timeout: :infinity
+      ]
+
+      pivot_distances =
+        sampled
+        |> Task.async_stream(
+          fn pivot ->
+            Dijkstra.single_source_distances(transposed, pivot, zero, add, compare)
+          end,
+          parallel_opts
+        )
+        |> Enum.map(fn {:ok, distances} -> distances end)
+
+      denominator = (n - 1) * 1.0
+
+      Map.new(nodes, fn v ->
+        sum_of_reciprocals =
+          Enum.reduce(pivot_distances, 0.0, fn dist_map, sum_acc ->
+            case Map.fetch(dist_map, v) do
+              {:ok, dist} ->
+                d = to_float.(dist)
+
+                if d > 0.0 do
+                  sum_acc + 1.0 / d
+                else
+                  sum_acc
+                end
+
+              :error ->
+                sum_acc
+            end
+          end)
+
+        score = sum_of_reciprocals * n / (k * denominator)
+        {v, score}
+      end)
+    end
+  end
+
+  # =============================================================================
   # Average Shortest Path Length Approximation
   # =============================================================================
 
@@ -229,7 +423,7 @@ defmodule Yog.Approximate do
 
   - `:samples` - Number of pivot nodes (default: `sqrt(V)`)
   - `:seed` - Random seed for reproducibility
-  - `:with_zero`, `:with_add`, `:with_compare`, `:with`, `:to_float` -
+  - `:with_zero`, `:with_add`, `:with_compare`, `:with`, `:with_to_float` -
     Weight options (same as `Yog.Health.average_path_length/2`)
 
   ## Examples
@@ -307,7 +501,7 @@ defmodule Yog.Approximate do
 
   - `:samples` - Number of pivot nodes (default: `sqrt(V)`)
   - `:seed` - Random seed for reproducibility
-  - `:with_zero`, `:with_add`, `:with_compare`, `:with`, `:to_float` -
+  - `:with_zero`, `:with_add`, `:with_compare`, `:with`, `:with_to_float` -
     Weight options (same as `Yog.Health.global_efficiency/2`)
 
   ## Examples
