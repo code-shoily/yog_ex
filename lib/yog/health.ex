@@ -278,8 +278,7 @@ defmodule Yog.Health do
         do: Transform.map_edges(graph, weight_fn),
         else: graph
 
-    all_nodes = Map.keys(reweighted_graph.nodes)
-    num_nodes = length(all_nodes)
+    num_nodes = map_size(reweighted_graph.nodes)
 
     if num_nodes <= 1 do
       zero
@@ -458,27 +457,22 @@ defmodule Yog.Health do
     if num_nodes <= 1 do
       nil
     else
-      parallel_opts = [
-        max_concurrency: System.schedulers_online(),
-        timeout: :infinity
-      ]
+      if Yog.Property.connected?(reweighted_graph) do
+        parallel_opts = [
+          max_concurrency: System.schedulers_online(),
+          timeout: :infinity
+        ]
 
-      all_distances =
-        nodes
-        |> Task.async_stream(
-          fn source ->
-            Dijkstra.single_source_distances(reweighted_graph, source, zero, add, compare)
-          end,
-          parallel_opts
-        )
-        |> Enum.map(fn {:ok, distances} -> distances end)
+        all_distances =
+          nodes
+          |> Task.async_stream(
+            fn source ->
+              Dijkstra.single_source_distances(reweighted_graph, source, zero, add, compare)
+            end,
+            parallel_opts
+          )
+          |> Enum.map(fn {:ok, distances} -> distances end)
 
-      all_reachable =
-        Enum.all?(all_distances, fn distances ->
-          map_size(distances) == num_nodes
-        end)
-
-      if all_reachable do
         total =
           List.foldl(all_distances, 0.0, fn distances, acc ->
             sum =
