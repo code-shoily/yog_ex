@@ -89,10 +89,7 @@ defmodule Yog.Health do
   """
   @spec diameter(Yog.graph(), metric_opts()) :: metric_value()
   def diameter(graph, opts \\ []) do
-    zero = opts[:with_zero] || 0
-    add = opts[:with_add] || (&Kernel.+/2)
-    compare = opts[:with_compare] || (&Yog.Utils.compare/2)
-    weight_fn = opts[:with] || (&Function.identity/1)
+    %{zero: zero, add: add, compare: compare, weight_fn: weight_fn} = parse_metric_opts(opts)
 
     reweighted_graph =
       if weight_fn != (&Function.identity/1),
@@ -180,10 +177,7 @@ defmodule Yog.Health do
   """
   @spec radius(Yog.graph(), metric_opts()) :: metric_value()
   def radius(graph, opts \\ []) do
-    zero = opts[:with_zero] || 0
-    add = opts[:with_add] || (&Kernel.+/2)
-    compare = opts[:with_compare] || (&Yog.Utils.compare/2)
-    weight_fn = opts[:with] || (&Function.identity/1)
+    %{zero: zero, add: add, compare: compare, weight_fn: weight_fn} = parse_metric_opts(opts)
 
     reweighted_graph =
       if weight_fn != (&Function.identity/1),
@@ -277,10 +271,7 @@ defmodule Yog.Health do
   """
   @spec eccentricity(Yog.graph(), Yog.node_id(), metric_opts()) :: metric_value()
   def eccentricity(graph, node, opts \\ []) do
-    zero = opts[:with_zero] || 0
-    add = opts[:with_add] || (&Kernel.+/2)
-    compare = opts[:with_compare] || (&Yog.Utils.compare/2)
-    weight_fn = opts[:with] || (&Function.identity/1)
+    %{zero: zero, add: add, compare: compare, weight_fn: weight_fn} = parse_metric_opts(opts)
 
     reweighted_graph =
       if weight_fn != (&Function.identity/1),
@@ -453,11 +444,8 @@ defmodule Yog.Health do
   """
   @spec average_path_length(Yog.graph(), metric_opts()) :: float() | nil
   def average_path_length(graph, opts \\ []) do
-    zero = opts[:with_zero] || 0
-    add = opts[:with_add] || (&Kernel.+/2)
-    compare = opts[:with_compare] || (&Yog.Utils.compare/2)
-    weight_fn = opts[:with] || (&Function.identity/1)
-    to_float = opts[:with_to_float] || fn x -> x * 1.0 end
+    %{zero: zero, add: add, compare: compare, weight_fn: weight_fn, to_float: to_float} =
+      parse_metric_opts(opts)
 
     reweighted_graph =
       if weight_fn != (&Function.identity/1),
