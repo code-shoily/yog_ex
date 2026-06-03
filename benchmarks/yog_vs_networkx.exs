@@ -79,35 +79,72 @@ defmodule YogVsNetworkX do
     # --- Python NetworkX benchmark ---
     py_script = Path.join("benchmarks", "yog_vs_networkx.py")
 
-    {py_output, 0} =
-      System.cmd("python3", [
-        py_script,
-        to_string(n),
-        to_string(m),
-        to_string(n_small),
-        to_string(seed)
-      ])
+    has_python = System.find_executable("python3") != nil
 
-    py_metrics = parse_python_output(py_output)
+    py_metrics =
+      if has_python do
+        case System.cmd(
+               "python3",
+               [
+                 py_script,
+                 to_string(n),
+                 to_string(m),
+                 to_string(n_small),
+                 to_string(seed)
+               ],
+               stderr_to_stdout: true
+             ) do
+          {py_output, 0} ->
+            parse_python_output(py_output)
+
+          {_error_msg, _status} ->
+            nil
+        end
+      else
+        nil
+      end
 
     # --- Print Comparison Table ---
     IO.puts(String.duplicate("-", 100))
 
-    printf(
-      "Algorithm",
-      "YogEx (Elixir)",
-      "Zog (Zig Native)",
-      "NetworkX (Python)",
-      "Zog vs. NetworkX Speedup"
-    )
+    if py_metrics do
+      printf(
+        "Algorithm",
+        "YogEx (Elixir)",
+        "Zog (Zig Native)",
+        "NetworkX (Python)",
+        "Zog vs. NetworkX Speedup"
+      )
 
-    IO.puts(String.duplicate("-", 100))
+      IO.puts(String.duplicate("-", 100))
 
-    print_row("PageRank", elixir_pr, zog_pr, py_metrics[:pagerank_time])
-    print_row("Louvain", elixir_louvain, zog_louvain, py_metrics[:louvain_time])
-    print_row("Floyd-Warshall", elixir_floyd, zog_floyd, py_metrics[:floyd_time])
-    IO.puts(String.duplicate("-", 100))
-    IO.puts("Note: Speedup = NetworkX time / Zog Native time. Speedup > 1.0 means Zog is faster.")
+      print_row("PageRank", elixir_pr, zog_pr, py_metrics[:pagerank_time])
+      print_row("Louvain", elixir_louvain, zog_louvain, py_metrics[:louvain_time])
+      print_row("Floyd-Warshall", elixir_floyd, zog_floyd, py_metrics[:floyd_time])
+      IO.puts(String.duplicate("-", 100))
+
+      IO.puts(
+        "Note: Speedup = NetworkX time / Zog Native time. Speedup > 1.0 means Zog is faster."
+      )
+    else
+      printf(
+        "Algorithm",
+        "YogEx (Elixir)",
+        "Zog (Zig Native)",
+        "NetworkX (Python)",
+        "YogEx vs. Zog Speedup"
+      )
+
+      IO.puts(String.duplicate("-", 100))
+      print_row_no_py("PageRank", elixir_pr, zog_pr)
+      print_row_no_py("Louvain", elixir_louvain, zog_louvain)
+      print_row_no_py("Floyd-Warshall", elixir_floyd, zog_floyd)
+      IO.puts(String.duplicate("-", 100))
+
+      IO.puts(
+        "Note: Python NetworkX was not found or failed. Showing YogEx vs. Zog native comparison."
+      )
+    end
   end
 
   defp bench(fun) do
@@ -151,6 +188,15 @@ defmodule YogVsNetworkX do
     ratio_str = :erlang.float_to_binary(ratio, decimals: 2) <> "x"
 
     printf(alg, elixir_str, zog_str, nx_str, ratio_str)
+  end
+
+  defp print_row_no_py(alg, elixir_val, zog_val) do
+    elixir_str = :erlang.float_to_binary(elixir_val, decimals: 2) <> " ms"
+    zog_str = :erlang.float_to_binary(zog_val, decimals: 2) <> " ms"
+    ratio = elixir_val / zog_val
+    ratio_str = :erlang.float_to_binary(ratio, decimals: 2) <> "x"
+
+    printf(alg, elixir_str, zog_str, "N/A", ratio_str)
   end
 end
 
