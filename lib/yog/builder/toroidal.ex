@@ -146,20 +146,12 @@ defmodule Yog.Builder.Toroidal do
           n_col = wrap_coordinate(col + d_col, cols)
 
           to_id = coord_to_id(n_row, n_col, cols)
-          to_data = Model.node(acc_g, to_id)
-
-          if to_data != nil && can_move_fn.(from_data, to_data) do
-            case Model.add_edge(acc_g, from_id, to_id, 1) do
-              {:ok, new_g} -> new_g
-              {:error, _} -> acc_g
-            end
-          else
-            acc_g
-          end
+          add_grid_edge(acc_g, from_id, from_data, to_id, can_move_fn)
         end)
       end)
 
-    ToroidalGraph.new(graph_with_edges, rows, cols, :rook)
+    detected_topology = Grid.detect_topology(topology)
+    ToroidalGraph.new(graph_with_edges, rows, cols, detected_topology)
   end
 
   @doc """
@@ -178,7 +170,9 @@ defmodule Yog.Builder.Toroidal do
     graph
   end
 
-  # ============= Cell Access =============
+  # =============================================================================
+  # Cell Access
+  # =============================================================================
 
   @doc """
   Gets the cell data at a specific row and column.
@@ -253,7 +247,9 @@ defmodule Yog.Builder.Toroidal do
     end
   end
 
-  # ============= Coordinate Conversion =============
+  # =============================================================================
+  # Coordinate conversions
+  # =============================================================================
 
   @doc """
   Converts grid coordinates `{row, col}` to a node ID.
@@ -275,7 +271,9 @@ defmodule Yog.Builder.Toroidal do
     Grid.id_to_coord(id, cols)
   end
 
-  # ============= Toroidal Distance Heuristics =============
+  # =============================================================================
+  # Toroidal distance heuristics
+  # =============================================================================
 
   @doc """
   Calculates the toroidal Manhattan distance between two grid node IDs.
@@ -364,7 +362,9 @@ defmodule Yog.Builder.Toroidal do
     min_d * 1.414213562373095 + (max_d - min_d)
   end
 
-  # ============= Topology Presets =============
+  # =============================================================================
+  # Topology Presets
+  # =============================================================================
 
   @doc """
   4-way cardinal movement (up, down, left, right) with wrapping.
@@ -406,7 +406,9 @@ defmodule Yog.Builder.Toroidal do
     Grid.knight()
   end
 
-  # ============= Movement Predicates =============
+  # =============================================================================
+  # Movement predicates
+  # =============================================================================
 
   @doc """
   Creates a predicate that only allows movement into cells matching `valid_value`.
@@ -440,7 +442,9 @@ defmodule Yog.Builder.Toroidal do
     Grid.always()
   end
 
-  # ============= Private Helpers =============
+  # =============================================================================
+  # Private helpers - parsing
+  # =============================================================================
 
   # Wraps a coordinate to stay within bounds [0, size)
   # Handles negative values correctly for wrapping
@@ -451,6 +455,23 @@ defmodule Yog.Builder.Toroidal do
       rem_result + size
     else
       rem_result
+    end
+  end
+
+  defp add_grid_edge(graph, from_id, from_data, to_id, can_move_fn) do
+    if Model.has_node?(graph, to_id) do
+      to_data = Model.node(graph, to_id)
+
+      if can_move_fn.(from_data, to_data) do
+        case Model.add_edge(graph, from_id, to_id, 1) do
+          {:ok, new_g} -> new_g
+          {:error, _} -> graph
+        end
+      else
+        graph
+      end
+    else
+      graph
     end
   end
 end

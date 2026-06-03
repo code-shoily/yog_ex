@@ -139,23 +139,15 @@ defmodule Yog.Builder.Grid do
 
           if n_row >= 0 && n_row < rows && n_col >= 0 && n_col < cols do
             to_id = coord_to_id(n_row, n_col, cols)
-            to_data = Model.node(acc_g, to_id)
-
-            if to_data != nil && can_move_fn.(from_data, to_data) do
-              case Model.add_edge(acc_g, from_id, to_id, 1) do
-                {:ok, new_g} -> new_g
-                {:error, _} -> acc_g
-              end
-            else
-              acc_g
-            end
+            add_grid_edge(acc_g, from_id, from_data, to_id, can_move_fn)
           else
             acc_g
           end
         end)
       end)
 
-    GridGraph.new(graph_with_edges, rows, cols, :rook)
+    detected_topology = detect_topology(topology)
+    GridGraph.new(graph_with_edges, rows, cols, detected_topology)
   end
 
   @doc """
@@ -176,7 +168,9 @@ defmodule Yog.Builder.Grid do
     graph
   end
 
-  # ============= Cell Access =============
+  # =============================================================================
+  # Cell access
+  # =============================================================================
 
   @doc """
   Gets the cell data at a specific row and column.
@@ -262,7 +256,9 @@ defmodule Yog.Builder.Grid do
     end
   end
 
-  # ============= Coordinate Conversion =============
+  # =============================================================================
+  # Coordinate Conversions
+  # =============================================================================
 
   @doc """
   Converts grid coordinates `{row, col}` to a node ID.
@@ -290,7 +286,9 @@ defmodule Yog.Builder.Grid do
     {div(id, cols), rem(id, cols)}
   end
 
-  # ============= Distance Heuristics =============
+  # =============================================================================
+  # Distance heuristics
+  # =============================================================================
 
   @doc """
   Calculates the Manhattan distance between two grid node IDs.
@@ -359,7 +357,9 @@ defmodule Yog.Builder.Grid do
     min_d * 1.414213562373095 + (max_d - min_d)
   end
 
-  # ============= Topology Presets =============
+  # =============================================================================
+  # Topology Presets
+  # =============================================================================
 
   @doc """
   4-way cardinal movement (up, down, left, right).
@@ -447,7 +447,9 @@ defmodule Yog.Builder.Grid do
     ]
   end
 
-  # ============= Movement Predicates =============
+  # =============================================================================
+  # Movement Predicates
+  # =============================================================================
 
   @doc """
   Creates a predicate that only allows movement into cells matching `valid_value`.
@@ -509,5 +511,35 @@ defmodule Yog.Builder.Grid do
   @spec always() :: (term(), term() -> boolean())
   def always do
     fn _from, _to -> true end
+  end
+
+  @doc false
+  def detect_topology(topology) do
+    sorted = Enum.sort(topology)
+
+    cond do
+      sorted == Enum.sort(rook()) -> :rook
+      sorted == Enum.sort(bishop()) -> :bishop
+      sorted == Enum.sort(queen()) -> :queen
+      sorted == Enum.sort(knight()) -> :knight
+      true -> :custom
+    end
+  end
+
+  defp add_grid_edge(graph, from_id, from_data, to_id, can_move_fn) do
+    if Model.has_node?(graph, to_id) do
+      to_data = Model.node(graph, to_id)
+
+      if can_move_fn.(from_data, to_data) do
+        case Model.add_edge(graph, from_id, to_id, 1) do
+          {:ok, new_g} -> new_g
+          {:error, _} -> graph
+        end
+      else
+        graph
+      end
+    else
+      graph
+    end
   end
 end

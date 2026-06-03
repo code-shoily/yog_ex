@@ -26,9 +26,18 @@ defmodule Yog.Builder.ToroidalTest do
       )
 
     assert match?(%Yog.Builder.ToroidalGraph{}, grid)
+    assert grid.topology == :queen
 
     graph = Toroidal.to_graph(grid)
     assert length(Yog.all_nodes(graph)) == 4
+  end
+
+  test "toroidal grid builder with nil cell values" do
+    data = [[nil, nil], [nil, nil]]
+    grid = Toroidal.from_2d_list(data, :undirected, Toroidal.always())
+    assert grid.topology == :rook
+    graph = Toroidal.to_graph(grid)
+    assert Yog.Model.edge_count(graph) == 4
   end
 
   test "toroidal_get_cell_test" do

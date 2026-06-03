@@ -211,6 +211,7 @@ defmodule Yog.Builder.GridTest do
         Grid.always()
       )
 
+    assert grid_result.topology == :queen
     graph = Grid.to_graph(grid_result)
 
     # Center node (4) should have 8 neighbors
@@ -225,6 +226,7 @@ defmodule Yog.Builder.GridTest do
     grid_result =
       Grid.from_2d_list_with_topology(grid_data, :directed, Grid.bishop(), Grid.always())
 
+    assert grid_result.topology == :bishop
     graph = Grid.to_graph(grid_result)
 
     # Center node (1,1) -> neighbors (0,0), (0,2), (2,0), (2,2)
@@ -239,6 +241,7 @@ defmodule Yog.Builder.GridTest do
     grid_result =
       Grid.from_2d_list_with_topology(grid_data, :directed, Grid.rook(), Grid.always())
 
+    assert grid_result.topology == :rook
     graph = Grid.to_graph(grid_result)
 
     # Center node (1,1) -> neighbors (0,1), (1,0), (1,2), (2,1)
@@ -259,6 +262,7 @@ defmodule Yog.Builder.GridTest do
     grid_result =
       Grid.from_2d_list_with_topology(grid_data, :directed, Grid.knight(), Grid.always())
 
+    assert grid_result.topology == :knight
     graph = Grid.to_graph(grid_result)
 
     # Center node (2,2) -> 8 knight jumps
@@ -338,6 +342,23 @@ defmodule Yog.Builder.GridTest do
 
     to2 = Grid.coord_to_id(0, 2, 10)
     assert Grid.octile_distance(from, to2, 10) == 2.0
+  end
+
+  test "from_2d_list with nil values builds edges correctly" do
+    grid_data = [[nil, nil], [nil, nil]]
+    grid_result = Grid.from_2d_list(grid_data, :undirected, Grid.always())
+    graph = Grid.to_graph(grid_result)
+    assert Yog.Model.edge_count(graph) == 4
+  end
+
+  test "toroidal from_2d_list with nil values builds edges correctly" do
+    grid_data = [[nil, nil], [nil, nil]]
+
+    grid_result =
+      Yog.Builder.Toroidal.from_2d_list(grid_data, :undirected, Yog.Builder.Toroidal.always())
+
+    graph = Yog.Builder.Toroidal.to_graph(grid_result)
+    assert Yog.Model.edge_count(graph) == 4
   end
 
   describe "legacy format support" do
