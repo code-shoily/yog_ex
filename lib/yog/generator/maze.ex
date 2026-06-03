@@ -1052,10 +1052,10 @@ defmodule Yog.Generator.Maze do
 
     case strategy do
       :last ->
-        len - 1
+        0
 
       :first ->
-        0
+        len - 1
 
       :random ->
         :rand.uniform(len) - 1
@@ -1066,10 +1066,10 @@ defmodule Yog.Generator.Maze do
       _ ->
         case Keyword.get(opts, :mix) do
           {:last, prob} when is_float(prob) ->
-            if :rand.uniform() < prob, do: len - 1, else: :rand.uniform(len) - 1
+            if :rand.uniform() < prob, do: 0, else: :rand.uniform(len) - 1
 
           _ ->
-            len - 1
+            0
         end
     end
   end
