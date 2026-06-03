@@ -252,4 +252,27 @@ defmodule Yog.Builder.LiveTest do
     edge_data = Yog.Multi.edges_between(multi, 0, 1)
     assert [{_eid, 1}] = edge_data
   end
+
+  test "live_builder_add_node_test" do
+    builder =
+      Live.new()
+      |> Live.add_node("A")
+      |> Live.add_node("B")
+
+    assert Live.node_count(builder) == 2
+    assert Enum.sort(Live.all_labels(builder)) == ["A", "B"]
+
+    {_builder, graph} = Live.sync(builder, Yog.directed())
+    assert length(Yog.all_nodes(graph)) == 2
+  end
+
+  test "live_builder_get_label_test" do
+    builder =
+      Live.new()
+      |> Live.add_node("A")
+
+    assert {:ok, id} = Live.get_id(builder, "A")
+    assert Live.get_label(builder, id) == {:ok, "A"}
+    assert Live.get_label(builder, 999) == {:error, nil}
+  end
 end

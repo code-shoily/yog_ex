@@ -110,8 +110,6 @@ defmodule Yog.Builder.Live do
           | {:remove_edge, Yog.node_id(), Yog.node_id()}
           | {:remove_node, Yog.node_id()}
 
-  # ============= Constructors =============
-
   @doc """
   Creates a new live builder for directed graphs.
 
@@ -170,7 +168,27 @@ defmodule Yog.Builder.Live do
     %__MODULE__{registry: registry, next_id: next_id, pending: []}
   end
 
-  # ============= Edge Operations =============
+  # =============================================================================
+  # Node Operations
+  # =============================================================================
+
+  @doc """
+  Adds a node with the given label.
+
+  The change is queued until `sync/2` is called.
+
+  ## Examples
+
+      iex> builder = Yog.Builder.Live.new()
+      ...> |> Yog.Builder.Live.add_node("A")
+      iex> Yog.Builder.Live.all_labels(builder)
+      ["A"]
+  """
+  @spec add_node(t(), label()) :: t()
+  def add_node(builder, label) do
+    {new_builder, _id} = ensure_node(builder, label)
+    new_builder
+  end
 
   @doc """
   Adds an edge between two labeled nodes with a weight.
@@ -286,8 +304,6 @@ defmodule Yog.Builder.Live do
     end
   end
 
-  # ============= Synchronization =============
-
   @doc """
   Applies all pending changes to a simple graph.
 
@@ -377,8 +393,6 @@ defmodule Yog.Builder.Live do
   @spec checkpoint(t()) :: t()
   def checkpoint(%__MODULE__{} = builder), do: %{builder | pending: []}
 
-  # ============= Queries =============
-
   @doc """
   Looks up the internal node ID for a given label.
 
@@ -403,6 +417,37 @@ defmodule Yog.Builder.Live do
     case Map.fetch(registry, label) do
       {:ok, id} -> {:ok, id}
       :error -> {:error, nil}
+    end
+  end
+
+  @doc """
+  Looks up the label for a given internal node ID.
+
+  Returns `{:ok, label}` if the ID exists in the registry,
+  `{:error, nil}` otherwise.
+
+  ## Examples
+
+      iex> builder = Yog.Builder.Live.new()
+      ...> |> Yog.Builder.Live.add_node("A")
+      iex> {:ok, id} = Yog.Builder.Live.get_id(builder, "A")
+      iex> Yog.Builder.Live.get_label(builder, id)
+      {:ok, "A"}
+
+      iex> builder = Yog.Builder.Live.new()
+      iex> Yog.Builder.Live.get_label(builder, 999)
+      {:error, nil}
+  """
+  @spec get_label(t(), Yog.node_id()) :: {:ok, label()} | {:error, nil}
+  def get_label(%__MODULE__{registry: registry}, id) do
+    result =
+      Enum.find_value(registry, fn {label, node_id} ->
+        if node_id == id, do: {:ok, label}, else: nil
+      end)
+
+    case result do
+      nil -> {:error, nil}
+      {:ok, label} -> {:ok, label}
     end
   end
 
@@ -465,7 +510,9 @@ defmodule Yog.Builder.Live do
   @spec pending_count(t()) :: integer()
   def pending_count(%__MODULE__{pending: pending}), do: length(pending)
 
-  # ============= Private Helpers =============
+  # =============================================================================
+  # Private helpers - parsing
+  # =============================================================================
 
   defp ensure_node(
          %__MODULE__{registry: registry, next_id: next_id, pending: pending} = builder,
