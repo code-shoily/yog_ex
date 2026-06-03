@@ -97,5 +97,15 @@ defmodule Yog.Builder.LabeledTest do
 
       assert Labeled.edge_count(builder) == 2
     end
+
+    test "get_label/2 returns label for existing ID and error otherwise" do
+      builder =
+        Labeled.directed()
+        |> Labeled.add_node("A")
+
+      assert {:ok, id} = Labeled.get_id(builder, "A")
+      assert Labeled.get_label(builder, id) == {:ok, "A"}
+      assert Labeled.get_label(builder, 999) == {:error, nil}
+    end
   end
 end

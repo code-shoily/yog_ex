@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **`Yog.Operation.tensor_product/2`, `Yog.Operation.strong_product/4`, & `Yog.Operation.lexicographic_product/4`** — Added three standard graph product operations with optimized private helpers and performance complexity warning alerts.
+- **`Yog.Operation` Property-Based Tests** — Added recursive mathematical invariants and edge/node count verification checks for all newly implemented graph products to the PBT suite.
 - **`Yog.Transform.add_self_loops/2` & `Yog.Transform.remove_self_loops/1`** — Added convenience functions for managing self-loops in graphs, along with delegations in `Yog.add_self_loops/2` and `Yog.remove_self_loops/1`.
 - **`Yog.PairingHeap.merge/2`** — Exposed the $O(1)$ priority queue merge operation as a public API.
 - **`Yog.PairingHeap` Inspect Protocol** — Implemented the `Inspect` protocol for pairing heaps (`%Yog.PairingHeap.Node{}` and `%Yog.PairingHeap.Empty{}`), showing size and peek elements cleanly.
@@ -18,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`Yog.Utils` Optimizations** — Refactored `norm_diff/3` to be completely allocation-free by using direct map folds, eliminating intermediate key list concatenations and temporary map allocations.
 - **`Yog.Transform` Optimizations** — Overhauled multiple transformer functions to eliminate dynamic protocol dispatch and intermediate list/tuple allocations during graph folding:
   - **`complement/2`**: Fetches the source node's out-edges once outside the inner loop (saving $O(V^2)$ lookups) and utilizes `List.foldl/3` / `Utils.map_fold/3`.
   - **`to_undirected/2`**: Replaced list-comprehension based reduction with nested `Utils.map_fold/3` loops.
@@ -28,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **`cartesian_product/4`**: Rewrote vertical, horizontal, and node product helpers to fold with `Utils.map_fold/3` and `List.foldl/3` instead of nested `Enum.reduce/3` on maps.
   - **`line_graph/2`**: Optimized unique undirected edge extraction to filter in $O(E)$ during fold, eliminating expensive `Enum.uniq_by/2` and `Enum.map/2` stages. Bypassed enumerable reduction in edge-incident traversals.
   - **`power/3`**: Refactored distance closure iterations to utilize fast `List.foldl/3` on lists.
+
 - **`Yog.PairingHeap`** — Optimized the internal `combine` helper to bypass creating `%Empty{}` structs when matching even number of children (size $\ge 2$), reducing allocation overhead during restructuring.
 - **`Yog.Model.add_node/3`** — Defaulted the `data` parameter to `nil`, allowing nodes to be added to graphs and multigraphs without a data payload (e.g., `Yog.add_node(graph, id)`). Updated delegations in `Yog.add_node/3` and `Yog.Multi.add_node/3`.
 - **`Yog.DisjointSet`** — Optimized `find/2` and `find_root_readonly/2` to eliminate redundant struct allocations during recursion. `find_root_readonly/2` now operates directly on the `parents` map.

@@ -139,5 +139,71 @@ defmodule Yog.PBT.OperationTest do
         assert Yog.edge_count(lg) == expected_edges
       end
     end
+
+    property "tensor_product order equals product of orders" do
+      check all({g1, g2} <- same_kind_graphs_gen()) do
+        product = Yog.Operation.tensor_product(g1, g2)
+        assert Yog.node_count(product) == Yog.node_count(g1) * Yog.node_count(g2)
+      end
+    end
+
+    property "tensor_product edge count invariants" do
+      check all({g1, g2} <- same_kind_graphs_gen()) do
+        product = Yog.Operation.tensor_product(g1, g2)
+        g1_edges = Yog.edge_count(g1)
+        g2_edges = Yog.edge_count(g2)
+
+        if g1.kind == :directed do
+          assert Yog.edge_count(product) == g1_edges * g2_edges
+        else
+          g1_no_loops = Yog.Transform.remove_self_loops(g1)
+          g2_no_loops = Yog.Transform.remove_self_loops(g2)
+          prod_no_loops = Yog.Operation.tensor_product(g1_no_loops, g2_no_loops)
+
+          assert Yog.edge_count(prod_no_loops) ==
+                   2 * Yog.edge_count(g1_no_loops) * Yog.edge_count(g2_no_loops)
+        end
+      end
+    end
+
+    property "strong_product order equals product of orders" do
+      check all({g1, g2} <- same_kind_graphs_gen()) do
+        product = Yog.Operation.strong_product(g1, g2, 0, 0)
+        assert Yog.node_count(product) == Yog.node_count(g1) * Yog.node_count(g2)
+      end
+    end
+
+    property "strong_product edge count is sum of Cartesian and Tensor edge counts" do
+      check all({g1, g2} <- same_kind_graphs_gen()) do
+        g1 = Yog.Transform.remove_self_loops(g1)
+        g2 = Yog.Transform.remove_self_loops(g2)
+        strong = Yog.Operation.strong_product(g1, g2, 0, 0)
+        cartesian = Yog.Operation.cartesian_product(g1, g2, 0, 0)
+        tensor = Yog.Operation.tensor_product(g1, g2)
+
+        assert Yog.edge_count(strong) == Yog.edge_count(cartesian) + Yog.edge_count(tensor)
+      end
+    end
+
+    property "lexicographic_product order equals product of orders" do
+      check all({g1, g2} <- same_kind_graphs_gen()) do
+        product = Yog.Operation.lexicographic_product(g1, g2, 0, 0)
+        assert Yog.node_count(product) == Yog.node_count(g1) * Yog.node_count(g2)
+      end
+    end
+
+    property "lexicographic_product edge count invariants" do
+      check all({g1, g2} <- same_kind_graphs_gen()) do
+        g1 = Yog.Transform.remove_self_loops(g1)
+        g2 = Yog.Transform.remove_self_loops(g2)
+        product = Yog.Operation.lexicographic_product(g1, g2, 0, 0)
+        v1 = Yog.node_count(g1)
+        v2 = Yog.node_count(g2)
+        e1 = Yog.edge_count(g1)
+        e2 = Yog.edge_count(g2)
+
+        assert Yog.edge_count(product) == v1 * e2 + e1 * v2 * v2
+      end
+    end
   end
 end

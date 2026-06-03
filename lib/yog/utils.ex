@@ -101,25 +101,48 @@ defmodule Yog.Utils do
   """
   @spec norm_diff(map(), map(), :l1 | :l2 | :max) :: float()
   def norm_diff(m1, m2, type) do
-    # Get all unique keys from both maps and compute element-wise differences
-    # Keys present in only one map are treated as 0 in the other
-    keys = Map.keys(m1) ++ Map.keys(m2)
-
-    diffs =
-      Map.new(keys, fn k ->
-        {k, Map.get(m1, k, 0) - Map.get(m2, k, 0)}
-      end)
-
     case type do
       :l1 ->
-        map_fold(diffs, 0.0, fn _k, v, acc -> acc + abs(v) end)
+        acc = map_fold(m1, 0.0, fn k, v1, acc -> acc + abs(v1 - Map.get(m2, k, 0)) end)
+
+        map_fold(m2, acc, fn k, v2, acc ->
+          if Map.has_key?(m1, k) do
+            acc
+          else
+            acc + abs(v2)
+          end
+        end)
 
       :l2 ->
-        sum_sq = map_fold(diffs, 0.0, fn _k, v, acc -> acc + v * v end)
+        sum_sq =
+          map_fold(m1, 0.0, fn k, v1, acc ->
+            diff = v1 - Map.get(m2, k, 0)
+            acc + diff * diff
+          end)
+
+        sum_sq =
+          map_fold(m2, sum_sq, fn k, v2, acc ->
+            if Map.has_key?(m1, k) do
+              acc
+            else
+              acc + v2 * v2
+            end
+          end)
+
         :math.sqrt(sum_sq)
 
       :max ->
-        max_val = map_fold(diffs, 0.0, fn _k, v, acc -> max(acc, abs(v)) end)
+        max_val = map_fold(m1, 0.0, fn k, v1, acc -> max(acc, abs(v1 - Map.get(m2, k, 0))) end)
+
+        max_val =
+          map_fold(m2, max_val, fn k, v2, acc ->
+            if Map.has_key?(m1, k) do
+              acc
+            else
+              max(acc, abs(v2))
+            end
+          end)
+
         max_val * 1.0
     end
   end

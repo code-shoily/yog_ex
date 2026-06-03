@@ -308,6 +308,32 @@ defmodule Yog.Builder.Labeled do
   end
 
   @doc """
+  Looks up the label for a given internal node ID.
+
+  Returns `{:ok, label}` if the ID exists, `{:error, nil}` otherwise.
+
+  ## Examples
+
+      iex> builder = Yog.Builder.Labeled.directed()
+      ...> |> Yog.Builder.Labeled.add_node("A")
+      iex> {:ok, id} = Yog.Builder.Labeled.get_id(builder, "A")
+      iex> Yog.Builder.Labeled.get_label(builder, id)
+      {:ok, "A"}
+
+      iex> builder = Yog.Builder.Labeled.directed()
+      iex> Yog.Builder.Labeled.get_label(builder, 999)
+      {:error, nil}
+  """
+  @spec get_label(t(), Yog.node_id()) :: {:ok, label()} | {:error, nil}
+  def get_label(%__MODULE__{graph: graph}, id) do
+    if Model.has_node?(graph, id) do
+      {:ok, Model.node(graph, id)}
+    else
+      {:error, nil}
+    end
+  end
+
+  @doc """
   Returns all labels that have been added to the builder.
 
   ## Examples
@@ -462,8 +488,6 @@ defmodule Yog.Builder.Labeled do
         {:error, nil}
     end
   end
-
-  # ============= Private Helpers =============
 
   defp map_ids_to_labels(edges, graph) do
     Enum.flat_map(edges, fn {node_id, edge_data} ->
