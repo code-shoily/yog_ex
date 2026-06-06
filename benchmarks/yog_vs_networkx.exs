@@ -61,6 +61,17 @@ defmodule YogVsNetworkX do
         Yog.Zog.ResourceGraph.louvain(zog_large)
       end)
 
+    # --- DIJKSTRA BENCHMARK ---
+    {elixir_dijkstra, _} =
+      bench(fn ->
+        Yog.Pathfinding.Dijkstra.shortest_path(large_graph, 0, n - 1)
+      end)
+
+    {zog_dijkstra, _} =
+      bench(fn ->
+        Yog.Zog.ResourceGraph.dijkstra(zog_large, 0, n - 1)
+      end)
+
     # --- FLOYD-WARSHALL BENCHMARK ---
     {elixir_floyd, _} =
       bench(fn ->
@@ -120,6 +131,7 @@ defmodule YogVsNetworkX do
 
       print_row("PageRank", elixir_pr, zog_pr, py_metrics[:pagerank_time])
       print_row("Louvain", elixir_louvain, zog_louvain, py_metrics[:louvain_time])
+      print_row("Dijkstra", elixir_dijkstra, zog_dijkstra, py_metrics[:dijkstra_time])
       print_row("Floyd-Warshall", elixir_floyd, zog_floyd, py_metrics[:floyd_time])
       IO.puts(String.duplicate("-", 100))
 
@@ -138,6 +150,7 @@ defmodule YogVsNetworkX do
       IO.puts(String.duplicate("-", 100))
       print_row_no_py("PageRank", elixir_pr, zog_pr)
       print_row_no_py("Louvain", elixir_louvain, zog_louvain)
+      print_row_no_py("Dijkstra", elixir_dijkstra, zog_dijkstra)
       print_row_no_py("Floyd-Warshall", elixir_floyd, zog_floyd)
       IO.puts(String.duplicate("-", 100))
 

@@ -29,6 +29,11 @@ def main():
     nx.community.louvain_communities(G, seed=seed)
     louvain_time = (time.perf_counter() - t0) * 1000
 
+    # Dijkstra Pathfinding
+    t0 = time.perf_counter()
+    nx.dijkstra_path(G, 0, n - 1)
+    dijkstra_time = (time.perf_counter() - t0) * 1000
+
     # --- 2. Small Dense Graph for Floyd-Warshall ---
     # Generate a dense graph of size n_small
     G_small = nx.gnp_random_graph(n_small, 0.4, seed=seed, directed=True)
@@ -42,6 +47,7 @@ def main():
 
     print(f"pagerank_time:{pagerank_time:.2f}")
     print(f"louvain_time:{louvain_time:.2f}")
+    print(f"dijkstra_time:{dijkstra_time:.2f}")
     print(f"floyd_time:{floyd_time:.2f}")
 
 if __name__ == '__main__':
