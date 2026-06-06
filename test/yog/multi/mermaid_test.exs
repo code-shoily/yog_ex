@@ -171,8 +171,8 @@ defmodule Yog.Multi.MermaidTest do
       mermaid = Mermaid.to_mermaid(multi)
 
       assert String.contains?(mermaid, "graph TD")
-      assert String.contains?(mermaid, "1 -->|5.0| 2")
-      assert String.contains?(mermaid, "1 -->|15.0| 2")
+      assert String.contains?(mermaid, "n_0 -->|5.0| n_1")
+      assert String.contains?(mermaid, "n_0 -->|15.0| n_1")
       # It should output multiple edge lines
       edge_lines = String.split(mermaid, "\n") |> Enum.filter(&String.contains?(&1, "-->"))
       assert length(edge_lines) == 2
@@ -190,8 +190,8 @@ defmodule Yog.Multi.MermaidTest do
       mermaid = Mermaid.to_mermaid(multi)
 
       assert String.contains?(mermaid, "graph TD")
-      assert String.contains?(mermaid, "1 -- 10 --- 2")
-      assert String.contains?(mermaid, "1 -- 20 --- 2")
+      assert String.contains?(mermaid, "n_0 -- 10 --- n_1")
+      assert String.contains?(mermaid, "n_0 -- 20 --- n_1")
       edge_lines = String.split(mermaid, "\n") |> Enum.filter(&String.contains?(&1, "---"))
       assert length(edge_lines) == 2
     end
@@ -282,8 +282,8 @@ defmodule Yog.Multi.MermaidTest do
       mermaid = Mermaid.to_mermaid(multi, opts)
       assert String.contains?(mermaid, "subgraph Group1")
       assert String.contains?(mermaid, "[\"SubGroup\"]")
-      assert String.contains?(mermaid, "1")
-      assert String.contains?(mermaid, "2")
+      assert String.contains?(mermaid, "n_0")
+      assert String.contains?(mermaid, "n_1")
       assert String.contains?(mermaid, "end")
     end
 
@@ -303,7 +303,7 @@ defmodule Yog.Multi.MermaidTest do
       }
 
       mermaid = Mermaid.to_mermaid(multi, opts)
-      assert String.contains?(mermaid, "style 1 fill:#e1f5fe,stroke:#0288d1")
+      assert String.contains?(mermaid, "style n_0 fill:#e1f5fe,stroke:#0288d1")
     end
 
     test "renders with per-node shape function" do
@@ -326,8 +326,8 @@ defmodule Yog.Multi.MermaidTest do
       }
 
       mermaid = Mermaid.to_mermaid(multi, opts)
-      assert String.contains?(mermaid, "db[(\"DB\")]")
-      assert String.contains?(mermaid, "api((\"API\"))")
+      assert String.contains?(mermaid, "n_1[(\"DB\")]")
+      assert String.contains?(mermaid, "n_0((\"API\"))")
     end
 
     test "renders with combined highlight and per-node attributes" do
@@ -352,7 +352,7 @@ defmodule Yog.Multi.MermaidTest do
 
       assert String.contains?(
                mermaid,
-               "style 1 fill:#ffeb3b,stroke:#f57c00,stroke-width:3px,stroke-width:4px"
+               "style n_0 fill:#ffeb3b,stroke:#f57c00,stroke-width:3px,stroke-width:4px"
              )
     end
 
@@ -405,16 +405,16 @@ defmodule Yog.Multi.MermaidTest do
       mermaid = Mermaid.to_mermaid(multi, opts)
 
       assert String.contains?(mermaid, "graph LR")
-      assert String.contains?(mermaid, "API -->|Auth Check (REST)| Auth")
-      assert String.contains?(mermaid, "Auth -->|Read (SQL)| UserDB")
-      assert String.contains?(mermaid, "style API fill:#4a90e2")
-      assert String.contains?(mermaid, "style UserDB fill:#50e3c2")
+      assert String.contains?(mermaid, "n_0 -->|Auth Check (REST)| n_2")
+      assert String.contains?(mermaid, "n_2 -->|Read (SQL)| n_5")
+      assert String.contains?(mermaid, "style n_0 fill:#4a90e2")
+      assert String.contains?(mermaid, "style n_5 fill:#50e3c2")
       assert String.contains?(mermaid, "subgraph SecurityDomain")
 
       # Parallel edges should both be present
       api_auth_lines =
         String.split(mermaid, "\n")
-        |> Enum.filter(&(String.contains?(&1, "API -->") and String.contains?(&1, "Auth")))
+        |> Enum.filter(&(String.contains?(&1, "n_0 -->") and String.contains?(&1, "n_2")))
 
       assert length(api_auth_lines) == 2
     end
@@ -476,6 +476,21 @@ defmodule Yog.Multi.MermaidTest do
 
       mermaid = Mermaid.to_mermaid(multi, opts)
       assert String.contains?(mermaid, "linkStyle")
+    end
+
+    test "prevents node ID collisions by using sequential visual IDs" do
+      multi =
+        Yog.Multi.directed()
+        |> Yog.Multi.add_node("User 1", "First User")
+        |> Yog.Multi.add_node("User_1", "Second User")
+
+      {multi, _} = Yog.Multi.add_edge(multi, "User 1", "User_1", 1)
+
+      mermaid = Mermaid.to_mermaid(multi, Mermaid.default_options())
+
+      assert String.contains?(mermaid, "n_0[\"First User\"]")
+      assert String.contains?(mermaid, "n_1[\"Second User\"]")
+      assert String.contains?(mermaid, "n_0 -->|1| n_1")
     end
   end
 end
