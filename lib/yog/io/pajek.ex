@@ -605,25 +605,19 @@ defmodule Yog.IO.Pajek do
     case parts do
       [from_str, to_str] ->
         # No weight
-        with {:ok, from} <- parse_int(from_str),
-             {:ok, to} <- parse_int(to_str) do
-          weight = edge_parser.(:none)
-          add_edge_to_graph(graph, from, to, weight)
-        else
-          :error -> {:warning, {:invalid_edge_format, line}}
-        end
+        {:ok, from} = parse_int(from_str)
+        {:ok, to} = parse_int(to_str)
+        weight = edge_parser.(:none)
+        add_edge_to_graph(graph, from, to, weight)
 
       [from_str, to_str | weight_parts] ->
         # With weight
-        with {:ok, from} <- parse_int(from_str),
-             {:ok, to} <- parse_int(to_str) do
-          weight_str = Enum.join(weight_parts, " ")
-          weight_value = parse_weight_value(weight_str)
-          weight = edge_parser.({:some, weight_value})
-          add_edge_to_graph(graph, from, to, weight)
-        else
-          :error -> {:warning, {:invalid_edge_format, line}}
-        end
+        {:ok, from} = parse_int(from_str)
+        {:ok, to} = parse_int(to_str)
+        weight_str = Enum.join(weight_parts, " ")
+        weight_value = parse_weight_value(weight_str)
+        weight = edge_parser.({:some, weight_value})
+        add_edge_to_graph(graph, from, to, weight)
 
       _ ->
         {:warning, {:malformed_edge, line}}

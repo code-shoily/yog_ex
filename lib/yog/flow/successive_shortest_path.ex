@@ -328,10 +328,13 @@ defmodule Yog.Flow.SuccessiveShortestPath do
         {path, path_cost, dist} ->
           bottleneck = compute_bottleneck(capacities, demands, source, sink, path)
 
+          new_source_demand = Map.fetch!(demands, source) + bottleneck
+          new_sink_demand = Map.fetch!(demands, sink) - bottleneck
+
           new_demands =
             demands
-            |> Map.update!(source, &(&1 + bottleneck))
-            |> Map.update!(sink, &(&1 - bottleneck))
+            |> Map.put(source, new_source_demand)
+            |> Map.put(sink, new_sink_demand)
 
           {new_flow, new_caps} = augment_flow(flow, capacities, original_edges, path, bottleneck)
           new_cost = cost + path_cost * bottleneck

@@ -310,9 +310,6 @@ defmodule Yog.Community.Walktrap do
     end)
   end
 
-  defp merge_community_pt(nil, p_c2), do: p_c2
-  defp merge_community_pt(p_c1, nil), do: p_c1
-
   defp merge_community_pt(p_c1, p_c2) do
     all_keys =
       Map.keys(p_c1)
