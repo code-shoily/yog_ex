@@ -724,5 +724,21 @@ defmodule Yog.Flow.MinCutTest do
       assert result.cut_value == 10
       assert result.algorithm == :edmonds_karp
     end
+
+    test "undirected-only algorithms raise ArgumentError for directed graphs" do
+      graph = Yog.directed() |> Yog.add_node(1) |> Yog.add_node(2)
+
+      assert_raise ArgumentError, ~r/requires an undirected graph/, fn ->
+        MinCut.global_min_cut(graph)
+      end
+
+      assert_raise ArgumentError, ~r/requires an undirected graph/, fn ->
+        MinCut.gomory_hu_tree(graph)
+      end
+
+      assert_raise ArgumentError, ~r/requires an undirected graph/, fn ->
+        MinCut.karger_stein(graph)
+      end
+    end
   end
 end
