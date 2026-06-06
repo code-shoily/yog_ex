@@ -551,4 +551,19 @@ defmodule Yog.Multi.DOTTest do
       assert String.contains?(dot, "color=\"red\"")
     end
   end
+
+  describe "HTML-like labels" do
+    test "renders HTML-like labels without quoting them" do
+      multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "A") |> Yog.Multi.add_node(2, "B")
+      {multi, _eid} = Yog.Multi.add_edge(multi, 1, 2, 5)
+
+      opts = %{
+        DOT.default_options()
+        | node_label: fn _id, _data -> "<table border=\"0\"><tr><td>Node</td></tr></table>" end
+      }
+
+      dot = DOT.to_dot(multi, opts)
+      assert String.contains?(dot, "1 [label=<table border=\"0\"><tr><td>Node</td></tr></table>]")
+    end
+  end
 end
