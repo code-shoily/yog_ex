@@ -82,4 +82,12 @@ defmodule Yog.Property.PlanarityTest do
         flunk("K5 should be non-planar")
     end
   end
+
+  test "directed graphs return nonplanar / false" do
+    graph = Yog.directed() |> Yog.add_node(1) |> Yog.add_node(2)
+
+    assert Planarity.planar?(graph) == false
+    assert Planarity.planar_embedding(graph) == :nonplanar
+    assert Planarity.kuratowski_witness(graph) == :nonplanar
+  end
 end

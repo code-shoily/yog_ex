@@ -593,8 +593,4 @@ defmodule Yog.Property.Bipartite do
   def get_partner(matches, person) when is_map(matches) do
     Map.get(matches, person)
   end
-
-  def get_partner({:stable_marriage, matches}, person) do
-    Map.get(matches, person)
-  end
 end

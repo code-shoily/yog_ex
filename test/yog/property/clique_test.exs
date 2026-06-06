@@ -128,4 +128,12 @@ defmodule Yog.Property.CliqueTest do
     pairs = Clique.k_cliques(graph, 2)
     assert length(pairs) == 2
   end
+
+  test "clique algorithms return error for directed graphs" do
+    graph = Yog.directed() |> Yog.add_node(1) |> Yog.add_node(2)
+
+    assert Clique.max_clique(graph) == {:error, :undirected_only}
+    assert Clique.all_maximal_cliques(graph) == {:error, :undirected_only}
+    assert Clique.k_cliques(graph, 2) == {:error, :undirected_only}
+  end
 end

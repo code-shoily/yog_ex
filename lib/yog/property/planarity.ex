@@ -94,31 +94,37 @@ defmodule Yog.Property.Planarity do
   Identifies a Kuratowski witness (a subdivision of K5 or K3,3) that proves
   the graph is non-planar.
   """
-  @spec kuratowski_witness(Yog.graph()) :: {:ok, map()} | :planar
+  @spec kuratowski_witness(Yog.graph()) :: {:ok, map()} | :planar | :nonplanar
   def kuratowski_witness(graph) do
-    if planar?(graph) do
-      :planar
-    else
-      minimal = do_reduce_to_minimal(graph)
-      type = identify_kuratowski_type(minimal)
+    case Model.type(graph) do
+      :undirected ->
+        if planar?(graph) do
+          :planar
+        else
+          minimal = do_reduce_to_minimal(graph)
+          type = identify_kuratowski_type(minimal)
 
-      # Fallback: if minimal reduction obscured the Kuratowski type
-      # (e.g., due to false negatives in the exact planarity test),
-      # try identifying on the original graph.
-      type = if type == :unknown, do: identify_kuratowski_type(graph), else: type
+          # Fallback: if minimal reduction obscured the Kuratowski type
+          # (e.g., due to false negatives in the exact planarity test),
+          # try identifying on the original graph.
+          type = if type == :unknown, do: identify_kuratowski_type(graph), else: type
 
-      edges =
-        minimal
-        |> Model.all_edges()
-        |> Enum.map(fn {u, v, _w} -> {u, v} end)
+          edges =
+            minimal
+            |> Model.all_edges()
+            |> Enum.map(fn {u, v, _w} -> {u, v} end)
 
-      {:ok,
-       %{
-         type: type,
-         nodes: Model.all_nodes(minimal),
-         edges: edges,
-         subgraph: minimal
-       }}
+          {:ok,
+           %{
+             type: type,
+             nodes: Model.all_nodes(minimal),
+             edges: edges,
+             subgraph: minimal
+           }}
+        end
+
+      :directed ->
+        :nonplanar
     end
   end
 
