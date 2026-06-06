@@ -38,7 +38,8 @@ defmodule Yog.Zog.Pathfinding do
       nifs: [
         ...,
         floyd_warshall: [concurrency: :dirty_cpu],
-        johnsons: [concurrency: :dirty_cpu]
+        johnsons: [concurrency: :dirty_cpu],
+        nif_dijkstra: [concurrency: :dirty_cpu]
       ]
 
     ~Z"""
@@ -134,6 +135,40 @@ defmodule Yog.Zog.Pathfinding do
         defer result.deinit();
 
         return extractMatrix(result, node_count);
+    }
+
+    // =============================================================================
+    // Dijkstra's Algorithm
+    // =============================================================================
+
+    /// Point-to-point shortest path using Dijkstra's Algorithm.
+    /// Returns `{:ok, {path, weight}}` or `{:error, :no_path}`.
+    pub fn nif_dijkstra(
+        node_count: usize,
+        from: []u32,
+        to: []u32,
+        weight: []f64,
+        start_node: u32,
+        goal_node: u32,
+    ) !beam.term {
+        var g = try buildGraph(node_count, from, to, weight);
+        defer g.deinit();
+
+        const opt_res = zog.pathfinding.dijkstra(beam.allocator, g, start_node, goal_node) catch |err| {
+            return err;
+        };
+
+        if (opt_res) |res| {
+            var path_res = res;
+            defer path_res.deinit(beam.allocator);
+
+            const path_slice = try beam.allocator.alloc(u32, path_res.path.items.len);
+            @memcpy(path_slice, path_res.path.items);
+
+            return beam.make(.{.ok, .{path_slice, path_res.weight}}, .{});
+        } else {
+            return beam.make(.{.@"error", .no_path}, .{});
+        }
     }
     """
 
@@ -234,6 +269,44 @@ defmodule Yog.Zog.Pathfinding do
           {:error, :negative_cycle}
       end
     end
+
+    @doc """
+    Computes the shortest path and its weight between two nodes using Dijkstra's algorithm via the native Zog backend.
+
+    **Time Complexity:** O((V + E) log V)
+
+    ## Example
+
+        iex> alias Yog.Builder.Zog
+        iex> builder = Zog.directed()
+        ...>   |> Zog.add_edge("A", "B", 1.0)
+        ...>   |> Zog.add_edge("B", "C", 2.0)
+        ...>   |> Zog.add_edge("A", "C", 10.0)
+        iex> Yog.Zog.Pathfinding.dijkstra(builder, "A", "C")
+        {:ok, {["A", "B", "C"], 3.0}}
+    """
+    @spec dijkstra(Zog.t(), Zog.label(), Zog.label()) ::
+            {:ok, {[Zog.label()], float()}} | {:error, :no_path}
+    def dijkstra(%Yog.Builder.Zog{} = builder, start_label, goal_label) do
+      start_id = Map.get(builder.label_to_id, start_label)
+      goal_id = Map.get(builder.label_to_id, goal_label)
+
+      if is_nil(start_id) or is_nil(goal_id) do
+        {:error, :no_path}
+      else
+        node_count = Zog.node_count(builder)
+        {from, to, weights} = Zog.to_edge_arrays(builder)
+
+        case nif_dijkstra(node_count, from, to, weights, start_id, goal_id) do
+          {:ok, {path_ids, weight}} ->
+            path_labels = Enum.map(path_ids, &Zog.id_to_label(builder, &1))
+            {:ok, {path_labels, weight}}
+
+          {:error, :no_path} ->
+            {:error, :no_path}
+        end
+      end
+    end
   else
     @moduledoc """
     Native pathfinding algorithms backed by Zog (Zig) via Zigler.
@@ -245,6 +318,10 @@ defmodule Yog.Zog.Pathfinding do
       def unquote(fun)(_builder) do
         raise "zigler is not installed. Add {:zigler, \"~> 0.15.2\", runtime: false} to your deps and run mix deps.get."
       end
+    end
+
+    def dijkstra(_builder, _start_label, _goal_label) do
+      raise "zigler is not installed. Add {:zigler, \"~> 0.15.2\", runtime: false} to your deps and run mix deps.get."
     end
   end
 end

@@ -58,6 +58,7 @@ defmodule Yog.Zog.ResourceGraph do
         modularity_f64: [concurrency: :dirty_cpu],
         nif_floyd_warshall: [concurrency: :dirty_cpu],
         nif_johnsons: [concurrency: :dirty_cpu],
+        nif_dijkstra: [concurrency: :dirty_cpu],
         nif_density: [concurrency: :dirty_cpu],
         nif_triangle_count: [concurrency: :dirty_cpu],
         nif_average_clustering_coefficient: [concurrency: :dirty_cpu],
@@ -334,6 +335,25 @@ defmodule Yog.Zog.ResourceGraph do
         };
         defer result.deinit();
         return extractMatrix(result, node_count);
+    }
+
+    pub fn nif_dijkstra(res: GraphRes, start_node: u32, goal_node: u32) !beam.term {
+        const g = res.unpack().graph;
+        const opt_res = zog.pathfinding.dijkstra(beam.allocator, g, start_node, goal_node) catch |err| {
+            return err;
+        };
+
+        if (opt_res) |res_val| {
+            var path_res = res_val;
+            defer path_res.deinit(beam.allocator);
+
+            const path_slice = try beam.allocator.alloc(u32, path_res.path.items.len);
+            @memcpy(path_slice, path_res.path.items);
+
+            return beam.make(.{.ok, .{path_slice, path_res.weight}}, .{});
+        } else {
+            return beam.make(.{.@"error", .no_path}, .{});
+        }
     }
 
     // =============================================================================
@@ -773,6 +793,42 @@ defmodule Yog.Zog.ResourceGraph do
       end
     end
 
+    @doc """
+    Computes the shortest path and its weight between two nodes using Dijkstra's algorithm directly on the native graph resource.
+
+    **Time Complexity:** O((V + E) log V)
+
+    ## Example
+
+        iex> alias Yog.Builder.Zog
+        iex> alias Yog.Zog.ResourceGraph
+        iex> builder = Zog.directed()
+        ...>   |> Zog.add_edge("A", "B", 1.0)
+        ...>   |> Zog.add_edge("B", "C", 2.0)
+        iex> graph = ResourceGraph.new(builder)
+        iex> ResourceGraph.dijkstra(graph, "A", "C")
+        {:ok, {["A", "B", "C"], 3.0}}
+    """
+    @spec dijkstra(t(), Zog.label(), Zog.label()) ::
+            {:ok, {[Zog.label()], float()}} | {:error, :no_path}
+    def dijkstra(%{resource: res, builder: builder}, start_label, goal_label) do
+      start_id = Map.get(builder.label_to_id, start_label)
+      goal_id = Map.get(builder.label_to_id, goal_label)
+
+      if is_nil(start_id) or is_nil(goal_id) do
+        {:error, :no_path}
+      else
+        case nif_dijkstra(res, start_id, goal_id) do
+          {:ok, {path_ids, weight}} ->
+            path_labels = Enum.map(path_ids, &Zog.id_to_label(builder, &1))
+            {:ok, {path_labels, weight}}
+
+          {:error, :no_path} ->
+            {:error, :no_path}
+        end
+      end
+    end
+
     # --------------------------------------------------------------------------
     # Metrics
     # --------------------------------------------------------------------------
@@ -962,6 +1018,10 @@ defmodule Yog.Zog.ResourceGraph do
     end
 
     def global_min_cut(_graph) do
+      raise "zigler is not installed. Add {:zigler, \"~> 0.15.2\", runtime: false} to your deps and run mix deps.get."
+    end
+
+    def dijkstra(_graph, _start_label, _goal_label) do
       raise "zigler is not installed. Add {:zigler, \"~> 0.15.2\", runtime: false} to your deps and run mix deps.get."
     end
   end

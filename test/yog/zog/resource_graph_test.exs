@@ -6,6 +6,8 @@ defmodule Yog.Zog.ResourceGraphTest do
 
   @moduletag :zigler
 
+  doctest Yog.Zog.ResourceGraph
+
   describe "new/1 and destroy/1" do
     test "builds and destroys a resource" do
       builder =
@@ -338,6 +340,52 @@ defmodule Yog.Zog.ResourceGraphTest do
       assert Enum.at(matrix, 1) == [2.0, 0.0, 1.0]
       assert Enum.at(matrix, 2) == [1.0, 2.0, 0.0]
 
+      ResourceGraph.destroy(graph)
+    end
+
+    test "dijkstra simple linear path" do
+      builder =
+        Zog.directed()
+        |> Zog.add_edge("A", "B", 1.0)
+        |> Zog.add_edge("B", "C", 2.0)
+
+      graph = ResourceGraph.new(builder)
+      assert {:ok, {["A", "B", "C"], 3.0}} = ResourceGraph.dijkstra(graph, "A", "C")
+      ResourceGraph.destroy(graph)
+    end
+
+    test "dijkstra chooses shorter path" do
+      builder =
+        Zog.directed()
+        |> Zog.add_edge("A", "B", 10.0)
+        |> Zog.add_edge("B", "D", 10.0)
+        |> Zog.add_edge("A", "C", 1.0)
+        |> Zog.add_edge("C", "D", 1.0)
+
+      graph = ResourceGraph.new(builder)
+      assert {:ok, {["A", "C", "D"], 2.0}} = ResourceGraph.dijkstra(graph, "A", "D")
+      ResourceGraph.destroy(graph)
+    end
+
+    test "dijkstra unreachable goal" do
+      builder =
+        Zog.directed()
+        |> Zog.add_edge("A", "B", 1.0)
+        |> Zog.add_node("C")
+
+      graph = ResourceGraph.new(builder)
+      assert ResourceGraph.dijkstra(graph, "A", "C") == {:error, :no_path}
+      ResourceGraph.destroy(graph)
+    end
+
+    test "dijkstra non-existent node labels" do
+      builder =
+        Zog.directed()
+        |> Zog.add_edge("A", "B", 1.0)
+
+      graph = ResourceGraph.new(builder)
+      assert ResourceGraph.dijkstra(graph, "A", "Z") == {:error, :no_path}
+      assert ResourceGraph.dijkstra(graph, "Z", "B") == {:error, :no_path}
       ResourceGraph.destroy(graph)
     end
   end

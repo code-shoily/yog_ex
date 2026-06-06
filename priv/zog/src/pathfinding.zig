@@ -419,6 +419,147 @@ pub fn singleSourceShortestPathCounts(
     };
 }
 
+pub fn ShortestPathResult(comptime NId: type, comptime Weight: type) type {
+    return struct {
+        weight: Weight,
+        path: std.ArrayList(NId),
+
+        pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+            self.path.deinit(allocator);
+        }
+    };
+}
+
+fn reconstructPath(
+    allocator: std.mem.Allocator,
+    node: anytype,
+    start_node: anytype,
+    weight: anytype,
+    ws: anytype,
+    mapper: anytype,
+) !ShortestPathResult(@TypeOf(node), @TypeOf(weight)) {
+    const NodeId = @TypeOf(node);
+    var path = std.ArrayList(NodeId).empty;
+    errdefer path.deinit(allocator);
+
+    var at = node;
+    while (true) {
+        try path.append(allocator, at);
+        if (std.meta.eql(at, start_node)) break;
+        const at_idx = mapper.get(at);
+        at = ws.prev[at_idx] orelse break;
+    }
+    std.mem.reverse(NodeId, path.items);
+
+    return .{
+        .weight = weight,
+        .path = path,
+    };
+}
+
+fn pointToPointSearchInternal(
+    comptime is_astar: bool,
+    allocator: std.mem.Allocator,
+    graph: anytype,
+    start_node: anytype,
+    goal_node: anytype,
+    comptime Weight: type,
+    zero: Weight,
+    comptime addFn: fn (a: Weight, b: Weight) Weight,
+    comptime compareFn: fn (a: Weight, b: Weight) std.math.Order,
+    heuristic_opt: ?fn (node: @TypeOf(start_node), goal: @TypeOf(start_node)) Weight,
+    workspace_opt: ?*SSSPWorkspace(@TypeOf(start_node), Weight),
+) !?ShortestPathResult(@TypeOf(start_node), Weight) {
+    const NodeId = @TypeOf(start_node);
+
+    var internal_ws: ?SSSPWorkspace(NodeId, Weight) = null;
+    defer if (internal_ws) |*ws| ws.deinit(allocator);
+
+    const ws = if (workspace_opt) |ws| ws else blk: {
+        internal_ws = try SSSPWorkspace(NodeId, Weight).init(allocator, graphNodeCapacity(graph));
+        break :blk &internal_ws.?;
+    };
+    ws.reset();
+
+    var mapper = try NodeMapper(NodeId, Weight).init(allocator, graph, ws);
+    defer mapper.deinit();
+
+    const Item = struct {
+        node: NodeId,
+        f: Weight,
+        g: Weight,
+    };
+
+    const PQ = std.PriorityQueue(Item, void, struct {
+        fn lessThan(_: void, a: Item, b: Item) std.math.Order {
+            return compareFn(a.f, b.f);
+        }
+    }.lessThan);
+
+    var pq = PQ.init(allocator, {});
+    defer pq.deinit();
+
+    const start_g = zero;
+    const start_f = if (is_astar) addFn(start_g, heuristic_opt.?(start_node, goal_node)) else start_g;
+
+    const start_idx = try mapper.getOrPut(start_node);
+    ws.dist[start_idx] = start_g;
+    try pq.add(.{ .node = start_node, .f = start_f, .g = start_g });
+
+    while (pq.count() > 0) {
+        const current = pq.remove();
+        const current_idx = mapper.get(current.node);
+        const best_g = ws.dist[current_idx] orelse continue;
+
+        if (compareFn(current.g, best_g) == .gt) continue;
+
+        if (std.meta.eql(current.node, goal_node)) {
+            return try reconstructPath(allocator, goal_node, start_node, current.g, ws, mapper);
+        }
+
+        var it = graph.successors(current.node);
+        while (it.next()) |edge| {
+            const tentative_g = addFn(current.g, edge.data);
+            const to_idx = try mapper.getOrPut(edge.to);
+            const old_g_opt = ws.dist[to_idx];
+            const better = if (old_g_opt) |old_g| compareFn(tentative_g, old_g) == .lt else true;
+
+            if (better) {
+                ws.dist[to_idx] = tentative_g;
+                ws.prev[to_idx] = current.node;
+                const f = if (is_astar) addFn(tentative_g, heuristic_opt.?(edge.to, goal_node)) else tentative_g;
+                try pq.add(.{ .node = edge.to, .f = f, .g = tentative_g });
+            }
+        }
+    }
+
+    return null;
+}
+
+pub fn dijkstraGeneric(
+    allocator: std.mem.Allocator,
+    graph: anytype,
+    start_node: anytype,
+    goal_node: anytype,
+    comptime Weight: type,
+    zero: Weight,
+    comptime addFn: fn (a: Weight, b: Weight) Weight,
+    comptime compareFn: fn (a: Weight, b: Weight) std.math.Order,
+    workspace_opt: ?*SSSPWorkspace(@TypeOf(start_node), Weight),
+) !?ShortestPathResult(@TypeOf(start_node), Weight) {
+    return pointToPointSearchInternal(false, allocator, graph, start_node, goal_node, Weight, zero, addFn, compareFn, null, workspace_opt);
+}
+
+pub fn dijkstra(
+    allocator: std.mem.Allocator,
+    graph: anytype,
+    start_node: anytype,
+    goal_node: anytype,
+) !?ShortestPathResult(@TypeOf(start_node), f64) {
+    return dijkstraGeneric(allocator, graph, start_node, goal_node, f64, 0.0, utils.addF64, utils.compareF64, null);
+}
+
+
 // --- Tests ---
 
 test "singleSourceDistances: all reachable nodes" {
@@ -442,6 +583,78 @@ test "singleSourceDistances: all reachable nodes" {
     try std.testing.expectEqual(@as(f64, 1.0), dist.get(b).?);
     try std.testing.expectEqual(@as(f64, 3.0), dist.get(c).?);
 }
+
+test "Dijkstra: simple linear path" {
+    const models = @import("root.zig").models;
+    const allocator = std.testing.allocator;
+
+    var g = models.ArrayGraph(void, f64).init(allocator);
+    defer g.deinit();
+
+    const n1 = try g.addNode({});
+    const n2 = try g.addNode({});
+    const n3 = try g.addNode({});
+
+    _ = try g.addEdge(n1, n2, 1.0);
+    _ = try g.addEdge(n2, n3, 2.0);
+
+    var result = try dijkstra(allocator, g, n1, n3);
+    defer if (result) |*r| r.deinit(allocator);
+
+    try std.testing.expect(result != null);
+    try std.testing.expectEqual(@as(f64, 3.0), result.?.weight);
+    try std.testing.expectEqual(@as(usize, 3), result.?.path.items.len);
+    try std.testing.expectEqual(n1, result.?.path.items[0]);
+    try std.testing.expectEqual(n2, result.?.path.items[1]);
+    try std.testing.expectEqual(n3, result.?.path.items[2]);
+}
+
+test "Dijkstra: chooses shorter path" {
+    const models = @import("root.zig").models;
+    const allocator = std.testing.allocator;
+
+    var g = models.ArrayGraph(void, f64).init(allocator);
+    defer g.deinit();
+
+    const a = try g.addNode({});
+    const b = try g.addNode({});
+    const c = try g.addNode({});
+    const d = try g.addNode({});
+
+    _ = try g.addEdge(a, b, 10.0);
+    _ = try g.addEdge(b, d, 10.0);
+    _ = try g.addEdge(a, c, 1.0);
+    _ = try g.addEdge(c, d, 1.0);
+
+    var result = try dijkstra(allocator, g, a, d);
+    defer if (result) |*r| r.deinit(allocator);
+
+    try std.testing.expect(result != null);
+    try std.testing.expectEqual(@as(f64, 2.0), result.?.weight);
+    try std.testing.expectEqual(a, result.?.path.items[0]);
+    try std.testing.expectEqual(c, result.?.path.items[1]);
+    try std.testing.expectEqual(d, result.?.path.items[2]);
+}
+
+test "Dijkstra: unreachable goal returns null" {
+    const models = @import("root.zig").models;
+    const allocator = std.testing.allocator;
+
+    var g = models.ArrayGraph(void, f64).init(allocator);
+    defer g.deinit();
+
+    const a = try g.addNode({});
+    const b = try g.addNode({});
+    const c = try g.addNode({});
+
+    _ = try g.addEdge(a, b, 1.0);
+
+    var result = try dijkstra(allocator, g, a, c);
+    defer if (result) |*r| r.deinit(allocator);
+
+    try std.testing.expect(result == null);
+}
+
 
 /// Result of an all-pairs shortest path computation using a flat matrix.
 pub fn AllPairsShortestPathResult(comptime NId: type, comptime Weight: type) type {

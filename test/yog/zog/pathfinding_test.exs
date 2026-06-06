@@ -90,4 +90,44 @@ defmodule Yog.Zog.PathfindingTest do
       assert Pathfinding.johnsons(builder) == {:error, :negative_cycle}
     end
   end
+
+  describe "dijkstra/3" do
+    test "simple linear path" do
+      builder =
+        Zog.directed()
+        |> Zog.add_edge("A", "B", 1.0)
+        |> Zog.add_edge("B", "C", 2.0)
+
+      assert {:ok, {["A", "B", "C"], 3.0}} = Pathfinding.dijkstra(builder, "A", "C")
+    end
+
+    test "chooses shorter path" do
+      builder =
+        Zog.directed()
+        |> Zog.add_edge("A", "B", 10.0)
+        |> Zog.add_edge("B", "D", 10.0)
+        |> Zog.add_edge("A", "C", 1.0)
+        |> Zog.add_edge("C", "D", 1.0)
+
+      assert {:ok, {["A", "C", "D"], 2.0}} = Pathfinding.dijkstra(builder, "A", "D")
+    end
+
+    test "unreachable goal" do
+      builder =
+        Zog.directed()
+        |> Zog.add_edge("A", "B", 1.0)
+        |> Zog.add_node("C")
+
+      assert Pathfinding.dijkstra(builder, "A", "C") == {:error, :no_path}
+    end
+
+    test "non-existent node labels" do
+      builder =
+        Zog.directed()
+        |> Zog.add_edge("A", "B", 1.0)
+
+      assert Pathfinding.dijkstra(builder, "A", "Z") == {:error, :no_path}
+      assert Pathfinding.dijkstra(builder, "Z", "B") == {:error, :no_path}
+    end
+  end
 end
