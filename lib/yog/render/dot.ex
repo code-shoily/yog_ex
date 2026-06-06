@@ -385,7 +385,26 @@ defmodule Yog.Render.DOT do
 
     # Convert highlight lists to MapSets for O(1) membership checks
     hl_nodes = to_mapset(options.highlighted_nodes)
-    hl_edges = to_edge_set(options.highlighted_edges)
+
+    hl_edges =
+      case to_edge_set(options.highlighted_edges) do
+        nil ->
+          nil
+
+        set ->
+          if kind == :undirected do
+            set
+            |> MapSet.to_list()
+            |> Enum.map(fn
+              {u, v} -> if u <= v, do: {u, v}, else: {v, u}
+              other -> other
+            end)
+            |> MapSet.new()
+          else
+            set
+          end
+      end
+
     options = %{options | highlighted_nodes: hl_nodes, highlighted_edges: hl_edges}
 
     # Generate nodes with per-element attributes
@@ -820,8 +839,14 @@ defmodule Yog.Render.DOT do
         # Add highlighting if applicable
         is_highlighted =
           options.highlighted_edges &&
-            (MapSet.member?(options.highlighted_edges, {from_id, to_id}) ||
-               MapSet.member?(options.highlighted_edges, {to_id, from_id}))
+            if kind == :undirected do
+              MapSet.member?(
+                options.highlighted_edges,
+                if(from_id <= to_id, do: {from_id, to_id}, else: {to_id, from_id})
+              )
+            else
+              MapSet.member?(options.highlighted_edges, {from_id, to_id})
+            end
 
         attrs =
           if is_highlighted do

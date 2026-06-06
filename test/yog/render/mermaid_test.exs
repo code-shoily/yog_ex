@@ -55,8 +55,8 @@ defmodule Yog.Render.MermaidTest do
       mermaid = Mermaid.to_mermaid(graph, Mermaid.default_options())
 
       assert String.contains?(mermaid, "graph TD")
-      assert String.contains?(mermaid, "1")
-      assert String.contains?(mermaid, "2")
+      assert String.contains?(mermaid, "n_0")
+      assert String.contains?(mermaid, "n_1")
       assert String.contains?(mermaid, "-->")
     end
 
@@ -86,9 +86,9 @@ defmodule Yog.Render.MermaidTest do
       mermaid = Mermaid.to_mermaid(graph, Mermaid.default_options())
 
       assert String.contains?(mermaid, "graph")
-      assert String.contains?(mermaid, "1")
-      assert String.contains?(mermaid, "2")
-      assert String.contains?(mermaid, "3")
+      assert String.contains?(mermaid, "n_0")
+      assert String.contains?(mermaid, "n_1")
+      assert String.contains?(mermaid, "n_2")
     end
 
     test "applies highlighting" do
@@ -168,7 +168,7 @@ defmodule Yog.Render.MermaidTest do
         end)
 
       mermaid = Mermaid.to_mermaid(graph, opts)
-      assert String.contains?(mermaid, "style 1 fill:#e1f5fe")
+      assert String.contains?(mermaid, "style n_0 fill:#e1f5fe")
     end
 
     test "renders with per-element edge attributes" do
@@ -275,8 +275,8 @@ defmodule Yog.Render.MermaidTest do
       }
 
       mermaid = Mermaid.to_mermaid(graph, opts)
-      assert String.contains?(mermaid, "db[(\"DB\")]")
-      assert String.contains?(mermaid, "api((\"API\"))")
+      assert String.contains?(mermaid, "n_1[(\"DB\")]")
+      assert String.contains?(mermaid, "n_0((\"API\"))")
     end
 
     test "undirected graph with labels uses correct syntax" do
@@ -287,8 +287,8 @@ defmodule Yog.Render.MermaidTest do
         |> Yog.add_edge_ensure(1, 2, "10")
 
       mermaid = Mermaid.to_mermaid(graph, Mermaid.default_options())
-      assert String.contains?(mermaid, "1 -- 10 --- 2")
-      refute String.contains?(mermaid, "1 ---|10| 2")
+      assert String.contains?(mermaid, "n_0 -- 10 --- n_1")
+      refute String.contains?(mermaid, "n_0 ---|10| n_1")
     end
 
     test "community_to_options generates node attributes" do
@@ -413,8 +413,8 @@ defmodule Yog.Render.MermaidTest do
       mermaid = Mermaid.to_mermaid(graph, Mermaid.default_options())
 
       # Should fall back to node ID as label
-      assert String.contains?(mermaid, "1[\"1\"]")
-      assert String.contains?(mermaid, "2[\"2\"]")
+      assert String.contains?(mermaid, "n_0[\"1\"]")
+      assert String.contains?(mermaid, "n_1[\"2\"]")
       assert String.contains?(mermaid, "-->")
     end
 
@@ -428,8 +428,8 @@ defmodule Yog.Render.MermaidTest do
       mermaid = Mermaid.to_mermaid(graph, Mermaid.default_options())
 
       # nil to_string gives "", so falls back to node ID
-      assert String.contains?(mermaid, "1[\"1\"]")
-      assert String.contains?(mermaid, "2[\"2\"]")
+      assert String.contains?(mermaid, "n_0[\"1\"]")
+      assert String.contains?(mermaid, "n_1[\"2\"]")
     end
 
     test "renders graph with atom node ids" do
@@ -441,8 +441,8 @@ defmodule Yog.Render.MermaidTest do
 
       mermaid = Mermaid.to_mermaid(graph, Mermaid.default_options())
 
-      assert String.contains?(mermaid, "start")
-      assert String.contains?(mermaid, "end")
+      assert String.contains?(mermaid, "n_1[\"Start\"]")
+      assert String.contains?(mermaid, "n_0[\"End\"]")
       assert String.contains?(mermaid, "-->")
     end
 
@@ -456,7 +456,7 @@ defmodule Yog.Render.MermaidTest do
       mermaid = Mermaid.to_mermaid(graph, Mermaid.default_options())
 
       # Empty map edge data should produce no label part
-      assert String.contains?(mermaid, "1 --> 2")
+      assert String.contains?(mermaid, "n_0 --> n_1")
     end
 
     test "renders graph with nil edge data" do
@@ -468,7 +468,7 @@ defmodule Yog.Render.MermaidTest do
 
       mermaid = Mermaid.to_mermaid(graph, Mermaid.default_options())
 
-      assert String.contains?(mermaid, "1 --> 2")
+      assert String.contains?(mermaid, "n_0 --> n_1")
     end
 
     test "escapes quotes in labels" do
@@ -498,7 +498,7 @@ defmodule Yog.Render.MermaidTest do
       graph = Yog.directed() |> Yog.add_node(1, "Only")
       mermaid = Mermaid.to_mermaid(graph, Mermaid.default_options())
 
-      assert String.contains?(mermaid, "1[\"Only\"]")
+      assert String.contains?(mermaid, "n_0[\"Only\"]")
       refute String.contains?(mermaid, "-->")
     end
 
@@ -597,6 +597,22 @@ defmodule Yog.Render.MermaidTest do
 
       assert highlighted.direction == :lr
       assert highlighted.highlighted_nodes == [1]
+    end
+  end
+
+  describe "visual id mapping and collision prevention" do
+    test "prevents node ID collisions by using sequential visual IDs" do
+      graph =
+        Yog.directed()
+        |> Yog.add_node("User 1", "First User")
+        |> Yog.add_node("User_1", "Second User")
+        |> Yog.add_edge_ensure("User 1", "User_1", 1)
+
+      mermaid = Mermaid.to_mermaid(graph, Mermaid.default_options())
+
+      assert String.contains?(mermaid, "n_0[\"First User\"]")
+      assert String.contains?(mermaid, "n_1[\"Second User\"]")
+      assert String.contains?(mermaid, "n_0 -->|1| n_1")
     end
   end
 end

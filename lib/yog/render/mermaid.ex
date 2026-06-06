@@ -379,8 +379,31 @@ defmodule Yog.Render.Mermaid do
 
     # Convert highlight lists to MapSets for O(1) membership checks
     hl_nodes = to_mapset(options.highlighted_nodes)
-    hl_edges = to_edge_set(options.highlighted_edges)
-    options = %{options | highlighted_nodes: hl_nodes, highlighted_edges: hl_edges}
+
+    hl_edges =
+      case to_edge_set(options.highlighted_edges) do
+        nil ->
+          nil
+
+        set ->
+          if kind == :undirected do
+            set
+            |> MapSet.to_list()
+            |> Enum.map(fn
+              {u, v} -> if u <= v, do: {u, v}, else: {v, u}
+              other -> other
+            end)
+            |> MapSet.new()
+          else
+            set
+          end
+      end
+
+    visual_id_map = build_visual_id_map(nodes, edges, options)
+
+    options =
+      %{options | highlighted_nodes: hl_nodes, highlighted_edges: hl_edges}
+      |> Map.put(:visual_id_map, visual_id_map)
 
     # Generate node declarations
     nodes_str = build_node_lines(nodes, options)
@@ -389,7 +412,7 @@ defmodule Yog.Render.Mermaid do
     node_styles_str = build_node_styles(nodes, options)
 
     # Generate subgraphs
-    subgraphs_str = build_subgraphs(options.subgraphs)
+    subgraphs_str = build_subgraphs(options.subgraphs, options)
 
     # Generate edge declarations
     {edges_str, link_styles} = build_edge_lines(edges, options, kind)
@@ -641,6 +664,29 @@ defmodule Yog.Render.Mermaid do
     end
   end
 
+  defp build_visual_id_map(nodes, edges, options) do
+    node_ids_from_nodes = Map.keys(nodes)
+
+    node_ids_from_edges =
+      Enum.flat_map(edges, fn {from_id, targets} ->
+        [from_id | Map.keys(targets)]
+      end)
+
+    node_ids_from_subgraphs =
+      if options.subgraphs do
+        Enum.flat_map(options.subgraphs, fn sub -> Map.get(sub, :node_ids, []) end)
+      else
+        []
+      end
+
+    [node_ids_from_nodes, node_ids_from_edges, node_ids_from_subgraphs]
+    |> List.flatten()
+    |> Enum.uniq()
+    |> Enum.sort()
+    |> Enum.with_index()
+    |> Map.new(fn {id, idx} -> {id, "n_#{idx}"} end)
+  end
+
   defp to_mapset(nil), do: nil
   defp to_mapset(list) when is_list(list), do: MapSet.new(list)
   defp to_mapset(%MapSet{} = set), do: set
@@ -660,7 +706,7 @@ defmodule Yog.Render.Mermaid do
           options.node_shape
         end
 
-      node_def = "  #{Yog.Utils.safe_string(id)}#{node_shape_brackets(shape, label)}"
+      node_def = "  #{Map.fetch!(options.visual_id_map, id)}#{node_shape_brackets(shape, label)}"
 
       # Add highlight class if this node is in the highlighted list
       if options.highlighted_nodes && MapSet.member?(options.highlighted_nodes, id) do
@@ -691,7 +737,7 @@ defmodule Yog.Render.Mermaid do
 
       if attrs != [] do
         style_str = attributes_to_style(attrs)
-        "  style #{Yog.Utils.safe_string(id)} #{style_str}"
+        "  style #{Map.fetch!(options.visual_id_map, id)} #{style_str}"
       else
         nil
       end
@@ -720,14 +766,14 @@ defmodule Yog.Render.Mermaid do
     |> Enum.join(",")
   end
 
-  defp build_subgraphs(nil), do: ""
-  defp build_subgraphs([]), do: ""
+  defp build_subgraphs(nil, _options), do: ""
+  defp build_subgraphs([], _options), do: ""
 
-  defp build_subgraphs(subgraph_list) when is_list(subgraph_list) do
-    Enum.map_join(subgraph_list, "\n", &build_subgraph/1)
+  defp build_subgraphs(subgraph_list, options) when is_list(subgraph_list) do
+    Enum.map_join(subgraph_list, "\n", &build_subgraph(&1, options))
   end
 
-  defp build_subgraph(sub) do
+  defp build_subgraph(sub, options) do
     header = "  subgraph #{escape_subgraph_name(sub.name)}"
 
     label =
@@ -741,7 +787,7 @@ defmodule Yog.Render.Mermaid do
       case Map.get(sub, :node_ids) do
         nil -> ""
         [] -> ""
-        ids -> Enum.map_join(ids, "\n", &"    #{Yog.Utils.safe_string(&1)}")
+        ids -> Enum.map_join(ids, "\n", &"    #{Map.fetch!(options.visual_id_map, &1)}")
       end
 
     header <> label <> "\n" <> node_list <> "\n  end"
@@ -782,21 +828,27 @@ defmodule Yog.Render.Mermaid do
             :directed ->
               label_part = if label == "", do: "", else: "|#{label}|"
 
-              "  #{Yog.Utils.safe_string(from_id)} -->#{label_part} #{Yog.Utils.safe_string(to_id)}"
+              "  #{Map.fetch!(options.visual_id_map, from_id)} -->#{label_part} #{Map.fetch!(options.visual_id_map, to_id)}"
 
             :undirected ->
               if label == "" do
-                "  #{Yog.Utils.safe_string(from_id)} --- #{Yog.Utils.safe_string(to_id)}"
+                "  #{Map.fetch!(options.visual_id_map, from_id)} --- #{Map.fetch!(options.visual_id_map, to_id)}"
               else
-                "  #{Yog.Utils.safe_string(from_id)} -- #{escape_label(label)} --- #{Yog.Utils.safe_string(to_id)}"
+                "  #{Map.fetch!(options.visual_id_map, from_id)} -- #{escape_label(label)} --- #{Map.fetch!(options.visual_id_map, to_id)}"
               end
           end
 
         # Check if this edge should be highlighted
         is_highlighted =
           options.highlighted_edges &&
-            (MapSet.member?(options.highlighted_edges, {from_id, to_id}) ||
-               MapSet.member?(options.highlighted_edges, {to_id, from_id}))
+            if kind == :undirected do
+              MapSet.member?(
+                options.highlighted_edges,
+                if(from_id <= to_id, do: {from_id, to_id}, else: {to_id, from_id})
+              )
+            else
+              MapSet.member?(options.highlighted_edges, {from_id, to_id})
+            end
 
         # Build custom edge attributes
         custom_attrs = options.edge_attributes.(from_id, to_id, weight)
