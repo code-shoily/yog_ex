@@ -288,7 +288,8 @@ defmodule Yog.Traversal.Walk do
     do_random_walk(graph.out_edges, from, steps, [from])
   end
 
-  defp do_random_walk(_out_edges, _current, 0, acc), do: Enum.reverse(acc)
+  defp do_random_walk(_out_edges, _current, steps, acc) when steps <= 0,
+    do: Enum.reverse(acc)
 
   defp do_random_walk(out_edges, current, steps, acc) do
     successors =

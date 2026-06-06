@@ -1071,4 +1071,14 @@ defmodule Yog.TraversalTest do
     path = Yog.Traversal.Walk.random_walk(graph, 1, 10)
     assert path == [1]
   end
+
+  test "random_walk with zero or negative steps" do
+    graph =
+      Yog.directed()
+      |> Yog.add_edge_ensure(1, 2, 1, nil)
+      |> Yog.add_edge_ensure(2, 1, 1, nil)
+
+    assert Yog.Traversal.Walk.random_walk(graph, 1, 0) == [1]
+    assert Yog.Traversal.Walk.random_walk(graph, 1, -5) == [1]
+  end
 end
