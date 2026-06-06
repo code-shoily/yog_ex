@@ -184,4 +184,23 @@ defmodule Yog.Pathfinding.ChinesePostmanTest do
     assert valid_closed_walk?(graph, walk)
     assert all_edges_covered?(graph, walk)
   end
+
+  test "triangle edge permutations traverse correctly without direction bugs" do
+    perms = [
+      [{2, 3, 1}, {1, 3, 1}, {1, 2, 1}],
+      [{2, 3, 1}, {1, 2, 1}, {1, 3, 1}],
+      [{1, 3, 1}, {2, 3, 1}, {1, 2, 1}],
+      [{1, 3, 1}, {1, 2, 1}, {2, 3, 1}],
+      [{1, 2, 1}, {2, 3, 1}, {1, 3, 1}],
+      [{1, 2, 1}, {1, 3, 1}, {2, 3, 1}]
+    ]
+
+    for p <- perms do
+      graph = Yog.from_edges(:undirected, p)
+      assert {:ok, walk, weight} = ChinesePostman.chinese_postman(graph)
+      assert weight == 3
+      assert valid_closed_walk?(graph, walk)
+      assert all_edges_covered?(graph, walk)
+    end
+  end
 end
