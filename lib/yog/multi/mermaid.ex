@@ -548,12 +548,6 @@ defmodule Yog.Multi.Mermaid do
     flat_edges =
       edges
       |> Enum.map(fn {edge_id, {from_id, to_id, weight}} -> {edge_id, from_id, to_id, weight} end)
-      |> Enum.filter(fn {_edge_id, from_id, to_id, _weight} ->
-        case kind do
-          :undirected -> from_id <= to_id
-          _ -> true
-        end
-      end)
 
     {edge_declarations, link_styles} =
       flat_edges
