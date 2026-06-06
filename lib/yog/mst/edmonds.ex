@@ -42,12 +42,13 @@ defmodule Yog.MST.Edmonds do
       iex> result.root
       1
   """
-  @spec compute(Yog.graph(), term()) :: {:ok, Result.t()} | {:error, term()}
-  def compute(graph, root) do
+  @spec compute(Yog.graph(), term(), (term(), term() -> :lt | :eq | :gt)) ::
+          {:ok, Result.t()} | {:error, term()}
+  def compute(graph, root, compare \\ &Yog.Utils.compare/2) do
     if graph.kind != :directed do
       {:error, :directed_only}
     else
-      case do_compute(graph, root) do
+      case do_compute(graph, root, compare) do
         {:ok, edges} ->
           {:ok, Result.new(edges, :chu_liu_edmonds, map_size(graph.nodes), root)}
 
@@ -57,9 +58,9 @@ defmodule Yog.MST.Edmonds do
     end
   end
 
-  defp do_compute(graph, root) do
+  defp do_compute(graph, root, compare) do
     # 1. For each node v != root, find the minimum weight incoming edge
-    best_in = find_best_in_edges(graph, root)
+    best_in = find_best_in_edges(graph, root, compare)
 
     # If any node besides root has no incoming edges, it might be unreachable
     # Actually, if a node has no incoming edges and it's not the root, it's impossible.
@@ -78,9 +79,9 @@ defmodule Yog.MST.Edmonds do
         {:ok, edges}
       else
         # 3. We found a cycle. Contract it.
-        {contracted_graph, cycle_info} = contract_cycle(graph, cycle, best_in)
+        {contracted_graph, cycle_info} = contract_cycle(graph, cycle, best_in, compare)
 
-        case do_compute(contracted_graph, root) do
+        case do_compute(contracted_graph, root, compare) do
           {:ok, contracted_edges} ->
             # 4. Expand cycle
             expanded_edges = expand_cycle(contracted_edges, cycle_info, best_in)
@@ -94,22 +95,37 @@ defmodule Yog.MST.Edmonds do
   end
 
   # Finds the minimum weight incoming edge for each node (except root)
-  defp find_best_in_edges(graph, root) do
-    Enum.reduce(graph.nodes, %{}, fn {node_id, _}, acc ->
-      if node_id == root do
-        acc
-      else
-        case Map.get(graph.in_edges, node_id, %{}) do
-          ins when ins == %{} ->
+  defp find_best_in_edges(graph, root, compare) do
+    for {node_id, _} <- graph.nodes, node_id != root, reduce: %{} do
+      acc ->
+        case Map.get(graph.in_edges, node_id) do
+          nil ->
             acc
 
           ins ->
-            # Find min weight edge
-            case Enum.min_by(ins, fn {_src, w} -> w end, fn -> nil end) do
-              nil -> acc
-              {src, w} -> Map.put(acc, node_id, %{from: src, to: node_id, weight: w})
+            case find_best_edge(ins, compare) do
+              nil ->
+                acc
+
+              {src, w} ->
+                Map.put(acc, node_id, %{from: src, to: node_id, weight: w})
             end
         end
+    end
+  end
+
+  defp find_best_edge(ins, compare) do
+    Enum.reduce(ins, nil, fn {src, w}, current_best ->
+      case current_best do
+        nil ->
+          {src, w}
+
+        {_best_src, best_w} ->
+          if compare.(w, best_w) == :lt do
+            {src, w}
+          else
+            current_best
+          end
       end
     end)
   end
@@ -142,7 +158,7 @@ defmodule Yog.MST.Edmonds do
   end
 
   # Contracts a cycle into a super-node
-  defp contract_cycle(graph, cycle, best_in) do
+  defp contract_cycle(graph, cycle, best_in, compare) do
     cycle_nodes = MapSet.new(cycle)
     super_node = {:super_node, make_ref()}
 
@@ -192,23 +208,23 @@ defmodule Yog.MST.Edmonds do
             # Yes, but Edmonds' usually only contracts incoming.
             # Actually, outgoing from cycle to same V should also keep min?
             # Wait, standard Edmonds' only cares about incoming to cycle.
-            add_contracted_edge(g, mapping, super_node, v, w, edge)
+            add_contracted_edge(g, mapping, super_node, v, w, edge, compare)
 
           v_in ->
             # (u, super_node, w - best_in[v].weight)
             new_w = w - best_in[v].weight
-            add_contracted_edge(g, mapping, u, super_node, new_w, edge)
+            add_contracted_edge(g, mapping, u, super_node, new_w, edge, compare)
 
           true ->
             # (u, v, w)
-            add_contracted_edge(g, mapping, u, v, w, edge)
+            add_contracted_edge(g, mapping, u, v, w, edge, compare)
         end
       end)
 
     {contracted_graph, %{super_node: super_node, cycle: cycle, mapping: edge_mapping}}
   end
 
-  defp add_contracted_edge(graph, mapping, u, v, w, orig_edge) do
+  defp add_contracted_edge(graph, mapping, u, v, w, orig_edge, compare) do
     # If u == v (self loop created by contraction), ignore
     if u == v do
       {graph, mapping}
@@ -223,7 +239,7 @@ defmodule Yog.MST.Edmonds do
           {new_g, new_mapping}
 
         existing_w ->
-          if w < existing_w do
+          if compare.(w, existing_w) == :lt do
             new_g = Yog.Model.add_edge!(graph, u, v, w)
             new_mapping = Map.put(mapping, {u, v}, orig_edge)
             {new_g, new_mapping}
