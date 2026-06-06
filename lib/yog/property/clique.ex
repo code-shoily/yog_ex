@@ -156,19 +156,23 @@ defmodule Yog.Property.Clique do
 
   O(3^(n/3)) worst case
   """
-  @spec max_clique(Yog.graph()) :: MapSet.t(Yog.node_id())
+  @spec max_clique(Yog.graph()) :: MapSet.t(Yog.node_id()) | {:error, :undirected_only}
   def max_clique(graph) do
-    nodes = Model.all_nodes(graph)
-
-    if nodes == [] do
-      MapSet.new()
+    if Model.type(graph) == :directed do
+      {:error, :undirected_only}
     else
-      all_cliques = all_maximal_cliques(graph)
+      nodes = Model.all_nodes(graph)
 
-      if all_cliques == [] do
+      if nodes == [] do
         MapSet.new()
       else
-        Enum.max_by(all_cliques, &MapSet.size/1)
+        all_cliques = all_maximal_cliques(graph)
+
+        if all_cliques == [] do
+          MapSet.new()
+        else
+          Enum.max_by(all_cliques, &MapSet.size/1)
+        end
       end
     end
   end
@@ -209,24 +213,28 @@ defmodule Yog.Property.Clique do
 
   O(3^(n/3)) worst case
   """
-  @spec all_maximal_cliques(Yog.graph()) :: [MapSet.t(Yog.node_id())]
+  @spec all_maximal_cliques(Yog.graph()) :: [MapSet.t(Yog.node_id())] | {:error, :undirected_only}
   def all_maximal_cliques(graph) do
-    nodes = Model.all_nodes(graph)
-
-    if nodes == [] do
-      []
+    if Model.type(graph) == :directed do
+      {:error, :undirected_only}
     else
-      adj =
-        Map.new(nodes, fn u ->
-          neighbors = Model.neighbor_ids(graph, u) |> MapSet.new()
-          {u, neighbors}
-        end)
+      nodes = Model.all_nodes(graph)
 
-      p = MapSet.new(nodes)
-      r = MapSet.new()
-      x = MapSet.new()
+      if nodes == [] do
+        []
+      else
+        adj =
+          Map.new(nodes, fn u ->
+            neighbors = Model.neighbor_ids(graph, u) |> MapSet.new()
+            {u, neighbors}
+          end)
 
-      bron_kerbosch_pivot(r, p, x, adj, [])
+        p = MapSet.new(nodes)
+        r = MapSet.new()
+        x = MapSet.new()
+
+        bron_kerbosch_pivot(r, p, x, adj, [])
+      end
     end
   end
 
@@ -330,10 +338,20 @@ defmodule Yog.Property.Clique do
 
   O(3^(n/3)) worst case
   """
-  def k_cliques(_graph, k) when k <= 0, do: []
-  def k_cliques(graph, 1), do: Model.all_nodes(graph) |> Enum.map(&MapSet.new([&1]))
-
+  @spec k_cliques(Yog.graph(), integer()) ::
+          [MapSet.t(Yog.node_id())] | {:error, :undirected_only}
   def k_cliques(graph, k) do
+    if Model.type(graph) == :directed do
+      {:error, :undirected_only}
+    else
+      do_k_cliques(graph, k)
+    end
+  end
+
+  defp do_k_cliques(_graph, k) when k <= 0, do: []
+  defp do_k_cliques(graph, 1), do: Model.all_nodes(graph) |> Enum.map(&MapSet.new([&1]))
+
+  defp do_k_cliques(graph, k) do
     nodes = Model.all_nodes(graph) |> Enum.sort()
 
     adj =

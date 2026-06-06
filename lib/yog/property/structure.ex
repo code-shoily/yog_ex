@@ -458,7 +458,7 @@ defmodule Yog.Property.Structure do
   end
 
   defp pop_max_weight_node(_buckets, max_weight) when max_weight < 0 do
-    raise "Bucket queue empty - no more nodes to process"
+    raise ArgumentError, "Bucket queue empty - no more nodes to process"
   end
 
   defp pop_max_weight_node(buckets, max_weight) do
