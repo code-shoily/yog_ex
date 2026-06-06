@@ -111,7 +111,7 @@ defmodule Yog.Builder.Zog do
           builder
           | label_to_id: Map.put(label_to_id, label, id),
             id_to_label: Map.put(builder.id_to_label, id, label),
-            nodes: builder.nodes ++ [label],
+            nodes: [label | builder.nodes],
             next_id: id + 1
         }
 
@@ -217,7 +217,7 @@ defmodule Yog.Builder.Zog do
       kind: kind,
       label_to_id: label_to_id,
       id_to_label: invert_map(label_to_id),
-      nodes: node_ids,
+      nodes: Enum.reverse(node_ids),
       edges: Enum.reverse(edges),
       next_id: length(node_ids)
     }
@@ -247,7 +247,7 @@ defmodule Yog.Builder.Zog do
       kind: kind,
       label_to_id: label_to_id,
       id_to_label: invert_map(label_to_id),
-      nodes: labels_in_order(graph.nodes, next_id),
+      nodes: Enum.reverse(labels_in_order(graph.nodes, next_id)),
       edges: Enum.reverse(edges),
       next_id: next_id
     }
@@ -266,7 +266,7 @@ defmodule Yog.Builder.Zog do
     base = Yog.new(kind)
 
     graph_with_nodes =
-      Enum.reduce(Enum.with_index(nodes), base, fn {label, idx}, g ->
+      Enum.reduce(Enum.with_index(Enum.reverse(nodes)), base, fn {label, idx}, g ->
         Yog.add_node(g, idx, label)
       end)
 
@@ -314,7 +314,7 @@ defmodule Yog.Builder.Zog do
   Returns all labels in insertion order (index = node id).
   """
   @spec all_labels(t()) :: [label()]
-  def all_labels(%__MODULE__{nodes: nodes}), do: nodes
+  def all_labels(%__MODULE__{nodes: nodes}), do: Enum.reverse(nodes)
 
   @doc """
   Returns all edges as `{from_id, to_id, weight}` tuples.

@@ -68,7 +68,10 @@ defmodule Yog.Zog.ResourceGraph do
         nif_analyze_connectivity: [concurrency: :dirty_cpu],
         nif_max_flow: [concurrency: :dirty_cpu],
         nif_push_relabel: [concurrency: :dirty_cpu],
-        nif_global_min_cut: [concurrency: :dirty_cpu]
+        nif_global_min_cut: [concurrency: :dirty_cpu],
+        nif_read_edgelist: [concurrency: :dirty_io],
+        nif_read_adjlist: [concurrency: :dirty_io],
+        nif_read_tgf: [concurrency: :dirty_io]
       ]
 
     ~Z"""
@@ -512,6 +515,195 @@ defmodule Yog.Zog.ResourceGraph do
             .sink_side = result.group_b,
         };
     }
+
+    fn getOrInsertNode(
+        arena: std.mem.Allocator,
+        g: *ArrayGraph(void, f64),
+        label_to_id: *std.StringHashMap(u32),
+        labels_list: *std.ArrayList([]const u8),
+        next_id: *u32,
+        label: []const u8,
+    ) !u32 {
+        if (label_to_id.get(label)) |id| {
+            return id;
+        }
+        const id = next_id.*;
+        _ = try g.addNode({});
+        const key_copy = try arena.dupe(u8, label);
+        try label_to_id.put(key_copy, id);
+        try labels_list.append(arena, key_copy);
+        next_id.* += 1;
+        return id;
+    }
+
+    pub fn nif_read_edgelist(file_path: []const u8, is_directed: bool) !beam.term {
+        var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+        defer arena.deinit();
+        const arena_allocator = arena.allocator();
+
+        var file = try std.fs.cwd().openFile(file_path, .{});
+        defer file.close();
+
+        var g = ArrayGraph(void, f64).init(beam.allocator);
+        errdefer g.deinit();
+
+        var label_to_id = std.StringHashMap(u32).init(arena_allocator);
+        var labels_list: std.ArrayList([]const u8) = .empty;
+        defer labels_list.deinit(arena_allocator);
+        var next_id: u32 = 0;
+
+        var read_buffer: [4096]u8 = undefined;
+        var file_reader = file.reader(&read_buffer);
+        const reader = &file_reader.interface;
+
+        while (true) {
+            const line = reader.takeDelimiterExclusive('\n') catch |err| {
+                if (err == error.EndOfStream) break;
+                return err;
+            };
+            reader.toss(1);
+
+            const trimmed = std.mem.trim(u8, line, " \t\r");
+            if (trimmed.len == 0 or trimmed[0] == '#') continue;
+
+            var parts = std.mem.tokenizeAny(u8, trimmed, " \t,");
+            const src_lbl = parts.next() orelse continue;
+            const dst_lbl = parts.next() orelse continue;
+            const opt_weight = parts.next();
+
+            const weight = if (opt_weight) |w_str| std.fmt.parseFloat(f64, w_str) catch 1.0 else 1.0;
+
+            const src_id = try getOrInsertNode(arena_allocator, &g, &label_to_id, &labels_list, &next_id, src_lbl);
+            const dst_id = try getOrInsertNode(arena_allocator, &g, &label_to_id, &labels_list, &next_id, dst_lbl);
+
+            _ = try g.addEdge(src_id, dst_id, weight);
+            if (!is_directed) {
+                _ = try g.addEdge(dst_id, src_id, weight);
+            }
+        }
+
+        const resource = try GraphRes.create(.{ .graph = g }, .{ .released = false });
+        const labels_slice = try labels_list.toOwnedSlice(arena_allocator);
+        return beam.make(.{.ok, resource, labels_slice}, .{});
+    }
+
+    pub fn nif_read_adjlist(file_path: []const u8, is_directed: bool) !beam.term {
+        var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+        defer arena.deinit();
+        const arena_allocator = arena.allocator();
+
+        var file = try std.fs.cwd().openFile(file_path, .{});
+        defer file.close();
+
+        var g = ArrayGraph(void, f64).init(beam.allocator);
+        errdefer g.deinit();
+
+        var label_to_id = std.StringHashMap(u32).init(arena_allocator);
+        var labels_list: std.ArrayList([]const u8) = .empty;
+        defer labels_list.deinit(arena_allocator);
+        var next_id: u32 = 0;
+
+        var read_buffer: [4096]u8 = undefined;
+        var file_reader = file.reader(&read_buffer);
+        const reader = &file_reader.interface;
+
+        while (true) {
+            const line = reader.takeDelimiterExclusive('\n') catch |err| {
+                if (err == error.EndOfStream) break;
+                return err;
+            };
+            reader.toss(1);
+
+            const trimmed = std.mem.trim(u8, line, " \t\r");
+            if (trimmed.len == 0 or trimmed[0] == '#') continue;
+
+            const colon_idx = std.mem.indexOf(u8, trimmed, ":") orelse continue;
+            const src_lbl = std.mem.trim(u8, trimmed[0..colon_idx], " \t");
+            const neighbors_part = trimmed[colon_idx + 1 ..];
+
+            const src_id = try getOrInsertNode(arena_allocator, &g, &label_to_id, &labels_list, &next_id, src_lbl);
+
+            var neighbors_it = std.mem.tokenizeAny(u8, neighbors_part, " \t");
+            while (neighbors_it.next()) |neighbor_token| {
+                var neighbor_parts = std.mem.splitScalar(u8, neighbor_token, ',');
+                const dst_lbl = neighbor_parts.first();
+                const opt_w = neighbor_parts.next();
+                const weight = if (opt_w) |w_str| std.fmt.parseFloat(f64, w_str) catch 1.0 else 1.0;
+
+                const dst_id = try getOrInsertNode(arena_allocator, &g, &label_to_id, &labels_list, &next_id, dst_lbl);
+                _ = try g.addEdge(src_id, dst_id, weight);
+                if (!is_directed) {
+                    _ = try g.addEdge(dst_id, src_id, weight);
+                }
+            }
+        }
+
+        const resource = try GraphRes.create(.{ .graph = g }, .{ .released = false });
+        const labels_slice = try labels_list.toOwnedSlice(arena_allocator);
+        return beam.make(.{.ok, resource, labels_slice}, .{});
+    }
+
+    pub fn nif_read_tgf(file_path: []const u8, is_directed: bool) !beam.term {
+        var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+        defer arena.deinit();
+        const arena_allocator = arena.allocator();
+
+        var file = try std.fs.cwd().openFile(file_path, .{});
+        defer file.close();
+
+        var g = ArrayGraph(void, f64).init(beam.allocator);
+        errdefer g.deinit();
+
+        var label_to_id = std.StringHashMap(u32).init(arena_allocator);
+        var labels_list: std.ArrayList([]const u8) = .empty;
+        defer labels_list.deinit(arena_allocator);
+        var next_id: u32 = 0;
+
+        var parsing_edges = false;
+        var read_buffer: [4096]u8 = undefined;
+        var file_reader = file.reader(&read_buffer);
+        const reader = &file_reader.interface;
+
+        while (true) {
+            const line = reader.takeDelimiterExclusive('\n') catch |err| {
+                if (err == error.EndOfStream) break;
+                return err;
+            };
+            reader.toss(1);
+
+            const trimmed = std.mem.trim(u8, line, " \t\r");
+            if (trimmed.len == 0) continue;
+
+            if (std.mem.eql(u8, trimmed, "#")) {
+                parsing_edges = true;
+                continue;
+            }
+
+            if (!parsing_edges) {
+                var parts = std.mem.tokenizeAny(u8, trimmed, " \t");
+                const node_lbl = parts.next() orelse continue;
+                _ = try getOrInsertNode(arena_allocator, &g, &label_to_id, &labels_list, &next_id, node_lbl);
+            } else {
+                var parts = std.mem.tokenizeAny(u8, trimmed, " \t");
+                const src_lbl = parts.next() orelse continue;
+                const dst_lbl = parts.next() orelse continue;
+                const opt_w = parts.next();
+                const weight = if (opt_w) |w_str| std.fmt.parseFloat(f64, w_str) catch 1.0 else 1.0;
+
+                const src_id = try getOrInsertNode(arena_allocator, &g, &label_to_id, &labels_list, &next_id, src_lbl);
+                const dst_id = try getOrInsertNode(arena_allocator, &g, &label_to_id, &labels_list, &next_id, dst_lbl);
+
+                _ = try g.addEdge(src_id, dst_id, weight);
+                if (!is_directed) {
+                    _ = try g.addEdge(dst_id, src_id, weight);
+                }
+            }
+        }
+
+        const resource = try GraphRes.create(.{ .graph = g }, .{ .released = false });
+        const labels_slice = try labels_list.toOwnedSlice(arena_allocator);
+        return beam.make(.{.ok, resource, labels_slice}, .{});
+    }
     """
 
     # ============================================================================
@@ -537,6 +729,80 @@ defmodule Yog.Zog.ResourceGraph do
 
       %{
         resource: new(node_count, from, to, weights),
+        builder: builder
+      }
+    end
+
+    @doc """
+    Reads a graph from an edge list file directly in native memory.
+
+    ## Options
+
+    - `:directed` — Set to `false` for an undirected graph (default: `true`).
+    """
+    @spec read_edgelist(Path.t(), keyword()) :: t()
+    def read_edgelist(path, opts \\ []) do
+      directed = Keyword.get(opts, :directed, true)
+      path_str = Path.expand(path)
+
+      case nif_read_edgelist(path_str, directed) do
+        {:ok, resource, labels} ->
+          build_from_labels(resource, labels, directed)
+      end
+    end
+
+    @doc """
+    Reads a graph from an adjacency list file directly in native memory.
+
+    ## Options
+
+    - `:directed` — Set to `false` for an undirected graph (default: `true`).
+    """
+    @spec read_adjlist(Path.t(), keyword()) :: t()
+    def read_adjlist(path, opts \\ []) do
+      directed = Keyword.get(opts, :directed, true)
+      path_str = Path.expand(path)
+
+      case nif_read_adjlist(path_str, directed) do
+        {:ok, resource, labels} ->
+          build_from_labels(resource, labels, directed)
+      end
+    end
+
+    @doc """
+    Reads a graph from a Trivial Graph Format (TGF) file directly in native memory.
+
+    ## Options
+
+    - `:directed` — Set to `false` for an undirected graph (default: `true`).
+    """
+    @spec read_tgf(Path.t(), keyword()) :: t()
+    def read_tgf(path, opts \\ []) do
+      directed = Keyword.get(opts, :directed, true)
+      path_str = Path.expand(path)
+
+      case nif_read_tgf(path_str, directed) do
+        {:ok, resource, labels} ->
+          build_from_labels(resource, labels, directed)
+      end
+    end
+
+    defp build_from_labels(resource, labels, directed) do
+      kind = if directed, do: :directed, else: :undirected
+      label_to_id = labels |> Enum.with_index() |> Map.new()
+      id_to_label = labels |> Enum.with_index() |> Map.new(fn {l, i} -> {i, l} end)
+
+      builder = %Yog.Builder.Zog{
+        kind: kind,
+        label_to_id: label_to_id,
+        id_to_label: id_to_label,
+        nodes: Enum.reverse(labels),
+        edges: [],
+        next_id: length(labels)
+      }
+
+      %{
+        resource: resource,
         builder: builder
       }
     end
@@ -1057,6 +1323,18 @@ defmodule Yog.Zog.ResourceGraph do
     end
 
     def destroy(_graph) do
+      raise "zigler is not installed. Add {:zigler, \"~> 0.15.2\", runtime: false} to your deps and run mix deps.get."
+    end
+
+    def read_edgelist(_path, _opts \\ []) do
+      raise "zigler is not installed. Add {:zigler, \"~> 0.15.2\", runtime: false} to your deps and run mix deps.get."
+    end
+
+    def read_adjlist(_path, _opts \\ []) do
+      raise "zigler is not installed. Add {:zigler, \"~> 0.15.2\", runtime: false} to your deps and run mix deps.get."
+    end
+
+    def read_tgf(_path, _opts \\ []) do
       raise "zigler is not installed. Add {:zigler, \"~> 0.15.2\", runtime: false} to your deps and run mix deps.get."
     end
 

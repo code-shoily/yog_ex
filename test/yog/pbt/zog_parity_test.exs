@@ -149,8 +149,10 @@ defmodule Yog.PBT.ZogParityTest do
           assert {:ok, nat_matrix} = Yog.Zog.Pathfinding.floyd_warshall(builder)
           assert {:ok, res_matrix} = ResourceGraph.floyd_warshall(res_graph)
 
-          for {u, i} <- Enum.with_index(builder.nodes) do
-            for {v, j} <- Enum.with_index(builder.nodes) do
+          labels = Zog.all_labels(builder)
+
+          for {u, i} <- Enum.with_index(labels) do
+            for {v, j} <- Enum.with_index(labels) do
               elixir_val = Map.get(el_matrix, {u, v})
               native_val = Enum.at(Enum.at(nat_matrix, i), j)
               res_val = Enum.at(Enum.at(res_matrix, i), j)
@@ -177,8 +179,10 @@ defmodule Yog.PBT.ZogParityTest do
           assert {:ok, nat_j_matrix} = Yog.Zog.Pathfinding.johnsons(builder)
           assert {:ok, res_j_matrix} = ResourceGraph.johnsons(res_graph)
 
-          for {u, i} <- Enum.with_index(builder.nodes) do
-            for {v, j} <- Enum.with_index(builder.nodes) do
+          labels = Zog.all_labels(builder)
+
+          for {u, i} <- Enum.with_index(labels) do
+            for {v, j} <- Enum.with_index(labels) do
               elixir_val = Map.get(el_j_matrix, {u, v})
               native_val = Enum.at(Enum.at(nat_j_matrix, i), j)
               res_val = Enum.at(Enum.at(res_j_matrix, i), j)
