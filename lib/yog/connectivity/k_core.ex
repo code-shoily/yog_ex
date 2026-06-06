@@ -82,6 +82,9 @@ defmodule Yog.Connectivity.KCore do
   Detects the k-core of a graph.
   Returns the maximal subgraph where every node has at least degree `k`.
 
+  > [!TIP]
+  > For a much faster native implementation, see `Yog.Zog.Connectivity.detect/2`.
+
   ## Examples
 
       iex> graph = Yog.undirected() |> Yog.add_node(1, nil) |> Yog.add_node(2, nil)
@@ -165,6 +168,9 @@ defmodule Yog.Connectivity.KCore do
   @doc """
   Calculates all core numbers for all nodes in the graph.
   Core number of node v is the largest k such that v is in a k-core.
+
+  > [!TIP]
+  > For a much faster native implementation, see `Yog.Zog.Connectivity.core_numbers/1` (on builder) or `Yog.Zog.ResourceGraph.core_numbers/1` (on ResourceGraph).
 
   ## Examples
 

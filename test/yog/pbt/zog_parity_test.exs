@@ -336,6 +336,84 @@ defmodule Yog.PBT.ZogParityTest do
         end
       end
     end
+
+    property "Connectivity: core_numbers, detect, and analyze (bridges/articulation_points)" do
+      check all(graph <- positive_undirected_graph_gen()) do
+        builder = Zog.from_graph(graph)
+        res_graph = ResourceGraph.new(builder)
+
+        try do
+          # 1. Core numbers
+          elixir_cores = Yog.Connectivity.KCore.core_numbers(graph)
+          native_cores = Yog.Zog.Connectivity.core_numbers(builder)
+          res_cores = ResourceGraph.core_numbers(res_graph)
+
+          assert native_cores == elixir_cores
+          assert res_cores == elixir_cores
+
+          # 2. Detect k-cores
+          for k <- 0..4 do
+            elixir_kcore = Yog.Connectivity.KCore.detect(graph, k)
+            native_kcore_builder = Yog.Zog.Connectivity.detect(builder, k)
+            native_kcore = Zog.to_graph(native_kcore_builder)
+
+            assert Yog.node_count(native_kcore) == Yog.node_count(elixir_kcore)
+            assert Yog.edge_count(native_kcore) == Yog.edge_count(elixir_kcore)
+          end
+
+          # 3. Analyze connectivity
+          elixir_analysis = Yog.Connectivity.Analysis.analyze(graph)
+          native_analysis = Yog.Zog.Connectivity.analyze(builder)
+          res_analysis = ResourceGraph.analyze(res_graph)
+
+          assert native_analysis.articulation_points == elixir_analysis.articulation_points
+          assert native_analysis.bridges == elixir_analysis.bridges
+          assert res_analysis.articulation_points == elixir_analysis.articulation_points
+          assert res_analysis.bridges == elixir_analysis.bridges
+        after
+          ResourceGraph.destroy(res_graph)
+        end
+      end
+    end
+
+    property "Property: cliques and coloring" do
+      check all(graph <- positive_undirected_graph_gen()) do
+        builder = Zog.from_graph(graph)
+
+        # 1. Maximal Cliques
+        elixir_cliques = Yog.Property.Clique.all_maximal_cliques(graph) |> Enum.sort()
+        native_cliques = Yog.Zog.Property.all_maximal_cliques(builder) |> Enum.sort()
+        assert native_cliques == elixir_cliques
+
+        # 2. Maximum Clique
+        elixir_max_clique = Yog.Property.Clique.max_clique(graph)
+        native_max_clique = Yog.Zog.Property.max_clique(builder)
+        assert MapSet.size(native_max_clique) == MapSet.size(elixir_max_clique)
+
+        # 3. DSatur Coloring
+        {native_chi, native_colors} = Yog.Zog.Property.coloring_dsatur(builder)
+        {elixir_chi, elixir_colors} = Yog.Property.Coloring.coloring_dsatur(graph)
+        assert native_chi == elixir_chi
+        verify_coloring(graph, native_colors)
+        verify_coloring(graph, elixir_colors)
+
+        # 4. Exact Coloring
+        case Yog.Zog.Property.coloring_exact(builder) do
+          {:ok, native_exact_chi, native_exact_colors} ->
+            case Yog.Property.Coloring.coloring_exact(graph) do
+              {:ok, elixir_exact_chi, _elixir_exact_colors} ->
+                assert native_exact_chi == elixir_exact_chi
+                verify_coloring(graph, native_exact_colors)
+
+              _ ->
+                :ok
+            end
+
+          _ ->
+            :ok
+        end
+      end
+    end
   end
 
   defp verify_partition_pbt(graph, result) do
@@ -353,5 +431,15 @@ defmodule Yog.PBT.ZogParityTest do
 
     ids = Map.values(assignments) |> Enum.uniq()
     assert length(ids) > 0
+  end
+
+  defp verify_coloring(graph, color_map) do
+    for {u, neighbors} <- graph.out_edges do
+      for {v, _weight} <- neighbors do
+        if Map.has_key?(color_map, u) and Map.has_key?(color_map, v) do
+          assert color_map[u] != color_map[v]
+        end
+      end
+    end
   end
 end

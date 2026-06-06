@@ -26,6 +26,9 @@ defmodule NativeVsElixirBenchmark do
     run_community_suite()
     run_pathfinding_suite()
     run_coloring_suite()
+    run_connectivity_suite()
+    run_flow_suite()
+    run_metrics_suite()
 
     IO.puts("\n" <> String.duplicate("=", 80))
     IO.puts("Summary:")
@@ -399,6 +402,233 @@ defmodule NativeVsElixirBenchmark do
       if copyin_ms > 0 do
         speedup = Float.round(elixir_ms / copyin_ms, 1)
         IO.puts("    → Zig Native #{speedup}x faster than Elixir")
+      end
+
+      IO.puts("")
+    end
+  end
+
+  defp run_connectivity_suite do
+    IO.puts("== Connectivity: Core Numbers ==")
+
+    for {name, n, m} <- [
+          {"Sparse 500n, 1500e", 500, 1500},
+          {"Sparse 2000n, 6000e", 2000, 6000},
+          {"Sparse 5000n, 15000e", 5000, 15000}
+        ] do
+      builder = build_zog_sparse_graph(n, m)
+
+      elixir_ms =
+        bench(fn ->
+          g = ZogBuilder.to_graph(builder)
+          Yog.Connectivity.KCore.core_numbers(g)
+        end)
+
+      copyin_ms =
+        bench(fn ->
+          Yog.Zog.Connectivity.core_numbers(builder)
+        end)
+
+      resource_ms =
+        bench_resource_amortized(
+          fn -> Yog.Zog.ResourceGraph.new(builder) end,
+          fn graph -> Yog.Zog.ResourceGraph.core_numbers(graph) end
+        )
+
+      IO.puts("  #{name}")
+      IO.puts("    Elixir:        #{elixir_ms}ms")
+      IO.puts("    Copy-In/Out:   #{copyin_ms}ms")
+      IO.puts("    ResourceGraph: #{resource_ms}ms")
+
+      if resource_ms > 0 do
+        speedup = Float.round(elixir_ms / resource_ms, 1)
+        IO.puts("    → ResourceGraph #{speedup}x faster than Elixir")
+      end
+
+      IO.puts("")
+    end
+
+    IO.puts("== Connectivity: Bridges & Articulation Points ==")
+
+    for {name, n, m} <- [
+          {"Sparse 500n, 1500e", 500, 1500},
+          {"Sparse 2000n, 6000e", 2000, 6000},
+          {"Sparse 5000n, 15000e", 5000, 15000}
+        ] do
+      builder = build_zog_sparse_graph(n, m)
+
+      elixir_ms =
+        bench(fn ->
+          g = ZogBuilder.to_graph(builder)
+          Yog.Connectivity.Analysis.analyze(g)
+        end)
+
+      copyin_ms =
+        bench(fn ->
+          Yog.Zog.Connectivity.analyze(builder)
+        end)
+
+      resource_ms =
+        bench_resource_amortized(
+          fn -> Yog.Zog.ResourceGraph.new(builder) end,
+          fn graph -> Yog.Zog.ResourceGraph.analyze(graph) end
+        )
+
+      IO.puts("  #{name}")
+      IO.puts("    Elixir:        #{elixir_ms}ms")
+      IO.puts("    Copy-In/Out:   #{copyin_ms}ms")
+      IO.puts("    ResourceGraph: #{resource_ms}ms")
+
+      if resource_ms > 0 do
+        speedup = Float.round(elixir_ms / resource_ms, 1)
+        IO.puts("    → ResourceGraph #{speedup}x faster than Elixir")
+      end
+
+      IO.puts("")
+    end
+  end
+
+  defp build_zog_directed_flow_graph(n, m) do
+    nodes = 0..(n - 1)
+    g = Enum.reduce(nodes, ZogBuilder.directed(), &ZogBuilder.add_node(&2, &1))
+
+    # Add edges with random positive capacities (1.0 to 10.0)
+    Enum.reduce(1..m, g, fn _, acc ->
+      u = :rand.uniform(n) - 1
+      v = :rand.uniform(n) - 1
+      cap = :rand.uniform(10) * 1.0
+
+      if u != v do
+        ZogBuilder.add_edge(acc, u, v, cap)
+      else
+        acc
+      end
+    end)
+  end
+
+  defp run_flow_suite do
+    IO.puts("== Flow: Maximum Flow & Global Min Cut ==")
+
+    for {name, n, m} <- [
+          {"Sparse Flow 100n, 400e", 100, 400},
+          {"Sparse Flow 300n, 1200e", 300, 1200}
+        ] do
+      builder = build_zog_directed_flow_graph(n, m)
+      source = 0
+      sink = n - 1
+
+      elixir_ms =
+        bench(fn ->
+          g = ZogBuilder.to_graph(builder)
+          Yog.Flow.MaxFlow.max_flow(g, source, sink, :edmonds_karp)
+        end)
+
+      copyin_ms =
+        bench(fn ->
+          Yog.Zog.Flow.max_flow(builder, source, sink, :edmonds_karp)
+        end)
+
+      resource_ms =
+        bench_resource_amortized(
+          fn -> Yog.Zog.ResourceGraph.new(builder) end,
+          fn graph -> Yog.Zog.ResourceGraph.max_flow(graph, source, sink) end
+        )
+
+      IO.puts("  #{name} (Edmonds-Karp)")
+      IO.puts("    Elixir:        #{elixir_ms}ms")
+      IO.puts("    Copy-In/Out:   #{copyin_ms}ms")
+      IO.puts("    ResourceGraph: #{resource_ms}ms")
+
+      if resource_ms > 0 do
+        speedup = Float.round(elixir_ms / resource_ms, 1)
+        IO.puts("    → ResourceGraph #{speedup}x faster than Elixir")
+      end
+
+      IO.puts("")
+    end
+
+    for {name, n, m} <- [
+          {"Sparse Min Cut 100n, 400e", 100, 400},
+          {"Sparse Min Cut 300n, 1200e", 300, 1200}
+        ] do
+      builder = build_zog_sparse_graph(n, m)
+
+      elixir_ms =
+        bench(fn ->
+          g = ZogBuilder.to_graph(builder)
+          Yog.Flow.MinCut.global_min_cut(g)
+        end)
+
+      copyin_ms =
+        bench(fn ->
+          Yog.Zog.Flow.global_min_cut(builder)
+        end)
+
+      resource_ms =
+        bench_resource_amortized(
+          fn -> Yog.Zog.ResourceGraph.new(builder) end,
+          fn graph -> Yog.Zog.ResourceGraph.global_min_cut(graph) end
+        )
+
+      IO.puts("  #{name} (Stoer-Wagner / global_min_cut)")
+      IO.puts("    Elixir:        #{elixir_ms}ms")
+      IO.puts("    Copy-In/Out:   #{copyin_ms}ms")
+      IO.puts("    ResourceGraph: #{resource_ms}ms")
+
+      if resource_ms > 0 do
+        speedup = Float.round(elixir_ms / resource_ms, 1)
+        IO.puts("    → ResourceGraph #{speedup}x faster than Elixir")
+      end
+
+      IO.puts("")
+    end
+  end
+
+  defp run_metrics_suite do
+    IO.puts("== Metrics: Density, Triangle Count, Clustering, Assortativity ==")
+
+    for {name, n, m} <- [
+          {"Sparse Metrics 500n, 2000e", 500, 2000},
+          {"Sparse Metrics 1000n, 4000e", 1000, 4000}
+        ] do
+      builder = build_zog_sparse_graph(n, m)
+
+      elixir_ms =
+        bench(fn ->
+          g = ZogBuilder.to_graph(builder)
+          Yog.Community.Metrics.density(g)
+          Yog.Community.Metrics.count_triangles(g)
+          Yog.Community.Metrics.average_clustering_coefficient(g)
+          Yog.Health.assortativity(g)
+        end)
+
+      copyin_ms =
+        bench(fn ->
+          Yog.Zog.Metrics.density(builder)
+          Yog.Zog.Metrics.triangle_count(builder)
+          Yog.Zog.Metrics.average_clustering_coefficient(builder)
+          Yog.Zog.Metrics.assortativity(builder)
+        end)
+
+      resource_ms =
+        bench_resource_amortized(
+          fn -> Yog.Zog.ResourceGraph.new(builder) end,
+          fn graph ->
+            Yog.Zog.ResourceGraph.density(graph)
+            Yog.Zog.ResourceGraph.triangle_count(graph)
+            Yog.Zog.ResourceGraph.average_clustering_coefficient(graph)
+            Yog.Zog.ResourceGraph.assortativity(graph)
+          end
+        )
+
+      IO.puts("  #{name}")
+      IO.puts("    Elixir:        #{elixir_ms}ms")
+      IO.puts("    Copy-In/Out:   #{copyin_ms}ms")
+      IO.puts("    ResourceGraph: #{resource_ms}ms")
+
+      if resource_ms > 0 do
+        speedup = Float.round(elixir_ms / resource_ms, 1)
+        IO.puts("    → ResourceGraph #{speedup}x faster than Elixir")
       end
 
       IO.puts("")

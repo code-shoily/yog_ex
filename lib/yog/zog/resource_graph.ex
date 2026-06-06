@@ -64,6 +64,8 @@ defmodule Yog.Zog.ResourceGraph do
         nif_average_clustering_coefficient: [concurrency: :dirty_cpu],
         nif_local_clustering_coefficient: [concurrency: :dirty_cpu],
         nif_assortativity: [concurrency: :dirty_cpu],
+        nif_core_numbers: [concurrency: :dirty_cpu],
+        nif_analyze_connectivity: [concurrency: :dirty_cpu],
         nif_max_flow: [concurrency: :dirty_cpu],
         nif_push_relabel: [concurrency: :dirty_cpu],
         nif_global_min_cut: [concurrency: :dirty_cpu]
@@ -392,6 +394,27 @@ defmodule Yog.Zog.ResourceGraph do
     pub fn nif_assortativity(res: GraphRes) !f64 {
         const g = res.unpack().graph;
         return try zog.metrics.assortativity(beam.allocator, g);
+    }
+
+    pub fn nif_core_numbers(res: GraphRes) ![]u32 {
+        const g = res.unpack().graph;
+        return try zog.connectivity.coreNumbers(beam.allocator, g);
+    }
+
+    pub fn nif_analyze_connectivity(res: GraphRes) !beam.term {
+        const g = res.unpack().graph;
+        const res_conn = try zog.connectivity.analyzeConnectivity(beam.allocator, g);
+        errdefer {
+            beam.allocator.free(res_conn.bridges);
+            beam.allocator.free(res_conn.articulation_points);
+        }
+
+        const term = beam.make(.{.ok, res_conn.bridges, res_conn.articulation_points}, .{});
+
+        beam.allocator.free(res_conn.bridges);
+        beam.allocator.free(res_conn.articulation_points);
+
+        return term;
     }
 
     const FlowNifResult = struct {
@@ -875,6 +898,56 @@ defmodule Yog.Zog.ResourceGraph do
     end
 
     @doc """
+    Calculates all core numbers for all nodes in the ResourceGraph.
+    """
+    @spec core_numbers(t()) :: %{Zog.label() => integer()}
+    def core_numbers(%{resource: res, builder: builder}) do
+      labels = Zog.all_labels(builder)
+      labels_tuple = List.to_tuple(labels)
+
+      case nif_core_numbers(res) do
+        [] ->
+          %{}
+
+        cores ->
+          cores
+          |> Enum.with_index()
+          |> Map.new(fn {core, idx} -> {elem(labels_tuple, idx), core} end)
+      end
+    end
+
+    @doc """
+    Analyzes an undirected ResourceGraph natively to find all bridges and articulation points.
+    """
+    @spec analyze(t()) :: %{
+            bridges: [{Zog.label(), Zog.label()}],
+            articulation_points: [Zog.label()]
+          }
+    def analyze(%{resource: res, builder: builder}) do
+      labels = Zog.all_labels(builder)
+      labels_tuple = List.to_tuple(labels)
+
+      case nif_analyze_connectivity(res) do
+        {:ok, bridges, articulation_points} ->
+          bridges_tuples =
+            bridges
+            |> Enum.map(fn [u_idx, v_idx] ->
+              u = elem(labels_tuple, u_idx)
+              v = elem(labels_tuple, v_idx)
+              if u < v, do: {u, v}, else: {v, u}
+            end)
+            |> Enum.sort()
+
+          ap_labels =
+            articulation_points
+            |> Enum.map(fn idx -> elem(labels_tuple, idx) end)
+            |> Enum.sort()
+
+          %{bridges: bridges_tuples, articulation_points: ap_labels}
+      end
+    end
+
+    @doc """
     Computes the maximum flow and minimum cut natively on a `ResourceGraph`.
     """
     @spec max_flow(t(), Zog.label(), Zog.label(), atom()) :: %{
@@ -1006,7 +1079,9 @@ defmodule Yog.Zog.ResourceGraph do
           :triangle_count,
           :average_clustering_coefficient,
           :local_clustering_coefficient,
-          :assortativity
+          :assortativity,
+          :core_numbers,
+          :analyze
         ] do
       def unquote(fun)(_graph, _opts \\ []) do
         raise "zigler is not installed. Add {:zigler, \"~> 0.15.2\", runtime: false} to your deps and run mix deps.get."
