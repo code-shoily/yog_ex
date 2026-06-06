@@ -886,5 +886,23 @@ defmodule Yog.DAGTest do
       assert distances[:compile] == 1
       assert distances[:package] == 3
     end
+
+    test "topological_generations/1 edge cases" do
+      # Empty DAG
+      assert DAG.topological_generations(DAG.new()) == []
+
+      # Single node DAG
+      dag_single = DAG.new() |> DAG.add_node(:a, nil)
+      assert DAG.topological_generations(dag_single) == [[:a]]
+
+      # Disconnected DAG
+      {:ok, dag_disconnected} = DAG.from_edges([{:a, :b}, {:c, :d}])
+      assert DAG.topological_generations(dag_disconnected) == [[:a, :c], [:b, :d]]
+    end
+
+    test "longest_path/1 on single node DAG" do
+      dag = DAG.new() |> DAG.add_node(:a, nil)
+      assert DAG.longest_path(dag) == [:a]
+    end
   end
 end
