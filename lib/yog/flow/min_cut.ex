@@ -127,8 +127,14 @@ defmodule Yog.Flow.MinCut do
   - Edge weights must be integers
   - Returns a `Yog.Flow.MinCutResult` struct
   """
+  def global_min_cut(graph, opts \\ [])
+
   @spec global_min_cut(Yog.graph(), keyword()) :: MinCutResult.t()
-  def global_min_cut(graph, opts \\ []) do
+  def global_min_cut(%Yog.Graph{kind: :directed}, _opts) do
+    raise ArgumentError, "global_min_cut/2 requires an undirected graph"
+  end
+
+  def global_min_cut(graph, opts) do
     track_partitions = Keyword.get(opts, :track_partitions, false)
     nodes = Map.keys(graph.nodes)
 
@@ -253,6 +259,10 @@ defmodule Yog.Flow.MinCut do
       3
   """
   @spec gomory_hu_tree(Yog.graph()) :: Yog.graph()
+  def gomory_hu_tree(%Yog.Graph{kind: :directed}) do
+    raise ArgumentError, "gomory_hu_tree/1 requires an undirected graph"
+  end
+
   def gomory_hu_tree(graph) do
     nodes = Model.all_nodes(graph) |> Enum.sort()
 
@@ -436,8 +446,14 @@ defmodule Yog.Flow.MinCut do
       iex> result.cut_value
       5
   """
+  def karger_stein(graph, opts \\ [])
+
   @spec karger_stein(Yog.graph(), keyword()) :: MinCutResult.t()
-  def karger_stein(graph, opts \\ []) do
+  def karger_stein(%Yog.Graph{kind: :directed}, _opts) do
+    raise ArgumentError, "karger_stein/2 requires an undirected graph"
+  end
+
+  def karger_stein(graph, opts) do
     nodes = Map.keys(graph.nodes)
     n = length(nodes)
 

@@ -106,12 +106,12 @@ defmodule Yog.Flow.MaxFlowResult do
   Get flow value on a specific edge in the residual graph.
   """
   @spec residual_capacity(t(), Yog.Model.node_id(), Yog.Model.node_id()) :: number()
-  def residual_capacity(%__MODULE__{residual_graph: graph}, src, dst) do
+  def residual_capacity(%__MODULE__{residual_graph: graph, zero: zero}, src, dst) do
     successors = Yog.Model.successors(graph, src)
 
     case Enum.find(successors, fn {id, _} -> id == dst end) do
       {_, capacity} -> capacity
-      nil -> 0
+      nil -> zero
     end
   end
 
