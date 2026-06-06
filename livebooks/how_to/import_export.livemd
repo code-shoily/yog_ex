@@ -2,7 +2,7 @@
 
 ```elixir
 Mix.install([
-  {:yog_ex, "~> 0.98"},
+  {:yog_ex, "~> 0.99"},
   {:jason, "~> 1.4"} # Needed for JSON
 ])
 ```

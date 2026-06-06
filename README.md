@@ -35,7 +35,7 @@ There is also [a similar library written in Gleam](https://hex.pm/packages/yog),
 Both libraries are actively maintained, with the Elixir version getting new features more frequently, and also sporting more experimental features.
 
 > [!WARNING]
-> **API Stability**: Until the version reaches 0.98.0 ~~1.0.0~~, there may be ~~breaking changes. While I'll try my best to keep the API stable, there's no guarantee~~ some hiccups in performance, and documentation quality maybe less than optimal. Before version 0.99.0 is released in **12-12-2026**, the primary focus is on **performance**, **documentation**, and **bugfixes**. From v0.97.0 onwards, there will be no breaking changes until v2.0 (No plans for that).
+> **API Stability**: Until the version reaches 0.99.0 ~~1.0.0~~, there may be ~~breaking changes. While I'll try my best to keep the API stable, there's no guarantee~~ some hiccups in performance, and documentation quality maybe less than optimal. Before version 0.99.0 is released in **12-12-2026**, the primary focus is on **performance**, **documentation**, and **bugfixes**. From v0.97.0 onwards, there will be no breaking changes until v2.0 (No plans for that).
 
 ## Features
 
@@ -70,7 +70,7 @@ Add YogEx to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:yog_ex, "~> 0.98.0"}
+    {:yog_ex, "~> 0.99.0"}
   ]
 end
 ```
@@ -96,7 +96,7 @@ To use these features, add the optional dependencies to your `mix.exs`:
 ```elixir
 def deps do
   [
-    {:yog_ex, "~> 0.98.0"},
+    {:yog_ex, "~> 0.99.0"},
     {:saxy, "~> 1.5"},       # For fast GraphML/XML parsing
     {:jason, "~> 1.4"},      # For JSON import/export
     {:libgraph, "~> 0.16"}   # For libgraph interoperability
@@ -147,7 +147,7 @@ Add both to your `mix.exs`:
 ```elixir
 def deps do
   [
-    {:yog_ex, "~> 0.98.0"},
+    {:yog_ex, "~> 0.99.0"},
     {:zigler, "~> 0.15.2", runtime: false}
   ]
 end
@@ -237,7 +237,7 @@ For livebook, add the following:
 
 ```elixir
 Mix.install(
-  {:yog_ex, "~> 0.98.0"}
+  {:yog_ex, "~> 0.99.0"}
 )
 ```
 
