@@ -270,14 +270,29 @@ defmodule Yog.Pathfinding.ChinesePostman do
 
   defp edge_ids_to_nodes(_multi, []), do: []
 
-  defp edge_ids_to_nodes(multi, [first | rest]) do
+  defp edge_ids_to_nodes(multi, [first]) do
     {a, b, _} = Map.fetch!(multi.edges, first)
+    [a, b]
+  end
+
+  defp edge_ids_to_nodes(multi, [first, second | rest]) do
+    {a, b, _} = Map.fetch!(multi.edges, first)
+    {x, y, _} = Map.fetch!(multi.edges, second)
+
+    {prev, acc} =
+      if b == x or b == y do
+        # first is traversed a -> b
+        {b, [b, a]}
+      else
+        # first is traversed b -> a
+        {a, [a, b]}
+      end
 
     {_, nodes_rev} =
-      Enum.reduce(rest, {b, [b, a]}, fn eid, {prev, acc} ->
-        {x, y, _} = Map.fetch!(multi.edges, eid)
-        next = if x == prev, do: y, else: x
-        {next, [next | acc]}
+      Enum.reduce([second | rest], {prev, acc}, fn eid, {p, acc_inner} ->
+        {u, v, _} = Map.fetch!(multi.edges, eid)
+        next = if u == p, do: v, else: u
+        {next, [next | acc_inner]}
       end)
 
     Enum.reverse(nodes_rev)
