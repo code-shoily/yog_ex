@@ -756,6 +756,33 @@ defmodule Yog.MSTTest do
     assert result.total_weight == 5
   end
 
+  test "minimum_arborescence_custom_compare_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "Root")
+      |> Yog.add_node(2, "A")
+      |> Yog.add_node(3, "B")
+      |> Yog.add_edges!([
+        {1, 2, 10},
+        {1, 3, 20},
+        {2, 3, 5}
+      ])
+
+    # Minimum Spanning Arborescence (default)
+    {:ok, min_res} = MST.minimum_arborescence(in: graph, root: 1)
+    assert min_res.total_weight == 15
+
+    # Maximum Spanning Arborescence (using compare_desc)
+    {:ok, max_res} =
+      MST.minimum_arborescence(in: graph, root: 1, compare: &Yog.Utils.compare_desc/2)
+
+    assert max_res.total_weight == 30
+
+    # Also test via chu_liu_edmonds/3 positional arguments
+    {:ok, max_res_pos} = MST.chu_liu_edmonds(graph, 1, &Yog.Utils.compare_desc/2)
+    assert max_res_pos.total_weight == 30
+  end
+
   describe "Wilson's Algorithm" do
     test "generates a valid spanning tree for a simple graph" do
       graph =

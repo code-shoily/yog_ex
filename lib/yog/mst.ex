@@ -272,14 +272,21 @@ defmodule Yog.MST do
       iex> result.edge_count
       2
   """
-  @spec uniform_spanning_tree(keyword()) :: {:ok, Result.t()}
+  @spec uniform_spanning_tree(keyword()) :: {:ok, Result.t()} | {:error, :undirected_only}
   def uniform_spanning_tree(opts) when is_list(opts) do
     graph = Keyword.fetch!(opts, :in)
-    Wilson.compute(graph, opts)
+    uniform_spanning_tree(graph, opts)
   end
 
-  @spec uniform_spanning_tree(Yog.graph(), keyword()) :: {:ok, Result.t()}
-  def uniform_spanning_tree(graph, opts \\ []) do
+  def uniform_spanning_tree(graph, opts \\ [])
+
+  @spec uniform_spanning_tree(Yog.graph(), keyword()) ::
+          {:ok, Result.t()} | {:error, :undirected_only}
+  def uniform_spanning_tree(%Yog.Graph{kind: :directed}, _opts) do
+    {:error, :undirected_only}
+  end
+
+  def uniform_spanning_tree(graph, opts) do
     Wilson.compute(graph, opts)
   end
 
@@ -305,7 +312,8 @@ defmodule Yog.MST do
   def minimum_arborescence(opts) when is_list(opts) do
     graph = Keyword.fetch!(opts, :in)
     root = Keyword.fetch!(opts, :root)
-    Edmonds.compute(graph, root)
+    compare = opts[:compare] || (&Yog.Utils.compare/2)
+    Edmonds.compute(graph, root, compare)
   end
 
   @spec minimum_arborescence(Yog.graph(), term()) :: {:ok, Result.t()} | {:error, term()}
@@ -313,14 +321,25 @@ defmodule Yog.MST do
     Edmonds.compute(graph, root)
   end
 
+  @spec minimum_arborescence(Yog.graph(), term(), (term(), term() -> :lt | :eq | :gt)) ::
+          {:ok, Result.t()} | {:error, term()}
+  def minimum_arborescence(graph, root, compare) do
+    Edmonds.compute(graph, root, compare)
+  end
+
   @doc """
   Alias for `minimum_arborescence/2`.
   """
-  @spec chu_liu_edmonds(keyword() | Yog.graph(), term()) ::
+  @spec chu_liu_edmonds(
+          keyword() | Yog.graph(),
+          term(),
+          (term(), term() -> :lt | :eq | :gt) | nil
+        ) ::
           {:ok, Result.t()} | {:error, term()}
-  def chu_liu_edmonds(opts_or_graph, root \\ nil)
-  def chu_liu_edmonds(opts, nil) when is_list(opts), do: minimum_arborescence(opts)
-  def chu_liu_edmonds(graph, root), do: minimum_arborescence(graph, root)
+  def chu_liu_edmonds(opts_or_graph, root \\ nil, compare \\ nil)
+  def chu_liu_edmonds(opts, nil, nil) when is_list(opts), do: minimum_arborescence(opts)
+  def chu_liu_edmonds(graph, root, nil), do: minimum_arborescence(graph, root)
+  def chu_liu_edmonds(graph, root, compare), do: minimum_arborescence(graph, root, compare)
 
   # =============================================================================
   # Facades

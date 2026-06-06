@@ -78,10 +78,6 @@ defmodule Yog.MST.Prim do
   end
 
   # Main Prim loop - grows MST from starting node.
-  defp do_prim_loop(_graph, pq, _visited, acc, _compare) when pq == %{} do
-    Enum.reverse(acc)
-  end
-
   defp do_prim_loop(graph, pq, visited, acc, compare) do
     if PQ.empty?(pq) do
       Enum.reverse(acc)

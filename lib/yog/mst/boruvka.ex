@@ -72,13 +72,7 @@ defmodule Yog.MST.Boruvka do
             {DisjointSet.union(d_acc, edge.from, edge.to), [edge | m_acc]}
           end)
 
-        # If we couldn't merge any components, we're done (disconnected graph)
-        if map_size(new_dsu.parents) == map_size(dsu.parents) and
-             DisjointSet.count_sets(new_dsu) == DisjointSet.count_sets(dsu) do
-          mst_edges
-        else
-          do_boruvka_loop(graph, all_edges, new_dsu, new_mst, compare)
-        end
+        do_boruvka_loop(graph, all_edges, new_dsu, new_mst, compare)
       end
     end
   end
