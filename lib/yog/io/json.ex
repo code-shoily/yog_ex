@@ -199,13 +199,11 @@ defmodule Yog.IO.JSON do
   end
 
   # Convert Gleam JSON iolist to Elixir term
-  defp gleam_json_to_term(iolist) when is_list(iolist) do
+  defp gleam_json_to_term(iolist) do
     iolist
     |> IO.iodata_to_binary()
     |> Jason.decode!()
   end
-
-  defp gleam_json_to_term(other), do: other
 
   # Serialize data using the provided serializer
   defp serialize_data(data, serializer, formatter) do
@@ -859,7 +857,6 @@ defmodule Yog.IO.JSON do
   defp parse_graph_type("digraph"), do: :directed
   defp parse_graph_type("graph"), do: :undirected
   defp parse_graph_type(true), do: :directed
-  defp parse_graph_type(false), do: :undirected
   defp parse_graph_type(_), do: :undirected
 
   defp parse_id(id) when is_binary(id) do

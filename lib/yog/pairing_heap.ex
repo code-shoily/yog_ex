@@ -224,10 +224,8 @@ defmodule Yog.PairingHeap do
   defp to_list(%Empty{}, acc), do: Enum.reverse(acc)
 
   defp to_list(pq, acc) do
-    case pop(pq) do
-      {:ok, v, new_pq} -> to_list(new_pq, [v | acc])
-      :error -> Enum.reverse(acc)
-    end
+    {:ok, v, new_pq} = pop(pq)
+    to_list(new_pq, [v | acc])
   end
 
   @doc """

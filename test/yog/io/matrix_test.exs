@@ -8,7 +8,7 @@ defmodule Yog.IO.MatrixTest do
   describe "from_matrix/2" do
     test "raises on invalid graph type" do
       assert_raise ArgumentError, fn ->
-        Matrix.from_matrix(:invalid, [[0, 1], [1, 0]])
+        apply(Matrix, :from_matrix, [:invalid, [[0, 1], [1, 0]]])
       end
     end
 
@@ -92,7 +92,7 @@ defmodule Yog.IO.MatrixTest do
 
     test "raises on non-list matrix" do
       assert_raise ArgumentError, fn ->
-        Matrix.from_matrix(:undirected, nil)
+        apply(Matrix, :from_matrix, [:undirected, nil])
       end
     end
 

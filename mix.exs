@@ -26,8 +26,8 @@ defmodule YogEx.MixProject do
       # Test Coverage
       test_coverage: [tool: ExCoveralls],
       # Suppress warnings for Erlang modules
-      xref: [
-        exclude: [
+      elixirc_options: [
+        no_warn_undefined: [
           # Erlang stdlib modules (xmerl)
           :xmerl_scan,
           :xmerl_xpath

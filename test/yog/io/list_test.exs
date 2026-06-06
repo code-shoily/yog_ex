@@ -8,7 +8,7 @@ defmodule Yog.IO.ListTest do
   describe "from_list/2" do
     test "raises on invalid graph type" do
       assert_raise ArgumentError, fn ->
-        List.from_list(:invalid, [{1, [{2, 1}]}])
+        apply(List, :from_list, [:invalid, [{1, [{2, 1}]}]])
       end
     end
 
@@ -181,7 +181,7 @@ defmodule Yog.IO.ListTest do
 
     test "raises on invalid graph type" do
       assert_raise ArgumentError, fn ->
-        List.from_string(:invalid, "1: 2")
+        apply(List, :from_string, [:invalid, "1: 2"])
       end
     end
 
