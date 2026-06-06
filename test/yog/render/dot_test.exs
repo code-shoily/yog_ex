@@ -735,5 +735,21 @@ defmodule Yog.Render.DOTTest do
         assert String.contains?(dot, "overlap=#{expected}")
       end
     end
+
+    test "renders HTML-like labels without quoting them" do
+      graph =
+        Yog.directed()
+        |> Yog.add_node(1, "A")
+        |> Yog.add_node(2, "B")
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: "1")
+
+      opts = %{
+        DOT.default_options()
+        | node_label: fn _id, _data -> "<table border=\"0\"><tr><td>Node</td></tr></table>" end
+      }
+
+      dot = DOT.to_dot(graph, opts)
+      assert String.contains?(dot, "1 [label=<table border=\"0\"><tr><td>Node</td></tr></table>]")
+    end
   end
 end

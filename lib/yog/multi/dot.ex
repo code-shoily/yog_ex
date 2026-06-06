@@ -605,7 +605,11 @@ defmodule Yog.Multi.DOT do
     attrs
     |> Enum.reverse()
     |> Enum.map_join(", ", fn {key, value} ->
-      "#{key}=\"#{escape_quotes(value)}\""
+      if is_binary(value) and String.starts_with?(value, "<") and String.ends_with?(value, ">") do
+        "#{key}=#{value}"
+      else
+        "#{key}=\"#{escape_quotes(value)}\""
+      end
     end)
   end
 
