@@ -9,7 +9,9 @@ defmodule Yog.Zog.Property do
       otp_app: :yog_ex,
       extra_modules: [zog: {"../../../priv/zog/src/root.zig", []}],
       nifs: [
-        all_maximal_cliques: [concurrency: :dirty_cpu]
+        all_maximal_cliques: [concurrency: :dirty_cpu],
+        nif_dsatur: [concurrency: :dirty_cpu],
+        nif_exact_coloring: [concurrency: :dirty_cpu]
       ]
 
     ~Z"""
@@ -52,6 +54,29 @@ defmodule Yog.Zog.Property do
 
         return try zog.property.allMaximalCliques(beam.allocator, g);
     }
+
+    // =============================================================================
+    // Coloring
+    // =============================================================================
+
+    pub fn nif_dsatur(node_count: usize, from: []u32, to: []u32, weight: []f64) ![]u32 {
+        var g = try buildGraph(node_count, from, to, weight);
+        defer g.deinit();
+
+        return try zog.property.dsatur(beam.allocator, g);
+    }
+
+    pub fn nif_exact_coloring(node_count: usize, from: []u32, to: []u32, weight: []f64, timeout_ms: u64) !beam.term {
+        var g = try buildGraph(node_count, from, to, weight);
+        defer g.deinit();
+
+        const res = try zog.property.exactColoring(beam.allocator, g, timeout_ms);
+        errdefer beam.allocator.free(res.colors);
+
+        const term = beam.make(.{.ok, res.chi, res.colors, res.timed_out}, .{});
+        beam.allocator.free(res.colors);
+        return term;
+    }
     """
 
     # ============================================================================
@@ -88,6 +113,61 @@ defmodule Yog.Zog.Property do
         all_cliques -> Enum.max_by(all_cliques, &MapSet.size/1)
       end
     end
+
+    @doc """
+    Computes graph coloring using the DSatur heuristic natively.
+    Returns `{chromatic_number, %{node_label => color}}`.
+    """
+    @spec coloring_dsatur(Zog.t()) :: Yog.Property.Coloring.coloring_result()
+    def coloring_dsatur(%Yog.Builder.Zog{} = builder) do
+      node_count = Zog.node_count(builder)
+      {from, to, weights} = Zog.to_edge_arrays(builder)
+
+      labels = Zog.all_labels(builder)
+      labels_tuple = List.to_tuple(labels)
+
+      case nif_dsatur(node_count, from, to, weights) do
+        [] ->
+          {0, %{}}
+
+        colors ->
+          max_color = Enum.max(colors)
+
+          color_map =
+            colors
+            |> Enum.with_index()
+            |> Map.new(fn {color, idx} -> {elem(labels_tuple, idx), color} end)
+
+          {max_color, color_map}
+      end
+    end
+
+    @doc """
+    Computes exact graph coloring natively using backtracking with pruning.
+    Returns `{:ok, chromatic_number, %{node_label => color}}` or `{:timeout, {best_chromatic, %{node_label => color}}}`.
+    """
+    @spec coloring_exact(Zog.t(), non_neg_integer()) :: Yog.Property.Coloring.exact_result()
+    def coloring_exact(%Yog.Builder.Zog{} = builder, timeout_ms \\ 5000) do
+      node_count = Zog.node_count(builder)
+      {from, to, weights} = Zog.to_edge_arrays(builder)
+
+      labels = Zog.all_labels(builder)
+      labels_tuple = List.to_tuple(labels)
+
+      case nif_exact_coloring(node_count, from, to, weights, timeout_ms) do
+        {:ok, chi, colors, timed_out} ->
+          color_map =
+            colors
+            |> Enum.with_index()
+            |> Map.new(fn {color, idx} -> {elem(labels_tuple, idx), color} end)
+
+          if timed_out do
+            {:timeout, {chi, color_map}}
+          else
+            {:ok, chi, color_map}
+          end
+      end
+    end
   else
     @moduledoc """
     Native graph properties backed by Zog (Zig) via Zigler.
@@ -95,10 +175,14 @@ defmodule Yog.Zog.Property do
     **Not available** — zigler is not installed. All functions will raise at runtime.
     """
 
-    for fun <- [:all_maximal_cliques, :max_clique] do
+    for fun <- [:all_maximal_cliques, :max_clique, :coloring_dsatur] do
       def unquote(fun)(_builder) do
         raise "zigler is not installed. Add {:zigler, \"~> 0.15.2\", runtime: false} to your deps and run mix deps.get."
       end
+    end
+
+    def coloring_exact(_builder, _timeout_ms \\ 5000) do
+      raise "zigler is not installed. Add {:zigler, \"~> 0.15.2\", runtime: false} to your deps and run mix deps.get."
     end
   end
 end

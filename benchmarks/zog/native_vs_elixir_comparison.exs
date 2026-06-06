@@ -25,6 +25,7 @@ defmodule NativeVsElixirBenchmark do
     run_centrality_suite()
     run_community_suite()
     run_pathfinding_suite()
+    run_coloring_suite()
 
     IO.puts("\n" <> String.duplicate("=", 80))
     IO.puts("Summary:")
@@ -366,6 +367,42 @@ defmodule NativeVsElixirBenchmark do
     Enum.reduce(edges, g, fn {u, v, w}, acc ->
       ZogBuilder.add_edge(acc, u, v, w)
     end)
+  end
+
+  defp run_coloring_suite do
+    IO.puts("== Coloring: Exact Coloring ==")
+
+    for {name, n, p} <- [
+          {"Random Graph 35n", 35, 0.5},
+          {"Random Graph 40n", 40, 0.5},
+          {"Random Graph 45n", 45, 0.5}
+        ] do
+      builder =
+        Yog.Generator.Random.erdos_renyi_gnp_with_type(n, p, :undirected, 42)
+        |> Yog.Builder.Zog.from_graph()
+
+      elixir_ms =
+        bench(fn ->
+          g = ZogBuilder.to_graph(builder)
+          Yog.Property.Coloring.coloring_exact(g)
+        end)
+
+      copyin_ms =
+        bench(fn ->
+          Yog.Zog.Property.coloring_exact(builder)
+        end)
+
+      IO.puts("  #{name}")
+      IO.puts("    Elixir:        #{elixir_ms}ms")
+      IO.puts("    Zig Native:    #{copyin_ms}ms")
+
+      if copyin_ms > 0 do
+        speedup = Float.round(elixir_ms / copyin_ms, 1)
+        IO.puts("    → Zig Native #{speedup}x faster than Elixir")
+      end
+
+      IO.puts("")
+    end
   end
 end
 

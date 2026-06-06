@@ -125,6 +125,9 @@ defmodule Yog.Property.Coloring do
   distinct colors among its colored neighbors) is chosen. Ties are broken by total
   degree. This usually produces better colorings than simple greedy ordering.
 
+  > [!TIP]
+  > For a much faster native implementation, see `Yog.Zog.Property.coloring_dsatur/1`.
+
   ## Examples
 
       iex> graph = Yog.Generator.Classic.cycle(5)
@@ -225,6 +228,9 @@ defmodule Yog.Property.Coloring do
 
   Returns `{:ok, chromatic_number, coloring}` on success, or `{:timeout, best_result}`
   if the timeout is reached, where `best_result` is the best valid coloring found so far.
+
+  > [!TIP]
+  > For a much faster native implementation, see `Yog.Zog.Property.coloring_exact/2`.
 
   ## Examples
 
