@@ -51,18 +51,15 @@ defmodule Yog.PBT.ZogParityTest do
           # 5. Assortativity (only if graph has edges)
           if length(Yog.all_edges(graph)) > 0 do
             elixir_assort = Yog.Health.assortativity(graph)
+            native_assort = Yog.Zog.Metrics.assortativity(builder)
+            res_assort = ResourceGraph.assortativity(res_graph)
 
-            if is_number(elixir_assort) do
-              native_assort = Yog.Zog.Metrics.assortativity(builder)
-              res_assort = ResourceGraph.assortativity(res_graph)
+            if is_number(native_assort) do
+              assert_in_delta native_assort, elixir_assort, 1.0e-3
+            end
 
-              if is_number(native_assort) do
-                assert_in_delta native_assort, elixir_assort, 1.0e-3
-              end
-
-              if is_number(res_assort) do
-                assert_in_delta res_assort, elixir_assort, 1.0e-3
-              end
+            if is_number(res_assort) do
+              assert_in_delta res_assort, elixir_assort, 1.0e-3
             end
           end
         after
