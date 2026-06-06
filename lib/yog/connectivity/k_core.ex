@@ -94,6 +94,10 @@ defmodule Yog.Connectivity.KCore do
   O(V + E)
   """
   @spec detect(Yog.graph(), integer()) :: Yog.graph()
+  def detect(%Yog.Graph{kind: :directed}, _k) do
+    raise ArgumentError, "k-core decomposition requires an undirected graph"
+  end
+
   def detect(graph, k) when k >= 0 do
     out_edges = graph.out_edges
     nodes = Map.keys(graph.nodes)
@@ -169,6 +173,10 @@ defmodule Yog.Connectivity.KCore do
       %{1 => 1, 2 => 1}
   """
   @spec core_numbers(Yog.graph()) :: %{Yog.node_id() => integer()}
+  def core_numbers(%Yog.Graph{kind: :directed}) do
+    raise ArgumentError, "core_numbers/1 requires an undirected graph"
+  end
+
   def core_numbers(graph) do
     out_edges = graph.out_edges
     nodes = Map.keys(graph.nodes)
