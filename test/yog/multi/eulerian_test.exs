@@ -359,6 +359,83 @@ defmodule Yog.Multi.EulerianTest do
   end
 
   # ============================================================
+  # Self-Loop Tests
+  # ============================================================
+
+  describe "self-loops" do
+    test "undirected self-loop plus edge has eulerian path" do
+      # self-loop at :u + edge :u—:v
+      # deg(u)=3 (odd), deg(v)=1 (odd) -> 2 odd nodes -> path exists
+      graph =
+        Model.undirected()
+        |> Model.add_node(:u, "U")
+        |> Model.add_node(:v, "V")
+        |> add_edge!(:u, :u, "loop")
+        |> add_edge!(:u, :v, "edge")
+
+      assert Eulerian.has_eulerian_path?(graph)
+
+      case Eulerian.find_eulerian_path(graph) do
+        {:ok, edge_ids} ->
+          assert length(edge_ids) == 2
+
+        :error ->
+          flunk("Expected to find an Eulerian path")
+      end
+    end
+
+    test "undirected self-loop plus edge has no eulerian circuit" do
+      graph =
+        Model.undirected()
+        |> Model.add_node(:u, "U")
+        |> Model.add_node(:v, "V")
+        |> add_edge!(:u, :u, "loop")
+        |> add_edge!(:u, :v, "edge")
+
+      refute Eulerian.has_eulerian_circuit?(graph)
+      assert Eulerian.find_eulerian_circuit(graph) == :error
+    end
+
+    test "undirected triangle plus self-loop has eulerian circuit" do
+      # Triangle: all deg 2. Self-loop at :a adds 2 -> deg(a)=4 (even)
+      graph =
+        Model.undirected()
+        |> Model.add_node(:a, "A")
+        |> Model.add_node(:b, "B")
+        |> Model.add_node(:c, "C")
+        |> add_edge!(:a, :b, 1)
+        |> add_edge!(:b, :c, 2)
+        |> add_edge!(:c, :a, 3)
+        |> add_edge!(:a, :a, "loop")
+
+      assert Eulerian.has_eulerian_circuit?(graph)
+
+      case Eulerian.find_eulerian_circuit(graph) do
+        {:ok, edge_ids} ->
+          assert length(edge_ids) == 4
+
+        :error ->
+          flunk("Expected to find an Eulerian circuit")
+      end
+    end
+
+    test "directed self-loop regression" do
+      # Directed self-loop at :a, edge :a->:b, edge :b->:a
+      # a: out=2, in=2 (balanced)
+      # b: out=1, in=1 (balanced)
+      graph =
+        Model.directed()
+        |> Model.add_node(:a, "A")
+        |> Model.add_node(:b, "B")
+        |> add_edge!(:a, :a, "loop")
+        |> add_edge!(:a, :b, 1)
+        |> add_edge!(:b, :a, 2)
+
+      assert Eulerian.has_eulerian_circuit?(graph)
+    end
+  end
+
+  # ============================================================
   # Complex Graph Tests
   # ============================================================
 

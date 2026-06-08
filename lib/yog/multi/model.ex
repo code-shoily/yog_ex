@@ -224,18 +224,30 @@ defmodule Yog.Multi.Model do
   @doc """
   Returns the out-degree of a node (number of outgoing edges).
   For undirected graphs, this equals the total degree.
+  Self-loops in undirected graphs contribute 2 to the degree.
   """
   @spec out_degree(t(), Yog.Model.node_id()) :: integer()
   def out_degree(graph, id) do
-    MapSet.size(Map.get(graph.out_edge_ids, id, MapSet.new()))
+    base = MapSet.size(Map.get(graph.out_edge_ids, id, MapSet.new()))
+
+    case graph.kind do
+      :undirected -> base + count_self_loops(graph, id)
+      :directed -> base
+    end
   end
 
   @doc """
   Returns the in-degree of a node (number of incoming edges).
+  Self-loops in undirected graphs contribute 2 to the degree.
   """
   @spec in_degree(t(), Yog.Model.node_id()) :: integer()
   def in_degree(graph, id) do
-    MapSet.size(Map.get(graph.in_edge_ids, id, MapSet.new()))
+    base = MapSet.size(Map.get(graph.in_edge_ids, id, MapSet.new()))
+
+    case graph.kind do
+      :undirected -> base + count_self_loops(graph, id)
+      :directed -> base
+    end
   end
 
   @doc """
@@ -243,6 +255,10 @@ defmodule Yog.Multi.Model do
 
   For directed graphs: in-degree + out-degree.
   For undirected graphs: same as out-degree.
+
+  Self-loops contribute 2 to degree in undirected graphs (standard graph
+  theory convention) and 1 to each of in-degree and out-degree in directed
+  graphs.
   """
   @spec degree(t(), Yog.Model.node_id()) :: integer()
   def degree(graph, id) do
@@ -382,6 +398,17 @@ defmodule Yog.Multi.Model do
   # ============================================================
   # Private Helpers
   # ============================================================
+
+  defp count_self_loops(graph, id) do
+    graph.out_edge_ids
+    |> Map.get(id, MapSet.new())
+    |> Enum.count(fn eid ->
+      case Map.fetch(graph.edges, eid) do
+        {:ok, {^id, ^id, _}} -> true
+        _ -> false
+      end
+    end)
+  end
 
   defp do_remove_edge(graph, eid) do
     case Map.fetch(graph.edges, eid) do

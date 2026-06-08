@@ -529,4 +529,79 @@ defmodule Yog.Multi.ModelTest do
       assert Model.edges_between(multi, :a, :c) == []
     end
   end
+
+  # ============================================================
+  # Self-Loop Degree Tests
+  # ============================================================
+
+  describe "self-loop degrees" do
+    test "single undirected self-loop contributes 2 to degree" do
+      {multi, _} =
+        Model.undirected()
+        |> Model.add_node(:u, nil)
+        |> Model.add_edge(:u, :u, "loop")
+
+      assert Model.degree(multi, :u) == 2
+      assert Model.out_degree(multi, :u) == 2
+      assert Model.in_degree(multi, :u) == 2
+    end
+
+    test "undirected self-loop plus regular edge" do
+      {multi, _} =
+        Model.undirected()
+        |> Model.add_node(:u, nil)
+        |> Model.add_node(:v, nil)
+        |> Model.add_edge(:u, :u, "loop")
+
+      {multi, _} = Model.add_edge(multi, :u, :v, "edge")
+
+      assert Model.degree(multi, :u) == 3
+      assert Model.degree(multi, :v) == 1
+    end
+
+    test "multiple undirected self-loops" do
+      {multi, _} =
+        Model.undirected()
+        |> Model.add_node(:u, nil)
+        |> Model.add_edge(:u, :u, "loop1")
+
+      {multi, _} = Model.add_edge(multi, :u, :u, "loop2")
+
+      assert Model.degree(multi, :u) == 4
+    end
+
+    test "directed self-loop contributes 1 to in-degree and 1 to out-degree" do
+      {multi, _} =
+        Model.directed()
+        |> Model.add_node(:u, nil)
+        |> Model.add_edge(:u, :u, "loop")
+
+      assert Model.out_degree(multi, :u) == 1
+      assert Model.in_degree(multi, :u) == 1
+      assert Model.degree(multi, :u) == 2
+    end
+
+    test "handshake lemma holds for undirected multigraph with self-loops" do
+      multi =
+        Model.undirected()
+        |> Model.add_node(:a, nil)
+        |> Model.add_node(:b, nil)
+        |> Model.add_node(:c, nil)
+        |> then(fn g ->
+          {g, _} = Model.add_edge(g, :a, :a, "loop")
+          {g, _} = Model.add_edge(g, :a, :b, "e1")
+          {g, _} = Model.add_edge(g, :b, :c, "e2")
+          {g, _} = Model.add_edge(g, :c, :c, "loop2")
+          g
+        end)
+
+      sum_deg =
+        multi
+        |> Model.all_nodes()
+        |> Enum.map(&Model.degree(multi, &1))
+        |> Enum.sum()
+
+      assert sum_deg == 2 * Model.size(multi)
+    end
+  end
 end
