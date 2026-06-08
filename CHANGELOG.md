@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`Yog.Community.Walktrap.detect/1`** — Now selects the modularity-maximizing level from the dendrogram instead of the trivial all-merged level. The default partition is meaningful for typical graphs.
+
 ## [0.98.2] - 2026-06-06
 
 ### Added

@@ -49,7 +49,7 @@ defmodule Yog.Community.Walktrap do
   """
 
   alias Yog.Community
-  alias Yog.Community.{Dendrogram, Result}
+  alias Yog.Community.{Dendrogram, Metrics, Result}
   alias Yog.PairingHeap
 
   @typedoc "Options for Walktrap algorithm"
@@ -121,7 +121,7 @@ defmodule Yog.Community.Walktrap do
 
         case options.target_communities do
           nil ->
-            List.last(dendrogram.levels) || Result.new(%{})
+            pick_best_level_by_modularity(dendrogram.levels, graph)
 
           target ->
             Enum.find(dendrogram.levels, fn c -> c.num_communities <= target end) ||
@@ -326,6 +326,18 @@ defmodule Yog.Community.Walktrap do
       else
         acc
       end
+    end)
+  end
+
+  # =============================================================================
+  # LEVEL SELECTION
+  # =============================================================================
+
+  defp pick_best_level_by_modularity([], _graph), do: Result.new(%{})
+
+  defp pick_best_level_by_modularity(levels, graph) do
+    Enum.max_by(levels, fn level ->
+      Metrics.modularity(graph, %{assignments: level.assignments})
     end)
   end
 end
