@@ -369,6 +369,91 @@ defmodule Yog.CentralityTest do
     assert_in_delta scores[3], scores[4], 0.01
   end
 
+  test "eigenvector_dag_hub_and_authority_test" do
+    # Hub-and-authority DAG: 1->2, 1->3, 4->2
+    # Eigenvector centrality is ill-defined on DAGs, so the function
+    # returns a uniform distribution as a fallback.
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_node(3, nil)
+      |> Yog.add_node(4, nil)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 4, to: 2, with: 1)
+
+    scores = Yog.Centrality.eigenvector(graph)
+
+    assert map_size(scores) == 4
+
+    uniform = 1.0 / :math.sqrt(4)
+    assert_in_delta scores[1], uniform, 0.0001
+    assert_in_delta scores[2], uniform, 0.0001
+    assert_in_delta scores[3], uniform, 0.0001
+    assert_in_delta scores[4], uniform, 0.0001
+  end
+
+  test "eigenvector_dag_linear_chain_test" do
+    # Linear chain DAG: 1->2->3->4->5
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_node(3, nil)
+      |> Yog.add_node(4, nil)
+      |> Yog.add_node(5, nil)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
+      |> Yog.add_edge_ensure(from: 4, to: 5, with: 1)
+
+    scores = Yog.Centrality.eigenvector(graph)
+
+    assert map_size(scores) == 5
+
+    uniform = 1.0 / :math.sqrt(5)
+    assert_in_delta scores[1], uniform, 0.0001
+    assert_in_delta scores[2], uniform, 0.0001
+    assert_in_delta scores[3], uniform, 0.0001
+    assert_in_delta scores[4], uniform, 0.0001
+    assert_in_delta scores[5], uniform, 0.0001
+  end
+
+  test "eigenvector_mixed_dag_with_cycle_test" do
+    # One component is a DAG (4->5->6), another is a cycle (1->2->3->1).
+    # The cycle component dominates; DAG nodes converge to 0.
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_node(3, nil)
+      |> Yog.add_node(4, nil)
+      |> Yog.add_node(5, nil)
+      |> Yog.add_node(6, nil)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+      |> Yog.add_edge_ensure(from: 3, to: 1, with: 1)
+      |> Yog.add_edge_ensure(from: 4, to: 5, with: 1)
+      |> Yog.add_edge_ensure(from: 5, to: 6, with: 1)
+
+    scores = Yog.Centrality.eigenvector(graph)
+
+    assert map_size(scores) == 6
+
+    # Cycle nodes should have roughly equal, non-zero scores.
+    # Perturbation in initial scores means they may not be exactly equal.
+    assert_in_delta scores[1], scores[2], 0.1
+    assert_in_delta scores[2], scores[3], 0.1
+    assert scores[1] > 0.1
+
+    # DAG nodes should have zero score because all in-neighbor influence
+    # dies out in the acyclic component.
+    assert scores[4] == 0.0
+    assert scores[5] == 0.0
+    assert scores[6] == 0.0
+  end
+
   # ============= Katz Centrality Tests =============
 
   test "katz_simple_test" do

@@ -58,6 +58,8 @@ defmodule Yog.Centrality do
 
   alias Yog.Pathfinding.{Brandes, Dijkstra}
 
+  require Logger
+
   @typedoc """
   A mapping of Node IDs to their calculated centrality scores.
   """
@@ -772,6 +774,16 @@ defmodule Yog.Centrality do
   Eigenvector scores are normalized (L2 norm = 1.0), so they represent
   relative importance rather than absolute counts.
 
+  ## DAGs and degenerate cases
+
+  On directed acyclic graphs (DAGs), eigenvector centrality is mathematically
+  ill-defined: the adjacency matrix is nilpotent, so the principal eigenvalue
+  is 0 and the principal eigenvector is the zero vector. In this case the
+  function logs a warning and returns a uniform distribution as a fallback.
+
+  For DAGs, consider `pagerank/2` or `katz/2` instead, which handle acyclic
+  structures gracefully.
+
   ## Options
 
   - `:max_iterations` - Maximum number of power iterations (default: 100)
@@ -1100,27 +1112,42 @@ defmodule Yog.Centrality do
         new_scores
       end
 
-    diff_norm = Yog.Utils.norm_diff(scores, normalized_scores, :l2)
-
-    is_oscillating =
-      if map_size(prev_prev) > 0 do
-        Yog.Utils.norm_diff(prev_prev, normalized_scores, :l2) < tolerance
-      else
-        false
-      end
-
-    if diff_norm < tolerance or is_oscillating do
-      normalized_scores
-    else
-      iterate_eigenvector(
-        nodes,
-        normalized_scores,
-        scores,
-        max_iterations,
-        tolerance,
-        iter + 1,
-        in_map
+    # Detect degenerate case: convergence to the zero vector on DAGs.
+    # Return a uniform distribution as a fallback rather than silent zeros.
+    if l2_norm == 0.0 do
+      Logger.warning(
+        "Yog.Centrality.eigenvector converged to the zero vector. This typically " <>
+          "means the graph is acyclic (in-edge convention). Returning a uniform " <>
+          "distribution as a fallback. Consider Yog.Centrality.pagerank/2 or " <>
+          "Yog.Centrality.katz/2 for DAGs."
       )
+
+      n = length(nodes)
+      uniform = 1.0 / :math.sqrt(n)
+      Map.new(nodes, fn id -> {id, uniform} end)
+    else
+      diff_norm = Yog.Utils.norm_diff(scores, normalized_scores, :l2)
+
+      is_oscillating =
+        if map_size(prev_prev) > 0 do
+          Yog.Utils.norm_diff(prev_prev, normalized_scores, :l2) < tolerance
+        else
+          false
+        end
+
+      if diff_norm < tolerance or is_oscillating do
+        normalized_scores
+      else
+        iterate_eigenvector(
+          nodes,
+          normalized_scores,
+          scores,
+          max_iterations,
+          tolerance,
+          iter + 1,
+          in_map
+        )
+      end
     end
   end
 
