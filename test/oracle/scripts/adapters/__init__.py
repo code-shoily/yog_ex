@@ -5,9 +5,11 @@ functions with signature `(nx.Graph | nx.DiGraph, dict) -> JSON-serializable`.
 """
 
 from . import flow
+from . import mst
 from . import pathfinding
 
 DISPATCH = {
     **pathfinding.DISPATCH,
     **flow.DISPATCH,
+    **mst.DISPATCH,
 }
