@@ -299,8 +299,10 @@ defmodule Yog.Connectivity.Reachability do
   defp init_hll, do: :binary.copy(<<0>>, @hll_num_registers)
 
   defp hll_add(hll_bin, value) when is_binary(hll_bin) do
-    # Retain full 32-bit spread
-    hash = :erlang.phash2(value)
+    # phash2/1 only ranges over [0, 2^27 - 1]; pass an explicit 2^32 range so
+    # the leading-zero count below sees a true 32-bit hash and isn't biased
+    # by always-zero high bits.
+    hash = :erlang.phash2(value, bsl(1, 32))
     index = band(hash, @hll_num_registers - 1)
     remaining = bsr(hash, @hll_precision)
     zeros = count_leading_zeros(remaining, 32 - @hll_precision)

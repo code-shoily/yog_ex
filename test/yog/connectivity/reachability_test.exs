@@ -90,5 +90,19 @@ defmodule Yog.Connectivity.ReachabilityTest do
       # 49 * 0.0325 ≈ 1.6. So should be close to 49.
       assert_in_delta counts[1], 49, 10
     end
+
+    test "stays accurate past the linear-counting cutoff" do
+      # With 1024 registers, linear counting tails off around ~2.5k. Above that,
+      # the raw HLL estimator has to be correct on its own — earlier the bias
+      # from a 27-bit phash silently inflated estimates by ~30x in this regime.
+      for n <- [5_000, 20_000] do
+        edges = for i <- 2..n, do: {1, i, 1}
+        graph = Yog.from_edges(:directed, edges)
+        estimate = Reachability.counts_estimate(graph, :descendants)[1]
+        truth = n - 1
+        # ~3.25% standard error; give ~4x headroom for randomness.
+        assert_in_delta estimate, truth, truth * 0.15
+      end
+    end
   end
 end
