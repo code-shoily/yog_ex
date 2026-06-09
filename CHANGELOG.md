@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **`Yog.Connectivity.Reachability.counts_estimate/2`** now works for large graphs. `phash2` has explicity range passed.
+
 ## 0.98.3 - 2026-06-09
 
 ### Fixed
