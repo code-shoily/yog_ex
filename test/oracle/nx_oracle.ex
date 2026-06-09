@@ -132,15 +132,29 @@ defmodule Yog.Oracle.NetworkX do
   # Result decoding
   # ---------------------------------------------------------------------------
 
-  # Algorithms that return node-keyed distance maps.
+  # Algorithms that return node-keyed maps.
   defp decode_result(result, algo)
        when algo in [
               "single_source_dijkstra_path_length",
               "all_pairs_shortest_path_length",
               "floyd_warshall",
-              "johnson"
+              "johnson",
+              "degree_centrality",
+              "in_degree_centrality",
+              "out_degree_centrality",
+              "closeness_centrality",
+              "harmonic_centrality",
+              "betweenness_centrality",
+              "pagerank",
+              "eigenvector_centrality",
+              "katz_centrality"
             ] do
     decode_node_keyed_map(result)
+  end
+
+  # HITS returns a nested structure with hubs and authorities maps.
+  defp decode_result(%{"hubs" => h, "authorities" => a}, "hits") do
+    %{hubs: decode_node_keyed_map(h), authorities: decode_node_keyed_map(a)}
   end
 
   # bidirectional_dijkstra returns %{"length" => _, "path" => _} or error
