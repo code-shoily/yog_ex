@@ -114,4 +114,31 @@ defmodule Yog.Community.Dendrogram do
       merge_order: merge_order
     }
   end
+
+  @doc """
+  Folds the per-level assignment maps into a single `Result.t()` whose
+  assignments map keys are the original-graph node ids and whose values
+  are the final-level community ids.
+
+  Use this when you want "the final partition" from a dendrogram produced
+  by a hierarchical algorithm such as `Yog.Community.Louvain.detect_hierarchical/1`.
+
+  Each level in a dendrogram is over the contracted graph at that depth:
+  level 0 maps original nodes to first-level communities, level 1 maps
+  first-level community ids to second-level community ids, and so on.
+  This helper composes all levels back down to original-node keys.
+  """
+  @spec flatten_to_original(t()) :: Result.t()
+  def flatten_to_original(%__MODULE__{levels: []}), do: Result.new(%{})
+
+  def flatten_to_original(%__MODULE__{levels: [base | rest]}) do
+    final_assignments =
+      Enum.reduce(rest, base.assignments, fn level, acc ->
+        Map.new(acc, fn {node, comm} ->
+          {node, Map.get(level.assignments, comm, comm)}
+        end)
+      end)
+
+    Result.new(final_assignments)
+  end
 end

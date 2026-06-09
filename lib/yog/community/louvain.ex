@@ -124,7 +124,10 @@ defmodule Yog.Community.Louvain do
       total_weight: total_weight
     }
 
-    do_louvain(graph, initial_state, [], 0, options)
+    {communities, stats} = do_louvain(graph, initial_state, [], 0, options)
+    final_q = Metrics.modularity(graph, Result.to_map(communities))
+    final_stats = %{stats | final_modularity: final_q}
+    {communities, final_stats}
   end
 
   @doc """
@@ -171,7 +174,9 @@ defmodule Yog.Community.Louvain do
     q = Metrics.modularity(graph, Result.to_map(communities))
     new_history = [q | mod_history]
 
-    if not improved or phase >= options.max_iterations do
+    num_comms = count_unique_communities(new_state.assignments)
+
+    if not improved or phase >= options.max_iterations or num_comms <= 1 do
       stats = %{
         num_phases: phase + 1,
         final_modularity: q,
@@ -180,14 +185,25 @@ defmodule Yog.Community.Louvain do
 
       {communities, stats}
     else
-      do_louvain(graph, new_state, new_history, phase + 1, options)
+      aggregated = phase2_aggregate(graph, new_state.assignments)
+      aggregated_state = rebuild_state(aggregated)
+
+      {agg_communities, agg_stats} =
+        do_louvain(aggregated, aggregated_state, new_history, phase + 1, options)
+
+      # Map aggregated communities back to original nodes
+      final_assignments =
+        Map.new(new_state.assignments, fn {node, comm} ->
+          {node, Map.get(agg_communities.assignments, comm, comm)}
+        end)
+
+      {Result.new(final_assignments), agg_stats}
     end
   end
 
   defp do_louvain_hierarchical(graph, state, levels, phase, options) do
     {improved, new_state} = phase1_local_optimize(graph, state, options)
-    normalized_assignments = normalize_assignments(new_state.assignments)
-    current_communities = Result.new(normalized_assignments)
+    current_communities = Result.new(new_state.assignments)
     new_levels = [current_communities | levels]
 
     num_comms = count_unique_communities(new_state.assignments)

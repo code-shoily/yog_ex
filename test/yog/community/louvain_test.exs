@@ -256,4 +256,50 @@ defmodule Yog.Community.LouvainTest do
     assert Map.has_key?(stats, :num_phases)
     assert Map.has_key?(stats, :final_modularity)
   end
+
+  test "detect_hierarchical round-trips to original nodes via flatten_to_original" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(0, nil)
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_node(3, nil)
+      |> Yog.add_node(4, nil)
+      |> Yog.add_node(5, nil)
+      |> Yog.add_edges!([
+        {0, 1, 1},
+        {1, 2, 1},
+        {2, 0, 1},
+        {3, 4, 1},
+        {4, 5, 1},
+        {5, 3, 1},
+        {2, 3, 1}
+      ])
+
+    dendrogram = Louvain.detect_hierarchical(graph)
+
+    flat = Yog.Community.Dendrogram.flatten_to_original(dendrogram)
+
+    assert map_size(flat.assignments) == 6
+    assert flat.num_communities >= 1
+  end
+
+  test "detect on hub-dominated graph finds many communities" do
+    graph = Yog.Generator.Random.barabasi_albert(500, 3, 42)
+    graph = Yog.Transform.map_edges(graph, fn _ -> 1.0 end)
+
+    comms = Louvain.detect(graph)
+
+    assert comms.num_communities > 2
+    assert map_size(comms.assignments) == 500
+  end
+
+  test "detect_with_stats on hub-dominated graph has multiple phases" do
+    graph = Yog.Generator.Random.barabasi_albert(500, 3, 42)
+    graph = Yog.Transform.map_edges(graph, fn _ -> 1.0 end)
+
+    {_communities, stats} = Louvain.detect_with_stats(graph, [])
+
+    assert stats.num_phases > 1
+  end
 end

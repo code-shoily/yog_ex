@@ -172,4 +172,59 @@ defmodule Yog.Community.DendrogramTest do
     assert Dendrogram.num_levels(restored) == 2
     assert restored.merge_order == [{0, 1}]
   end
+
+  # ============================================================
+  # Flatten Tests
+  # ============================================================
+
+  test "flatten_to_original with single level" do
+    l0 = Result.new(%{1 => 0, 2 => 0, 3 => 1, 4 => 1})
+    dend = Dendrogram.new([l0])
+
+    flat = Dendrogram.flatten_to_original(dend)
+    assert flat.assignments == %{1 => 0, 2 => 0, 3 => 1, 4 => 1}
+  end
+
+  test "flatten_to_original composes multiple levels" do
+    # Level 0: original nodes -> first-level communities
+    l0 = Result.new(%{:a => 0, :b => 0, :c => 1, :d => 1})
+    # Level 1: first-level communities -> second-level communities
+    l1 = Result.new(%{0 => 0, 1 => 0})
+
+    dend = Dendrogram.new([l0, l1])
+    flat = Dendrogram.flatten_to_original(dend)
+
+    assert flat.assignments == %{:a => 0, :b => 0, :c => 0, :d => 0}
+    assert flat.num_communities == 1
+  end
+
+  test "flatten_to_original with three levels" do
+    l0 = Result.new(%{:a => 0, :b => 0, :c => 1, :d => 1, :e => 2})
+    l1 = Result.new(%{0 => 0, 1 => 0, 2 => 1})
+    l2 = Result.new(%{0 => 0, 1 => 0})
+
+    dend = Dendrogram.new([l0, l1, l2])
+    flat = Dendrogram.flatten_to_original(dend)
+
+    assert flat.assignments == %{:a => 0, :b => 0, :c => 0, :d => 0, :e => 0}
+  end
+
+  test "flatten_to_original with empty dendrogram" do
+    dend = Dendrogram.new([])
+    flat = Dendrogram.flatten_to_original(dend)
+
+    assert flat.assignments == %{}
+    assert flat.num_communities == 0
+  end
+
+  test "flatten_to_original with partial merge" do
+    l0 = Result.new(%{:a => 0, :b => 0, :c => 1, :d => 1})
+    l1 = Result.new(%{0 => 0, 1 => 1})
+
+    dend = Dendrogram.new([l0, l1])
+    flat = Dendrogram.flatten_to_original(dend)
+
+    assert flat.assignments == %{:a => 0, :b => 0, :c => 1, :d => 1}
+    assert flat.num_communities == 2
+  end
 end
