@@ -1,0 +1,62 @@
+name: Nightly Oracle & Soak
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # 06:00 UTC daily
+  workflow_dispatch:
+
+jobs:
+  oracle:
+    name: Oracle tests + soak
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        elixir: ['1.20']
+        otp: ['29']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Elixir
+      uses: erlef/setup-beam@v1
+      with:
+        elixir-version: ${{ matrix.elixir }}
+        otp-version: ${{ matrix.otp }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install NetworkX
+      run: |
+        python3 -m pip install -r test/oracle/scripts/requirements.txt
+
+    - name: Restore dependencies cache
+      uses: actions/cache@v3
+      with:
+        path: deps
+        key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
+        restore-keys: ${{ runner.os }}-mix-
+
+    - name: Restore _build cache
+      uses: actions/cache@v3
+      with:
+        path: _build
+        key: ${{ runner.os }}-build-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
+        restore-keys: ${{ runner.os }}-build-${{ matrix.otp }}-${{ matrix.elixir }}-
+
+    - name: Install dependencies
+      run: mix deps.get
+
+    - name: Compile
+      run: mix compile
+
+    - name: Run oracle tests
+      run: mix test --include oracle
+
+    - name: Run soak tests
+      run: mix test --include soak --max-cases 1 --seed 0
+      env:
+        STREAMDATA_RUN_LENGTH: "10000"
