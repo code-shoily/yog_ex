@@ -383,7 +383,10 @@ defmodule Yog.CentralityTest do
       |> Yog.add_edge_ensure(from: 1, to: 3, with: 1)
       |> Yog.add_edge_ensure(from: 4, to: 2, with: 1)
 
+    old_level = Logger.level()
+    Logger.configure(level: :error)
     scores = Yog.Centrality.eigenvector(graph)
+    Logger.configure(level: old_level)
 
     assert map_size(scores) == 4
 
@@ -408,7 +411,10 @@ defmodule Yog.CentralityTest do
       |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
       |> Yog.add_edge_ensure(from: 4, to: 5, with: 1)
 
+    old_level = Logger.level()
+    Logger.configure(level: :error)
     scores = Yog.Centrality.eigenvector(graph)
+    Logger.configure(level: old_level)
 
     assert map_size(scores) == 5
 
