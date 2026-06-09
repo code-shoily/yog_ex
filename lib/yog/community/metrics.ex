@@ -310,6 +310,76 @@ defmodule Yog.Community.Metrics do
     end)
   end
 
+  # ============= NMI =============
+
+  @doc """
+  Computes the Normalized Mutual Information (NMI) between two partitions.
+
+  NMI measures the agreement between two community assignments, normalized
+  by the arithmetic mean of their entropies.  Range: [0, 1], where 1 means
+  perfect agreement.
+
+  ## Examples
+
+      iex> truth = %{1 => 0, 2 => 0, 3 => 1, 4 => 1}
+      iex> detected = %{1 => 0, 2 => 0, 3 => 1, 4 => 1}
+      iex> Yog.Community.Metrics.nmi(detected, truth)
+      1.0
+  """
+  @spec nmi(%{Yog.node_id() => integer()}, %{Yog.node_id() => integer()}) :: float()
+  def nmi(detected, truth) do
+    nodes = Map.keys(truth)
+    n = length(nodes)
+
+    if n == 0 do
+      0.0
+    else
+      detected_communities = group_nodes_by_community(detected)
+      truth_communities = group_nodes_by_community(truth)
+
+      h_detected = entropy(detected_communities, n)
+      h_truth = entropy(truth_communities, n)
+
+      mi = mutual_information(detected_communities, truth_communities, n)
+
+      denominator = h_detected + h_truth
+
+      if denominator == 0.0 do
+        1.0
+      else
+        2.0 * mi / denominator
+      end
+    end
+  end
+
+  defp entropy(communities, n) do
+    communities
+    |> Map.values()
+    |> Enum.reduce(0.0, fn members, acc ->
+      p = length(members) / n
+      if p > 0, do: acc - p * :math.log2(p), else: acc
+    end)
+  end
+
+  defp mutual_information(detected, truth, n) do
+    for {_d_comm, d_members} <- detected,
+        {_t_comm, t_members} <- truth,
+        reduce: 0.0 do
+      acc ->
+        overlap =
+          MapSet.intersection(MapSet.new(d_members), MapSet.new(t_members)) |> MapSet.size()
+
+        if overlap > 0 do
+          p_dt = overlap / n
+          p_d = length(d_members) / n
+          p_t = length(t_members) / n
+          acc + p_dt * :math.log2(p_dt / (p_d * p_t))
+        else
+          acc
+        end
+    end
+  end
+
   # ============= Private Helpers =============
 
   defp get_neighbor_sets(%Yog.Graph{out_edges: out_edges, nodes: nodes}) do
