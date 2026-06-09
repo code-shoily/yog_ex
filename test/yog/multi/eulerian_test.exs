@@ -359,6 +359,124 @@ defmodule Yog.Multi.EulerianTest do
   end
 
   # ============================================================
+  # Isolated Node Tests
+  # ============================================================
+
+  describe "isolated nodes" do
+    test "undirected triangle + isolated node has eulerian circuit" do
+      graph =
+        Model.undirected()
+        |> Model.add_node(:a, "A")
+        |> Model.add_node(:b, "B")
+        |> Model.add_node(:c, "C")
+        |> Model.add_node(:z, "Z")
+        |> add_edge!(:a, :b, 1)
+        |> add_edge!(:b, :c, 2)
+        |> add_edge!(:c, :a, 3)
+
+      assert Eulerian.has_eulerian_circuit?(graph)
+
+      case Eulerian.find_eulerian_circuit(graph) do
+        {:ok, edge_ids} ->
+          assert length(edge_ids) == 3
+
+        :error ->
+          flunk("Expected to find an Eulerian circuit")
+      end
+    end
+
+    test "directed cycle + isolated node has eulerian circuit" do
+      graph =
+        Model.directed()
+        |> Model.add_node(:a, "A")
+        |> Model.add_node(:b, "B")
+        |> Model.add_node(:c, "C")
+        |> Model.add_node(:z, "Z")
+        |> add_edge!(:a, :b, 1)
+        |> add_edge!(:b, :c, 2)
+        |> add_edge!(:c, :a, 3)
+
+      assert Eulerian.has_eulerian_circuit?(graph)
+    end
+
+    test "undirected path + isolated node has eulerian path" do
+      graph =
+        Model.undirected()
+        |> Model.add_node(:a, "A")
+        |> Model.add_node(:b, "B")
+        |> Model.add_node(:c, "C")
+        |> Model.add_node(:z, "Z")
+        |> add_edge!(:a, :b, 1)
+        |> add_edge!(:b, :c, 2)
+
+      assert Eulerian.has_eulerian_path?(graph)
+
+      case Eulerian.find_eulerian_path(graph) do
+        {:ok, edge_ids} ->
+          assert length(edge_ids) == 2
+
+        :error ->
+          flunk("Expected to find an Eulerian path")
+      end
+    end
+
+    test "all-isolated graph has no eulerian circuit or path" do
+      graph =
+        Model.undirected()
+        |> Model.add_node(:a, "A")
+        |> Model.add_node(:b, "B")
+        |> Model.add_node(:c, "C")
+
+      refute Eulerian.has_eulerian_circuit?(graph)
+      refute Eulerian.has_eulerian_path?(graph)
+      assert Eulerian.find_eulerian_circuit(graph) == :error
+      assert Eulerian.find_eulerian_path(graph) == :error
+    end
+
+    test "two disconnected eulerian components still rejected" do
+      graph =
+        Model.undirected()
+        |> Model.add_node(:a, "A")
+        |> Model.add_node(:b, "B")
+        |> Model.add_node(:c, "C")
+        |> Model.add_node(:d, "D")
+        |> Model.add_node(:e, "E")
+        |> Model.add_node(:f, "F")
+        |> add_edge!(:a, :b, 1)
+        |> add_edge!(:b, :c, 2)
+        |> add_edge!(:c, :a, 3)
+        |> add_edge!(:d, :e, 4)
+        |> add_edge!(:e, :f, 5)
+        |> add_edge!(:f, :d, 6)
+
+      refute Eulerian.has_eulerian_circuit?(graph)
+      refute Eulerian.has_eulerian_path?(graph)
+    end
+
+    test "first node in insertion order is isolated" do
+      graph =
+        Model.undirected()
+        |> Model.add_node(:z, "Z")
+        |> Model.add_node(:a, "A")
+        |> Model.add_node(:b, "B")
+        |> Model.add_node(:c, "C")
+        |> add_edge!(:a, :b, 1)
+        |> add_edge!(:b, :c, 2)
+        |> add_edge!(:c, :a, 3)
+
+      assert Eulerian.has_eulerian_circuit?(graph)
+
+      case Eulerian.find_eulerian_circuit(graph) do
+        {:ok, edge_ids} ->
+          assert length(edge_ids) == 3
+
+        :error ->
+          flunk("Expected to find an Eulerian circuit")
+      end
+    end
+  end
+
+  # ============================================================
   # Self-Loop Tests
   # ============================================================
 

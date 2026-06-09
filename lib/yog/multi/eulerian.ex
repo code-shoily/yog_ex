@@ -47,9 +47,13 @@ defmodule Yog.Multi.Eulerian do
 
   ## Conditions
 
-  - **Undirected:** all nodes have even degree and the graph is connected
-  - **Directed:** every node has equal in-degree and out-degree and the
-    graph is (weakly) connected
+  - **Undirected:** all nodes with non-zero degree have even degree, and the
+    non-isolated portion of the graph is connected
+  - **Directed:** every node with non-zero degree has equal in-degree and
+    out-degree, and the non-isolated portion is (weakly) connected
+
+  Isolated nodes (nodes with degree 0) are ignored — they do not affect the
+  existence of an Eulerian circuit.
 
   ## Time Complexity
 
@@ -82,7 +86,7 @@ defmodule Yog.Multi.Eulerian do
   """
   @spec has_eulerian_circuit?(Model.t()) :: boolean()
   def has_eulerian_circuit?(graph) do
-    if map_size(graph.nodes) == 0 do
+    if map_size(graph.nodes) == 0 or Model.size(graph) == 0 do
       false
     else
       check_eulerian_circuit(graph)
@@ -105,9 +109,13 @@ defmodule Yog.Multi.Eulerian do
 
   ## Conditions
 
-  - **Undirected:** exactly 0 or 2 nodes have odd degree and the graph is connected
-  - **Directed:** at most one node with (out − in = 1), at most one with
-    (in − out = 1), all others balanced; graph must be connected
+  - **Undirected:** exactly 0 or 2 nodes with non-zero degree have odd degree,
+    and the non-isolated portion of the graph is connected
+  - **Directed:** at most one non-isolated node with (out − in = 1), at most
+    one with (in − out = 1), all others balanced; the non-isolated portion
+    must be connected
+
+  Isolated nodes (nodes with degree 0) are ignored.
 
   ## Time Complexity
 
@@ -140,7 +148,7 @@ defmodule Yog.Multi.Eulerian do
   """
   @spec has_eulerian_path?(Model.t()) :: boolean()
   def has_eulerian_path?(graph) do
-    if map_size(graph.nodes) == 0 do
+    if map_size(graph.nodes) == 0 or Model.size(graph) == 0 do
       false
     else
       check_eulerian_path(graph)
@@ -221,7 +229,7 @@ defmodule Yog.Multi.Eulerian do
   @spec find_eulerian_circuit(Model.t()) :: {:ok, [Model.edge_id()]} | :error
   def find_eulerian_circuit(graph) do
     if has_eulerian_circuit?(graph) do
-      case Model.all_nodes(graph) |> List.first() do
+      case first_non_isolated(graph) do
         nil -> :error
         start -> run_hierholzer(graph, start)
       end
@@ -314,16 +322,18 @@ defmodule Yog.Multi.Eulerian do
   end
 
   defp connected?(graph) do
-    nodes = Map.keys(graph.nodes)
+    non_isolated =
+      graph.nodes
+      |> Map.keys()
+      |> Enum.filter(fn n -> Model.degree(graph, n) > 0 end)
 
-    if nodes == [] do
-      true
-    else
-      source = hd(nodes)
-      visited = bfs_visited(graph, source)
+    case non_isolated do
+      [] ->
+        true
 
-      # All nodes should be reachable
-      Enum.all?(nodes, fn n -> n in visited end)
+      [source | _] ->
+        visited = bfs_visited(graph, source)
+        Enum.all?(non_isolated, fn n -> n in visited end)
     end
   end
 
@@ -367,7 +377,7 @@ defmodule Yog.Multi.Eulerian do
     case Enum.find(nodes, fn n ->
            rem(Model.out_degree(graph, n), 2) == 1
          end) do
-      nil -> List.first(nodes)
+      nil -> first_non_isolated(graph)
       node -> node
     end
   end
@@ -378,9 +388,15 @@ defmodule Yog.Multi.Eulerian do
     case Enum.find(nodes, fn n ->
            Model.out_degree(graph, n) == Model.in_degree(graph, n) + 1
          end) do
-      nil -> List.first(nodes)
+      nil -> first_non_isolated(graph)
       node -> node
     end
+  end
+
+  defp first_non_isolated(graph) do
+    graph.nodes
+    |> Map.keys()
+    |> Enum.find(fn n -> Model.degree(graph, n) > 0 end)
   end
 
   defp run_hierholzer(graph, start) do

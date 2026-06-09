@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`Yog.Community.Walktrap.detect/1`** — Now selects the modularity-maximizing level from the dendrogram instead of the trivial all-merged level. The default partition is meaningful for typical graphs.
 - **`Yog.Multi.Model.degree/2`, `out_degree/2`, `in_degree/2`** — Now correctly count undirected self-loops as contributing 2 to a node's degree (matching standard graph theory). This also fixes false-negative Eulerian path/circuit detection on undirected multigraphs containing self-loops.
+- **`Yog.Multi.Eulerian.has_eulerian_circuit?/1`, `has_eulerian_path?/1`, `find_eulerian_circuit/1`, `find_eulerian_path/1`** — Now correctly tolerate isolated nodes (nodes with zero degree). Connectivity is checked over non-isolated nodes only, and start-node selection skips isolated nodes, matching standard Eulerian theory and NetworkX's behavior.
 
 ## [0.98.2] - 2026-06-06
 
