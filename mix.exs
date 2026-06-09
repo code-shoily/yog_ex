@@ -24,7 +24,7 @@ defmodule YogEx.MixProject do
       docs: docs(),
 
       # Test Coverage
-      test_coverage: [tool: ExCoveralls],
+      test_coverage: [tool: ExCoveralls, summary: [threshold: 85]],
       # Suppress warnings for Erlang modules
       elixirc_options: [
         no_warn_undefined: [
