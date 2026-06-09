@@ -9,6 +9,7 @@ from . import connectivity
 from . import flow
 from . import mst
 from . import pathfinding
+from . import properties
 
 DISPATCH = {
     **pathfinding.DISPATCH,
@@ -16,4 +17,5 @@ DISPATCH = {
     **mst.DISPATCH,
     **centrality.DISPATCH,
     **connectivity.DISPATCH,
+    **properties.DISPATCH,
 }

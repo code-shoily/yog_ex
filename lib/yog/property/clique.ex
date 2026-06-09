@@ -225,7 +225,11 @@ defmodule Yog.Property.Clique do
       else
         adj =
           Map.new(nodes, fn u ->
-            neighbors = Model.neighbor_ids(graph, u) |> MapSet.new()
+            neighbors =
+              Model.neighbor_ids(graph, u)
+              |> MapSet.new()
+              |> MapSet.delete(u)
+
             {u, neighbors}
           end)
 
