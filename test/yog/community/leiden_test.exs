@@ -241,4 +241,71 @@ defmodule Yog.Community.LeidenTest do
     assert comms.num_communities == 1
     assert comms.assignments[0] == 0
   end
+
+  # ============================================================
+  # Hierarchical Flatten Tests
+  # ============================================================
+
+  test "detect_hierarchical flattens to original nodes" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(0, nil)
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_node(3, nil)
+      |> Yog.add_node(4, nil)
+      |> Yog.add_node(5, nil)
+      |> Yog.add_edges!([
+        {0, 1, 1},
+        {1, 2, 1},
+        {2, 0, 1},
+        {3, 4, 1},
+        {4, 5, 1},
+        {5, 3, 1},
+        {2, 3, 1}
+      ])
+
+    dendrogram = Leiden.detect_hierarchical(graph)
+
+    flat = Yog.Community.Dendrogram.flatten_to_original(dendrogram)
+
+    assert map_size(flat.assignments) == 6
+    assert flat.num_communities >= 1
+  end
+
+  test "detect and detect_hierarchical flatten are consistent" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(0, nil)
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_node(3, nil)
+      |> Yog.add_node(4, nil)
+      |> Yog.add_node(5, nil)
+      |> Yog.add_edges!([
+        {0, 1, 1},
+        {1, 2, 1},
+        {2, 0, 1},
+        {3, 4, 1},
+        {4, 5, 1},
+        {5, 3, 1},
+        {2, 3, 1}
+      ])
+
+    flat = Leiden.detect(graph)
+    dendrogram = Leiden.detect_hierarchical(graph)
+    hierarchical_flat = Yog.Community.Dendrogram.flatten_to_original(dendrogram)
+
+    # Both should assign all nodes
+    assert map_size(flat.assignments) == 6
+    assert map_size(hierarchical_flat.assignments) == 6
+
+    # Both should have the same number of communities
+    assert flat.num_communities == hierarchical_flat.num_communities
+
+    # Both should have the same modularity (same partition structure, possibly relabeled)
+    q_flat = Metrics.modularity(graph, flat)
+    q_hier = Metrics.modularity(graph, hierarchical_flat)
+    assert_in_delta q_flat, q_hier, 1.0e-6
+  end
 end

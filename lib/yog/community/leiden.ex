@@ -164,7 +164,16 @@ defmodule Yog.Community.Leiden do
   @doc """
   Full hierarchical Leiden detection.
 
-  Returns a dendrogram with all hierarchical levels.
+  Returns a dendrogram with all hierarchical levels. Each level stores
+  assignments over the contracted graph at that aggregation depth — see
+  `Yog.Community.Dendrogram` for the per-level semantics.
+
+  To obtain the final partition over original-graph nodes, use
+  `Yog.Community.Dendrogram.flatten_to_original/1`:
+
+      dend = Yog.Community.Leiden.detect_hierarchical(graph)
+      final = Yog.Community.Dendrogram.flatten_to_original(dend)
+      # final.assignments is now keyed by original node ids
 
   ## Example
 
@@ -178,6 +187,17 @@ defmodule Yog.Community.Leiden do
 
   @doc """
   Full hierarchical Leiden detection with custom options.
+
+  Returns a dendrogram with all hierarchical levels. Each level stores
+  assignments over the contracted graph at that aggregation depth — see
+  `Yog.Community.Dendrogram` for the per-level semantics.
+
+  To obtain the final partition over original-graph nodes, use
+  `Yog.Community.Dendrogram.flatten_to_original/1`:
+
+      dend = Yog.Community.Leiden.detect_hierarchical_with_options(graph, options)
+      final = Yog.Community.Dendrogram.flatten_to_original(dend)
+      # final.assignments is now keyed by original node ids
 
   ## Example
 

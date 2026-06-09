@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`Yog.Multi.Eulerian.has_eulerian_circuit?/1`, `has_eulerian_path?/1`, `find_eulerian_circuit/1`, `find_eulerian_path/1`** — Now correctly tolerate isolated nodes (nodes with zero degree). Connectivity is checked over non-isolated nodes only, and start-node selection skips isolated nodes, matching standard Eulerian theory and NetworkX's behavior.
 - **`Yog.Community.Louvain.detect/1`** — Now runs full hierarchical Louvain (phase 1 + aggregation + recursion) instead of phase 1 only. The returned partition may differ from previous versions on graphs without strong community structure (e.g., scale-free networks) — both partitions are valid modularity local optima but the new one is the standard Louvain output.
 - **`Yog.Community.Louvain.detect_hierarchical/1`** — Now stores raw community IDs at each level so that the dendrogram can be correctly flattened back to original node IDs. See `Yog.Community.Dendrogram.flatten_to_original/1`.
+- **`Yog.Community.Leiden.detect_hierarchical/1`** — Updated docstrings to point at `Yog.Community.Dendrogram.flatten_to_original/1` for obtaining final partitions over original node IDs. The dendrogram structure was already compatible after the Louvain fix.
 
 ### Added
 
