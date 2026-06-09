@@ -8,7 +8,7 @@ defmodule Yog.Community.GirvanNewmanTest do
 
   use ExUnit.Case
 
-  alias Yog.Community.GirvanNewman
+  alias Yog.Community.{GirvanNewman, Metrics}
 
   doctest GirvanNewman
 
@@ -38,8 +38,8 @@ defmodule Yog.Community.GirvanNewmanTest do
 
     comms = GirvanNewman.detect(graph)
 
-    # Should find communities
-    assert comms.num_communities >= 1
+    # Should find meaningful communities, not all singletons
+    assert comms.num_communities == 2
     assert map_size(comms.assignments) == 6
   end
 
@@ -110,5 +110,30 @@ defmodule Yog.Community.GirvanNewmanTest do
 
     assert result.num_communities == 2
     assert map_size(result.assignments) == 34
+  end
+
+  test "detect default returns meaningful communities on two K5 cliques + bridge" do
+    graph =
+      Yog.undirected()
+      |> then(fn g -> Enum.reduce(0..9, g, &Yog.add_node(&2, &1, nil)) end)
+      |> then(fn g ->
+        edges =
+          for(i <- 0..4, j <- (i + 1)..4//1, do: {i, j, 1.0}) ++
+            for(i <- 5..9, j <- (i + 1)..9//1, do: {i, j, 1.0}) ++
+            [{4, 5, 1.0}]
+
+        Enum.reduce(edges, g, fn {u, v, w}, acc ->
+          {:ok, ng} = Yog.add_edge(acc, u, v, w)
+          ng
+        end)
+      end)
+
+    result = GirvanNewman.detect(graph)
+
+    assert result.num_communities == 2
+    assert map_size(result.assignments) == 10
+
+    mod = Metrics.modularity(graph, %{assignments: result.assignments})
+    assert mod >= 0.4
   end
 end

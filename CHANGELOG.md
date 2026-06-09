@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`Yog.Community.Louvain.detect_hierarchical/1`** — Now stores raw community IDs at each level so that the dendrogram can be correctly flattened back to original node IDs. See `Yog.Community.Dendrogram.flatten_to_original/1`.
 - **`Yog.Community.Leiden.detect_hierarchical/1`** — Updated docstrings to point at `Yog.Community.Dendrogram.flatten_to_original/1` for obtaining final partitions over original node IDs. The dendrogram structure was already compatible after the Louvain fix.
 - **`Yog.Community.Infomap.detect/1`** — Rewrote to implement the actual Map Equation optimization (Rosvall & Bergstrom 2008). Previously ran a single greedy pass with a flow heuristic that did not compute description length. Now computes L(M) = q_↷ H(Q) + Σ p_↻^i H(P^i), iterates to convergence, and minimizes description length as documented.
+- **`Yog.Community.GirvanNewman.detect/1`** — Now defaults to the modularity-maximizing partition across the dendrogram instead of the trivial all-singletons partition. For users who specifically want the all-singletons partition, pass `target_communities: Yog.node_count(graph)` explicitly.
 
 ### Added
 

@@ -32,7 +32,7 @@ defmodule Yog.Community.GirvanNewman do
 
   ## Example
 
-      # Basic usage - returns finest partition
+      # Basic usage - returns modularity-maximizing partition
       communities = Yog.Community.GirvanNewman.detect(graph)
 
       # With options - target specific number of communities
@@ -50,7 +50,7 @@ defmodule Yog.Community.GirvanNewman do
 
   """
 
-  alias Yog.Community.{Dendrogram, Result}
+  alias Yog.Community.{Dendrogram, Metrics, Result}
   alias Yog.Pathfinding.Brandes
 
   @typedoc "Options for Girvan-Newman algorithm"
@@ -106,7 +106,7 @@ defmodule Yog.Community.GirvanNewman do
   @doc """
   Detects communities using Girvan-Newman with default options.
 
-  Returns the finest partition (most communities).
+  Returns the modularity-maximizing partition across the dendrogram.
   """
   @spec detect(Yog.graph()) :: Result.t()
   def detect(graph) do
@@ -121,7 +121,7 @@ defmodule Yog.Community.GirvanNewman do
 
   ## Options
 
-  - `:target_communities` - Stop when this many communities reached (default: nil = full)
+  - `:target_communities` - Stop when this many communities reached (default: nil = modularity-max)
 
   ## Example
 
@@ -141,10 +141,7 @@ defmodule Yog.Community.GirvanNewman do
 
     case options.target_communities do
       nil ->
-        case List.last(dendrogram.levels) do
-          nil -> {:error, "Empty dendrogram"}
-          communities -> {:ok, communities}
-        end
+        pick_best_level_by_modularity(dendrogram.levels, graph)
 
       num_communities ->
         case Enum.find(dendrogram.levels, fn c -> c.num_communities >= num_communities end) do
@@ -257,5 +254,20 @@ defmodule Yog.Community.GirvanNewman do
       end)
 
     Result.new(assignments)
+  end
+
+  # =============================================================================
+  # LEVEL SELECTION
+  # =============================================================================
+
+  defp pick_best_level_by_modularity([], _graph), do: {:error, "Empty dendrogram"}
+
+  defp pick_best_level_by_modularity(levels, graph) do
+    best =
+      Enum.max_by(levels, fn level ->
+        Metrics.modularity(graph, %{assignments: level.assignments})
+      end)
+
+    {:ok, best}
   end
 end
