@@ -143,4 +143,31 @@ defmodule Yog.Oracle.PropertiesTest do
       assert hash1 == hash2
     end
   end
+
+  @tag :oracle
+  property "P-ORAC-PROP-008 Weisfeiler-Lehman Graph Hash equivalence matches NetworkX" do
+    check all(
+            g1 <- Yog.Generators.graph_gen(),
+            g2 <- Yog.Generators.graph_of_kind_gen(g1.kind),
+            max_runs: 50
+          ) do
+      nodes = Map.keys(g1.nodes)
+      shuffled = Enum.shuffle(nodes)
+      mapping = Enum.zip(nodes, shuffled) |> Map.new()
+      g1_relabeled = Yog.Transform.relabel_nodes(g1, fn id -> Map.fetch!(mapping, id) end)
+
+      yog_hash1 = Yog.Property.WeisfeilerLehman.graph_hash(g1)
+      yog_hash_relabeled = Yog.Property.WeisfeilerLehman.graph_hash(g1_relabeled)
+      assert yog_hash1 == yog_hash_relabeled
+
+      nx_hash1 = NetworkX.run("weisfeiler_lehman_graph_hash", g1)
+      nx_hash_relabeled = NetworkX.run("weisfeiler_lehman_graph_hash", g1_relabeled)
+      assert nx_hash1 == nx_hash_relabeled
+
+      yog_hash2 = Yog.Property.WeisfeilerLehman.graph_hash(g2)
+      nx_hash2 = NetworkX.run("weisfeiler_lehman_graph_hash", g2)
+
+      assert yog_hash1 == yog_hash2 == (nx_hash1 == nx_hash2)
+    end
+  end
 end

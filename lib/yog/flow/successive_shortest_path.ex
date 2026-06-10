@@ -206,26 +206,71 @@ defmodule Yog.Flow.SuccessiveShortestPath do
 
   # Successive Shortest Path algorithm with proper residual graph and node potentials
   defp solve_min_cost_flow(nodes, edges, demands) do
+    total_supply =
+      demands
+      |> Map.values()
+      |> Enum.filter(&(&1 < 0))
+      |> Enum.sum()
+      |> Kernel.abs()
+
+    s = :super_source
+    t = :super_sink
+
+    extended_nodes = [s, t | nodes]
+
+    virtual_edges =
+      Enum.flat_map(nodes, fn node ->
+        d = demands[node]
+
+        cond do
+          d < 0 -> [{s, node, -d, 0}]
+          d > 0 -> [{node, t, d, 0}]
+          true -> []
+        end
+      end)
+
+    extended_edges = edges ++ virtual_edges
+
+    extended_demands =
+      Map.new(extended_nodes, fn node ->
+        cond do
+          node == s -> {node, -total_supply}
+          node == t -> {node, total_supply}
+          true -> {node, 0}
+        end
+      end)
+
     original_edges = MapSet.new(edges, fn {u, v, _, _} -> {u, v} end)
-    {capacities, costs, adj} = build_residual_graph(nodes, edges)
+    {capacities, costs, adj} = build_residual_graph(extended_nodes, extended_edges)
 
-    supply_nodes = Enum.filter(nodes, fn n -> demands[n] < 0 end)
-    demand_nodes = Enum.filter(nodes, fn n -> demands[n] > 0 end)
+    supply_nodes = [s]
+    demand_nodes = [t]
 
-    case initialize_potentials(adj, capacities, costs, nodes) do
+    case initialize_potentials(adj, capacities, costs, extended_nodes) do
       {:ok, potentials} ->
-        do_ssp(
-          supply_nodes,
-          demand_nodes,
-          demands,
-          adj,
-          capacities,
-          costs,
-          original_edges,
-          %{},
-          0,
-          potentials
-        )
+        case do_ssp(
+               supply_nodes,
+               demand_nodes,
+               extended_demands,
+               adj,
+               capacities,
+               costs,
+               original_edges,
+               %{},
+               0,
+               potentials
+             ) do
+          {:ok, flow, total_cost} ->
+            filtered_flow =
+              Enum.filter(flow, fn {u, v, _} ->
+                u != s and u != t and v != s and v != t
+              end)
+
+            {:ok, filtered_flow, total_cost}
+
+          :infeasible ->
+            :infeasible
+        end
 
       :negative_cycle ->
         :infeasible
@@ -478,12 +523,17 @@ defmodule Yog.Flow.SuccessiveShortestPath do
       c = Map.update!(c, {v, u}, &(&1 + amount))
 
       f =
-        if MapSet.member?(original_edges, {u, v}) do
-          # Augmenting along original forward edge
-          Map.update(f, {u, v}, amount, &(&1 + amount))
-        else
-          # Augmenting along backward edge -> reduce flow on original edge {v, u}
-          Map.update!(f, {v, u}, &(&1 - amount))
+        cond do
+          u == :super_source or v == :super_source or u == :super_sink or v == :super_sink ->
+            f
+
+          MapSet.member?(original_edges, {u, v}) ->
+            # Augmenting along original forward edge
+            Map.update(f, {u, v}, amount, &(&1 + amount))
+
+          true ->
+            # Augmenting along backward edge -> reduce flow on original edge {v, u}
+            Map.update(f, {v, u}, 0, &(&1 - amount))
         end
 
       {f, c}

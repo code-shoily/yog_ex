@@ -183,6 +183,62 @@ defmodule Yog.Generators do
     end
   end
 
+  def min_cost_flow_problem_gen do
+    gen all(
+          nodes <- node_list_gen(3, 15, 1000),
+          raw_demands <- StreamData.list_of(StreamData.integer(-30..30), length: length(nodes)),
+          edges_spec <-
+            StreamData.list_of(
+              gen all(
+                    from_idx <- StreamData.integer(0..(length(nodes) - 1)),
+                    to_idx <- StreamData.integer(0..(length(nodes) - 1)),
+                    capacity <- StreamData.integer(1..50),
+                    cost <- StreamData.integer(0..30)
+                  ) do
+                {from_idx, to_idx, capacity, cost}
+              end,
+              max_length: length(nodes) * 3
+            )
+        ) do
+      # Adjust demands to sum to 0
+      sum = Enum.sum(raw_demands)
+
+      demands =
+        case raw_demands do
+          [] -> []
+          [first | rest] -> [first - sum | rest]
+        end
+
+      # Map nodes to demands
+      node_demands = Enum.zip(nodes, demands) |> Map.new()
+
+      # Build graph
+      graph =
+        Enum.reduce(nodes, Yog.directed(), fn node, g ->
+          demand = Map.fetch!(node_demands, node)
+          Yog.add_node(g, node, {demand, nil})
+        end)
+
+      # Add edges, excluding self loops
+      graph =
+        Enum.reduce(edges_spec, graph, fn {from_idx, to_idx, capacity, cost}, g ->
+          if from_idx == to_idx do
+            g
+          else
+            from_node = Enum.at(nodes, from_idx)
+            to_node = Enum.at(nodes, to_idx)
+
+            case Yog.add_edge(g, from_node, to_node, {capacity, cost}) do
+              {:ok, new_g} -> new_g
+              _ -> g
+            end
+          end
+        end)
+
+      graph
+    end
+  end
+
   def build_graph(kind, nodes, edges) do
     # Map raw indices to actual node IDs
     node_map = Enum.with_index(nodes) |> Enum.into(%{}, fn {id, idx} -> {idx, id} end)

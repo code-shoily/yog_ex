@@ -22,7 +22,41 @@ def stoer_wagner(graph, options):
     return cut_value
 
 
+def min_cost_flow(graph, options):
+    demands = options.get("demands", {})
+    edge_attrs = options.get("edge_attrs", [])
+
+    for node in graph.nodes:
+        demand_val = demands.get(str(node))
+        if demand_val is None:
+            demand_val = demands.get(node, 0)
+        graph.nodes[node]['demand'] = demand_val
+
+    for attr in edge_attrs:
+        u = attr["from"]
+        v = attr["to"]
+        u_typed = int(u) if (isinstance(u, str) and u.isdigit()) else u
+        v_typed = int(v) if (isinstance(v, str) and v.isdigit()) else v
+        if graph.has_edge(u_typed, v_typed):
+            graph[u_typed][v_typed]['capacity'] = attr["capacity"]
+            graph[u_typed][v_typed]['weight'] = attr["cost"]
+
+    try:
+        flow_cost, flow_dict = nx.network_simplex(graph)
+        flow_list = []
+        for u, neighbors in flow_dict.items():
+            for v, val in neighbors.items():
+                if val > 0:
+                    flow_list.append([u, v, val])
+        return {"status": "ok", "cost": flow_cost, "flow": flow_list}
+    except nx.NetworkXUnfeasible:
+        return {"status": "error", "reason": "infeasible"}
+    except nx.NetworkXUnbalanced:
+        return {"status": "error", "reason": "unbalanced"}
+
+
 DISPATCH = {
     "maximum_flow": maximum_flow,
     "stoer_wagner": stoer_wagner,
+    "min_cost_flow": min_cost_flow,
 }

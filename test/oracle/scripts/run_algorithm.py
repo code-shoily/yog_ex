@@ -26,6 +26,9 @@ Payload shape:
 
 import json
 import sys
+import warnings
+
+warnings.filterwarnings("ignore")
 
 import networkx as nx
 

@@ -53,6 +53,10 @@ def is_isomorphic(graph, options):
     return nx.is_isomorphic(graph, other_graph)
 
 
+def weisfeiler_lehman_graph_hash(graph, options):
+    return nx.weisfeiler_lehman_graph_hash(graph, iterations=options.get("iterations", 3))
+
+
 DISPATCH = {
     "is_bipartite": is_bipartite,
     "is_tree": is_tree,
@@ -62,4 +66,5 @@ DISPATCH = {
     "is_complete_graph": is_complete_graph,
     "graph_clique_number": graph_clique_number,
     "is_isomorphic": is_isomorphic,
+    "weisfeiler_lehman_graph_hash": weisfeiler_lehman_graph_hash,
 }

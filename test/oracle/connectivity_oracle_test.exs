@@ -83,4 +83,46 @@ defmodule Yog.Oracle.ConnectivityTest do
       assert_sets_equal(yog_result, nx_result)
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # Tarjan's Bridges & Articulation Points (undirected)
+  # ---------------------------------------------------------------------------
+
+  @tag :oracle
+  property "P-ORAC-CONN-004 Bridges agree with NetworkX" do
+    check all(
+            nodes <- Yog.Generators.node_list_gen(3, 25),
+            edges <- Yog.Generators.weight_list_gen(length(nodes)),
+            graph = Yog.Generators.build_graph(:undirected, nodes, edges),
+            max_runs: 50
+          ) do
+      yog_result = Yog.Connectivity.analyze(graph)
+
+      yog_bridges =
+        Enum.map(yog_result.bridges, fn {u, v} -> Enum.sort([u, v]) end) |> Enum.sort()
+
+      nx_result = NetworkX.run("bridges", graph, [])
+      nx_bridges = Enum.map(nx_result, &Enum.sort/1) |> Enum.sort()
+
+      assert yog_bridges == nx_bridges
+    end
+  end
+
+  @tag :oracle
+  property "P-ORAC-CONN-005 Articulation points agree with NetworkX" do
+    check all(
+            nodes <- Yog.Generators.node_list_gen(3, 25),
+            edges <- Yog.Generators.weight_list_gen(length(nodes)),
+            graph = Yog.Generators.build_graph(:undirected, nodes, edges),
+            max_runs: 50
+          ) do
+      yog_result = Yog.Connectivity.analyze(graph)
+      yog_points = Enum.sort(yog_result.articulation_points)
+
+      nx_result = NetworkX.run("articulation_points", graph, [])
+      nx_points = Enum.sort(nx_result)
+
+      assert yog_points == nx_points
+    end
+  end
 end

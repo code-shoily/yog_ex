@@ -132,6 +132,7 @@ defmodule Yog.Oracle.NetworkX do
   defp encode_weight(:infinity), do: "__Inf__"
   defp encode_weight(:neg_infinity), do: "__NegInf__"
   defp encode_weight(:nan), do: "__NaN__"
+  defp encode_weight(w) when is_tuple(w), do: Tuple.to_list(w)
   defp encode_weight(w), do: w
 
   # ---------------------------------------------------------------------------
