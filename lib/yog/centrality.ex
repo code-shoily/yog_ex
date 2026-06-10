@@ -163,7 +163,10 @@ defmodule Yog.Centrality do
   Formula: C(v) = (n - 1) / Σ d(v, u) for all u ≠ v
 
   Note: In disconnected graphs, nodes that cannot reach all other nodes
-  will have a centrality of 0.0. Consider `harmonic/2` for disconnected graphs.
+  will have a centrality of 0.0 by default. Pass `wf_improved: true` for
+  the Wasserman-Faust correction (the NetworkX default convention), which
+  scales the score by the fraction of reachable nodes. Consider
+  `harmonic/2` for disconnected graphs as an alternative.
 
   **Time Complexity:** O(V * (V + E) log V) using Dijkstra from each node
 
@@ -181,6 +184,13 @@ defmodule Yog.Centrality do
   - `:add` - Function to add two distances
   - `:compare` - Function to compare two distances (returns `:lt`, `:eq`, or `:gt`)
   - `:to_float` - Function to convert distance type to Float for final score
+  - `:wf_improved` - When `true`, apply the Wasserman-Faust correction on
+    disconnected graphs: `C_wf(v) = ((|R(v)| - 1) / (n - 1)) * ((|R(v)| - 1) / Σ d(v, u))`,
+    where `R(v)` is the set of nodes reachable from `v`. When `false`
+    (default), nodes that cannot reach every other node receive `0.0`.
+    The NetworkX `closeness_centrality` default is `wf_improved=True`;
+    Yog defaults to `false` to preserve backwards compatibility. See
+    Wasserman & Faust, *Social Network Analysis* (1994), §5.
 
   ## Example
 
@@ -208,6 +218,7 @@ defmodule Yog.Centrality do
     add = opts[:add] || (&Kernel.+/2)
     compare = opts[:compare] || (&Yog.Utils.compare/2)
     to_float = opts[:to_float] || fn x -> x * 1.0 end
+    wf_improved = Keyword.get(opts, :wf_improved, false)
 
     nodes = Map.keys(graph.nodes)
     n = map_size(graph.nodes)
@@ -227,18 +238,36 @@ defmodule Yog.Centrality do
       |> Task.async_stream(
         fn source ->
           distances = dijkstra_single_source(graph, source, zero, add, compare)
+          reachable = map_size(distances)
 
-          if map_size(distances) < n do
-            {source, 0.0}
-          else
-            total_distance =
-              List.foldl(Map.to_list(distances), zero, fn {_node, dist}, sum ->
-                add.(sum, dist)
-              end)
+          total_distance =
+            List.foldl(Map.to_list(distances), zero, fn {_node, dist}, sum ->
+              add.(sum, dist)
+            end)
 
-            centrality_score = (n - 1) / to_float.(total_distance)
-            {source, centrality_score}
-          end
+          score =
+            cond do
+              # Source reaches only itself; closeness undefined.
+              reachable <= 1 ->
+                0.0
+
+              # Partial reachability without WF correction — Yog's
+              # strict convention.
+              reachable < n and not wf_improved ->
+                0.0
+
+              # Partial reachability with WF correction — scale by
+              # the fraction of reachable nodes.
+              reachable < n and wf_improved ->
+                base = (reachable - 1) / to_float.(total_distance)
+                base * ((reachable - 1) / (n - 1))
+
+              # Fully reachable — standard closeness.
+              true ->
+                (n - 1) / to_float.(total_distance)
+            end
+
+          {source, score}
         end,
         parallel_opts
       )
