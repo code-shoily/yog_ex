@@ -582,6 +582,47 @@ defmodule Yog.CentralityTest do
     assert scores == %{}
   end
 
+  test "pagerank_default_options_test" do
+    graph = triangle_graph()
+    scores_default = Yog.Centrality.pagerank(graph)
+
+    scores_explicit =
+      Yog.Centrality.pagerank(graph, damping: 0.85, max_iterations: 100, tolerance: 0.0001)
+
+    assert scores_default == scores_explicit
+  end
+
+  test "hits_default_options_test" do
+    graph = triangle_graph()
+    scores_default = Yog.Centrality.hits(graph)
+    scores_explicit = Yog.Centrality.hits(graph, max_iterations: 100, tolerance: 1.0e-6)
+
+    assert scores_default == scores_explicit
+  end
+
+  test "eigenvector_default_options_test" do
+    graph = triangle_graph()
+    scores_default = Yog.Centrality.eigenvector(graph)
+    scores_explicit = Yog.Centrality.eigenvector(graph, max_iterations: 100, tolerance: 0.0001)
+
+    assert scores_default == scores_explicit
+  end
+
+  test "alpha_default_options_test" do
+    graph = triangle_graph()
+    scores_default = Yog.Centrality.alpha(graph)
+
+    scores_explicit =
+      Yog.Centrality.alpha(graph,
+        alpha: 0.1,
+        initial: 1.0,
+        max_iterations: 100,
+        tolerance: 1.0e-6
+      )
+
+    assert scores_default == scores_explicit
+  end
+
   # ============= Helper Functions =============
 
   defp compare_int(a, b) when a < b, do: :lt
