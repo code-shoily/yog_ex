@@ -51,21 +51,24 @@ def minimum_weight_full_matching(graph, options):
     top_nodes = {n for n, c in color.items() if c == 0}
     opt = options.get("optimization", "min")
 
-    if opt == "max":
-        # Negate weights to turn max into min
-        G = graph.copy()
-        for u, v, data in G.edges(data=True):
-            data["weight"] = -data.get("weight", 1)
-        result = nx.bipartite.minimum_weight_full_matching(
-            G, top_nodes=top_nodes, weight="weight"
-        )
-        # The negated total is the minimum; negate back for maximum
-        return -_matching_cost(G, result)
-    else:
-        result = nx.bipartite.minimum_weight_full_matching(
-            graph, top_nodes=top_nodes, weight="weight"
-        )
-        return _matching_cost(graph, result)
+    try:
+        if opt == "max":
+            # Negate weights to turn max into min
+            G = graph.copy()
+            for u, v, data in G.edges(data=True):
+                data["weight"] = -data.get("weight", 1)
+            result = nx.bipartite.minimum_weight_full_matching(
+                G, top_nodes=top_nodes, weight="weight"
+            )
+            # The negated total is the minimum; negate back for maximum
+            return -_matching_cost(G, result)
+        else:
+            result = nx.bipartite.minimum_weight_full_matching(
+                graph, top_nodes=top_nodes, weight="weight"
+            )
+            return _matching_cost(graph, result)
+    except (ValueError, nx.NetworkXError):
+        return {"error": "not_bipartite_or_disconnected"}
 
 
 DISPATCH = {

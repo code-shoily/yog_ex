@@ -73,7 +73,7 @@ def eigenvector_centrality(graph, options):
     tol = options.get("tol", 1.0e-10)
     max_iter = options.get("max_iter", 1000)
     try:
-        result = nx.eigenvector_centrality(graph, tol=tol, max_iter=max_iter, weight="weight")
+        result = nx.eigenvector_centrality(graph, tol=tol, max_iter=max_iter, weight=None)
     except nx.PowerIterationFailedConvergence:
         return {"error": "power_iteration_failed"}
     return {str(k): v for k, v in result.items()}
@@ -84,7 +84,16 @@ def katz_centrality(graph, options):
     beta = options.get("beta", 1.0)
     tol = options.get("tol", 1.0e-10)
     max_iter = options.get("max_iter", 1000)
-    result = nx.katz_centrality(graph, alpha=alpha, beta=beta, tol=tol, max_iter=max_iter, weight="weight")
+    normalized = options.get("normalized", False)
+    result = nx.katz_centrality(
+        graph,
+        alpha=alpha,
+        beta=beta,
+        tol=tol,
+        max_iter=max_iter,
+        weight=None,
+        normalized=normalized
+    )
     return {str(k): v for k, v in result.items()}
 
 

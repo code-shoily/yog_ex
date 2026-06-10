@@ -232,10 +232,110 @@ defmodule Yog.Oracle.CentralityTest do
   end
 
   # ---------------------------------------------------------------------------
+  # Eigenvector centrality
+  # ---------------------------------------------------------------------------
+
+  @tag :oracle
+  property "P-ORAC-CENT-009 Eigenvector centrality agrees with NetworkX" do
+    check all(
+            graph <- connected_non_bipartite_graph_gen({3, 15}),
+            max_runs: 50
+          ) do
+      # Set tight tolerances so both converge to the exact same vector
+      yog_result = Yog.Centrality.eigenvector(graph, tolerance: 1.0e-9, max_iterations: 1000)
+
+      nx_result =
+        NetworkX.run("eigenvector_centrality", graph, %{
+          "tol" => 1.0e-9,
+          "max_iter" => 1000
+        })
+
+      assert_maps_close(yog_result, nx_result, delta: 1.0e-6)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Katz centrality
+  # ---------------------------------------------------------------------------
+
+  @tag :oracle
+  property "P-ORAC-CENT-010 Katz centrality agrees with NetworkX" do
+    check all(
+            nodes <- Yog.Generators.node_list_gen(3, 15),
+            edges <- simple_edges_gen(length(nodes)),
+            graph = Yog.Generators.build_graph(:directed, nodes, edges),
+            max_runs: 50
+          ) do
+      # Use a safe alpha (0.01) to guarantee convergence (alpha < 1/max_degree)
+      alpha = 0.01
+      beta = 1.0
+
+      yog_result =
+        Yog.Centrality.katz(graph,
+          alpha: alpha,
+          beta: beta,
+          tolerance: 1.0e-9,
+          max_iterations: 1000
+        )
+
+      nx_result =
+        NetworkX.run("katz_centrality", graph, %{
+          "alpha" => alpha,
+          "beta" => beta,
+          "tol" => 1.0e-9,
+          "max_iter" => 1000,
+          "normalized" => false
+        })
+
+      assert_maps_close(yog_result, nx_result, delta: 1.0e-6)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Helper Generators
+  # ---------------------------------------------------------------------------
+
+  # Generates connected, non-bipartite undirected graphs to guarantee convergence for Eigenvector centrality.
+  # Starts with a triangle (nodes 0, 1, 2) to ensure aperiodicity, then attaches remaining nodes sequentially to ensure connectivity.
+  defp connected_non_bipartite_graph_gen(node_range) do
+    gen all(
+          nodes <- Yog.Generators.node_list_gen(elem(node_range, 0), elem(node_range, 1)),
+          # Random extra edges
+          extra_edges <-
+            StreamData.list_of(
+              {StreamData.integer(0..(length(nodes) - 1)),
+               StreamData.integer(0..(length(nodes) - 1)), StreamData.constant(1)},
+              max_length: 20
+            )
+        ) do
+      n = length(nodes)
+
+      # Build the initial triangle backbone
+      backbone_edges =
+        cond do
+          n > 3 ->
+            [{0, 1, 1}, {1, 2, 1}, {2, 0, 1}] ++
+              Enum.map(3..(n - 1), fn i -> {i, Enum.random(0..(i - 1)), 1} end)
+
+          n == 3 ->
+            [{0, 1, 1}, {1, 2, 1}, {2, 0, 1}]
+
+          true ->
+            # Fallback (though node_range should guarantee n >= 3)
+            Enum.chunk_every(Enum.to_list(0..(n - 1)), 2, 1, :discard)
+            |> Enum.map(fn [u, v] -> {u, v, 1} end)
+        end
+
+      all_edges = backbone_edges ++ extra_edges
+      # Reject self-loops for cleaner comparison
+      clean_edges = Enum.reject(all_edges, fn {u, v, _} -> u == v end)
+
+      Yog.Generators.build_graph(:undirected, nodes, clean_edges)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Remaining centrality measures
-  #
-  # Katz, Eigenvector — deferred pending precondition-guard work
-  # (α·ρ(A)<1 for Katz; dominant real eigenvalue for eigenvector).
   #
   # HITS — 🔴 documented algorithmic divergence (see above); not
   # oracle-tested. Yog uses iterative power method (L2-normalized),
