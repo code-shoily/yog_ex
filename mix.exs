@@ -119,6 +119,7 @@ defmodule YogEx.MixProject do
          [filename: "mermaid_complete_guide", title: "Mermaid Complete Guide"]},
         "ALGORITHMS.md",
         "PROPERTIES.md",
+        "test/oracle/README.md",
         "CHANGELOG.md"
       ],
       source_ref: "v#{@version}",
@@ -198,6 +199,9 @@ defmodule YogEx.MixProject do
         Reference: [
           "ALGORITHMS.md",
           "PROPERTIES.md"
+        ],
+        "Testing & Verification": [
+          "test/oracle/README.md"
         ],
         Resources: [
           "CHANGELOG.md"
