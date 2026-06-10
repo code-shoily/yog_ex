@@ -9,7 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`Yog.Property.Clique.all_maximal_cliques/1`** — Self-loop edges no longer cause the node to appear as its own neighbour in the Bron–Kerbosch adjacency map. Previously a single node with a self-loop was incorrectly counted as a 2-clique.
 - **`Yog.Connectivity.Reachability.counts_estimate/2`** now works for large graphs. `phash2` has explicity range passed.
+
+### Added
+
+- **NetworkX Oracle Test Suite** — Property-based cross-implementation parity tests that treat NetworkX as a ground-truth oracle. Every test generates a random graph, dispatches it to a Python subprocess running NetworkX, and compares the decoded result against YogEx. 37 properties covering:
+  - **Pathfinding** (8 properties): Dijkstra SSSP, A*, Bellman-Ford, Floyd-Warshall, Johnson, Bidirectional Dijkstra, Bidirectional BFS, Yen k-shortest.
+  - **Flow & Cuts** (3 properties): Edmonds-Karp, Dinic, Stoer-Wagner.
+  - **Spanning Tree** (5 properties): Kruskal, Prim, Borůvka, Maximum ST, Minimum Arborescence.
+  - **Matching** (4 properties): Hopcroft-Karp cardinality, Blossom maximum cardinality, Hungarian min/max weight.
+  - **Connectivity** (3 properties): SCC (Tarjan), Connected Components, Weakly Connected Components.
+  - **Graph Properties** (5 properties): Bipartite, Tree, Forest, DAG, Clique number.
+  - **Traversal** (3 properties): BFS layers, Lexicographical topological sort, Topological generations.
+  - **Centrality** (3 properties): Degree, In-degree, Out-degree (exact).
+  - **Community Quality** (3 properties): Louvain, Leiden, and Label Propagation NMI floors on well-separated SBM.
+- **`test/oracle/README.md`** — Full documentation of the oracle harness architecture, parity matrix, known semantic differences, running instructions, and guide for adding new oracle properties. Registered in `ex_doc` under *Testing & Verification*.
+- **`Yog.Community.Metrics.nmi/2`** and **`Yog.Community.Metrics.ari/2`** — Normalized Mutual Information and Adjusted Rand Index for comparing detected communities against ground truth.
+
+### Changed
+
+- **CI split** — Fast main CI (`mix test`) excludes `:oracle` tags and finishes in ~5 s. Oracle parity tests run nightly via a separate workflow.
+- **`test/oracle/scripts/requirements.txt`** — Now pins `scipy>=1.11` alongside `numpy>=1.24` and `networkx==3.6.1` (required for Hungarian and PageRank/HITS adapters).
+
+### Fixed (Test Hygiene)
+
+- **Community quality floors** — Louvain, Leiden, and Label Propagation are all sensitive to random node-visit ordering. A single bad seed can trap the algorithm in a poor local optimum. Quality-floor tests now run each algorithm with 5 different random seeds and take the best NMI, eliminating flakiness without weakening regression signal.
+- **Oracle test hygiene** (ORC-001–ORC-013 audit): fixed `length` variable shadowing in bidirectional Dijkstra, replaced silent `assert true` no-ops with `:ok`, replaced `String.to_atom/1` on Python error strings with an explicit mapping, removed dead `alpha` parameter from HITS adapter, moved inline `__import__("itertools")` to a top-level import, replaced `float('inf')` literal with `math.isinf`, guarded `nx.bipartite.color` against disconnected graphs, replaced non-reproducible `:rand.uniform/0` and `Enum.shuffle/1` with StreamData primitives, and short-circuited `weight_list_gen(0, _range)` to avoid `0..-1` range warnings.
 
 ## 0.98.3 - 2026-06-09
 
