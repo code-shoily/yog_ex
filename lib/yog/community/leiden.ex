@@ -24,6 +24,15 @@ defmodule Yog.Community.Leiden do
   | Hierarchical quality | Good | Better |
   | Disconnected communities | Possible | Prevented |
 
+  > #### Note on well-separated inputs
+  >
+  > On graphs where Louvain already produces connected communities
+  > (e.g. well-separated SBMs or dense clusters), Leiden's refinement
+  > step has no effect and both algorithms return equivalent partitions.
+  > The refinement guarantee matters most near the resolution limit,
+  > where Louvain may merge weakly-connected components into a single
+  > disconnected community.
+
   ## When to Use
 
   - When **community quality** matters more than raw speed
