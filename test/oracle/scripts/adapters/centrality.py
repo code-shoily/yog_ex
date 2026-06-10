@@ -20,19 +20,25 @@ def out_degree_centrality(graph, options):
 
 def closeness_centrality(graph, options):
     wf_improved = options.get("wf_improved", True)
-    result = nx.closeness_centrality(graph, wf_improved=wf_improved)
+    # Use edge weights as distances to match Yog's weighted Dijkstra.
+    result = nx.closeness_centrality(graph, wf_improved=wf_improved, distance="weight")
     return {str(k): v for k, v in result.items()}
 
 
 def harmonic_centrality(graph, options):
-    result = nx.harmonic_centrality(graph)
+    # Use edge weights as distances to match Yog (which runs Dijkstra
+    # with the graph's edge weights).
+    result = nx.harmonic_centrality(graph, distance="weight")
     return {str(k): v for k, v in result.items()}
 
 
 def betweenness_centrality(graph, options):
     normalized = options.get("normalized", True)
     endpoints = options.get("endpoints", False)
-    result = nx.betweenness_centrality(graph, normalized=normalized, endpoints=endpoints)
+    # Use edge weights to match Yog's weighted Brandes.
+    result = nx.betweenness_centrality(
+        graph, normalized=normalized, endpoints=endpoints, weight="weight"
+    )
     return {str(k): v for k, v in result.items()}
 
 
@@ -40,14 +46,23 @@ def pagerank(graph, options):
     alpha = options.get("alpha", 0.85)
     tol = options.get("tol", 1.0e-10)
     max_iter = options.get("max_iter", 1000)
-    result = nx.pagerank(graph, alpha=alpha, tol=tol, max_iter=max_iter, weight="weight")
+    # Yog's PageRank is unweighted (uniform 1/out_degree transitions);
+    # pass weight=None so NetworkX matches that convention.
+    result = nx.pagerank(graph, alpha=alpha, tol=tol, max_iter=max_iter, weight=None)
     return {str(k): v for k, v in result.items()}
 
 
 def hits(graph, options):
     tol = options.get("tol", 1.0e-10)
     max_iter = options.get("max_iter", 1000)
-    h, a = nx.hits(graph, normalized=True, max_iter=max_iter, tol=tol)
+    try:
+        h, a = nx.hits(graph, normalized=True, max_iter=max_iter, tol=tol)
+    except Exception as e:
+        # NetworkX HITS uses scipy SVD which raises on degenerate
+        # adjacency matrices (isolated nodes, certain disconnected
+        # directed structures). Treat as out-of-class input for the
+        # oracle and let the Elixir side skip the comparison.
+        return {"error": "hits_undefined", "reason": str(e)[:200]}
     return {
         "hubs": {str(k): v for k, v in h.items()},
         "authorities": {str(k): v for k, v in a.items()},
