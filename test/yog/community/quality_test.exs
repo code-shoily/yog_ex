@@ -1,4 +1,4 @@
-defmodule Yog.Oracle.CommunityQualityTest do
+defmodule Yog.Community.QualityTest do
   use ExUnit.Case, async: false
   use ExUnitProperties
 

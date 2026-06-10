@@ -20,7 +20,11 @@ def hopcroft_karp(graph, options):
     if graph.number_of_nodes() == 0:
         return 0
 
-    color = nx.bipartite.color(graph)
+    try:
+        color = nx.bipartite.color(graph)
+    except nx.NetworkXError:
+        return {"error": "not_bipartite_or_disconnected"}
+
     top_nodes = {n for n, c in color.items() if c == 0}
     matching = nx.bipartite.maximum_matching(graph, top_nodes=top_nodes)
     return len(matching) // 2
@@ -39,7 +43,11 @@ def minimum_weight_full_matching(graph, options):
     if graph.number_of_nodes() == 0:
         return 0
 
-    color = nx.bipartite.color(graph)
+    try:
+        color = nx.bipartite.color(graph)
+    except nx.NetworkXError:
+        return {"error": "not_bipartite_or_disconnected"}
+
     top_nodes = {n for n, c in color.items() if c == 0}
     opt = options.get("optimization", "min")
 

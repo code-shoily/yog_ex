@@ -78,7 +78,7 @@ defmodule Yog.Oracle.PathfindingTest do
           assert_in_delta w, nx_length, 1.0e-9
 
         {:error, {:error, :no_path}} ->
-          assert true
+          :ok
 
         _ ->
           flunk(
@@ -118,7 +118,7 @@ defmodule Yog.Oracle.PathfindingTest do
           assert yog_path.weight == path_length(graph, nx_path)
 
         {:error, {:error, :no_path}} ->
-          assert true
+          :ok
 
         _ ->
           flunk("Mismatched A* result: yog=#{inspect(yog_result)}, nx=#{inspect(nx_result)}")
@@ -155,10 +155,10 @@ defmodule Yog.Oracle.PathfindingTest do
           assert_in_delta yog_path.weight, nx_length, 1.0e-9
 
         {{:error, :negative_cycle}, {:error, :negative_cycle}} ->
-          assert true
+          :ok
 
         {{:error, :no_path}, {:error, :no_path}} ->
-          assert true
+          :ok
 
         _ ->
           flunk(
@@ -185,7 +185,7 @@ defmodule Yog.Oracle.PathfindingTest do
       case yog_result do
         {:error, :negative_cycle} ->
           # NetworkX also raises on negative cycles; skip this graph
-          assert true
+          :ok
 
         {:ok, yog_distances} ->
           nx_distances =
@@ -218,7 +218,7 @@ defmodule Yog.Oracle.PathfindingTest do
 
       case yog_result do
         {:error, :negative_cycle} ->
-          assert true
+          :ok
 
         {:ok, yog_distances} ->
           nx_distances = NetworkX.run("johnson", graph, weight: "weight")
@@ -257,12 +257,12 @@ defmodule Yog.Oracle.PathfindingTest do
         )
 
       case {yog_result, nx_result} do
-        {{:ok, yog_path}, %{length: length}} ->
-          assert_in_delta yog_path.weight, length, 1.0e-9
-          assert length(yog_path.nodes) == length(nx_result.path)
+        {{:ok, yog_path}, %{length: nx_length, path: nx_path}} ->
+          assert_in_delta yog_path.weight, nx_length, 1.0e-9
+          assert length(yog_path.nodes) == length(nx_path)
 
         {:error, {:error, :no_path}} ->
-          assert true
+          :ok
 
         _ ->
           flunk(
@@ -302,7 +302,7 @@ defmodule Yog.Oracle.PathfindingTest do
           assert length(yog_path.nodes) == length(nx_path)
 
         {:error, {:error, :no_path}} ->
-          assert true
+          :ok
 
         _ ->
           flunk(

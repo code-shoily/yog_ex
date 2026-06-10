@@ -70,11 +70,14 @@ defmodule Yog.Generators do
     # Generate a graph with at least 2 nodes and distinct source/sink
     gen all(
           nodes <- node_list_gen(2, 50, 1000),
-          weights <- weight_list_gen(length(nodes), 0..100)
+          weights <- weight_list_gen(length(nodes), 0..100),
+          s_idx <- StreamData.integer(0..(length(nodes) - 1)),
+          t_idx <- StreamData.integer(0..(length(nodes) - 2))
         ) do
+      s = Enum.at(nodes, s_idx)
+      t_candidates = List.delete_at(nodes, s_idx)
+      t = Enum.at(t_candidates, t_idx)
       graph = build_graph(:directed, nodes, weights)
-      # Ensure distinct s and t
-      [s, t | _] = Enum.shuffle(nodes)
       {graph, s, t}
     end
   end
@@ -121,7 +124,10 @@ defmodule Yog.Generators do
     end
   end
 
-  def weight_list_gen(num_nodes, range \\ -100..100) do
+  def weight_list_gen(num_nodes, range \\ -100..100)
+  def weight_list_gen(0, _range), do: StreamData.constant([])
+
+  def weight_list_gen(num_nodes, range) do
     # Generate 0 to 30 edges
     StreamData.list_of(
       {StreamData.integer(0..(num_nodes - 1)), StreamData.integer(0..(num_nodes - 1)),

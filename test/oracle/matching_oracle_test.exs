@@ -36,7 +36,7 @@ defmodule Yog.Oracle.MatchingTest do
     gen all(
           left_size <- StreamData.integer(0..12),
           right_size <- StreamData.integer(0..12),
-          edge_prob <- StreamData.float(min: 0.2, max: 1.0)
+          edge_keep <- StreamData.list_of(StreamData.boolean(), length: left_size * right_size)
         ) do
       left = if left_size > 0, do: Enum.to_list(1..left_size), else: []
 
@@ -46,16 +46,19 @@ defmodule Yog.Oracle.MatchingTest do
       graph =
         Enum.reduce(left ++ right, Yog.undirected(), fn id, g -> Yog.add_node(g, id, nil) end)
 
-      for u <- left,
-          v <- right,
-          :rand.uniform() <= edge_prob,
-          reduce: graph do
-        acc ->
+      candidates = for u <- left, v <- right, do: {u, v}
+
+      Enum.zip(candidates, edge_keep)
+      |> Enum.reduce(graph, fn {{u, v}, keep}, acc ->
+        if keep do
           case Yog.add_edge(acc, u, v, 1) do
             {:ok, new_g} -> new_g
             {:error, _} -> acc
           end
-      end
+        else
+          acc
+        end
+      end)
     end
   end
 

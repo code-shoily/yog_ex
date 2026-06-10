@@ -86,12 +86,13 @@ defmodule Yog.Oracle.PropertiesTest do
             graph = Yog.Generators.build_graph(:undirected, nodes, edges),
             max_runs: 20
           ) do
-      yog_clique = Yog.Property.Clique.max_clique(graph)
-      nx_result = NetworkX.run("graph_clique_number", graph, [])
+      case {Yog.Property.Clique.max_clique(graph), NetworkX.run("graph_clique_number", graph, [])} do
+        {%MapSet{} = clique, nx_result} ->
+          assert MapSet.size(clique) == nx_result
 
-      yog_size = if is_struct(yog_clique, MapSet), do: MapSet.size(yog_clique), else: 0
-
-      assert yog_size == nx_result
+        {other, _nx_result} ->
+          flunk("max_clique returned #{inspect(other)}, expected MapSet")
+      end
     end
   end
 end

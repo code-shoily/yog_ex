@@ -45,7 +45,6 @@ def pagerank(graph, options):
 
 
 def hits(graph, options):
-    alpha = options.get("alpha", 0.85)
     tol = options.get("tol", 1.0e-10)
     max_iter = options.get("max_iter", 1000)
     h, a = nx.hits(graph, normalized=True, max_iter=max_iter, tol=tol)

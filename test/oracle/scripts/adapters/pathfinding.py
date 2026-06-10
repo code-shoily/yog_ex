@@ -1,5 +1,8 @@
 """Pathfinding adapters for NetworkX oracle."""
 
+import itertools
+import math
+
 import networkx as nx
 
 
@@ -61,7 +64,7 @@ def floyd_warshall(graph, options):
     for k, v in result.items():
         row = {}
         for kk, vv in v.items():
-            if vv == float('inf'):
+            if math.isinf(vv):
                 row[str(kk)] = "__Inf__"
             else:
                 row[str(kk)] = vv
@@ -112,7 +115,7 @@ def shortest_simple_paths(graph, options):
     target = options["target"]
     k = options.get("k", 3)
     gen = nx.shortest_simple_paths(graph, source, target, weight=options.get("weight", "weight"))
-    return [list(p) for p in __import__("itertools").islice(gen, k)]
+    return [list(p) for p in itertools.islice(gen, k)]
 
 
 def single_source_shortest_path_length(graph, options):

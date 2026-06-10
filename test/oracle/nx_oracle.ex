@@ -166,6 +166,12 @@ defmodule Yog.Oracle.NetworkX do
     %{length: length, path: Enum.map(path, &decode_node_id/1)}
   end
 
+  # Matching algorithms may return an error dict on non-bipartite or edgeless graphs
+  defp decode_result(%{"error" => "not_bipartite_or_disconnected"}, algo)
+       when algo in ["hopcroft_karp", "minimum_weight_full_matching"] do
+    {:error, :not_bipartite_or_disconnected}
+  end
+
   # Generic path lists (astar, bidirectional_shortest_path, shortest_simple_paths)
   defp decode_result(%{"error" => "no_path"}, algo)
        when algo in ["astar_path", "bidirectional_shortest_path"] do
@@ -186,7 +192,7 @@ defmodule Yog.Oracle.NetworkX do
 
   # bellman_ford returns either a number or an error map
   defp decode_result(%{"error" => err}, "bellman_ford_path_length") do
-    {:error, String.to_atom(err)}
+    {:error, error_atom(err)}
   end
 
   # dijkstra_path_length returns either a number or an error map
@@ -196,6 +202,11 @@ defmodule Yog.Oracle.NetworkX do
 
   # Default: pass through
   defp decode_result(result, _algo), do: result
+
+  defp error_atom("no_path"), do: :no_path
+  defp error_atom("negative_cycle"), do: :negative_cycle
+  defp error_atom("node_not_found"), do: :node_not_found
+  defp error_atom(other), do: String.to_existing_atom(other)
 
   defp decode_node_keyed_map(map) when is_map(map) do
     for {k, v} <- map, into: %{} do
