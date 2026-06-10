@@ -38,6 +38,21 @@ def graph_clique_number(graph, options):
     return max(len(c) for c in cliques)
 
 
+def _build_graph(spec):
+    cls = nx.DiGraph if spec["directed"] else nx.Graph
+    g = cls()
+    for n in spec["nodes"]:
+        g.add_node(n)
+    for e in spec["edges"]:
+        g.add_edge(e["from"], e["to"], weight=e["weight"])
+    return g
+
+
+def is_isomorphic(graph, options):
+    other_graph = _build_graph(options["other_graph"])
+    return nx.is_isomorphic(graph, other_graph)
+
+
 DISPATCH = {
     "is_bipartite": is_bipartite,
     "is_tree": is_tree,
@@ -46,4 +61,5 @@ DISPATCH = {
     "is_chordal": is_chordal,
     "is_complete_graph": is_complete_graph,
     "graph_clique_number": graph_clique_number,
+    "is_isomorphic": is_isomorphic,
 }

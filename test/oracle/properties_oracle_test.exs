@@ -95,4 +95,52 @@ defmodule Yog.Oracle.PropertiesTest do
       end
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # Isomorphism
+  # ---------------------------------------------------------------------------
+
+  @tag :oracle
+  property "P-ORAC-PROP-006 Graph isomorphism agrees with NetworkX" do
+    check all(
+            g1 <- Yog.Generators.graph_gen(),
+            nodes = Map.keys(g1.nodes),
+            shuffled = Enum.shuffle(nodes),
+            mapping = Enum.zip(nodes, shuffled) |> Map.new(),
+            g2 = Yog.Transform.relabel_nodes(g1, fn id -> Map.fetch!(mapping, id) end),
+            g3 <- Yog.Generators.graph_of_kind_gen(g1.kind),
+            max_runs: 50
+          ) do
+      # 1. G1 is isomorphic to its relabeled version G2
+      assert Yog.Operation.isomorphic?(g1, g2) == true
+
+      # Verify via NetworkX
+      assert NetworkX.run("is_isomorphic", g1, other_graph: g2) == true
+
+      # 2. G1 is isomorphic to G3 if and only if NetworkX agrees
+      yog_iso = Yog.Operation.isomorphic?(g1, g3)
+      nx_iso = NetworkX.run("is_isomorphic", g1, other_graph: g3)
+      assert yog_iso == nx_iso
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Weisfeiler-Lehman Graph Hash
+  # ---------------------------------------------------------------------------
+
+  @tag :oracle
+  property "P-ORAC-PROP-007 Weisfeiler-Lehman Graph Hash matches on isomorphic graphs" do
+    check all(
+            g1 <- Yog.Generators.graph_gen(),
+            nodes = Map.keys(g1.nodes),
+            shuffled = Enum.shuffle(nodes),
+            mapping = Enum.zip(nodes, shuffled) |> Map.new(),
+            g2 = Yog.Transform.relabel_nodes(g1, fn id -> Map.fetch!(mapping, id) end),
+            max_runs: 50
+          ) do
+      hash1 = Yog.Property.WeisfeilerLehman.graph_hash(g1)
+      hash2 = Yog.Property.WeisfeilerLehman.graph_hash(g2)
+      assert hash1 == hash2
+    end
+  end
 end

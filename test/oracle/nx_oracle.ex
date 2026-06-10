@@ -28,10 +28,16 @@ defmodule Yog.Oracle.NetworkX do
   """
   @spec run(String.t(), Yog.graph(), keyword()) :: term()
   def run(algorithm, graph, opts \\ []) do
+    encoded_opts =
+      Map.new(opts, fn
+        {k, %Yog.Graph{} = g} -> {k, encode_graph(g)}
+        {k, v} -> {k, v}
+      end)
+
     payload = %{
       algorithm: algorithm,
       graph: encode_graph(graph),
-      options: Map.new(opts)
+      options: encoded_opts
     }
 
     input = Jason.encode!(payload)

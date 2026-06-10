@@ -248,7 +248,7 @@ defmodule Yog.Community.Leiden do
   defp do_leiden(graph, state, iteration, options) do
     {improved_after_local, state_after_local} = phase1_local_optimize(graph, state, options)
 
-    state_after_refinement = phase15_refinement(graph, state_after_local)
+    state_after_refinement = phase15_refinement(graph, state_after_local, options)
     new_num_comms = count_unique_communities(state_after_refinement.assignments)
     old_num_comms = count_unique_communities(state.assignments)
 
@@ -279,7 +279,7 @@ defmodule Yog.Community.Leiden do
   defp do_leiden_hierarchical(graph, state, levels, iteration, options) do
     {improved_after_local, state_after_local} = phase1_local_optimize(graph, state, options)
 
-    state_after_refinement = phase15_refinement(graph, state_after_local)
+    state_after_refinement = phase15_refinement(graph, state_after_local, options)
     current_communities = Result.new(state_after_refinement.assignments)
     new_levels = [current_communities | levels]
 
@@ -365,139 +365,173 @@ defmodule Yog.Community.Leiden do
   end
 
   # =============================================================================
-  # PHASE 1.5: REFINEMENT (key difference from Louvain)
-  # =============================================================================
+  defp phase15_refinement(graph, state, options) do
+    nodes = Map.keys(state.assignments)
+    refined_assignments = Map.new(nodes, fn node -> {node, node} end)
+    refined_comm_totals = Map.new(state.node_weights)
+    refined_comm_sizes = Map.new(nodes, fn node -> {node, 1} end)
 
-  defp phase15_refinement(graph, state) do
-    # Refinement: ensure communities are well-connected
-    # For each community, check if it's connected and split if necessary
-    # Uses memory-efficient adjacency map instead of subgraph extraction
+    coarse_communities = get_community_nodes(state.assignments)
 
-    communities = get_community_nodes(state.assignments)
-
-    Enum.reduce(communities, state, fn {_comm_id, nodes}, current_state ->
-      if MapSet.size(nodes) <= 1 do
-        current_state
-      else
-        # Build adjacency map for this community (memory efficient)
-        adjacency = build_community_adjacency(graph, nodes)
-        components = find_connected_components(adjacency, nodes)
-
-        if length(components) > 1 do
-          # Split into connected components
-          split_community(current_state, components)
-        else
-          current_state
+    {final_assignments, _final_totals, _final_sizes} =
+      Enum.reduce(
+        coarse_communities,
+        {refined_assignments, refined_comm_totals, refined_comm_sizes},
+        fn {_comm_id, nodes_in_c}, acc_state ->
+          refine_coarse_community(graph, nodes_in_c, state, acc_state, options)
         end
-      end
-    end)
+      )
+
+    final_totals = calculate_community_totals(final_assignments, state.node_weights)
+
+    %{
+      state
+      | assignments: final_assignments,
+        community_totals: final_totals
+    }
   end
 
-  # Memory-efficient connectivity check without building subgraph
-  # Returns adjacency map for nodes within the community
-  defp build_community_adjacency(%Yog.Graph{out_edges: out_edges}, nodes) do
-    node_list = MapSet.to_list(nodes)
-
-    List.foldl(node_list, %{}, fn u, adj ->
-      # Get neighbors that are also in the community
-      successors =
-        case Map.fetch(out_edges, u) do
-          {:ok, edges} -> Map.to_list(edges)
-          :error -> []
-        end
-
-      neighbors_in_comm =
-        successors
-        |> Enum.filter(fn {v, _weight} -> MapSet.member?(nodes, v) end)
-        |> Enum.map(fn {v, _weight} -> v end)
-
-      Map.put(adj, u, neighbors_in_comm)
-    end)
-  end
-
-  defp find_connected_components(adjacency, nodes) do
-    node_list = MapSet.to_list(nodes)
-    visited = MapSet.new()
-
-    {_final_visited, components} =
-      Enum.reduce(node_list, {visited, []}, fn node, {visited_acc, comps} ->
-        if MapSet.member?(visited_acc, node) do
-          {visited_acc, comps}
-        else
-          component = bfs_component_adj(adjacency, node, visited_acc)
-          new_visited = MapSet.union(visited_acc, component)
-          {new_visited, [component | comps]}
-        end
-      end)
-
-    components
-  end
-
-  defp bfs_component_adj(adjacency, start, initial_visited) do
-    if MapSet.member?(initial_visited, start) do
-      MapSet.new()
+  defp refine_coarse_community(
+         graph,
+         nodes_in_c,
+         state,
+         {refined_assignments, refined_totals, refined_sizes},
+         options
+       ) do
+    if MapSet.size(nodes_in_c) <= 1 do
+      {refined_assignments, refined_totals, refined_sizes}
     else
-      do_bfs_component_adj(
-        adjacency,
-        [start],
-        MapSet.put(initial_visited, start),
-        MapSet.new([start])
+      m = state.total_weight
+      node_list = MapSet.to_list(nodes_in_c)
+
+      well_connected_nodes =
+        Enum.filter(node_list, fn u ->
+          k_u = Map.get(state.node_weights, u, 0.0)
+          w_u_c = calculate_w_u_c(graph, u, nodes_in_c)
+
+          comm_u = Map.get(state.assignments, u)
+          sigma_tot_c = Map.get(state.community_totals, comm_u, 0.0)
+
+          if m == 0.0 do
+            false
+          else
+            w_u_c >= options.resolution * k_u * (sigma_tot_c - k_u) / (2.0 * m)
+          end
+        end)
+
+      shuffled_nodes = Yog.Utils.fisher_yates(well_connected_nodes, options.seed)
+
+      Enum.reduce(
+        shuffled_nodes,
+        {refined_assignments, refined_totals, refined_sizes},
+        fn u, {r_assigns, r_tots, r_sizes} ->
+          comm_u = Map.get(r_assigns, u)
+
+          if Map.get(r_sizes, comm_u, 0) == 1 do
+            k_u = Map.get(state.node_weights, u, 0.0)
+            neighbor_weights = calculate_neighbor_weights_in_c(graph, u, nodes_in_c, r_assigns)
+
+            candidates =
+              Enum.filter(neighbor_weights, fn {c_ref, w_u_cref} ->
+                c_ref != comm_u and
+                  (
+                    k_cref = Map.get(r_tots, c_ref, 0.0)
+                    m > 0.0 and w_u_cref >= options.resolution * k_u * k_cref / (2.0 * m)
+                  )
+              end)
+
+            theta = 1.0
+
+            weights =
+              Enum.map(candidates, fn {c_ref, w_u_cref} ->
+                k_cref = Map.get(r_tots, c_ref, 0.0)
+                gain = w_u_cref - options.resolution * k_u * k_cref / (2.0 * m)
+                weight = :math.exp(gain / theta)
+                {c_ref, weight}
+              end)
+
+            total_weight = 1.0 + Enum.sum(Enum.map(weights, &elem(&1, 1)))
+
+            # Seed the random number generator deterministically for this node
+            seed_val = options.seed + :erlang.phash2(u)
+            _ = :rand.seed(:exsss, {seed_val, 0, 0})
+            r = :rand.uniform() * total_weight
+
+            target_comm = select_target(weights, r, 1.0)
+
+            if target_comm != nil do
+              new_assigns = Map.put(r_assigns, u, target_comm)
+
+              new_tots =
+                r_tots
+                |> Map.update!(comm_u, &(&1 - k_u))
+                |> Map.update!(target_comm, &(&1 + k_u))
+
+              new_sizes =
+                r_sizes
+                |> Map.put(comm_u, 0)
+                |> Map.update!(target_comm, &(&1 + 1))
+
+              {new_assigns, new_tots, new_sizes}
+            else
+              {r_assigns, r_tots, r_sizes}
+            end
+          else
+            {r_assigns, r_tots, r_sizes}
+          end
+        end
       )
     end
   end
 
-  defp do_bfs_component_adj(_adjacency, [], _blocked, component), do: component
+  defp calculate_w_u_c(%Yog.Graph{out_edges: out_edges}, u, nodes_in_c) do
+    case Map.fetch(out_edges, u) do
+      {:ok, edges} ->
+        List.foldl(Map.to_list(edges), 0.0, fn {v, w}, acc ->
+          if MapSet.member?(nodes_in_c, v) do
+            acc + w
+          else
+            acc
+          end
+        end)
 
-  defp do_bfs_component_adj(adjacency, [current | queue], blocked, component) do
-    neighbors = Map.get(adjacency, current, [])
-
-    {new_queue, new_blocked, new_component} =
-      Enum.reduce(neighbors, {queue, blocked, component}, fn neighbor, {q, b, c} ->
-        if MapSet.member?(b, neighbor) do
-          {q, b, c}
-        else
-          # credo:disable-for-this-file Credo.Check.Refactor.AppendSingleItem
-          {q ++ [neighbor], MapSet.put(b, neighbor), MapSet.put(c, neighbor)}
-        end
-      end)
-
-    do_bfs_component_adj(adjacency, new_queue, new_blocked, new_component)
+      :error ->
+        0.0
+    end
   end
 
-  defp split_community(state, components) when length(components) <= 1 do
-    state
+  defp calculate_neighbor_weights_in_c(
+         %Yog.Graph{out_edges: out_edges},
+         u,
+         nodes_in_c,
+         refined_assignments
+       ) do
+    case Map.fetch(out_edges, u) do
+      {:ok, edges} ->
+        List.foldl(Map.to_list(edges), %{}, fn {v, w}, acc ->
+          if MapSet.member?(nodes_in_c, v) do
+            comm_v = Map.get(refined_assignments, v)
+            Map.update(acc, comm_v, w, &(&1 + w))
+          else
+            acc
+          end
+        end)
+
+      :error ->
+        %{}
+    end
   end
 
-  defp split_community(state, components) do
-    max_comm_id =
-      state.assignments
-      |> Map.values()
-      |> Enum.max()
+  defp select_target([], _r, _acc_weight), do: nil
 
-    {new_assignments, _next_id} =
-      components
-      |> Enum.with_index()
-      |> Enum.reduce({state.assignments, max_comm_id + 1}, fn {component, idx},
-                                                              {assigns, next_id} ->
-        if idx == 0 do
-          {assigns, next_id}
-        else
-          new_assigns =
-            Enum.reduce(component, assigns, fn node, a ->
-              Map.put(a, node, next_id)
-            end)
+  defp select_target([{c_ref, w} | rest], r, acc_weight) do
+    new_acc = acc_weight + w
 
-          {new_assigns, next_id + 1}
-        end
-      end)
-
-    new_totals = calculate_community_totals(new_assignments, state.node_weights)
-
-    %{
-      state
-      | assignments: new_assignments,
-        community_totals: new_totals
-    }
+    if r <= new_acc do
+      c_ref
+    else
+      select_target(rest, r, new_acc)
+    end
   end
 
   # =============================================================================
