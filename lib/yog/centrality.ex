@@ -888,7 +888,7 @@ defmodule Yog.Centrality do
   """
   @spec katz(Yog.graph(), keyword()) :: centrality_scores()
   def katz(graph, opts \\ []) do
-    alpha = Keyword.fetch!(opts, :alpha)
+    alpha = Keyword.get(opts, :alpha, 0.1)
     beta = Keyword.get(opts, :beta, 1.0)
 
     alpha(graph, Keyword.merge(opts, alpha: alpha, initial: beta))
