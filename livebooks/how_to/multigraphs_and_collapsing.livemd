@@ -40,11 +40,15 @@ IO.inspect Multi.edges_between(mg, :london, :paris), label: "Edges between Londo
 ```elixir
 # DOT rendering (rich, customizable)
 dot = Yog.Multi.DOT.to_dot(mg)
-Kino.VizJS.render(dot)
+dot = Kino.VizJS.render(dot)
 
 # Mermaid rendering (great for docs)
 mermaid = Yog.Multi.Mermaid.to_mermaid(mg)
-IO.puts(mermaid)
+mermaid = Kino.Mermaid.new(mermaid)
+
+Kino.Layout.tabs(
+  Dot: dot, Mermaid: mermaid
+)
 ```
 
 ### Styled Multigraph Rendering
@@ -53,7 +57,7 @@ IO.puts(mermaid)
 # Render with per-edge styling
 opts = %{
   Yog.Multi.DOT.default_options()
-  | edge_attributes: fn _from, _to, edge_id, weight ->
+  | edge_attributes: fn _from, _to, _edge_id, weight ->
       color =
         cond do
           weight == 50 -> "#10b981"  # Train (fastest)
@@ -95,33 +99,36 @@ IO.inspect Multi.edges_between(multi, 0, 1), label: "Edges A -> B"
 To run a shortest-path algorithm, we might only care about the *cheapest* or *fastest* option. We can collapse the multigraph into a simple graph.
 
 ### 1. Keep Minimum (Shortest Path)
+
 When finding the shortest path, we usually want to keep only the edge with the smallest weight.
 
 ```elixir
 # Collapse keeping the minimum weight
 g_min = Multi.to_simple_graph(mg, fn a, b -> min(a, b) end)
 
-IO.puts "Simple Graph Edge Weight: #{Yog.Model.edge_weight(g_min, :london, :paris)}"
+IO.puts "Simple Graph Edge Weight: #{Yog.Model.edge_data(g_min, :london, :paris)}"
 # Should be 50
 ```
 
 ### 2. Keep Maximum (Throughput)
+
 In some scenarios, you might want to know the maximum capacity of any single link.
 
 ```elixir
 g_max = Multi.to_simple_graph(mg, fn a, b -> max(a, b) end)
 
-IO.puts "Simple Graph Edge Weight: #{Yog.Model.edge_weight(g_max, :london, :paris)}"
+IO.puts "Simple Graph Edge Weight: #{Yog.Model.edge_data(g_max, :london, :paris)}"
 # Should be 300
 ```
 
 ### 3. Sum Weights (Total Capacity)
+
 For Max-Flow problems, you often want to sum the capacities of all parallel links.
 
 ```elixir
 g_sum = Multi.to_simple_graph(mg, fn a, b -> a + b end)
 
-IO.puts "Simple Graph Edge Weight: #{Yog.Model.edge_weight(g_sum, :london, :paris)}"
+IO.puts "Simple Graph Edge Weight: #{Yog.Model.edge_data(g_sum, :london, :paris)}"
 # Should be 450 (100 + 50 + 300)
 ```
 
@@ -187,10 +194,11 @@ IO.inspect(Multi.dfs(mg, :a), label: "DFS from A")
 ## Summary
 
 Multigraphs are powerful for modeling, but simple graphs are often better for analysis.
-*   Use `Yog.Multi` to capture the full complexity of your data.
-*   Use `Yog.Builder.Live.sync_multi/2` to build multigraphs incrementally.
-*   Use `Yog.Multi.DOT` and `Yog.Multi.Mermaid` to visualize parallel edges.
-*   Use `to_simple_graph/2` to prepare your data for algorithms.
-*   Choose your **combine function** (`min`, `max`, `sum`) based on the problem you are solving.
+
+* Use `Yog.Multi` to capture the full complexity of your data.
+* Use `Yog.Builder.Live.sync_multi/2` to build multigraphs incrementally.
+* Use `Yog.Multi.DOT` and `Yog.Multi.Mermaid` to visualize parallel edges.
+* Use `to_simple_graph/2` to prepare your data for algorithms.
+* Choose your **combine function** (`min`, `max`, `sum`) based on the problem you are solving.
 
 Next, explore **Customizing Visualizations** to see how to render these parallel edges!

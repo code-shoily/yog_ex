@@ -19,16 +19,20 @@ Topological sorting orders nodes such that for every edge $u \to v$, node $u$ co
 
 ```elixir
 # Create a DAG representing a build process
-{:ok, dag} = Yog.DAG.Model.from_graph(
-  Yog.directed()
-  |> Yog.add_edges!([
-    {"Compiler", "Linker", 1},
-    {"SourceCode", "Compiler", 1},
-    {"HeaderFiles", "Compiler", 1},
-    {"Linker", "Executable", 1},
-    {"Libraries", "Linker", 1}
-  ])
-)
+{:ok, dag} =
+  Yog.DAG.Model.from_graph(
+    Yog.directed()
+    |> Yog.add_nodes_from(~w{
+    Compiler Linker HeaderFiles SourceCode Executable Libraries
+  })
+    |> Yog.add_edges!([
+      {"Compiler", "Linker", 1},
+      {"SourceCode", "Compiler", 1},
+      {"HeaderFiles", "Compiler", 1},
+      {"Linker", "Executable", 1},
+      {"Libraries", "Linker", 1}
+    ])
+  )
 
 # 1. Linear Ordering
 sorted = Yog.DAG.Algorithm.topological_sort(dag)
@@ -46,7 +50,11 @@ In a general graph, the "Longest Path Problem" is NP-hard. However, in a DAG, it
 
 ```elixir
 # Edges represent (Task, dependency, duration)
-tasks = Yog.directed()
+tasks =
+  Yog.directed()
+  |> Yog.add_nodes_from(~w{
+    Start Foundation Walls Roof Plumbing Finish
+  })
   |> Yog.add_edges!([
     {"Start", "Foundation", 5},
     {"Foundation", "Walls", 10},
@@ -66,7 +74,7 @@ IO.inspect(path, label: "Critical Path")
 # Highlight it!
 path_opts = Yog.Render.DOT.path_to_options(%{nodes: path, weight: 0})
 dot = Yog.Render.DOT.to_dot(tasks, path_opts)
-Kino.VizJS.render(dot)
+Kino.VizJS.render(dot, height: "600px")
 ```
 
 ## Cycle Detection
@@ -75,17 +83,22 @@ Before treating a graph as a DAG, you should verify it has no cycles.
 
 ```elixir
 # This graph has a cycle
-cyclic = Yog.directed()
+cyclic =
+  Yog.directed()
+  |> Yog.add_nodes_from(~w[A B C])
   |> Yog.add_edges!([
     {"A", "B", 1},
     {"B", "C", 1},
-    {"C", "A", 1}  # Cycle!
+    # Cycle!
+    {"C", "A", 1}
   ])
 
 IO.puts("Is cyclic? #{Yog.cyclic?(cyclic)}")
 
 # This graph is a DAG
-acyclic = Yog.directed()
+acyclic =
+  Yog.directed()
+  |> Yog.add_nodes_from(~w[A B C])
   |> Yog.add_edges!([
     {"A", "B", 1},
     {"B", "C", 1}
@@ -96,7 +109,7 @@ IO.puts("Is acyclic? #{Yog.acyclic?(acyclic)}")
 # DAG.Model.from_graph will fail on cyclic graphs
 case Yog.DAG.Model.from_graph(cyclic) do
   {:ok, _dag} -> IO.puts("Valid DAG")
-  {:error, :contains_cycle} -> IO.puts("Cannot create DAG: graph contains a cycle")
+  {:error, :cycle_detected} -> IO.puts("Cannot create DAG: graph contains a cycle")
 end
 ```
 
@@ -105,20 +118,29 @@ end
 Transitive reduction finds the "skeleton" of a DAG by removing redundant edges—edges that are implied by other paths. This is how Git computes its merge base.
 
 ```elixir
-g = Yog.directed()
+g =
+  Yog.directed()
+  |> Yog.add_nodes_from(~w[A B C])
   |> Yog.add_edges!([
     {"A", "B", 1},
     {"B", "C", 1},
-    {"A", "C", 1}  # Redundant: A -> C is implied by A -> B -> C
+    # Redundant: A -> C is implied by A -> B -> C
+    {"A", "C", 1}
   ])
 
 {:ok, dag} = Yog.DAG.Model.from_graph(g)
-reduced = Yog.DAG.Algorithm.transitive_reduction(dag)
+{:ok, reduced} = Yog.Transform.transitive_reduction(g)
 
 IO.puts("Original edges: #{Yog.edge_count(g)}")
 IO.puts("Reduced edges:  #{Yog.edge_count(reduced)}")
 
-Kino.VizJS.render(Yog.Render.DOT.to_dot(reduced))
+Kino.Layout.grid(
+  [
+    Kino.VizJS.render(Yog.Render.DOT.to_dot(g)),
+    Kino.VizJS.render(Yog.Render.DOT.to_dot(reduced))
+  ],
+  columns: 2
+)
 ```
 
 ## Shared Dependencies (LCA)
@@ -127,12 +149,19 @@ Finding the **Lowest Common Ancestor (LCA)** helps identify the most recent shar
 
 ```elixir
 # A more complex dependency structure
-g = Yog.directed()
+g =
+  Yog.directed()
+  |> Yog.add_nodes_from(~w{
+    Base FeatureA FeatureB UserAuth App Logging 
+  })
   |> Yog.add_edges!([
-    {"Base", "FeatureA", 1}, {"Base", "FeatureB", 1},
-    {"FeatureA", "UserAuth", 1}, {"FeatureB", "UserAuth", 1},
+    {"Base", "FeatureA", 1},
+    {"Base", "FeatureB", 1},
+    {"FeatureA", "UserAuth", 1},
+    {"FeatureB", "UserAuth", 1},
     {"UserAuth", "App", 1},
-    {"FeatureA", "Logging", 1}, {"Logging", "App", 1}
+    {"FeatureA", "Logging", 1},
+    {"Logging", "App", 1}
   ])
 
 {:ok, dag} = Yog.DAG.Model.from_graph(g)
@@ -148,7 +177,9 @@ IO.inspect(lcas, label: "Shared Ancestors")
 DAGs are perfect for Mermaid diagrams since they naturally flow in one direction.
 
 ```elixir
-g = Yog.directed()
+g =
+  Yog.directed()
+  |> Yog.add_nodes_from(~w[Design Code Tests Review Deploy])
   |> Yog.add_edges!([
     {"Design", "Code", 1},
     {"Design", "Tests", 1},
@@ -157,22 +188,25 @@ g = Yog.directed()
     {"Review", "Deploy", 1}
   ])
 
-mermaid = Yog.Render.Mermaid.to_mermaid(g, %{
-  Yog.Render.Mermaid.default_options()
-  | direction: :lr,
-    node_shape: :rounded_rect
-})
-IO.puts(mermaid)
+mermaid =
+  Yog.Render.Mermaid.to_mermaid(g, %{
+    Yog.Render.Mermaid.default_options()
+    | direction: :lr,
+      node_shape: :rounded_rect
+  })
+
+Kino.Mermaid.new(mermaid)
 ```
 
 ## Summary
 
 `Yog`'s DAG toolkit provides:
-1.  **Topological Sort & Generations** for scheduling and parallel processing.
-2.  **Longest Path** for critical path analysis.
-3.  **LCA** for dependency resolution and merge operations.
-4.  **Cycle Detection** to validate DAG constraints.
-5.  **Transitive Reduction** to find the minimal edge set.
-6.  **Guaranteed Safety**: The `DAG` type ensures you never accidentally introduce a circular dependency.
+
+1. **Topological Sort & Generations** for scheduling and parallel processing.
+2. **Longest Path** for critical path analysis.
+3. **LCA** for dependency resolution and merge operations.
+4. **Cycle Detection** to validate DAG constraints.
+5. **Transitive Reduction** to find the minimal edge set.
+6. **Guaranteed Safety**: The `DAG` type ensures you never accidentally introduce a circular dependency.
 
 Next, explore **Graph Properties** to see how to analyze the mathematical constraints of your network!

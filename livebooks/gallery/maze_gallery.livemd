@@ -1,0 +1,163 @@
+# Gallery: Maze Showroom
+
+```elixir
+Mix.install([
+  {:yog_ex, "~> 0.98"},
+  {:kino_vizjs, "~> 0.8.0"}
+])
+```
+
+## Introduction
+
+This gallery showcases the diverse textures, biases, and visual styles of all the maze generation algorithms supported by `Yog.Generator.Maze`.
+
+Each section highlights a different generator, offering a clean look at the **Unicode rendering**, a **pathfinding solution** (from the top-left `S` to bottom-right `E`), and the underlying **spanning tree network**.
+
+## Set up
+
+````elixir
+defmodule MazeGalleryHelper do
+  def render_maze_tabs(maze_name, maze) do
+    # 1. Unicode String
+    unicode_string = Yog.Render.ASCII.grid_to_string_unicode(maze)
+
+    # 2. Solved Maze
+    graph = Yog.Builder.GridGraph.to_graph(maze)
+    start_node = Yog.Builder.GridGraph.coord_to_id(maze, 0, 0)
+    end_node = Yog.Builder.GridGraph.coord_to_id(maze, maze.rows - 1, maze.cols - 1)
+
+    solved_string =
+      case Yog.Pathfinding.Dijkstra.shortest_path(graph, start_node, end_node) do
+        {:ok, path} ->
+          occupants = 
+            path.nodes 
+            |> Map.new(fn id -> {id, "•"} end)
+            |> Map.put(start_node, "S")
+            |> Map.put(end_node, "E")
+
+          Yog.Render.ASCII.grid_to_string_unicode(maze, occupants)
+        :error ->
+          "Error: Pathfinding failed."
+      end
+
+    # 3. Graphviz DOT
+    # Use a smaller version for DOT visualization to keep it readable
+    small_maze = apply(Yog.Generator.Maze, String.to_atom(Macro.underscore(maze_name)), [6, 6])
+    dot_source = Yog.Render.DOT.to_dot(Yog.Builder.GridGraph.to_graph(small_maze))
+
+    IO.puts("### #{maze_name} Maze (#{maze.rows}x#{maze.cols})")
+
+    Kino.Layout.tabs([
+      "Unicode Layout": Kino.Markdown.new("```\n" <> unicode_string <> "\n```"),
+      "Solved Path": Kino.Markdown.new("```\n" <> solved_string <> "\n```"),
+      "Graph Network (6x6)": Kino.VizJS.render(dot_source, height: "800px")
+    ])
+  end
+end
+````
+
+## Classic Maze Algorithms
+
+These popular algorithms are frequently used in game design due to their balance of speed and maze complexity.
+
+### Binary Tree
+
+The fastest algorithm. It carves north or east for each cell, resulting in a very strong diagonal bias.
+
+```elixir
+maze = Yog.Generator.Maze.binary_tree(15, 15, seed: 42)
+MazeGalleryHelper.render_maze_tabs("BinaryTree", maze)
+```
+
+### Sidewinder
+
+A row-based generator similar to Binary Tree but with less diagonal bias. It creates distinct vertical corridors.
+
+```elixir
+maze = Yog.Generator.Maze.sidewinder(15, 15, seed: 42)
+MazeGalleryHelper.render_maze_tabs("Sidewinder", maze)
+```
+
+### Recursive Backtracker
+
+A Depth-First Search walk that backtracks when stuck. It creates very winding, challenging paths with long corridors and few branches.
+
+```elixir
+maze = Yog.Generator.Maze.recursive_backtracker(15, 15, seed: 42)
+MazeGalleryHelper.render_maze_tabs("RecursiveBacktracker", maze)
+```
+
+### Hunt and Kill
+
+Similar to Recursive Backtracker but hunts sequentially across the grid for adjacent visited cells when stuck. It produces winding corridors with no recursion stack.
+
+```elixir
+maze = Yog.Generator.Maze.hunt_and_kill(15, 15, seed: 42)
+MazeGalleryHelper.render_maze_tabs("HuntAndKill", maze)
+```
+
+---
+
+## Unbiased Random Spanning Trees
+
+These algorithms generate mathematically unbiased perfect mazes: all possible mazes are equally likely. They have no directional bias.
+
+### Wilson's
+
+Uses loop-erased random walks to build a perfect spanning tree. It creates beautifully balanced mazes with highly organic corridors.
+
+```elixir
+maze = Yog.Generator.Maze.wilson(15, 15, seed: 42)
+MazeGalleryHelper.render_maze_tabs("Wilson", maze)
+```
+
+### Aldous-Broder
+
+Performs a true random walk over the entire grid. It is slower but guarantees completely uniform randomness.
+
+```elixir
+maze = Yog.Generator.Maze.aldous_broder(15, 15, seed: 42)
+MazeGalleryHelper.render_maze_tabs("AldousBroder", maze)
+```
+
+---
+
+## Partition & Tree-based Algorithms
+
+These algorithms treat maze generation as minimum spanning trees or geometric subdivisions.
+
+### Kruskal's
+
+Treats every cell as a separate set and shuffles all potential passages, merging them using a Disjoint Set Union (DSU) until one spanning tree remains.
+
+```elixir
+maze = Yog.Generator.Maze.kruskal(15, 15, seed: 42)
+MazeGalleryHelper.render_maze_tabs("Kruskal", maze)
+```
+
+### Prim's (Simplified)
+
+Starts from a single cell and grows outwards by adding random adjacent frontier cells, producing high branch densities and many short dead ends.
+
+```elixir
+maze = Yog.Generator.Maze.prim_simplified(15, 15, seed: 42)
+MazeGalleryHelper.render_maze_tabs("PrimSimplified", maze)
+```
+
+### Growing Tree
+
+A highly customizable algorithm that can mimic either Prim's (radial) or Recursive Backtracker (winding) depending on how it selects cells from its active list.
+
+```elixir
+maze = Yog.Generator.Maze.growing_tree(15, 15, seed: 42)
+MazeGalleryHelper.render_maze_tabs("GrowingTree", maze)
+```
+
+### Recursive Division
+
+A fractal-like algorithm that divides the chamber with walls, adding a single passage through the wall, and repeating the process recursively.
+
+```elixir
+maze = Yog.Generator.Maze.recursive_division(15, 15, seed: 42)
+MazeGalleryHelper.render_maze_tabs("RecursiveDivision", maze)
+```

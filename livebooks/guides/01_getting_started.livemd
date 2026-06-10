@@ -45,9 +45,15 @@ g =
   |> Yog.add_node(1, %{label: "Start"})
   |> Yog.add_node(2, %{label: "End"})
   |> Yog.add_nodes_from([3, 4, 5]) # Adding multiple nodes with nil data
+```
 
-# Let's visualize it
-Kino.VizJS.render(Yog.Render.DOT.to_dot(g), height: "100px")
+Now let's visualize the nodes. `Yog` supports both Dot and Mermaid for rendering graphs.
+
+```elixir
+Kino.Layout.tabs(
+  Dot: Kino.VizJS.render(Yog.Render.DOT.to_dot(g), height: "100px"),
+  Mermaid: Kino.Mermaid.new(Yog.Render.Mermaid.to_mermaid(g))
+)
 ```
 
 ### Adding Edges
@@ -57,35 +63,93 @@ Edges connect nodes. In `Yog`, we provide several ways to add edges, depending o
 ```elixir
 # 1. add_edge! - Raises if nodes don't exist
 g = g |> Yog.add_edge!(1, 2, 10)
+IO.inspect(g)
 
 # 2. add_edge_ensure - Automatically creates nodes if they are missing
 g = g |> Yog.add_edge_ensure(2, 3, 5, %{label: "Auto-created"})
+IO.inspect(g)
 
 # 3. add_simple_edge - Adds an edge with weight 1
 g = g |> Yog.add_simple_edge!(3, 1)
-
-# Visualize the resulting graph
-Kino.VizJS.render(Yog.Render.DOT.to_dot(g))
+IO.inspect(g)
 ```
 
-### Live Builder
+And this is how the graph looks like:
 
-For incremental construction, use the `Live` builder. It tracks pending changes and syncs them efficiently.
+```elixir
+Kino.Layout.tabs(
+  Dot: Kino.VizJS.render(Yog.Render.DOT.to_dot(g)),
+  Mermaid: Kino.Mermaid.new(Yog.Render.Mermaid.to_mermaid(g))
+)
+```
+
+### LabeledBuilder and the Builder pattern
+
+<!-- livebook:{"break_markdown":true} -->
+
+Yog lets you define your graph with any data as node ID or edge weight.
+
+```elixir
+graph =
+  Yog.directed()
+  |> Yog.add_node({0, 0}, nil)
+  |> Yog.add_node(:point, %{})
+  |> Yog.add_edge!({0, 0}, :point, :unreachable)
+
+
+Yog.all_edges(graph)
+```
+
+However, many algorithms or graph file formats are simplier when the Node IDs are integers. It also makes traversals and lookups faster. The `graph` above could look like:
+
+```elixir
+graph =
+  Yog.directed()
+  |> Yog.add_node(1, {{0, 0}, nil})
+  |> Yog.add_node(2, {:point, %{}})
+  |> Yog.add_edge!(1, 2, :unreachable)
+
+Yog.all_edges(graph)
+```
+
+The example above is much cleaner. But it also come with an ergonomic tax. If consuming from a stream, one would need to keep a map of ID to Data, and Data to ID.
+
+This is exactly where the `LabeledBuilder` becomes relevant.
+
+Yog has a set of Builders that acts like a domain specific graph creation API - hides the implementation detail but creates Yog graph underneath. They can be added anywhere, but Yog provides a few builders to get you going.
+
+The one we discuss here is the `LabeledBuilder`. This lets you build graphs with any data as NodeID but creates a graph with integer based ID.
+
+Here's an example:
 
 ```elixir
 builder =
-  Yog.Builder.Live.new()
-  |> Yog.Builder.Live.add_edge("A", "B", 10)
-  |> Yog.Builder.Live.add_edge("B", "C", 5)
+  Yog.Builder.Labeled.directed()
+  |> Yog.Builder.Labeled.add_edge("A", "B", 10)
+  |> Yog.Builder.Labeled.add_edge("B", "C", 5)
 
-{builder, g_live} = Yog.Builder.Live.sync(builder, Yog.directed())
-IO.puts("Live-built graph has #{Yog.node_count(g_live)} nodes and #{Yog.edge_count(g_live)} edges")
+IO.puts("These are the labels")
+IO.inspect(builder |> Yog.Builder.Labeled.all_labels())
 
-# Add more edges incrementally
-builder = Yog.Builder.Live.add_edge(builder, "C", "D", 3)
-{_builder, g_live} = Yog.Builder.Live.sync(builder, g_live)
-IO.puts("After incremental sync: #{Yog.node_count(g_live)} nodes, #{Yog.edge_count(g_live)} edges")
+IO.puts("A registry that maps labels to Node IDs")
+IO.inspect(builder |> Yog.Builder.Labeled.to_registry())
+
+IO.puts("The underlying graph")
+graph = builder |> Yog.Builder.Labeled.to_graph()
+IO.inspect(Yog.node_ids(graph))
+
+IO.puts("To query between NodeID and Label")
+IO.inspect(Yog.Builder.Labeled.get_id(builder, "A"))
+IO.inspect(Yog.Builder.Labeled.get_label(builder, 0))
+
 ```
+
+There are a few other builders:
+
+* `LiveBuilder` - superpowered `LabeledBuilder` instead of creating the whole builder, it lets you continuously add/remove nodes from builder and create graph via a WAL log lite.
+* `GridGraph` &amp; `ToroidalGraph` - Creates graphs from 2D grid data. Toroidal wraps ends of rows and columns.
+
+A use case for Yog builders is [Choreo](https://www.github.com/code-shoily/choreo) where builder pattern is used to add system design DSL on top of Yog.
 
 ## Examining the Graph
 
@@ -121,26 +185,42 @@ numeric_only = Yog.Transform.filter_nodes_indexed(g, fn id, _ -> is_integer(id) 
 
 ## Comprehensive Algorithms
 
-`Yog` comes with 60+ algorithms out of the box.
+`Yog` comes with 223 registered algorithms, generators, and helper tools categorized across 22 areas
 
 ### Pathfinding
 
 ```elixir
-# Find the shortest path from 1 to 3
-case Yog.Pathfinding.shortest_path(g, 1, 3) do
-  {:ok, path} -> 
-    IO.puts "Found path with weight: #{path.weight}"
-    IO.inspect(path.nodes, label: "Path")
-  :error -> 
-    IO.puts "No path found"
-end
+cols = 6
+grid_data = List.duplicate(List.duplicate(".", cols), cols)
+grid_builder = Yog.Builder.Grid.from_2d_list(grid_data, :undirected, Yog.Builder.Grid.always())
+graph = Yog.Builder.Grid.to_graph(grid_builder)
+
+start_node = Yog.Builder.Grid.coord_to_id(0, 0, cols)
+end_node = Yog.Builder.Grid.coord_to_id(5, 5, cols)
+
+{:ok, path} = Yog.Pathfinding.Dijkstra.shortest_path(graph, start_node, end_node)
+
+# Create base options with coordinate labels for nodes, and hide edge labels
+base_opts = 
+  Yog.Render.DOT.default_options()
+  |> Map.put(:node_label, fn id, _data ->
+    {r, c} = Yog.Builder.Grid.id_to_coord(id, cols)
+    "#{r},#{c}"
+  end)
+  |> Map.put(:edge_label, fn _weight -> "" end)
+
+# Pass base_opts to path_to_options to highlight path and retain custom labeling
+opts = Yog.Render.DOT.path_to_options(path, base_opts)
+
+Kino.VizJS.render(Yog.Render.DOT.to_dot(graph, opts), height: "800px")
+
 ```
 
 ### Community Detection
 
 ```elixir
-# Generate a graph with communities and detect them
-sbm = Yog.Generator.Random.sbm([8, 8, 8], [[0.7, 0.1, 0.1], [0.1, 0.7, 0.1], [0.1, 0.1, 0.7]])
+# Generate a graph with 24 nodes, 3 communities, p_in = 0.7, p_out = 0.1
+sbm = Yog.Generator.Random.sbm(24, 3, 0.7, 0.1, community_sizes: [8, 8, 8])
 result = Yog.Community.Louvain.detect(sbm)
 
 IO.puts("Detected #{result.num_communities} communities")
@@ -148,7 +228,7 @@ IO.inspect(result.assignments, label: "Node -> Community")
 
 # Visualize with community colors
 opts = Yog.Render.DOT.community_to_options(result)
-Kino.VizJS.render(Yog.Render.DOT.to_dot(sbm, opts))
+Kino.VizJS.render(Yog.Render.DOT.to_dot(sbm, opts), engine: "circo", height: "1200px")
 ```
 
 ## Visualization Formats
@@ -157,19 +237,31 @@ Kino.VizJS.render(Yog.Render.DOT.to_dot(sbm, opts))
 
 ```elixir
 # Graphviz DOT (rich, customizable)
-dot = Yog.Render.DOT.to_dot(g, Yog.Render.DOT.theme(:dark))
-Kino.VizJS.render(dot)
+dot = Yog.Render.DOT.to_dot(g)
 
 # Mermaid.js (great for Markdown docs)
-mermaid = Yog.Render.Mermaid.to_mermaid(g, Yog.Render.Mermaid.theme(:minimal))
+mermaid = Yog.Render.Mermaid.to_mermaid(g)
+
+
+IO.puts("DOT")
+IO.puts(dot)
+IO.puts("Mermaid")
 IO.puts(mermaid)
+
+```
+
+```elixir
+Kino.Layout.tabs(
+  Dot: Kino.VizJS.render(dot),
+  Mermaid: Kino.Mermaid.new(mermaid)
+)
 ```
 
 ## Serialization
 
 You can easily import/export graphs in various formats like GraphML, JSON, GDF, Graph6, or DOT.
 
-```elixir
+````elixir
 xml = """
 <?xml version="1.0" encoding="UTF-8"?>
 <graphml xmlns="http://graphml.graphdrawing.org/xmlns"  
@@ -210,7 +302,18 @@ xml = """
 # Export to GDF (GUESS format)
 gdf = Yog.IO.GDF.serialize(graph)
 IO.puts String.slice(gdf, 0, 300) <> "..."
-```
+
+Kino.Layout.grid([
+  Kino.Markdown.new("""
+  ```text
+  #{gdf}
+  ```
+  """),
+  graph
+  |> Yog.Render.DOT.to_dot()
+  |> Kino.VizJS.render(height: "600px")
+], columns: 2)
+````
 
 ## Next Steps
 

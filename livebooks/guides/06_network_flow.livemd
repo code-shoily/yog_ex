@@ -22,10 +22,12 @@ alias Yog.Flow.MaxFlow
 
 # Create a flow network
 # Edges represent (from, to, capacity)
-g = Yog.directed()
-  |> Yog.add_edges!([
-    {:s, :a, 10}, {:s, :b, 10},
-    {:a, :c, 8}, {:a, :b, 2},
+g =
+  Yog.from_edges(:directed, [
+    {:s, :a, 10},
+    {:s, :b, 10},
+    {:a, :c, 8},
+    {:a, :b, 2},
     {:b, :c, 9},
     {:c, :t, 20}
   ])
@@ -33,7 +35,7 @@ g = Yog.directed()
 # Calculate Max Flow using Dinic's algorithm (efficient for dense networks)
 result = MaxFlow.dinic(g, :s, :t)
 
-IO.puts "Maximum Flow from S to T: #{result.max_flow}"
+IO.puts("Maximum Flow from S to T: #{result.max_flow}")
 ```
 
 ## Minimum Cut (Finding the Bottleneck)
@@ -44,7 +46,7 @@ The minimum cut is the set of edges that, if removed, would completely disconnec
 # Extract the min-cut from the previous result
 min_cut = MaxFlow.min_cut(result)
 
-IO.puts "Min-Cut Capacity: #{min_cut.capacity}"
+IO.puts "Min-Cut Capacity: #{min_cut.cut_value}"
 IO.inspect(min_cut.source_side, label: "Nodes on Source side")
 IO.inspect(min_cut.sink_side, label: "Nodes on Sink side")
 
@@ -52,7 +54,7 @@ IO.inspect(min_cut.sink_side, label: "Nodes on Sink side")
 # We'll color nodes by which side of the cut they are on
 cut_opts = Yog.Render.DOT.cut_to_options(min_cut)
 dot = Yog.Render.DOT.to_dot(g, cut_opts)
-Kino.VizJS.render(dot)
+Kino.VizJS.render(dot, height: "600px")
 ```
 
 ## Global Min-Cut
@@ -61,10 +63,12 @@ Sometimes you want the minimum cut of the entire graph (not just between a speci
 
 ```elixir
 # Create an undirected graph
-g = Yog.undirected()
-  |> Yog.add_edges!([
-    {:a, :b, 3}, {:a, :c, 2},
-    {:b, :c, 4}, {:b, :d, 1},
+g =
+  Yog.from_edges(:undirected, [
+    {:a, :b, 3},
+    {:a, :c, 2},
+    {:b, :c, 4},
+    {:b, :d, 1},
     {:c, :d, 5}
   ])
 
@@ -80,20 +84,44 @@ IO.inspect(global_cut.sink_side, label: "Sink side")
 One of the most powerful applications of Max-Flow is solving **Matching Problems** (e.g., matching jobs to candidates). By adding a virtual source and sink, any matching problem becomes a flow problem.
 
 ```elixir
-# Yog provides a dedicated module for this too
-g = Yog.undirected()
-  |> Yog.add_edges!([
-    {"Job1", "Alice", 1}, {"Job1", "Bob", 1},
-    {"Job2", "Alice", 1},
-    {"Job3", "Charlie", 1}
-  ])
+# 1. Build a Bipartite Graph of Workers and Tasks
+graph = Yog.from_edges(:undirected, [
+  {:alice, :development, 1},
+  {:alice, :design, 1},
+  {:bob, :development, 1},
+  {:bob, :qa, 1},
+  {:charlie, :design, 1},
+  {:charlie, :qa, 1},
+  {:charlie, :devops, 1},
+  {:dave, :qa, 1}
+])
 
-matching = Yog.Matching.HopcroftKarp.max_matching(g)
-IO.inspect(matching, label: "Optimal Job-Candidate Pairs")
+# 2. Run Bipartite Matching (Hopcroft-Karp)
+matching = Yog.Matching.hopcroft_karp(graph)
 
-# Count how many jobs got matched
-matched_jobs = matching |> Map.keys() |> Enum.filter(&String.starts_with?(&1, "Job")) |> length()
-IO.puts("Matched #{matched_jobs} jobs")
+# 3. Create a clean left-to-right presentation theme
+base_opts = 
+  Yog.Render.DOT.theme(:presentation)
+  |> Map.merge(%{
+    # Left-to-Right layout direction
+    rankdir: :lr,
+    # Align workers on the left side, tasks on the right side
+    ranks: [
+      {:same, [:alice, :bob, :charlie, :dave]},
+      {:same, [:development, :design, :qa, :devops]}
+    ],
+    # Custom node shapes
+    node_shape: :box,
+    # Hide edge weight labels for a cleaner look
+    edge_label: fn _weight -> "" end
+  })
+
+# 4. Generate highlighted option mapping for matching edges/nodes
+opts = Yog.Render.DOT.matching_to_options(matching, base_opts)
+
+# 5. Render it!
+Kino.VizJS.render(Yog.Render.DOT.to_dot(graph, opts), height: "400px")
+
 ```
 
 ## Summary

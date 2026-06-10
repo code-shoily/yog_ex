@@ -11,49 +11,85 @@ Mix.install([
 
 This gallery showcases the wide variety of graph structures that `Yog` can generate out-of-the-box. Whether you need a standard deterministic structure for benchmarking or a complex random network for simulation, the `Yog.Generator` suite has you covered.
 
+## Setup
+
+```elixir
+defmodule CatalogHelper do
+  def render_tabs(graph, label \\ nil) do
+    if label do
+      IO.puts("#{label} — Nodes: #{Yog.node_count(graph)}, Edges: #{Yog.edge_count(graph)}")
+    else
+      IO.puts("Nodes: #{Yog.node_count(graph)}, Edges: #{Yog.edge_count(graph)}")
+    end
+
+    dot_source = Yog.Render.DOT.to_dot(graph)
+    mermaid_source = Yog.Render.Mermaid.to_mermaid(graph)
+
+    Kino.Layout.tabs([
+      "Dot": Kino.VizJS.render(dot_source, height: "500px"),
+      "Mermaid": Kino.Mermaid.new(mermaid_source)
+    ])
+  end
+
+  def render_tabs_with_opts(graph, opts, label \\ nil) do
+    if label do
+      IO.puts("#{label} — Nodes: #{Yog.node_count(graph)}, Edges: #{Yog.edge_count(graph)}")
+    else
+      IO.puts("Nodes: #{Yog.node_count(graph)}, Edges: #{Yog.edge_count(graph)}")
+    end
+
+    dot_source = Yog.Render.DOT.to_dot(graph, opts)
+    mermaid_source = Yog.Render.Mermaid.to_mermaid(graph)
+
+    Kino.Layout.tabs([
+      "Dot": Kino.VizJS.render(dot_source, height: "500px"),
+      "Mermaid": Kino.Mermaid.new(mermaid_source)
+    ])
+  end
+end
+```
+
 ## Classic Deterministic Graphs
 
 These graphs are the building blocks of graph theory. They have predictable properties and are essential for testing algorithms.
 
 ### The Famous Petersen Graph
+
 A 3-regular graph with 10 nodes and 15 edges. It is a frequent counterexample in graph theory.
 
 ```elixir
 petersen = Yog.Generator.Classic.petersen()
-IO.puts("Nodes: #{Yog.node_count(petersen)}, Edges: #{Yog.edge_count(petersen)}")
-Kino.VizJS.render(Yog.Render.DOT.to_dot(petersen))
+CatalogHelper.render_tabs(petersen)
 ```
 
 ### Complete Graphs ($K_n$)
+
 Every node is connected to every other node.
 
 ```elixir
 k5 = Yog.Generator.Classic.complete(5)
-IO.puts("Nodes: #{Yog.node_count(k5)}, Edges: #{Yog.edge_count(k5)}")
-Kino.VizJS.render(Yog.Render.DOT.to_dot(k5))
+CatalogHelper.render_tabs(k5)
 ```
 
 ### Grid Graphs (2D Lattice)
+
 Nodes arranged in a grid, connecting to their neighbors (up, down, left, right).
 
 ```elixir
 grid = Yog.Generator.Classic.grid_2d(4, 4)
-IO.puts("Nodes: #{Yog.node_count(grid)}, Edges: #{Yog.edge_count(grid)}")
-Kino.VizJS.render(Yog.Render.DOT.to_dot(grid))
+CatalogHelper.render_tabs(grid)
 ```
 
 ### Star and Wheel Graphs
+
 A **Star** has one central hub, while a **Wheel** adds a cycle around the rim.
 
 ```elixir
 star = Yog.Generator.Classic.star(7)
 wheel = Yog.Generator.Classic.wheel(7)
 
-IO.puts("Star — Nodes: #{Yog.node_count(star)}, Edges: #{Yog.edge_count(star)}")
-Kino.VizJS.render(Yog.Render.DOT.to_dot(star))
-
-IO.puts("Wheel — Nodes: #{Yog.node_count(wheel)}, Edges: #{Yog.edge_count(wheel)}")
-Kino.VizJS.render(Yog.Render.DOT.to_dot(wheel))
+CatalogHelper.render_tabs(star, "Star")
+CatalogHelper.render_tabs(wheel, "Wheel")
 ```
 
 ### Binary Tree and Hypercube
@@ -61,13 +97,12 @@ Kino.VizJS.render(Yog.Render.DOT.to_dot(wheel))
 ```elixir
 # A perfect binary tree of depth 3
 tree = Yog.Generator.Classic.binary_tree(3)
-IO.puts("Binary Tree — Nodes: #{Yog.node_count(tree)}, Edges: #{Yog.edge_count(tree)}")
-Kino.VizJS.render(Yog.Render.DOT.to_dot(tree))
 
 # A 4-dimensional hypercube (16 nodes, 32 edges)
 hypercube = Yog.Generator.Classic.hypercube(4)
-IO.puts("Hypercube — Nodes: #{Yog.node_count(hypercube)}, Edges: #{Yog.edge_count(hypercube)}")
-Kino.VizJS.render(Yog.Render.DOT.to_dot(hypercube))
+
+CatalogHelper.render_tabs(tree, "Binary Tree")
+CatalogHelper.render_tabs(hypercube, "Hypercube")
 ```
 
 ## Random Graph Models
@@ -75,43 +110,42 @@ Kino.VizJS.render(Yog.Render.DOT.to_dot(hypercube))
 Random graphs are used to model real-world phenomena like social networks, the internet, or biological systems.
 
 ### Erdős-Rényi ($G(n, p)$)
+
 Edges are created between any two nodes with a fixed probability $p$.
 
 ```elixir
 # 20 nodes, each edge has 15% chance of existing
 er = Yog.Generator.Random.erdos_renyi_gnp(20, 0.15)
-IO.puts("Nodes: #{Yog.node_count(er)}, Edges: #{Yog.edge_count(er)}")
-Kino.VizJS.render(Yog.Render.DOT.to_dot(er))
+CatalogHelper.render_tabs(er)
 ```
 
 ### Watts-Strogatz (Small World)
+
 Starts with a regular ring lattice and then rewires edges to create "short cuts," resulting in low average path length and high clustering.
 
 ```elixir
 # 20 nodes, each connected to 4 neighbors, 10% rewiring
 ws = Yog.Generator.Random.watts_strogatz(20, 4, 0.1)
-IO.puts("Nodes: #{Yog.node_count(ws)}, Edges: #{Yog.edge_count(ws)}")
-Kino.VizJS.render(Yog.Render.DOT.to_dot(ws))
+CatalogHelper.render_tabs(ws)
 ```
 
 ### Barabási-Albert (Scale-Free)
+
 Uses "preferential attachment" (the rich get richer) to create networks with power-law degree distributions—hubs are common.
 
 ```elixir
 # 30 nodes, each new node attaches to 2 existing ones
 ba = Yog.Generator.Random.barabasi_albert(30, 2)
-IO.puts("Nodes: #{Yog.node_count(ba)}, Edges: #{Yog.edge_count(ba)}")
-Kino.VizJS.render(Yog.Render.DOT.to_dot(ba))
+CatalogHelper.render_tabs(ba)
 ```
 
 ### Stochastic Block Model (SBM)
+
 Generates graphs with predefined community structures.
 
 ```elixir
-# 3 communities of 10 nodes each
-# High probability of edges within groups, low between them
-g = Yog.Generator.Random.sbm([10, 10, 10], [[0.8, 0.05, 0.05], [0.05, 0.8, 0.05], [0.05, 0.05, 0.8]])
-IO.puts("Nodes: #{Yog.node_count(g)}, Edges: #{Yog.edge_count(g)}")
+# 30 nodes total, 3 communities of 10 nodes each, p_in = 0.8, p_out = 0.05
+g = Yog.Generator.Random.sbm(30, 3, 0.8, 0.05, community_sizes: [10, 10, 10])
 
 # Color nodes by their planted community
 opts = Yog.Render.DOT.community_to_options(%Yog.Community.Result{
@@ -119,7 +153,8 @@ opts = Yog.Render.DOT.community_to_options(%Yog.Community.Result{
   num_communities: 3,
   metadata: %{}
 })
-Kino.VizJS.render(Yog.Render.DOT.to_dot(g, opts))
+CatalogHelper.render_tabs_with_opts(g, opts)
+
 ```
 
 ## Quick Property Checks
@@ -133,11 +168,11 @@ g = Yog.Generator.Classic.petersen()
 IO.inspect([
   node_count: Yog.node_count(g),
   edge_count: Yog.edge_count(g),
-  is_regular: Yog.regular?(g, 3),
-  is_connected: Yog.Connectivity.connected?(g),
-  diameter: Yog.Property.Structure.diameter(g),
-  girth: Yog.Property.Structure.girth(g)
+  is_regular: Yog.Property.Structure.regular?(g, 3),
+  is_connected: Yog.Property.Structure.connected?(g),
+  diameter: Yog.Health.diameter(g)
 ], label: "Petersen Properties")
+
 ```
 
 ## Mermaid Rendering
@@ -147,14 +182,17 @@ All graphs can also be rendered as Mermaid diagrams for embedding in Markdown do
 ```elixir
 g = Yog.Generator.Classic.petersen()
 mermaid = Yog.Render.Mermaid.to_mermaid(g, Yog.Render.Mermaid.theme(:minimal))
+
 IO.puts(mermaid)
+Kino.Mermaid.new(mermaid)
 ```
 
 ## Summary
 
 The `Yog.Generator` suite allows you to:
-1.  **Benchmarking**: Test how your algorithms scale from sparse paths to dense cliques.
-2.  **Simulation**: Model real-world networks using well-studied random models.
-3.  **Visualization**: Quickly create complex structures to verify your rendering pipelines.
+
+1. **Benchmarking**: Test how your algorithms scale from sparse paths to dense cliques.
+2. **Simulation**: Model real-world networks using well-studied random models.
+3. **Visualization**: Quickly create complex structures to verify your rendering pipelines.
 
 Check out the [Algorithm Catalog](ALGORITHMS.md) to see how to analyze these graphs!

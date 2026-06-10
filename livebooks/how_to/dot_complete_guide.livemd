@@ -1,0 +1,609 @@
+# How-To: Complete Graphviz DOT Guide
+
+```elixir
+Mix.install([
+  {:yog_ex, "~> 0.98"},
+  {:kino_vizjs, "~> 0.8.0"}
+])
+```
+
+## Introduction
+
+`Yog.Render.DOT` and `Yog.Multi.DOT` export graphs to the standard [Graphviz DOT language](https://graphviz.org/doc/info/lang.html) for visualization. By combining the `kino_vizjs` package with `Kino.VizJS`, you can render stunning interactive graph diagrams directly in your Livebook.
+
+This guide covers everything from simple rendering to advanced styling, custom subgraphs, algorithm-specific helpers, and parallel-edge multigraph visualizations.
+
+---
+
+## Quick Start
+
+Creating a graph and rendering it with the default settings:
+
+```elixir
+g = Yog.directed()
+  |> Yog.add_node("Start", nil)
+  |> Yog.add_node("Process", nil)
+  |> Yog.add_node("End", nil)
+  |> Yog.add_edges!([
+    {"Start", "Process", 1},
+    {"Process", "End", 1}
+  ])
+
+# Render with defaults
+dot = Yog.Render.DOT.to_dot(g)
+IO.puts(dot)
+
+Kino.VizJS.render(dot)
+```
+
+---
+
+## Default Options & Helpers
+
+`Yog.Render.DOT` provides a rich configuration map for customizing the generated output.
+
+### `default_options/0`
+
+```elixir
+opts = Yog.Render.DOT.default_options()
+IO.inspect(opts.rankdir, label: "Direction")
+IO.inspect(opts.node_shape, label: "Shape")
+IO.inspect(opts.node_color, label: "Node Color")
+```
+
+### `default_options_with_edge_formatter/1`
+
+Use this when edge data is not a string (e.g. integers, custom structs) to clean up edge labels.
+
+```elixir
+g = Yog.from_edges(:undirected, [{:a, :b, 42}, {:b, :c, 99}])
+
+opts = Yog.Render.DOT.default_options_with_edge_formatter(fn weight ->
+  "#{weight} ms"
+end)
+
+dot = Yog.Render.DOT.to_dot(g, opts)
+Kino.VizJS.render(dot)
+```
+
+### `default_options_with/2`
+
+Customize both node and edge labels at once.
+
+```elixir
+g = Yog.directed()
+  |> Yog.add_node(1, %{name: "Alice", role: "Admin"})
+  |> Yog.add_node(2, %{name: "Bob", role: "User"})
+  |> Yog.add_edge_ensure(1, 2, 100)
+
+opts = Yog.Render.DOT.default_options_with(
+  node_label: fn _id, data -> "#{data.name} (#{data.role})" end,
+  edge_label: fn weight -> "#{weight} Mbps" end
+)
+
+dot = Yog.Render.DOT.to_dot(g, opts)
+Kino.VizJS.render(dot)
+```
+
+### `default_options_without_labels/0`
+
+Hide edge labels entirely for a cleaner structure.
+
+```elixir
+g = Yog.from_edges(:directed, [{:a, :b, 5}, {:b, :c, 10}])
+
+opts = Yog.Render.DOT.default_options_without_labels()
+dot = Yog.Render.DOT.to_dot(g, opts)
+Kino.VizJS.render(dot)
+```
+
+---
+
+## Themes
+
+Professionally designed color schemes built directly into `Yog.Render.DOT`.
+
+```elixir
+g = Yog.Generator.Classic.binary_tree(3)
+```
+
+### Default Theme
+
+```elixir
+dot = Yog.Render.DOT.to_dot(g, Yog.Render.DOT.theme(:default))
+Kino.VizJS.render(dot)
+```
+
+### Dark Theme
+
+```elixir
+dot = Yog.Render.DOT.to_dot(g, Yog.Render.DOT.theme(:dark))
+Kino.VizJS.render(dot)
+```
+
+### Minimal Theme
+
+```elixir
+dot = Yog.Render.DOT.to_dot(g, Yog.Render.DOT.theme(:minimal))
+Kino.VizJS.render(dot)
+```
+
+### Presentation Theme
+
+```elixir
+dot = Yog.Render.DOT.to_dot(g, Yog.Render.DOT.theme(:presentation))
+Kino.VizJS.render(dot)
+```
+
+---
+
+## Directions (`rankdir`)
+
+Control the layout direction of the graph.
+
+```elixir
+g = Yog.from_edges(:directed, [{:a, :b, 1}, {:b, :c, 1}])
+```
+
+### Top-Down (`:tb`)
+
+```elixir
+Kino.VizJS.render(
+  Yog.Render.DOT.to_dot(g, %{Yog.Render.DOT.default_options() | rankdir: :tb})
+)
+```
+
+### Left-to-Right (`:lr`)
+
+```elixir
+Kino.VizJS.render(
+  Yog.Render.DOT.to_dot(g, %{Yog.Render.DOT.default_options() | rankdir: :lr})
+)
+```
+
+### Bottom-to-Top (`:bt`)
+
+```elixir
+Kino.VizJS.render(
+  Yog.Render.DOT.to_dot(g, %{Yog.Render.DOT.default_options() | rankdir: :bt})
+)
+```
+
+### Right-to-Left (`:rl`)
+
+```elixir
+Kino.VizJS.render(
+  Yog.Render.DOT.to_dot(g, %{Yog.Render.DOT.default_options() | rankdir: :rl})
+)
+```
+
+---
+
+## Node Shapes
+
+Graphviz supports a massive variety of node shapes. You can set them globally or per-node.
+
+```elixir
+g = Yog.directed()
+  |> Yog.add_node(1, "Start")
+  |> Yog.add_node(2, "Process")
+  |> Yog.add_node(3, "Decision")
+  |> Yog.add_node(4, "Database")
+  |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}, {3, 4, 1}])
+```
+
+### Box (Rectangle)
+
+```elixir
+Kino.VizJS.render(
+  Yog.Render.DOT.to_dot(g, %{Yog.Render.DOT.default_options() | node_shape: :box})
+)
+```
+
+### Circle
+
+```elixir
+Kino.VizJS.render(
+  Yog.Render.DOT.to_dot(g, %{Yog.Render.DOT.default_options() | node_shape: :circle})
+)
+```
+
+### Cylinder (Database)
+
+```elixir
+Kino.VizJS.render(
+  Yog.Render.DOT.to_dot(g, %{Yog.Render.DOT.default_options() | node_shape: :cylinder})
+)
+```
+
+### Diamond (Decision)
+
+```elixir
+Kino.VizJS.render(
+  Yog.Render.DOT.to_dot(g, %{Yog.Render.DOT.default_options() | node_shape: :diamond})
+)
+```
+
+### Hexagon
+
+```elixir
+Kino.VizJS.render(
+  Yog.Render.DOT.to_dot(g, %{Yog.Render.DOT.default_options() | node_shape: :hexagon})
+)
+```
+
+### Parallelogram
+
+```elixir
+Kino.VizJS.render(
+  Yog.Render.DOT.to_dot(g, %{Yog.Render.DOT.default_options() | node_shape: :parallelogram})
+)
+```
+
+---
+
+## Per-Element Styling
+
+### Per-Node Styling (`node_attributes`)
+
+Pass a callback function `fn id, data -> [{attribute, value}] end` to customize individual node visual characteristics.
+
+```elixir
+g = Yog.directed()
+  |> Yog.add_node(1, %{name: "Alice", role: "Admin"})
+  |> Yog.add_node(2, %{name: "Bob", role: "User"})
+  |> Yog.add_node(3, %{name: "Carol", role: "Guest"})
+  |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}])
+
+node_attrs = fn _id, data ->
+  case data.role do
+    "Admin" -> [{:fillcolor, "#ef4444"}, {:style, "filled"}, {:fontcolor, "white"}]
+    "User" -> [{:fillcolor, "#3b82f6"}, {:style, "filled"}, {:fontcolor, "white"}]
+    _ -> [{:fillcolor, "#94a3b8"}, {:style, "filled"}, {:fontcolor, "black"}]
+  end
+end
+
+opts = %{
+  Yog.Render.DOT.default_options()
+  | node_attributes: node_attrs
+}
+
+Kino.VizJS.render(Yog.Render.DOT.to_dot(g, opts))
+```
+
+### Per-Edge Styling (`edge_attributes`)
+
+Pass a callback function `fn from, to, data -> [{attribute, value}] end` for simple graphs to style individual relationships.
+
+```elixir
+g = Yog.from_edges(:directed, [
+    {:a, :b, %{priority: :high}},
+    {:b, :c, %{priority: :low}},
+    {:a, :c, %{priority: :medium}}
+  ])
+
+edge_attrs = fn _from, _to, weight ->
+  case weight.priority do
+    :high -> [{:color, "#ef4444"}, {:penwidth, 3}]
+    :medium -> [{:color, "#f59e0b"}, {:penwidth, 2}]
+    :low -> [{:color, "#94a3b8"}, {:style, "dashed"}]
+  end
+end
+
+opts = %{
+  Yog.Render.DOT.default_options()
+  | edge_attributes: edge_attrs
+}
+
+Kino.VizJS.render(Yog.Render.DOT.to_dot(g, opts))
+```
+
+---
+
+## Subgraphs & Clusters
+
+In Graphviz, grouping nodes into subgraphs whose names begin with `cluster_` places them in bounding boxes.
+
+```elixir
+g = Yog.directed()
+  |> Yog.add_node(:api, "API Gateway")
+  |> Yog.add_node(:auth, "Auth Service")
+  |> Yog.add_node(:db, "Database")
+  |> Yog.add_node(:cache, "Cache")
+  |> Yog.add_edges!([{:api, :auth, 1}, {:auth, :db, 1}, {:api, :cache, 1}])
+
+opts = %{
+  Yog.Render.DOT.default_options()
+  | subgraphs: [
+      %{
+        name: "cluster_backend",
+        label: "Secure Backend Services",
+        node_ids: [:auth, :db],
+        style: :filled,
+        fillcolor: "#e0f2fe",
+        color: "#0284c7"
+      },
+      %{
+        name: "cluster_infra",
+        label: "Infrastructure",
+        node_ids: [:cache],
+        style: :dotted,
+        fillcolor: "#f1f5f9",
+        color: "#475569"
+      }
+    ]
+}
+
+Kino.VizJS.render(Yog.Render.DOT.to_dot(g, opts))
+```
+
+---
+
+## Capstone: System Architecture Diagram
+
+Combining shapes, custom inline styles, edge latency annotations, and clusters:
+
+```elixir
+system = Yog.directed()
+  # Users & entry points
+  |> Yog.add_node(:users, "Mobile / Web")
+  |> Yog.add_node(:cdn, "CDN")
+  |> Yog.add_node(:lb, "Load Balancer")
+  |> Yog.add_node(:api, "API Gateway")
+
+  # Domain services
+  |> Yog.add_node(:auth, "Auth Service")
+  |> Yog.add_node(:orders, "Order Service")
+  |> Yog.add_node(:payments, "Payment Service")
+  |> Yog.add_node(:inventory, "Inventory Service")
+  |> Yog.add_node(:notifications, "Notification Service")
+
+  # Data layer
+  |> Yog.add_node(:users_db, "Users DB")
+  |> Yog.add_node(:orders_db, "Orders DB")
+  |> Yog.add_node(:inventory_db, "Inventory DB")
+  |> Yog.add_node(:cache, "Redis Cache")
+  |> Yog.add_node(:queue, "Event Queue")
+
+  # Connections with protocol metadata
+  |> Yog.add_edge_ensure(:users, :cdn, %{protocol: :https, latency: 20})
+  |> Yog.add_edge_ensure(:cdn, :lb, %{protocol: :https, latency: 10})
+  |> Yog.add_edge_ensure(:lb, :api, %{protocol: :https, latency: 5})
+  |> Yog.add_edge_ensure(:api, :auth, %{protocol: :grpc, latency: 15})
+  |> Yog.add_edge_ensure(:api, :orders, %{protocol: :grpc, latency: 15})
+  |> Yog.add_edge_ensure(:api, :payments, %{protocol: :grpc, latency: 15})
+  |> Yog.add_edge_ensure(:orders, :inventory, %{protocol: :grpc, latency: 10})
+  |> Yog.add_edge_ensure(:orders, :payments, %{protocol: :grpc, latency: 10})
+  |> Yog.add_edge_ensure(:payments, :queue, %{protocol: :amqp, latency: 5})
+  |> Yog.add_edge_ensure(:queue, :notifications, %{protocol: :amqp, latency: 5})
+  |> Yog.add_edge_ensure(:auth, :users_db, %{protocol: :sql, latency: 5})
+  |> Yog.add_edge_ensure(:auth, :cache, %{protocol: :redis, latency: 2})
+  |> Yog.add_edge_ensure(:orders, :orders_db, %{protocol: :sql, latency: 5})
+  |> Yog.add_edge_ensure(:inventory, :inventory_db, %{protocol: :sql, latency: 5})
+
+# Node shapes based on role
+shape_fn = fn id ->
+  case id do
+    :users -> :circle
+    :cdn -> :hexagon
+    :lb -> :diamond
+    :api -> :box
+    n when n in [:auth, :orders, :payments, :inventory, :notifications] -> :box
+    n when n in [:users_db, :orders_db, :inventory_db] -> :cylinder
+    :cache -> :ellipse
+    :queue -> :box
+    _ -> :box
+  end
+end
+
+# Per-edge colors by protocol
+edge_attrs = fn _from, _to, weight ->
+  case weight.protocol do
+    :https -> [{:color, "#3b82f6"}]
+    :grpc -> [{:color, "#10b981"}]
+    :sql -> [{:color, "#f59e0b"}]
+    :redis -> [{:color, "#ef4444"}]
+    :amqp -> [{:color, "#8b5cf6"}]
+    _ -> []
+  end
+end
+
+opts = %{
+  Yog.Render.DOT.default_options()
+  | rankdir: :lr,
+    bgcolor: "#f8fafc",
+    node_attributes: fn id, _data ->
+      shape = shape_fn.(id)
+      # Base node attributes
+      [{:shape, shape}, {:style, "filled"}, {:fillcolor, "#ffffff"}]
+    end,
+    edge_attributes: edge_attrs,
+    edge_label: fn weight -> "#{weight.latency} ms" end,
+    subgraphs: [
+      %{name: "cluster_entry", label: "Edge Layer", node_ids: [:users, :cdn, :lb], style: nil, fillcolor: nil, color: nil},
+      %{name: "cluster_services", label: "Services", node_ids: [:api, :auth, :orders, :payments, :inventory, :notifications], style: nil, fillcolor: nil, color: nil},
+      %{name: "cluster_data", label: "Data Layer", node_ids: [:users_db, :orders_db, :inventory_db, :cache, :queue], style: nil, fillcolor: nil, color: nil}
+    ]
+}
+
+Kino.VizJS.render(Yog.Render.DOT.to_dot(system, opts))
+```
+
+---
+
+## Highlighting
+
+### Manual Highlighting
+
+```elixir
+g = Yog.from_edges(:directed, [{:a, :b, 1}, {:b, :c, 1}, {:c, :d, 1}])
+
+opts = %{
+  Yog.Render.DOT.default_options()
+  | highlighted_nodes: [:a, :b, :c],
+    highlighted_edges: [{:a, :b}, {:b, :c}]
+}
+
+Kino.VizJS.render(Yog.Render.DOT.to_dot(g, opts))
+```
+
+### `path_to_options/2` — Shortest Path Highlighting
+
+```elixir
+g = Yog.Generator.Classic.grid_2d(5, 5)
+source = 0
+target = 24
+
+{:ok, path} = Yog.Pathfinding.shortest_path(in: g, from: source, to: target)
+
+opts = Yog.Render.DOT.path_to_options(path)
+Kino.VizJS.render(Yog.Render.DOT.to_dot(g, opts), height: "600px")
+```
+
+---
+
+## Algorithm Helper Options
+
+### `mst_to_options/2` — Minimum Spanning Tree
+
+```elixir
+weighted = Yog.from_edges(:undirected, [
+  {:a, :b, 4}, {:a, :h, 8}, {:b, :c, 8},
+  {:c, :d, 7}, {:c, :f, 4}, {:d, :e, 9},
+  {:e, :f, 10}, {:f, :g, 2}, {:g, :h, 1}
+])
+
+{:ok, mst} = Yog.MST.kruskal(in: weighted)
+mst_opts = Yog.Render.DOT.mst_to_options(mst)
+Kino.VizJS.render(Yog.Render.DOT.to_dot(weighted, mst_opts), height: "500px")
+```
+
+### `community_to_options/2` — Community Detection
+
+```elixir
+sbm = Yog.Generator.Random.sbm(16, 2, 0.8, 0.1, community_sizes: [8, 8])
+comm = Yog.Community.Louvain.detect(sbm)
+comm_opts = Yog.Render.DOT.community_to_options(comm)
+Kino.VizJS.render(Yog.Render.DOT.to_dot(sbm, comm_opts), height: "700px")
+```
+
+### `cut_to_options/2` — Min-Cut Partitions
+
+```elixir
+flow = Yog.from_edges(:directed, [{:s, :a, 10}, {:s, :b, 10}, {:a, :t, 10}, {:b, :t, 5}])
+
+result = Yog.Flow.MaxFlow.dinic(flow, :s, :t)
+min_cut = Yog.Flow.MaxFlow.min_cut(result)
+cut_opts = Yog.Render.DOT.cut_to_options(min_cut)
+Kino.VizJS.render(Yog.Render.DOT.to_dot(flow, cut_opts))
+```
+
+### `matching_to_options/2` — Bipartite Matching
+
+```elixir
+bipartite = Yog.from_edges(:undirected, [
+  {:a1, :b1, 1}, {:a1, :b2, 1}, {:a2, :b2, 1}, {:a2, :b3, 1}
+])
+
+matching = Yog.Matching.hopcroft_karp(bipartite)
+match_opts = Yog.Render.DOT.matching_to_options(matching)
+Kino.VizJS.render(Yog.Render.DOT.to_dot(bipartite, match_opts))
+```
+
+---
+
+## Multigraph DOT
+
+`Yog.Multi.DOT` mirrors `Yog.Render.DOT` but supports parallel edges.
+
+### Basic Multigraph Rendering
+
+```elixir
+alias Yog.Multi
+
+mg = Multi.undirected()
+  |> Multi.add_node(:london, nil)
+  |> Multi.add_node(:paris, nil)
+
+{mg, _e1} = Multi.add_edge(mg, :london, :paris, 100)  # Flight
+{mg, _e2} = Multi.add_edge(mg, :london, :paris, 50)   # Train
+{mg, e3} = Multi.add_edge(mg, :london, :paris, 300)   # Ferry
+
+Kino.VizJS.render(Yog.Multi.DOT.to_dot(mg))
+```
+
+### Per-Edge Styling with `edge_id`
+
+In multigraphs, the `edge_attributes` callback receives the unique `edge_id` as the third parameter and the weight as the fourth: `fn from, to, edge_id, weight -> ... end`.
+
+```elixir
+opts = %{
+  Yog.Multi.DOT.default_options()
+  | edge_attributes: fn _from, _to, edge_id, weight ->
+      color =
+        cond do
+          weight == 50 -> "#10b981"   # Train (fastest)
+          weight == 100 -> "#3b82f6"  # Flight
+          true -> "#f59e0b"           # Ferry
+        end
+
+      width = if edge_id == e3, do: "4.0", else: "1.5"
+      [{:color, color}, {:penwidth, width}]
+    end
+}
+
+Kino.VizJS.render(Yog.Multi.DOT.to_dot(mg, opts))
+```
+
+### Subgraphs in Multigraphs
+
+```elixir
+mg = Multi.directed()
+  |> Multi.add_node(:web, "Web Layer")
+  |> Multi.add_node(:api, "API Layer")
+  |> Multi.add_node(:db1, "Primary DB")
+  |> Multi.add_node(:db2, "Replica DB")
+  |> (fn g -> {g, _} = Multi.add_edge(g, :web, :api, 1); g end).()
+  |> (fn g -> {g, _} = Multi.add_edge(g, :api, :db1, 1); g end).()
+  |> (fn g -> {g, _} = Multi.add_edge(g, :api, :db2, 1); g end).()
+
+opts = %{
+  Yog.Multi.DOT.default_options()
+  | subgraphs: [
+      %{
+        name: "cluster_data_layer",
+        label: "Data Layer",
+        node_ids: [:db1, :db2],
+        style: nil,
+        fillcolor: nil,
+        color: nil
+      }
+    ]
+}
+
+Kino.VizJS.render(Yog.Multi.DOT.to_dot(mg, opts))
+```
+
+---
+
+## Summary
+
+| Capability                    | Module           | Key Function / Option                                            |
+| ----------------------------- | ---------------- | ---------------------------------------------------------------- |
+| Basic export                  | `Yog.Render.DOT` | `to_dot/2`                                                       |
+| Basic export (parallel edges) | `Yog.Multi.DOT`  | `to_dot/2`                                                       |
+| Default options               | Both             | `default_options/0`                                              |
+| Custom edge formatter         | `Yog.Render.DOT` | `default_options_with_edge_formatter/1`                          |
+| Custom labels                 | `Yog.Render.DOT` | `default_options_with/2`                                         |
+| Themes                        | `Yog.Render.DOT` | `theme/1` (`:default`, `:dark`, `:minimal`, `:presentation`)     |
+| Direction                     | Both             | `rankdir:` (`:tb`, `:lr`, `:bt`, `:rl`)                          |
+| Node shapes                   | Both             | `node_shape:` (e.g., `:circle`, `:box`, `:cylinder`, `:diamond`) |
+| Per-node styles               | Both             | `node_attributes:` callback                                      |
+| Per-edge styles               | `Yog.Render.DOT` | `edge_attributes: fn f, t, w -> ...`                             |
+| Per-edge styles (multi)       | `Yog.Multi.DOT`  | `edge_attributes: fn f, t, id, w -> ...`                         |
+| Subgraphs                     | Both             | `subgraphs:` list                                                |
+| Path highlighting             | `Yog.Render.DOT` | `path_to_options/2`                                              |
+| MST highlighting              | `Yog.Render.DOT` | `mst_to_options/2`                                               |
+| Community colors              | `Yog.Render.DOT` | `community_to_options/2`                                         |
+| Min-cut colors                | `Yog.Render.DOT` | `cut_to_options/2`                                               |
+| Matching highlight            | `Yog.Render.DOT` | `matching_to_options/2`                                          |

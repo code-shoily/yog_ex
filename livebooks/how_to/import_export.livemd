@@ -3,120 +3,251 @@
 ```elixir
 Mix.install([
   {:yog_ex, "~> 0.98"},
-  {:jason, "~> 1.4"} # Needed for JSON
+  {:jason, "~> 1.4"}, # Optional, but needed for JSON serialization
+  {:libgraph, "~> 0.16.0"},
+  {:kino_vizjs, "~> 0.8.0"} # Needed to render Graphviz DOT diagrams
 ])
 ```
 
 ## Introduction
 
-`Yog` is designed to be a "good citizen" in the data ecosystem. It supports several industry-standard formats for importing and exporting graphs, ensuring that you can easily integrate `Yog` with other tools like Gephi, Cytoscape, or NetworkX.
+`Yog` is built to be a highly interoperable participant in the data ecosystem. It supports a wide range of industry-standard serialization and graph exchange formats. This makes it seamless to move graph datasets between `Yog` and external toolkits (such as Gephi, NetworkX, Cytoscape, or mathematical database archives).
 
-## GraphML (The Standard)
+This guide showcases all of `Yog`'s import/export engines.
 
-GraphML is an XML-based format that is the de-facto standard for graph interchange.
+---
+
+## 1. Structured XML Formats
+
+### GraphML (The Enterprise Standard)
+
+GraphML is the de-facto XML standard for graph interchange. It supports comprehensive node and edge properties.
 
 ```elixir
 g = Yog.Generator.Classic.petersen()
 
-# 1. Export to GraphML string
-{:ok, xml} = Yog.IO.GraphML.serialize(g)
-IO.puts String.slice(xml, 0, 200) <> "..."
+# Export to GraphML string
+graphml_xml = Yog.IO.GraphML.serialize(g)
+IO.puts(String.slice(graphml_xml, 0, 250) <> "...\n")
 
-# 2. Import from GraphML string
-{:ok, imported_g} = Yog.IO.GraphML.deserialize(xml)
-IO.puts("Imported graph has #{Yog.node_count(imported_g)} nodes and #{Yog.edge_count(imported_g)} edges")
+# Import back from GraphML
+{:ok, imported_g} = Yog.IO.GraphML.deserialize(graphml_xml)
+IO.puts("Imported GraphML: #{Yog.node_count(imported_g)} nodes, #{Yog.edge_count(imported_g)} edges")
+
+# Render imported graph
+Kino.VizJS.render(Yog.Render.DOT.to_dot(imported_g))
 ```
 
-## JSON (For Web & Data)
+### GEXF (Gephi Exchange Format)
 
-JSON is perfect for passing graph data to frontend libraries like Cytoscape.js or D3.js.
+GEXF is the native format for **Gephi**. It supports structural components, hierarchical structures, and visual styling metadata.
+
+```elixir
+g = Yog.directed()
+  |> Yog.add_node(1, %{label: "A"})
+  |> Yog.add_node(2, %{label: "B"})
+  |> Yog.add_edge_ensure(1, 2, 5.5)
+
+# Export to GEXF
+gexf_xml = Yog.IO.GEXF.serialize(g)
+IO.puts(String.slice(gexf_xml, 0, 250) <> "...\n")
+
+# Import back from GEXF
+{:ok, imported_g} = Yog.IO.GEXF.deserialize(gexf_xml)
+IO.puts("Imported GEXF: #{Yog.node_count(imported_g)} nodes")
+
+# Render imported graph
+Kino.VizJS.render(Yog.Render.DOT.to_dot(imported_g))
+```
+
+---
+
+## 2. Web Serialization
+
+### JSON (Cytoscape & D3.js)
+
+JSON is the standard format for pushing graph databases to frontend clients using visualization libraries like Cytoscape.js or D3.js.
 
 ```elixir
 g = Yog.undirected()
   |> Yog.add_node(1, %{name: "Alice"})
   |> Yog.add_node(2, %{name: "Bob"})
-  |> Yog.add_edge!(1, 2, %{type: "friend"})
+  |> Yog.add_edge!(1, 2, %{type: "friends"})
 
-# 1. Export to JSON (uses Jason internally)
-{:ok, json} = Yog.IO.JSON.serialize(g)
-IO.puts json
+# Export to JSON (returns the JSON string directly)
+json = Yog.IO.JSON.to_json(g)
+IO.puts(json)
 
-# 2. Import from JSON
-{:ok, imported_g} = Yog.IO.JSON.deserialize(json)
-IO.puts("Imported: #{Yog.node_count(imported_g)} nodes")
+# Import back from JSON
+{:ok, imported_g} = Yog.IO.JSON.from_json(json)
+IO.puts("\nImported JSON: #{Yog.node_count(imported_g)} nodes")
+
+# Render imported graph
+Kino.VizJS.render(Yog.Render.DOT.to_dot(imported_g))
 ```
 
-## GDF (GUESS Format)
+---
 
-GDF is a simple CSV-like format used by the GUESS visualization tool and Gephi.
+## 3. Compact Mathematical Representations
 
-```elixir
-g = Yog.Generator.Classic.cycle(5)
+### Graph6 (For Small Graphs)
 
-# Export to GDF
-gdf = Yog.IO.GDF.serialize(g)
-IO.puts gdf
-
-# Import from GDF
-{:ok, imported} = Yog.IO.GDF.deserialize(gdf)
-IO.puts("Imported: #{Yog.node_count(imported)} nodes, #{Yog.edge_count(imported)} edges")
-```
-
-## Graph6 (Compact Encoding)
-
-Graph6 is a compact text format for encoding small graphs. It's popular in mathematics and competitions.
+Graph6 is an extremely compact ASCII format for storing small, undirected graphs. It is widely used in graph databases, graph theory contests, and academic databases.
 
 ```elixir
 g = Yog.Generator.Classic.petersen()
 
-# Export to graph6
-{:ok, g6} = Yog.IO.Graph6.serialize(g)
-IO.puts("Graph6: #{g6}")
+# Export to Graph6
+{:ok, g6_str} = Yog.IO.Graph6.serialize(g)
+IO.puts("Petersen in Graph6: #{g6_str}")
 
-# Import from graph6
-{:ok, imported} = Yog.IO.Graph6.deserialize(g6)
-IO.puts("Imported: #{Yog.node_count(imported)} nodes, #{Yog.edge_count(imported)} edges")
+# Import back from Graph6
+{:ok, imported} = Yog.IO.Graph6.parse(g6_str)
+IO.puts("Imported Graph6: #{Yog.node_count(imported)} nodes")
 
-# Cycle graph C5
-c5_g6 = Yog.IO.Graph6.encode_graph6(Yog.Generator.Classic.cycle(5))
-IO.puts("C5 in graph6: #{c5_g6}")
+# Render imported graph
+Kino.VizJS.render(Yog.Render.DOT.to_dot(imported))
 ```
 
-## Interoperability with `libgraph`
+### Sparse6 (For Large Sparse Graphs)
 
-If you are migrating from `libgraph` or need to use an algorithm only available there, `Yog` makes the transition seamless.
+Sparse6 is a companion format to Graph6 designed for much larger, sparse graphs where Graph6 becomes inefficient.
+
+```elixir
+g = Yog.Generator.Classic.cycle(20)
+
+# Export to Sparse6
+{:ok, s6_str} = Yog.IO.Sparse6.serialize(g)
+IO.puts("Cycle(20) in Sparse6: #{s6_str}")
+
+# Import back from Sparse6
+{:ok, imported} = Yog.IO.Sparse6.parse(s6_str)
+IO.puts("Imported Sparse6: #{Yog.node_count(imported)} nodes")
+
+# Render imported graph
+Kino.VizJS.render(Yog.Render.DOT.to_dot(imported))
+```
+
+---
+
+## 4. Trivial & Legacy Formats
+
+### TGF (Trivial Graph Format)
+
+TGF is the simplest possible text format: nodes on top, a separator line `#`, and edges on the bottom. It's excellent for rapid debugging.
+
+```elixir
+g = Yog.directed()
+  |> Yog.add_node(1, "Alice")
+  |> Yog.add_node(2, "Bob")
+  |> Yog.add_edge_ensure(1, 2, "follows")
+
+# Export to TGF
+tgf = Yog.IO.TGF.serialize(g)
+IO.puts(tgf)
+
+# Import back from TGF
+{:ok, {:tgf_result, imported, _warnings}} = Yog.IO.TGF.parse(tgf, :directed)
+IO.puts("Imported TGF: #{Yog.node_count(imported)} nodes")
+
+# Render imported graph
+Kino.VizJS.render(Yog.Render.DOT.to_dot(imported))
+```
+
+### GDF (GUESS Format)
+
+GDF is a CSV-like flat structure used by the GUESS visualization tool.
+
+```elixir
+g = Yog.Generator.Classic.cycle(4)
+
+# Export to GDF
+gdf = Yog.IO.GDF.serialize(g)
+IO.puts(gdf)
+
+# Import back from GDF
+{:ok, imported} = Yog.IO.GDF.deserialize(gdf)
+IO.puts("Imported GDF: #{Yog.node_count(imported)} nodes")
+
+# Render imported graph
+Kino.VizJS.render(Yog.Render.DOT.to_dot(imported))
+```
+
+### Pajek (`.net` format)
+
+Pajek format is a popular format used by the Pajek social network analysis package.
+
+```elixir
+g = Yog.from_edges(:directed, [{1, 2, 10}, {2, 3, 5}])
+
+# Export to Pajek format
+pajek = Yog.IO.Pajek.serialize(g)
+IO.puts(pajek)
+
+# Import back from Pajek
+{:ok, {_, imported, _}} = Yog.IO.Pajek.parse(pajek)
+IO.puts("Imported Pajek: #{Yog.Model.node_count(imported)} nodes")
+
+# Render imported graph
+Kino.VizJS.render(Yog.Render.DOT.to_dot(imported))
+```
+
+### Matrix Market (Scientific / Sparse Matrix)
+
+The Matrix Market coordinate format represents a graph as a sparse matrix, used heavily in scientific and numerical computing packages.
+
+```elixir
+g = Yog.from_edges(:undirected, [{1, 2, 5.0}, {2, 3, 12.5}])
+
+# Export to Matrix Market Format
+matrix_market = Yog.IO.MatrixMarket.serialize(g)
+IO.puts(matrix_market)
+
+# Import back from Matrix Market
+{:ok, {_, imported, _}} = Yog.IO.MatrixMarket.parse(matrix_market)
+IO.puts("Imported Matrix Market: #{Yog.node_count(imported)} nodes")
+
+# Render imported graph
+Kino.VizJS.render(Yog.Render.DOT.to_dot(imported))
+```
+
+---
+
+## 5. Elixir Ecosystem Interoperability
+
+### libgraph Bridge
+
+If you are using Elixir's classic `libgraph` package elsewhere in your architecture, `Yog` provides an adapter to convert graphs back and forth seamlessly.
 
 ```elixir
 # Create a libgraph graph
 lg = Graph.new() |> Graph.add_edge(1, 2)
 
-# Convert to Yog
-yg = Yog.IO.Libgraph.from_libgraph(lg)
-IO.puts("Yog graph: #{Yog.node_count(yg)} nodes")
+# Convert libgraph -> Yog
+{:ok, yg} = Yog.IO.Libgraph.from_libgraph(lg)
+IO.puts("Yog graph nodes: #{Yog.DAG.to_graph(yg) |> Yog.node_count()}")
 
-# Convert back to libgraph
+# Convert Yog -> libgraph
 lg_back = Yog.IO.Libgraph.to_libgraph(yg)
-IO.puts("Back to libgraph: #{length(Graph.vertices(lg_back))} vertices")
+IO.puts("libgraph vertices back: #{length(Graph.vertices(lg_back))}")
+
+# Render the Yog equivalent
+Kino.VizJS.render(Yog.Render.DOT.to_dot(Yog.DAG.to_graph(yg)))
 ```
 
-## DOT (For Visualization)
+---
 
-While DOT is primarily for visualization, it is also a valid interchange format.
+## I/O Modules Summary
 
-```elixir
-g = Yog.Generator.Classic.cycle(5)
-
-dot = Yog.Render.DOT.to_dot(g)
-IO.puts dot
-```
-
-## Summary
-
-`Yog`'s I/O suite allows you to:
-1.  **Collaborate**: Use **GraphML** to share data with researchers using other languages.
-2.  **Build**: Use **JSON** to power interactive web visualizations.
-3.  **Archive**: Use **Graph6** for compact, lossless graph encoding.
-4.  **Migrate**: Use the **libgraph** bridge to leverage existing Elixir codebases.
-5.  **Publish**: Use **DOT** to generate high-quality diagrams.
-
-Next, explore the **Gallery** to see more exotic graph structures!
+| Format            | Module                | Typical File Ext | Description                                         |
+| ----------------- | --------------------- | ---------------- | --------------------------------------------------- |
+| **GraphML**       | `Yog.IO.GraphML`      | `.graphml`       | XML standard, retains attributes                    |
+| **GEXF**          | `Yog.IO.GEXF`         | `.gexf`          | Gephi XML format, retains styles/hierarchies        |
+| **JSON**          | `Yog.IO.JSON`         | `.json`          | Web frontend/interop (requires `jason`)             |
+| **Graph6**        | `Yog.IO.Graph6`       | `.g6`            | Compact mathematical format for small graphs        |
+| **Sparse6**       | `Yog.IO.Sparse6`      | `.s6`            | Compact mathematical format for large sparse graphs |
+| **TGF**           | `Yog.IO.TGF`          | `.tgf`           | Simple space-separated text layout                  |
+| **GDF**           | `Yog.IO.GDF`          | `.gdf`           | CSV-like layout for GUESS / Gephi                   |
+| **Pajek**         | `Yog.IO.Pajek`        | `.net` / `.paj`  | Pajek social network representation                 |
+| **Matrix Market** | `Yog.IO.MatrixMarket` | `.mtx`           | Scientific coordinate sparse matrix format          |
+| **libgraph**      | `Yog.IO.Libgraph`     | N/A              | Convert between `Yog` and legacy `libgraph` structs |

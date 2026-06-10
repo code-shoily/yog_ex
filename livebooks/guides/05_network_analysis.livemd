@@ -17,15 +17,14 @@ Network analysis allows us to understand the underlying structure of a graph. Wh
 
 Centrality measures tell us which nodes are the most "important," but "importance" can mean different things:
 
-*   **Degree Centrality**: Who has the most connections? (Popularity)
-*   **Betweenness Centrality**: Who acts as a bridge between groups? (Brokerage)
-*   **Closeness Centrality**: Who can reach everyone else fastest? (Efficiency)
-*   **PageRank**: Who is connected to other important nodes? (Influence)
+* **Degree Centrality**: Who has the most connections? (Popularity)
+* **Betweenness Centrality**: Who acts as a bridge between groups? (Brokerage)
+* **Closeness Centrality**: Who can reach everyone else fastest? (Efficiency)
+* **PageRank**: Who is connected to other important nodes? (Influence)
 
 ```elixir
 # Create a "Bowtie" graph: two triangles connected by a bridge
-g = Yog.undirected()
-  |> Yog.add_edges!([
+g = Yog.from_edges(:undirected, [
     {:a, :b, 1}, {:b, :c, 1}, {:c, :a, 1}, # Triangle 1
     {:c, :d, 1},                          # The Bridge
     {:d, :e, 1}, {:e, :f, 1}, {:f, :d, 1}  # Triangle 2
@@ -51,8 +50,8 @@ Community detection finds groups of nodes that are more densely connected to eac
 
 ```elixir
 # Generate a random graph with built-in communities
-# Using Stochastic Block Model (SBM)
-g = Yog.Generator.Random.sbm([10, 10, 10], [[0.8, 0.1, 0.1], [0.1, 0.8, 0.1], [0.1, 0.1, 0.8]])
+# 30 nodes total, 3 communities of 10 nodes each, p_in = 0.8, p_out = 0.1
+g = Yog.Generator.Random.sbm(30, 3, 0.8, 0.1, community_sizes: [10, 10, 10])
 
 # Detect communities using the Louvain method
 result = Yog.Community.Louvain.detect(g)
@@ -62,7 +61,8 @@ IO.inspect(result.assignments, label: "Node -> Community")
 
 # Visualize it! (We'll color nodes by community)
 opts = Yog.Render.DOT.community_to_options(result)
-Kino.VizJS.render(Yog.Render.DOT.to_dot(g, opts))
+Kino.VizJS.render(Yog.Render.DOT.to_dot(g, opts), engine: "circo", height: "600px")
+
 ```
 
 ## Connectivity & Robustness
@@ -70,24 +70,21 @@ Kino.VizJS.render(Yog.Render.DOT.to_dot(g, opts))
 A network is only as strong as its weakest link. `Yog` can find **Articulation Points** (nodes whose removal increases the number of connected components) and **Bridges** (edges whose removal does the same).
 
 ```elixir
-g = Yog.undirected()
-  |> Yog.add_edges!([
+g = Yog.from_edges(:undirected, [
     {1, 2, 1}, {2, 3, 1}, {3, 1, 1}, # Component 1
     {3, 4, 1},                      # Bridge!
     {4, 5, 1}, {5, 6, 1}, {6, 4, 1}  # Component 2
   ])
 
-# Find Articulation Points
-# Nodes 3 and 4 are articulation points
-aps = Yog.Connectivity.Articulation.find(g)
-IO.inspect(aps, label: "Articulation Points")
+# 1. Analyze connectivity in one pass
+results = Yog.Connectivity.analyze(g)
+aps = results.articulation_points # [3, 4]
+bridges = results.bridges         # [{3, 4}]
 
-# Find Bridges
-# Edge {3, 4} is a bridge
-bridges = Yog.Connectivity.Bridge.find(g)
+IO.inspect(aps, label: "Articulation Points")
 IO.inspect(bridges, label: "Bridges")
 
-# Visualize with articulation points highlighted
+# 2. Visualize with articulation points highlighted
 node_attrs = fn id, _data ->
   if id in aps do
     [{:fillcolor, "#ef4444"}, {:style, "filled"}, {:shape, "doublecircle"}]
@@ -98,7 +95,7 @@ end
 
 edge_attrs = fn u, v, _w ->
   if {u, v} in bridges or {v, u} in bridges do
-    [{:color, "#ef4444"}, {:penwidth, 3}]
+    [{:color, "#ef4444"}, {:penwidth, "3"}]
   else
     []
   end
@@ -109,14 +106,16 @@ dot = Yog.Render.DOT.to_dot(g,
   |> Map.put(:node_attributes, node_attrs)
   |> Map.put(:edge_attributes, edge_attrs)
 )
-Kino.VizJS.render(dot)
+Kino.VizJS.render(dot, height: "500px")
+
 ```
 
 ## Summary
 
 `Yog`'s network analysis toolkit includes:
-1.  **9+ Centrality Measures** for identifying key actors.
-2.  **State-of-the-art Community Detection** (Louvain, Leiden, Infomap).
-3.  **Connectivity Analysis** to identify vulnerabilities and bottlenecks.
+
+1. **9+ Centrality Measures** for identifying key actors.
+2. **State-of-the-art Community Detection** (Louvain, Leiden, Infomap).
+3. **Connectivity Analysis** to identify vulnerabilities and bottlenecks.
 
 Next, explore **Network Flow** to see how much "traffic" your network can handle!

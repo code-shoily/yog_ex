@@ -80,24 +80,31 @@ IO.inspect(path.nodes, label: "Route")
 A* uses a heuristic to "guide" the search towards the goal, making it much faster for coordinate-based graphs.
 
 ```elixir
-# Create a small grid graph
-grid = Yog.Builder.GridGraph.new(5, 5)
+# 1. Create a populated 5x5 grid graph
+grid = Yog.Builder.Grid.from_2d_list(
+  List.duplicate(List.duplicate(".", 5), 5),
+  :undirected,
+  Yog.Builder.Grid.always()
+)
 graph = Yog.Builder.GridGraph.to_graph(grid)
 
-# Manhattan distance heuristic
+# 2. Manhattan distance heuristic
 heuristic = fn node, goal ->
   {r1, c1} = Yog.Builder.GridGraph.id_to_coord(grid, node)
   {r2, c2} = Yog.Builder.GridGraph.id_to_coord(grid, goal)
   abs(r1 - r2) + abs(c1 - c2)
 end
 
+# 3. Define endpoints using coordinates
 start = Yog.Builder.GridGraph.coord_to_id(grid, 0, 0)
 goal = Yog.Builder.GridGraph.coord_to_id(grid, 4, 4)
 
+# 4. Perform A* pathfinding
 {:ok, path} = Yog.Pathfinding.a_star(in: graph, from: start, to: goal, heuristic: heuristic)
 
 IO.puts "A* path length: #{path.weight}"
 IO.inspect(path.nodes, label: "Path nodes")
+
 ```
 
 ### Bellman-Ford (Negative Weights)
@@ -114,8 +121,7 @@ g = Yog.from_edges(:directed, [
     {:c, :b, 2}
   ])
 
-{:ok, distances} = Yog.Pathfinding.BellmanFord.shortest_path(in: g, from: :s)
-IO.inspect(distances, label: "Shortest distances from S")
+Yog.Pathfinding.BellmanFord.bellman_ford(in: g, from: :s, to: :b)
 ```
 
 ## All-Pairs Shortest Paths (Floyd-Warshall)

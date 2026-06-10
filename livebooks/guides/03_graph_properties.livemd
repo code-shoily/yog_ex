@@ -11,7 +11,7 @@ Mix.install([
 
 Graph properties help us understand the mathematical nature of a network. Can it be drawn on a flat surface without edges crossing? Does it have a path that visits every edge exactly once? How can we connect all points with the minimum amount of cable?
 
-`Yog` provides high-performance implementations for these classic graph theory problems.
+`Yog` provides expressive implementations for these classic graph theory problems.
 
 ## Minimum Spanning Tree (MST)
 
@@ -36,9 +36,9 @@ g = Yog.from_edges(:undirected, [
 IO.puts "MST Total Weight: #{result.total_weight}"
 
 # Visualize the MST (highlighting the edges)
-mst_options = Yog.Render.DOT.mst_to_options(result, Yog.Render.DOT.theme(:minimal))
+mst_options = Yog.Render.DOT.mst_to_options(result)
 dot = Yog.Render.DOT.to_dot(g, mst_options)
-Kino.VizJS.render(dot, height: "400px")
+Kino.VizJS.render(dot, height: "600px")
 ```
 
 ## Eulerian Paths (Seven Bridges of Königsberg)
@@ -46,32 +46,40 @@ Kino.VizJS.render(dot, height: "400px")
 An **Eulerian Path** visits every edge exactly once. An **Eulerian Circuit** starts and ends at the same node.
 
 ```elixir
-# The famous Seven Bridges of Königsberg graph
-# (This multigraph cannot have an Eulerian path because 4 nodes have odd degrees)
-konigsberg =
-  Yog.from_edges(:undirected, [
-    # Two bridges
-    {:north, :island, 1},
-    {:north, :island, 2},
-    # Two bridges
-    {:south, :island, 3},
-    {:south, :island, 4},
-    {:east, :island, 5},
-    {:north, :east, 6},
-    {:south, :east, 7}
-  ])
+# 1. Build the Seven Bridges of Königsberg as a Multigraph
+bridges = [
+  {:north, :island, 1},
+  {:north, :island, 2},
+  {:south, :island, 3},
+  {:south, :island, 4},
+  {:east, :island, 5},
+  {:north, :east, 6},
+  {:south, :east, 7}
+]
 
-case Yog.Property.Eulerian.eulerian_circuit(konigsberg) do
+konigsberg =
+  Enum.reduce(bridges, Yog.Multi.undirected(), fn {from, to, data}, g ->
+    g
+    |> Yog.Multi.add_node(from)
+    |> Yog.Multi.add_node(to)
+    |> Yog.Multi.add_edge(from, to, data)
+    |> elem(0)
+  end)
+
+# 2. Check Eulerian circuit on multigraph using Yog.Multi
+case Yog.Multi.find_eulerian_circuit(konigsberg) do
   {:ok, path} ->
     IO.puts("Eulerian circuit exists!")
     IO.inspect(path, label: "Circuit")
 
-  {:error, _} ->
+  :error ->
     IO.puts("No Eulerian circuit possible. (Euler was right!)")
 end
 
-# A graph that DOES have an Eulerian circuit (all even degrees)
-square = Yog.undirected()
+# 3. Simple graphs work fine with Yog.Property.Eulerian
+square = 
+  Yog.undirected()
+  |> Yog.add_nodes_from([:a, :b,  :c, :d])
   |> Yog.add_edges!([
     {:a, :b, 1}, {:b, :c, 1},
     {:c, :d, 1}, {:d, :a, 1}
@@ -85,6 +93,18 @@ case Yog.Property.Eulerian.eulerian_circuit(square) do
   {:error, _} ->
     IO.puts("No Eulerian circuit.")
 end
+
+opts = 
+  Yog.Multi.DOT.default_options()
+  |> Map.merge(%{
+    splines: :curved,
+    layout: :circo,
+    edge_label: fn _edge_id, bridge_name -> bridge_name end,
+    node_shape: :circle
+  })
+
+dot_source = Yog.Multi.DOT.to_dot(konigsberg, opts)
+Kino.VizJS.render(dot_source)
 ```
 
 ## Graph Coloring
@@ -111,7 +131,7 @@ node_attrs = fn id, _data ->
 end
 
 dot = Yog.Render.DOT.to_dot(g, Yog.Render.DOT.theme(:minimal) |> Map.put(:node_attributes, node_attrs))
-Kino.VizJS.render(dot)
+Kino.VizJS.render(dot, height: "600px")
 ```
 
 ## Planarity
