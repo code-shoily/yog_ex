@@ -473,6 +473,14 @@ defmodule Yog.CentralityTest do
     assert scores[3] >= 1.0
   end
 
+  test "katz_default_options_test" do
+    graph = triangle_graph()
+    scores_default = Yog.Centrality.katz(graph)
+    scores_explicit = Yog.Centrality.katz(graph, alpha: 0.1, beta: 1.0)
+
+    assert scores_default == scores_explicit
+  end
+
   test "katz_with_options_test" do
     graph = triangle_graph()
 

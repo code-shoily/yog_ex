@@ -259,7 +259,13 @@ defmodule Yog.Community.Leiden do
     else
       aggregated = phase2_aggregate(graph, state_after_refinement.assignments)
 
-      new_state = rebuild_state(aggregated)
+      initial_assignments_next_level =
+        Enum.reduce(state_after_refinement.assignments, %{}, fn {node, r_comm}, acc ->
+          c_comm = Map.get(state_after_local.assignments, node)
+          Map.put_new(acc, r_comm, c_comm)
+        end)
+
+      new_state = rebuild_state(aggregated, initial_assignments_next_level)
       {next_level_state, _} = do_leiden(aggregated, new_state, iteration + 1, options)
 
       composed_assignments =
@@ -293,7 +299,14 @@ defmodule Yog.Community.Leiden do
       Dendrogram.new(Enum.reverse(new_levels), [])
     else
       aggregated = phase2_aggregate(graph, state_after_refinement.assignments)
-      new_state = rebuild_state(aggregated)
+
+      initial_assignments_next_level =
+        Enum.reduce(state_after_refinement.assignments, %{}, fn {node, r_comm}, acc ->
+          c_comm = Map.get(state_after_local.assignments, node)
+          Map.put_new(acc, r_comm, c_comm)
+        end)
+
+      new_state = rebuild_state(aggregated, initial_assignments_next_level)
       do_leiden_hierarchical(aggregated, new_state, new_levels, iteration + 1, options)
     end
   end
@@ -419,6 +432,7 @@ defmodule Yog.Community.Leiden do
           end
         end)
 
+      well_connected_set = MapSet.new(well_connected_nodes)
       shuffled_nodes = Yog.Utils.fisher_yates(well_connected_nodes, options.seed)
 
       Enum.reduce(
@@ -434,6 +448,7 @@ defmodule Yog.Community.Leiden do
             candidates =
               Enum.filter(neighbor_weights, fn {c_ref, w_u_cref} ->
                 c_ref != comm_u and
+                  (Map.get(r_sizes, c_ref, 0) > 1 or MapSet.member?(well_connected_set, c_ref)) and
                   (
                     k_cref = Map.get(r_tots, c_ref, 0.0)
                     m > 0.0 and w_u_cref >= options.resolution * k_u * k_cref / (2.0 * m)
@@ -442,22 +457,35 @@ defmodule Yog.Community.Leiden do
 
             theta = 1.0
 
+            max_gain =
+              Enum.reduce(candidates, 0.0, fn {c_ref, w_u_cref}, acc ->
+                k_cref = Map.get(r_tots, c_ref, 0.0)
+                gain = w_u_cref - options.resolution * k_u * k_cref / (2.0 * m)
+                max(acc, gain / theta)
+              end)
+
             weights =
               Enum.map(candidates, fn {c_ref, w_u_cref} ->
                 k_cref = Map.get(r_tots, c_ref, 0.0)
                 gain = w_u_cref - options.resolution * k_u * k_cref / (2.0 * m)
-                weight = :math.exp(gain / theta)
+                weight = :math.exp(gain / theta - max_gain)
                 {c_ref, weight}
               end)
 
-            total_weight = 1.0 + Enum.sum(Enum.map(weights, &elem(&1, 1)))
+            stay_weight = :math.exp(-max_gain)
+            total_weight = stay_weight + Enum.sum(Enum.map(weights, &elem(&1, 1)))
 
             # Seed the random number generator deterministically for this node
             seed_val = options.seed + :erlang.phash2(u)
             _ = :rand.seed(:exsss, {seed_val, 0, 0})
             r = :rand.uniform() * total_weight
 
-            target_comm = select_target(weights, r, 1.0)
+            target_comm =
+              if r <= stay_weight do
+                nil
+              else
+                select_target(weights, r, stay_weight)
+              end
 
             if target_comm != nil do
               new_assigns = Map.put(r_assigns, u, target_comm)
@@ -488,7 +516,7 @@ defmodule Yog.Community.Leiden do
     case Map.fetch(out_edges, u) do
       {:ok, edges} ->
         List.foldl(Map.to_list(edges), 0.0, fn {v, w}, acc ->
-          if MapSet.member?(nodes_in_c, v) do
+          if v != u and MapSet.member?(nodes_in_c, v) do
             acc + w
           else
             acc
@@ -756,17 +784,14 @@ defmodule Yog.Community.Leiden do
     end)
   end
 
-  defp rebuild_state(aggregated_graph) do
-    nodes = Map.keys(aggregated_graph.nodes)
+  defp rebuild_state(aggregated_graph, initial_assignments) do
     total_weight = calculate_total_weight(aggregated_graph)
-
-    new_assignments = Map.new(Enum.with_index(nodes), fn {node, i} -> {node, i} end)
     node_weights = calculate_node_weights(aggregated_graph)
 
     %{
-      assignments: new_assignments,
+      assignments: initial_assignments,
       node_weights: node_weights,
-      community_totals: calculate_community_totals(new_assignments, node_weights),
+      community_totals: calculate_community_totals(initial_assignments, node_weights),
       total_weight: total_weight
     }
   end
