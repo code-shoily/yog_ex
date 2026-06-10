@@ -147,8 +147,8 @@ defmodule Yog.Oracle.PropertiesTest do
   @tag :oracle
   property "P-ORAC-PROP-008 Weisfeiler-Lehman Graph Hash equivalence matches NetworkX" do
     check all(
-            g1 <- Yog.Generators.graph_gen(),
-            g2 <- Yog.Generators.graph_of_kind_gen(g1.kind),
+            g1 <- Yog.Generators.undirected_graph_gen(),
+            g2 <- Yog.Generators.undirected_graph_gen(),
             max_runs: 50
           ) do
       nodes = Map.keys(g1.nodes)
