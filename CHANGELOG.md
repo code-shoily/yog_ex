@@ -11,9 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`Yog.Property.Clique.all_maximal_cliques/1`** — Self-loop edges no longer cause the node to appear as its own neighbour in the Bron–Kerbosch adjacency map. Previously a single node with a self-loop was incorrectly counted as a 2-clique.
 - **`Yog.Connectivity.Reachability.counts_estimate/2`** now works for large graphs. `phash2` has explicity range passed.
+- **`Yog.Flow.MinCost.ssp/4`** — Rewrote residual graph representation to use unique edge IDs in the Successive Shortest Path (SSP) min-cost flow algorithm, preventing antiparallel edges from overwriting each other.
+- **`Yog.Community.Leiden`** — Corrected refinement target community selection, candidate filtering, and self-loop exclusion.
 
 ### Added
 
+- **NetworkX Comparative Benchmarks** — Added a comparative benchmark suite (`benchmarks/networkx/`) comparing YogEx performance to NetworkX across various algorithms (topological sort, connected components, shortest paths, centrality measures, community detection, max flow, MST, etc.).
+- **Centrality Oracle Tests** — Added oracle parity tests for centrality measures (PageRank, Betweenness, Closeness, Harmonic, Katz, and Eigenvector centrality) to verify agreement between Yog and NetworkX.
+- **Priority 1 Oracle Tests** — Implemented oracle tests for Successive Shortest Path (Min-Cost Flow), Graph Isomorphism, Weisfeiler-Lehman (WL) Hash, and Tarjan's Bridges & Articulation Points.
 - **NetworkX Oracle Test Suite** — Property-based cross-implementation parity tests that treat NetworkX as a ground-truth oracle. Every test generates a random graph, dispatches it to a Python subprocess running NetworkX, and compares the decoded result against YogEx. 37 properties covering:
   - **Pathfinding** (8 properties): Dijkstra SSSP, A*, Bellman-Ford, Floyd-Warshall, Johnson, Bidirectional Dijkstra, Bidirectional BFS, Yen k-shortest.
   - **Flow & Cuts** (3 properties): Edmonds-Karp, Dinic, Stoer-Wagner.
@@ -29,11 +34,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Leiden Community Detection** — Refactored the Leiden algorithm (`Yog.Community.Leiden`) to use true stochastic refinement.
+- **Weighted Centrality** — Updated centrality functions to support and utilize edge weights.
 - **CI split** — Fast main CI (`mix test`) excludes `:oracle` tags and finishes in ~5 s. Oracle parity tests run nightly via a separate workflow.
 - **`test/oracle/scripts/requirements.txt`** — Now pins `scipy>=1.11` alongside `numpy>=1.24` and `networkx==3.6.1` (required for Hungarian and PageRank/HITS adapters).
 
 ### Fixed (Test Hygiene)
 
+- **Centrality Unit Tests** — Added unit tests verifying default options for PageRank, HITS, Eigenvector, Katz, and Alpha centrality.
+- **Weisfeiler-Lehman (WL) Hash Oracle Tests** — Restricted the WL hash equivalence oracle test to undirected graphs.
 - **Community quality floors** — Louvain, Leiden, and Label Propagation are all sensitive to random node-visit ordering. A single bad seed can trap the algorithm in a poor local optimum. Quality-floor tests now run each algorithm with 5 different random seeds and take the best NMI, eliminating flakiness without weakening regression signal.
 - **Oracle test hygiene** (ORC-001–ORC-013 audit): fixed `length` variable shadowing in bidirectional Dijkstra, replaced silent `assert true` no-ops with `:ok`, replaced `String.to_atom/1` on Python error strings with an explicit mapping, removed dead `alpha` parameter from HITS adapter, moved inline `__import__("itertools")` to a top-level import, replaced `float('inf')` literal with `math.isinf`, guarded `nx.bipartite.color` against disconnected graphs, replaced non-reproducible `:rand.uniform/0` and `Enum.shuffle/1` with StreamData primitives, and short-circuited `weight_list_gen(0, _range)` to avoid `0..-1` range warnings.
 

@@ -148,6 +148,27 @@ defmodule Yog.Utils do
   end
 
   @doc """
+  Calculates vector difference between two maps that are known/guaranteed to have
+  the exact same key sets (e.g. node scores in iterations), avoiding redundant membership checks and folds.
+  """
+  @spec norm_diff_same_keys(map(), map(), :l1 | :l2) :: float()
+  def norm_diff_same_keys(m1, m2, type) do
+    case type do
+      :l1 ->
+        map_fold(m1, 0.0, fn k, v1, acc -> acc + abs(v1 - Map.get(m2, k, 0.0)) end)
+
+      :l2 ->
+        sum_sq =
+          map_fold(m1, 0.0, fn k, v1, acc ->
+            diff = v1 - Map.get(m2, k, 0.0)
+            acc + diff * diff
+          end)
+
+        :math.sqrt(sum_sq)
+    end
+  end
+
+  @doc """
   Fisher-Yates shuffle: O(n) unbiased shuffling.
 
   Uses Erlang's :array for efficient mutable-style operations.

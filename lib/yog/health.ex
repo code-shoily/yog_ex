@@ -103,26 +103,31 @@ defmodule Yog.Health do
     else
       n = length(nodes)
 
-      parallel_opts = [
-        max_concurrency: System.schedulers_online(),
-        timeout: :infinity
-      ]
+      compute = fn node ->
+        eccentricity(reweighted_graph, node,
+          with_zero: zero,
+          with_add: add,
+          with_compare: compare,
+          with: &Function.identity/1
+        )
+      end
 
       eccentricities =
-        nodes
-        |> Task.async_stream(
-          fn node ->
-            eccentricity(reweighted_graph, node,
-              with_zero: zero,
-              with_add: add,
-              with_compare: compare,
-              with: &Function.identity/1
-            )
-          end,
-          parallel_opts
-        )
-        |> Enum.map(fn {:ok, ecc} -> ecc end)
-        |> Enum.reject(&is_nil/1)
+        if n < 50 do
+          Enum.map(nodes, compute)
+          |> Enum.reject(&is_nil/1)
+        else
+          parallel_opts = [
+            max_concurrency: System.schedulers_online(),
+            timeout: :infinity,
+            ordered: false
+          ]
+
+          nodes
+          |> Task.async_stream(compute, parallel_opts)
+          |> Enum.map(fn {:ok, ecc} -> ecc end)
+          |> Enum.reject(&is_nil/1)
+        end
 
       if length(eccentricities) < n do
         nil
@@ -191,26 +196,31 @@ defmodule Yog.Health do
     else
       n = length(nodes)
 
-      parallel_opts = [
-        max_concurrency: System.schedulers_online(),
-        timeout: :infinity
-      ]
+      compute = fn node ->
+        eccentricity(reweighted_graph, node,
+          with_zero: zero,
+          with_add: add,
+          with_compare: compare,
+          with: &Function.identity/1
+        )
+      end
 
       eccentricities =
-        nodes
-        |> Task.async_stream(
-          fn node ->
-            eccentricity(reweighted_graph, node,
-              with_zero: zero,
-              with_add: add,
-              with_compare: compare,
-              with: &Function.identity/1
-            )
-          end,
-          parallel_opts
-        )
-        |> Enum.map(fn {:ok, ecc} -> ecc end)
-        |> Enum.reject(&is_nil/1)
+        if n < 50 do
+          Enum.map(nodes, compute)
+          |> Enum.reject(&is_nil/1)
+        else
+          parallel_opts = [
+            max_concurrency: System.schedulers_online(),
+            timeout: :infinity,
+            ordered: false
+          ]
+
+          nodes
+          |> Task.async_stream(compute, parallel_opts)
+          |> Enum.map(fn {:ok, ecc} -> ecc end)
+          |> Enum.reject(&is_nil/1)
+        end
 
       if length(eccentricities) < n do
         nil
@@ -457,22 +467,34 @@ defmodule Yog.Health do
     if num_nodes <= 1 do
       nil
     else
-      if Yog.Property.connected?(reweighted_graph) do
-        parallel_opts = [
-          max_concurrency: System.schedulers_online(),
-          timeout: :infinity
-        ]
+      compute = fn source ->
+        distances = Dijkstra.single_source_distances(reweighted_graph, source, zero, add, compare)
 
-        all_distances =
+        if map_size(distances) < num_nodes do
+          :disconnected
+        else
+          distances
+        end
+      end
+
+      all_distances =
+        if num_nodes < 50 do
+          Enum.map(nodes, compute)
+        else
+          parallel_opts = [
+            max_concurrency: System.schedulers_online(),
+            timeout: :infinity,
+            ordered: false
+          ]
+
           nodes
-          |> Task.async_stream(
-            fn source ->
-              Dijkstra.single_source_distances(reweighted_graph, source, zero, add, compare)
-            end,
-            parallel_opts
-          )
-          |> Enum.map(fn {:ok, distances} -> distances end)
+          |> Task.async_stream(compute, parallel_opts)
+          |> Enum.map(fn {:ok, res} -> res end)
+        end
 
+      if :disconnected in all_distances do
+        nil
+      else
         total =
           List.foldl(all_distances, 0.0, fn distances, acc ->
             sum =
@@ -487,8 +509,6 @@ defmodule Yog.Health do
         num_pairs = num_nodes * (num_nodes - 1) * 1.0
 
         (total - zero_distances) / num_pairs
-      else
-        nil
       end
     end
   end
@@ -568,27 +588,32 @@ defmodule Yog.Health do
     if n <= 1 do
       0.0
     else
-      parallel_opts = [
-        max_concurrency: System.schedulers_online(),
-        timeout: :infinity
-      ]
+      compute = fn source ->
+        distances =
+          Dijkstra.single_source_distances(reweighted_graph, source, zero, add, compare)
+
+        distances
+        |> Map.delete(source)
+        |> Enum.reduce(0.0, fn {_node, dist}, sum ->
+          sum + safe_inverse(dist, to_float)
+        end)
+      end
 
       total =
-        nodes
-        |> Task.async_stream(
-          fn source ->
-            distances =
-              Dijkstra.single_source_distances(reweighted_graph, source, zero, add, compare)
+        if n < 50 do
+          Enum.map(nodes, compute)
+          |> Enum.reduce(0.0, fn source_sum, acc -> acc + source_sum end)
+        else
+          parallel_opts = [
+            max_concurrency: System.schedulers_online(),
+            timeout: :infinity,
+            ordered: false
+          ]
 
-            distances
-            |> Map.delete(source)
-            |> Enum.reduce(0.0, fn {_node, dist}, sum ->
-              sum + safe_inverse(dist, to_float)
-            end)
-          end,
-          parallel_opts
-        )
-        |> Enum.reduce(0.0, fn {:ok, source_sum}, acc -> acc + source_sum end)
+          nodes
+          |> Task.async_stream(compute, parallel_opts)
+          |> Enum.reduce(0.0, fn {:ok, source_sum}, acc -> acc + source_sum end)
+        end
 
       total / (n * (n - 1) * 1.0)
     end
@@ -656,18 +681,23 @@ defmodule Yog.Health do
 
       opts_without_weight = Keyword.delete(opts, :with)
 
-      parallel_opts = [
-        max_concurrency: System.schedulers_online(),
-        timeout: :infinity
-      ]
+      compute = fn node -> local_efficiency(reweighted_graph, node, opts_without_weight) end
 
       total =
-        nodes
-        |> Task.async_stream(
-          fn node -> local_efficiency(reweighted_graph, node, opts_without_weight) end,
-          parallel_opts
-        )
-        |> Enum.reduce(0.0, fn {:ok, eff}, acc -> acc + eff end)
+        if n < 50 do
+          Enum.map(nodes, compute)
+          |> Enum.reduce(0.0, fn eff, acc -> acc + eff end)
+        else
+          parallel_opts = [
+            max_concurrency: System.schedulers_online(),
+            timeout: :infinity,
+            ordered: false
+          ]
+
+          nodes
+          |> Task.async_stream(compute, parallel_opts)
+          |> Enum.reduce(0.0, fn {:ok, eff}, acc -> acc + eff end)
+        end
 
       total / n
     end

@@ -228,52 +228,59 @@ defmodule Yog.Centrality do
         Map.put(acc, id, 0.0)
       end)
     else
-      # Set parallelism options
-      parallel_opts = [
-        max_concurrency: System.schedulers_online(),
-        timeout: :infinity
-      ]
+      # Computation function per source node
+      compute = fn source ->
+        distances = dijkstra_single_source(graph, source, zero, add, compare)
+        reachable = map_size(distances)
 
-      nodes
-      |> Task.async_stream(
-        fn source ->
-          distances = dijkstra_single_source(graph, source, zero, add, compare)
-          reachable = map_size(distances)
+        total_distance =
+          List.foldl(Map.to_list(distances), zero, fn {_node, dist}, sum ->
+            add.(sum, dist)
+          end)
 
-          total_distance =
-            List.foldl(Map.to_list(distances), zero, fn {_node, dist}, sum ->
-              add.(sum, dist)
-            end)
+        score =
+          cond do
+            # Source reaches only itself; closeness undefined.
+            reachable <= 1 ->
+              0.0
 
-          score =
-            cond do
-              # Source reaches only itself; closeness undefined.
-              reachable <= 1 ->
-                0.0
+            # Partial reachability without WF correction — Yog's
+            # strict convention.
+            reachable < n and not wf_improved ->
+              0.0
 
-              # Partial reachability without WF correction — Yog's
-              # strict convention.
-              reachable < n and not wf_improved ->
-                0.0
+            # Partial reachability with WF correction — scale by
+            # the fraction of reachable nodes.
+            reachable < n and wf_improved ->
+              base = (reachable - 1) / to_float.(total_distance)
+              base * ((reachable - 1) / (n - 1))
 
-              # Partial reachability with WF correction — scale by
-              # the fraction of reachable nodes.
-              reachable < n and wf_improved ->
-                base = (reachable - 1) / to_float.(total_distance)
-                base * ((reachable - 1) / (n - 1))
+            # Fully reachable — standard closeness.
+            true ->
+              (n - 1) / to_float.(total_distance)
+          end
 
-              # Fully reachable — standard closeness.
-              true ->
-                (n - 1) / to_float.(total_distance)
-            end
+        {source, score}
+      end
 
-          {source, score}
-        end,
-        parallel_opts
-      )
-      |> Enum.reduce(%{}, fn {:ok, {source, score}}, acc ->
-        Map.put(acc, source, score)
-      end)
+      if n < 50 do
+        List.foldl(nodes, %{}, fn source, acc ->
+          {source, score} = compute.(source)
+          Map.put(acc, source, score)
+        end)
+      else
+        parallel_opts = [
+          max_concurrency: System.schedulers_online(),
+          timeout: :infinity,
+          ordered: false
+        ]
+
+        nodes
+        |> Task.async_stream(compute, parallel_opts)
+        |> Enum.reduce(%{}, fn {:ok, {source, score}}, acc ->
+          Map.put(acc, source, score)
+        end)
+      end
     end
   end
 
@@ -347,38 +354,45 @@ defmodule Yog.Centrality do
     else
       denominator = (n - 1) * 1.0
 
-      parallel_opts = [
-        max_concurrency: System.schedulers_online(),
-        timeout: :infinity
-      ]
+      compute = fn source ->
+        distances = dijkstra_single_source(graph, source, zero, add, compare)
 
-      nodes
-      |> Task.async_stream(
-        fn source ->
-          distances = dijkstra_single_source(graph, source, zero, add, compare)
+        sum_of_reciprocals =
+          List.foldl(Map.to_list(distances), 0.0, fn {node, dist}, sum ->
+            if node == source do
+              sum
+            else
+              d = to_float.(dist)
 
-          sum_of_reciprocals =
-            List.foldl(Map.to_list(distances), 0.0, fn {node, dist}, sum ->
-              if node == source do
-                sum
+              if d > 0.0 do
+                sum + 1.0 / d
               else
-                d = to_float.(dist)
-
-                if d > 0.0 do
-                  sum + 1.0 / d
-                else
-                  sum
-                end
+                sum
               end
-            end)
+            end
+          end)
 
-          {source, sum_of_reciprocals / denominator}
-        end,
-        parallel_opts
-      )
-      |> Enum.reduce(%{}, fn {:ok, {source, score}}, acc ->
-        Map.put(acc, source, score)
-      end)
+        {source, sum_of_reciprocals / denominator}
+      end
+
+      if n < 50 do
+        List.foldl(nodes, %{}, fn source, acc ->
+          {source, score} = compute.(source)
+          Map.put(acc, source, score)
+        end)
+      else
+        parallel_opts = [
+          max_concurrency: System.schedulers_online(),
+          timeout: :infinity,
+          ordered: false
+        ]
+
+        nodes
+        |> Task.async_stream(compute, parallel_opts)
+        |> Enum.reduce(%{}, fn {:ok, {source, score}}, acc ->
+          Map.put(acc, source, score)
+        end)
+      end
     end
   end
 
@@ -443,27 +457,34 @@ defmodule Yog.Centrality do
     initial =
       Map.new(nodes, fn id -> {id, 0.0} end)
 
-    parallel_opts = [
-      max_concurrency: System.schedulers_online(),
-      timeout: :infinity
-    ]
+    compute = fn s ->
+      {stack, preds, sigmas} = Brandes.discovery(graph, s, zero, add, compare)
+
+      dependencies =
+        Brandes.accumulate_node_dependencies(stack, preds, sigmas)
+
+      {s, dependencies}
+    end
 
     scores =
-      nodes
-      |> Task.async_stream(
-        fn s ->
-          {stack, preds, sigmas} = Brandes.discovery(graph, s, zero, add, compare)
+      if length(nodes) < 50 do
+        List.foldl(nodes, initial, fn s, acc ->
+          {s, dependencies} = compute.(s)
+          merge_scores(acc, dependencies, s)
+        end)
+      else
+        parallel_opts = [
+          max_concurrency: System.schedulers_online(),
+          timeout: :infinity,
+          ordered: false
+        ]
 
-          dependencies =
-            Brandes.accumulate_node_dependencies(stack, preds, sigmas)
-
-          {s, dependencies}
-        end,
-        parallel_opts
-      )
-      |> Enum.reduce(initial, fn {:ok, {s, dependencies}}, acc ->
-        merge_scores(acc, dependencies, s)
-      end)
+        nodes
+        |> Task.async_stream(compute, parallel_opts)
+        |> Enum.reduce(initial, fn {:ok, {s, dependencies}}, acc ->
+          merge_scores(acc, dependencies, s)
+        end)
+      end
 
     apply_undirected_scaling(scores, graph)
   end
@@ -751,8 +772,8 @@ defmodule Yog.Centrality do
     normalized_hub =
       if norm_hub > 0, do: Map.new(new_hub, fn {k, v} -> {k, v / norm_hub} end), else: new_hub
 
-    auth_diff = Yog.Utils.norm_diff(auth, normalized_auth, :l2)
-    hub_diff = Yog.Utils.norm_diff(hub, normalized_hub, :l2)
+    auth_diff = Yog.Utils.norm_diff_same_keys(auth, normalized_auth, :l2)
+    hub_diff = Yog.Utils.norm_diff_same_keys(hub, normalized_hub, :l2)
 
     if auth_diff < tolerance and hub_diff < tolerance do
       {normalized_auth, normalized_hub}
@@ -1076,11 +1097,7 @@ defmodule Yog.Centrality do
 
         rank_sum =
           List.foldl(in_neighbors, 0.0, fn {neighbor, split_factor}, sum ->
-            if split_factor > 0.0 do
-              sum + Map.get(ranks, neighbor, 0.0) * split_factor
-            else
-              sum
-            end
+            sum + Map.get(ranks, neighbor, 0.0) * split_factor
           end)
 
         teleport_const = (1.0 - damping) / n_float + damping * sink_total / n_float
@@ -1089,7 +1106,7 @@ defmodule Yog.Centrality do
         Map.put(acc, node, new_rank)
       end)
 
-    if Yog.Utils.norm_diff(ranks, new_ranks, :l1) < tolerance do
+    if Yog.Utils.norm_diff_same_keys(ranks, new_ranks, :l1) < tolerance do
       new_ranks
     else
       iterate_pagerank(
@@ -1155,11 +1172,11 @@ defmodule Yog.Centrality do
       uniform = 1.0 / :math.sqrt(n)
       Map.new(nodes, fn id -> {id, uniform} end)
     else
-      diff_norm = Yog.Utils.norm_diff(scores, normalized_scores, :l2)
+      diff_norm = Yog.Utils.norm_diff_same_keys(scores, normalized_scores, :l2)
 
       is_oscillating =
         if map_size(prev_prev) > 0 do
-          Yog.Utils.norm_diff(prev_prev, normalized_scores, :l2) < tolerance
+          Yog.Utils.norm_diff_same_keys(prev_prev, normalized_scores, :l2) < tolerance
         else
           false
         end
@@ -1217,7 +1234,7 @@ defmodule Yog.Centrality do
 
   # Standardized L1 Norm convergence check
   defp converged?(old_scores, new_scores, _nodes, tolerance) do
-    Yog.Utils.norm_diff(old_scores, new_scores, :l1) < tolerance
+    Yog.Utils.norm_diff_same_keys(old_scores, new_scores, :l1) < tolerance
   end
 
   # Fast direct access versions for internal use

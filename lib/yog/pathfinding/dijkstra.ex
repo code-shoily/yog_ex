@@ -514,7 +514,7 @@ defmodule Yog.Pathfinding.Dijkstra do
     successors = Map.get(graph.out_edges, node, %{})
 
     {new_queue, new_distances, new_predecessors} =
-      Enum.reduce(successors, {rest, distances, predecessors}, fn {neighbor, weight}, acc ->
+      Yog.Utils.map_fold(successors, {rest, distances, predecessors}, fn neighbor, weight, acc ->
         relax_neighbor(acc, node, neighbor, weight, dist, add, compare)
       end)
 

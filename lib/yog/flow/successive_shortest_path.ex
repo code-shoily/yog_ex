@@ -331,7 +331,7 @@ defmodule Yog.Flow.SuccessiveShortestPath do
   end
 
   defp relax_all_edges(adj, capacities, costs, dist, prev) do
-    Enum.reduce(adj, {dist, prev}, fn {u, neighbors}, {_d, _p} = acc ->
+    Yog.Utils.map_fold(adj, {dist, prev}, fn u, neighbors, acc ->
       Enum.reduce(neighbors, acc, fn {v, edge_ref}, {d2, p2} = acc2 ->
         if capacities[edge_ref] > 0 do
           edge_cost = costs[edge_ref]
@@ -495,7 +495,7 @@ defmodule Yog.Flow.SuccessiveShortestPath do
   end
 
   defp update_potentials(potentials, dist) do
-    Enum.reduce(dist, potentials, fn {node, d}, pots ->
+    Yog.Utils.map_fold(dist, potentials, fn node, d, pots ->
       Map.update!(pots, node, &(&1 + d))
     end)
   end

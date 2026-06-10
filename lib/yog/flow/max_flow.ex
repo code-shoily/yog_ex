@@ -827,7 +827,9 @@ defmodule Yog.Flow.MaxFlow do
     {residual, excess, buckets, max_h} =
       case Map.fetch(residual, source) do
         {:ok, out_edges} ->
-          Enum.reduce(out_edges, {residual, excess_, %{}, 0}, fn {v, cap}, {res, exc, bks, mh} ->
+          Yog.Utils.map_fold(out_edges, {residual, excess_, %{}, 0}, fn v,
+                                                                        cap,
+                                                                        {res, exc, bks, mh} ->
             if v == source do
               {res, exc, bks, mh}
             else
@@ -1115,7 +1117,7 @@ defmodule Yog.Flow.MaxFlow do
 
   defp apply_gap_heuristic(height, buckets, gap_height, n) do
     {new_height, new_buckets} =
-      Enum.reduce(height, {height, buckets}, fn {u, h}, {h_acc, b_acc} ->
+      Yog.Utils.map_fold(height, {height, buckets}, fn u, h, {h_acc, b_acc} ->
         if h > gap_height and h < n + 1 do
           # Remove from old bucket
           old_b = Map.get(b_acc, h)

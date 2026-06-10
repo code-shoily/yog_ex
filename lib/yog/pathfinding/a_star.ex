@@ -500,7 +500,7 @@ defmodule Yog.Pathfinding.AStar do
       successors = Map.get(graph.out_edges, node, %{})
 
       {new_queue, new_g_scores, new_predecessors} =
-        Enum.reduce(successors, {rest, g_scores, preds}, fn {neighbor, cost}, acc ->
+        Yog.Utils.map_fold(successors, {rest, g_scores, preds}, fn neighbor, cost, acc ->
           relax_neighbor(acc, node, neighbor, cost, g, to, add, compare, heuristic)
         end)
 
