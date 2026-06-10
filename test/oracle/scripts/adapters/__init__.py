@@ -11,6 +11,7 @@ from . import matching
 from . import mst
 from . import pathfinding
 from . import properties
+from . import traversal
 
 DISPATCH = {
     **pathfinding.DISPATCH,
@@ -20,4 +21,5 @@ DISPATCH = {
     **centrality.DISPATCH,
     **connectivity.DISPATCH,
     **properties.DISPATCH,
+    **traversal.DISPATCH,
 }
