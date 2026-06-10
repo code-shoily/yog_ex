@@ -1,6 +1,8 @@
 defmodule Yog.Oracle.NetworkXTest do
   use ExUnit.Case, async: true
 
+  @moduletag :oracle
+
   alias Yog.Oracle.NetworkX
 
   describe "adapter_health/0" do
