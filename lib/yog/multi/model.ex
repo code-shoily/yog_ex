@@ -172,9 +172,19 @@ defmodule Yog.Multi.Model do
   def edges_between(graph, from, to) do
     edge_ids = Map.get(graph.out_edge_ids, from, MapSet.new())
 
-    for eid <- edge_ids,
-        {:ok, {_, ^to, data}} <- [Map.fetch(graph.edges, eid)],
-        do: {eid, data}
+    Enum.reduce(edge_ids, [], fn eid, acc ->
+      case Map.fetch(graph.edges, eid) do
+        {:ok, {^from, ^to, data}} ->
+          [{eid, data} | acc]
+
+        {:ok, {^to, ^from, data}} when graph.kind == :undirected ->
+          [{eid, data} | acc]
+
+        _ ->
+          acc
+      end
+    end)
+    |> Enum.reverse()
   end
 
   @doc """

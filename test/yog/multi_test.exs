@@ -262,6 +262,23 @@ defmodule Yog.MultiTest do
       edges_2_1 = Multi.edges_between(graph, 2, 1)
       assert length(edges_2_1) == 1
     end
+
+    test "handles undirected graphs correctly in both directions" do
+      {graph, _} =
+        Multi.undirected()
+        |> Multi.add_node(1, "A")
+        |> Multi.add_node(2, "B")
+        |> Multi.add_edge(1, 2, 10)
+
+      {graph, _} = Multi.add_edge(graph, 1, 2, 20)
+      {graph, _} = Multi.add_edge(graph, 2, 1, 30)
+
+      edges_1_2 = Multi.edges_between(graph, 1, 2)
+      assert length(edges_1_2) == 3
+
+      edges_2_1 = Multi.edges_between(graph, 2, 1)
+      assert length(edges_2_1) == 3
+    end
   end
 
   describe "successors/2 and predecessors/2 delegation" do
