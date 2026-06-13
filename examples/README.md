@@ -78,7 +78,7 @@ IO.puts("Modularity: #{modularity}")
 # => Modularity: 0.35714285714285715
 ```
 
-**Related file**: `social_network.exs`
+**Related files**: `zacharys_karate_club.exs`, `social_network_analysis.exs`
 
 ---
 
@@ -101,7 +101,7 @@ scale_free = Random.barabasi_albert(1000, 3)   # Preferential attachment
 small_world = Random.watts_strogatz(100, 6, 0.1)  # Small-world
 ```
 
-**Related files**: `random_graphs.exs`, `classic_patterns.exs`
+**Related file**: `graph_generation_showcase.exs`
 
 ---
 
@@ -210,7 +210,7 @@ degree = Centrality.degree(graph, :out_degree)
 # => %{1 => 1.0, 2 => 0.5, 3 => 0.0}
 ```
 
-**Related file**: `network_analysis.exs`
+**Related file**: `zacharys_karate_club.exs`
 
 ---
 
@@ -240,7 +240,7 @@ pajek_string = Pajek.serialize(graph)
 # {:ok, loaded} = GraphML.read("slashdot.xml")
 ```
 
-**Related file**: `import_export.exs`
+**Related files**: `render_dot.exs`, `render_json.exs`, `render_mermaid.exs`
 
 ---
 
@@ -291,15 +291,32 @@ mix run examples/maze_solver.exs
 
 | File | Description |
 |------|-------------|
-| `gps_navigation.exs` | Shortest path with labeled cities |
-| `network_bandwidth.exs` | Max flow for network optimization |
-| `social_network.exs` | Community detection in social graphs |
-| `maze_solver.exs` | 2D grid pathfinding |
-| `random_graphs.exs` | Generating random graph models |
-| `classic_patterns.exs` | Complete, cycle, star, grid graphs |
-| `network_analysis.exs` | Centrality measures |
-| `import_export.exs` | I/O with various formats |
-| `functional_example.exs` | Pure functional graph operations |
+| `gps_navigation.exs` | Shortest path with labeled cities using Dijkstra |
+| `network_bandwidth.exs` | Maximum flow for network optimization |
+| `social_network_analysis.exs` | Finding strong components in social graphs |
+| `zacharys_karate_club.exs` | Louvain community detection on Karate Club dataset |
+| `maze_solver.exs` | Solving a grid maze using BFS/DFS |
+| `maze_solver_directional.exs` | Solving a grid maze with directional constraints |
+| `graph_creation.exs` | Manually building and querying graphs |
+| `graph_generation_showcase.exs` | Showcasing classic generators (cliques, cycles, grids) |
+| `functional_example.exs` | Pure functional graph operations (experimental) |
+| `render_dot.exs` | Exporting graphs to Graphviz DOT format |
+| `render_json.exs` | Serializing/deserializing graphs to JSON |
+| `render_mermaid.exs` | Rendering graphs using Mermaid.js syntax |
+| `ascii_maze.exs` | Generating and printing ASCII mazes |
+| `bridges_of_konigsberg.exs` | Modeling the Seven Bridges of Königsberg |
+| `cave_path_counting.exs` | Custom backtracking DFS path counting |
+| `city_distance_matrix.exs` | Shortest paths matrix on city networks |
+| `flood_fill.exs` | BFS-based grid flood fill example |
+| `global_min_cut.exs` | Computing global min-cut on flow networks |
+| `job_assignment.exs` | Bipartite matching for job assignment |
+| `job_matching.exs` | Stable marriage/matching with Gale-Shapley |
+| `medical_residency.exs` | Gale-Shapley matching for residency matching |
+| `maze_gallery.exs` | Maze generator comparison and generation |
+| `network_cable_layout.exs` | Spanning trees for cable layouts |
+| `number_of_islands.exs` | BFS-based grid island counting |
+| `task_ordering.exs` | Resolving dependencies with topological sort |
+| `task_scheduling.exs` | Critical path method for scheduling |
 
 ---
 
