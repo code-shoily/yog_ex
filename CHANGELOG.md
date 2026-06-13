@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`Yog.IO.GEXF`** — Fixed a parser crash that occurred when encountering invalid/malformed integer attributes, replacing unsafe `String.to_integer/1` calls with `Integer.parse/1` fallbacks in both the `Saxy` and `xmerl` parsing backends.
 - **`Yog.Property.Clique.all_maximal_cliques/1`** — Self-loop edges no longer cause the node to appear as its own neighbour in the Bron–Kerbosch adjacency map. Previously a single node with a self-loop was incorrectly counted as a 2-clique.
 - **`Yog.Connectivity.Reachability.counts_estimate/2`** now works for large graphs. `phash2` has explicity range passed.
 - **`Yog.Flow.MinCost.ssp/4`** — Rewrote residual graph representation to use unique edge IDs in the Successive Shortest Path (SSP) min-cost flow algorithm, preventing antiparallel edges from overwriting each other.
