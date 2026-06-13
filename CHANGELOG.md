@@ -31,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Centrality** (3 properties): Degree, In-degree, Out-degree (exact).
   - **Community Quality** (3 properties): Louvain, Leiden, and Label Propagation NMI floors on well-separated SBM.
 - **`test/oracle/README.md`** — Full documentation of the oracle harness architecture, parity matrix, known semantic differences, running instructions, and guide for adding new oracle properties. Registered in `ex_doc` under *Testing & Verification*.
-- **`Yog.Community.Metrics.nmi/2`** and **`Yog.Community.Metrics.ari/2`** — Normalized Mutual Information and Adjusted Rand Index for comparing detected communities against ground truth.
+- **`Yog.Community.Metrics.nmi/2`** — Normalized Mutual Information for comparing detected communities against ground truth.
 
 ### Changed
 

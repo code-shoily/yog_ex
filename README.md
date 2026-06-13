@@ -177,7 +177,7 @@ end
 
 ## Examples
 
-Detailed examples are located in the [examples/](examples/) directory.
+Detailed examples are located in the [examples/README.md](examples/README.md) file.
 
 ### Advent of Code Solutions
 

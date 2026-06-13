@@ -90,7 +90,7 @@ defmodule YogEx.MixProject do
     [
       main: "readme",
       extras: [
-        "README.md",
+        {"README.md", [title: "Overview", filename: "readme"]},
         {"lib/yog/CHEATSHEET.cheatmd", [title: "Cheat Sheet", filename: "cheat_sheet"]},
         {"examples/README.md", [filename: "examples_readme", title: "Examples"]},
         {"lib/yog/functional/README.md",
@@ -123,7 +123,7 @@ defmodule YogEx.MixProject do
          [filename: "mermaid_complete_guide", title: "Mermaid Complete Guide"]},
         "ALGORITHMS.md",
         "PROPERTIES.md",
-        "test/oracle/README.md",
+        {"test/oracle/README.md", [filename: "oracle_readme", title: "Oracle Tests"]},
         "CHANGELOG.md"
       ],
       source_ref: "v#{@version}",
