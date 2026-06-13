@@ -176,4 +176,35 @@ defmodule Yog.Pathfinding.AStarTest do
 
     assert {:ok, 0} = result
   end
+
+  test "a_star_keyword_api_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+
+    result =
+      AStar.a_star(
+        in: graph,
+        from: 1,
+        to: 2,
+        heuristic: fn _, _ -> 0 end
+      )
+
+    assert {:ok, path} = result
+    assert path.weight == 5
+  end
+
+  test "implicit_a_star_keyword_api_test" do
+    result =
+      AStar.implicit_a_star(
+        from: 1,
+        successors_with_cost: fn n -> [{n + 1, 1}] end,
+        is_goal: fn n -> n == 3 end,
+        heuristic: fn n -> 3 - n end
+      )
+
+    assert {:ok, 2} = result
+  end
 end

@@ -566,4 +566,42 @@ defmodule Yog.Multi.DOTTest do
       assert String.contains?(dot, "1 [label=<table border=\"0\"><tr><td>Node</td></tr></table>]")
     end
   end
+
+  describe "ranks and custom arrowheads" do
+    test "renders node ranks" do
+      multi =
+        Yog.Multi.directed()
+        |> Yog.Multi.add_node(1, "A")
+        |> Yog.Multi.add_node(2, "B")
+
+      opts = %{
+        DOT.default_options()
+        | ranks: [
+            {:same, [1, 2]}
+          ]
+      }
+
+      dot = DOT.to_dot(multi, opts)
+      assert String.contains?(dot, "{rank=same; 1; 2;}")
+    end
+
+    test "renders custom arrow style tuple" do
+      multi =
+        Yog.Multi.directed()
+        |> Yog.Multi.add_node(1, "A")
+        |> Yog.Multi.add_node(2, "B")
+
+      {multi, _} = Yog.Multi.add_edge(multi, 1, 2, 5)
+
+      opts = %{
+        DOT.default_options()
+        | arrowhead: {:custom, "myarrow"},
+          arrowtail: {:custom, "myarrowtail"}
+      }
+
+      dot = DOT.to_dot(multi, opts)
+      assert String.contains?(dot, "arrowhead=myarrow")
+      assert String.contains?(dot, "arrowtail=myarrowtail")
+    end
+  end
 end

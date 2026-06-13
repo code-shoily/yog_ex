@@ -477,4 +477,26 @@ defmodule Yog.Pathfinding.BellmanFordTest do
 
     assert {:ok, -4} = result
   end
+
+  test "implicit_bellman_ford_by_keyword_api_test" do
+    successors = fn {pos, keys} ->
+      case pos do
+        1 -> [{{2, keys}, 1}]
+        _ -> []
+      end
+    end
+
+    result =
+      BellmanFord.implicit_bellman_ford_by(
+        from: {1, MapSet.new()},
+        successors_with_cost: successors,
+        visited_by: fn {pos, _} -> pos end,
+        is_goal: fn {pos, _} -> pos == 2 end,
+        zero: 0,
+        add: &add/2,
+        compare: &compare/2
+      )
+
+    assert {:ok, 1} = result
+  end
 end
