@@ -726,4 +726,75 @@ defmodule Yog.IO.GEXFTest do
   test "deserialize returns error for malformed xml" do
     assert {:error, {:parse_error, _}} = GEXF.deserialize("<?xml version='1.0'?><gexf><graph>")
   end
+
+  test "deserialize cast values and attribute fallbacks" do
+    xml = """
+    <?xml version="1.0"?>
+    <gexf version="1.3">
+      <graph defaultedgetype="directed">
+        <attributes>
+          <attribute id="a1" type="long"/>
+          <attribute id="a2" type="boolean"/>
+          <attribute id="a3" type="boolean"/>
+          <attribute id="a4" type="double"/>
+          <attribute id="a5"/>
+        </attributes>
+        <nodes>
+          <node id="1">
+            <attvalues>
+              <attvalue for="a1" value="123456789"/>
+              <attvalue for="a2" value="true"/>
+              <attvalue for="a3" value="false"/>
+              <attvalue for="a4" value="3.14"/>
+              <attvalue for="a5" value="hello"/>
+            </attvalues>
+          </node>
+        </nodes>
+        <edges>
+          <edge source="1" target="1"/>
+        </edges>
+      </graph>
+    </gexf>
+    """
+
+    {:ok, graph} = GEXF.deserialize(xml)
+    node = Yog.Model.node(graph, 1)
+    assert node["a1"] == 123_456_789
+    assert node["a2"] == true
+    assert node["a3"] == false
+    assert node["a4"] == 3.14
+    assert node["a5"] == "hello"
+
+    {_, edge_data} = Yog.successors(graph, 1) |> hd()
+    assert edge_data["weight"] == ""
+  end
+
+  test "deserialize incomplete viz attributes" do
+    xml = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <gexf xmlns="http://gexf.net/1.3" xmlns:viz="http://gexf.net/1.3/viz" version="1.3">
+      <graph defaultedgetype="directed">
+        <nodes>
+          <node id="1" label="A">
+            <viz:color r="abc" g="10" b="20" a="invalid_float"/>
+            <viz:size value="invalid_float"/>
+            <viz:position x="invalid" y="2" z="3"/>
+            <viz:shape/>
+          </node>
+        </nodes>
+        <edges></edges>
+      </graph>
+    </gexf>
+    """
+
+    {:ok, graph} = GEXF.deserialize(xml)
+    data = Yog.Model.node(graph, 1)
+    # Falling back to defaults where parsing fails
+    assert data["viz:color"].r == 0
+    assert data["viz:color"].a == 1.0
+    assert data["viz:size"] == 1.0
+    assert data["viz:position"].x == 0.0
+    assert data["viz:position"].y == 2.0
+    assert data["viz:shape"] == "disc"
+  end
 end

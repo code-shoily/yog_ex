@@ -283,8 +283,14 @@ defmodule Yog.IO.GEXF.SaxyHandler do
 
   defp get_attr_int(attrs, name, default) do
     case List.keyfind(attrs, name, 0) do
-      {^name, v} -> String.to_integer(v)
-      _ -> default
+      {^name, v} ->
+        case Integer.parse(v) do
+          {i, _} -> i
+          :error -> default
+        end
+
+      _ ->
+        default
     end
   end
 

@@ -97,4 +97,19 @@ defmodule Yog.Community.LocalCommunityTest do
     assert MapSet.size(result) >= 5
     assert MapSet.size(result) <= 34
   end
+
+  test "detect with max_iterations boundary" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(0, nil)
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_edges!([
+        {0, 1, 1},
+        {1, 2, 1}
+      ])
+
+    result = LocalCommunity.detect_with_options(graph, [0], max_iterations: 0)
+    assert MapSet.size(result) == 2
+  end
 end

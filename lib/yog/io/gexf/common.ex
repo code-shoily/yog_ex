@@ -461,8 +461,14 @@ defmodule Yog.IO.GEXF.Common do
 
   def xmerl_get_int(elem, name, default) do
     case xmerl_string_value(:xmerl_xpath.string(~c'string(@#{name})', elem)) do
-      "" -> default
-      v -> String.to_integer(v)
+      "" ->
+        default
+
+      v ->
+        case Integer.parse(v) do
+          {i, _} -> i
+          :error -> default
+        end
     end
   end
 
