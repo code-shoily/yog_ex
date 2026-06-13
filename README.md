@@ -35,7 +35,7 @@ There is also [a similar library written in Gleam](https://hex.pm/packages/yog),
 Both libraries are actively maintained, with the Elixir version getting new features more frequently, and also sporting more experimental features.
 
 > [!WARNING]
-> **API Stability**: Until the version reaches 0.98.0 ~~1.0.0~~, there may be ~~breaking changes. While I'll try my best to keep the API stable, there's no guarantee~~ some hiccups in performance, and documentation quality maybe less than optimal. Before version 0.99.0 is released in **12-12-2026**, the primary focus is on **performance**, **documentation**, and **bugfixes**. From v0.97.0 onwards, there will be no breaking changes until v2.0 (No plans for that).
+> **API Stability**: Until the version reaches `1.0.0`, there may be some hiccups in performance, and documentation quality may be less than optimal. Before version `0.99.0` is released in **December 2026**, the primary focus is on **performance**, **documentation**, and **bugfixes**. From v0.97.0 onwards, there will be no breaking changes until v2.0 (no plans for that).
 
 ## Features
 
@@ -177,7 +177,7 @@ end
 
 ## Examples
 
-Detailed examples are located in the [examples/](https://github.com/code-shoily/yog_ex/tree/main/examples) directory
+Detailed examples are located in the [examples/](examples/) directory.
 
 ### Advent of Code Solutions
 
