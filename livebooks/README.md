@@ -21,7 +21,7 @@ Step-by-step learning notebooks designed to take you from graph basics to advanc
 
 ### 2. [How-To Guides](file:///home/mafinar/repos/elixir/yog_ex/livebooks/how_to/)
 Practical walkthroughs addressing specific design patterns, configurations, or features:
-*   [customizing_visualizations.livemd](file:///home/mafinar/repos/elixir/yog_ex/livebooks/how_to/customizing_visualizations.livemd): How to color nodes, customize styles, and format Graphviz DOT attributes.
+*   [dot_complete_guide.livemd](file:///home/mafinar/repos/elixir/yog_ex/livebooks/how_to/dot_complete_guide.livemd): Rendering interactive graph diagrams, customizing styles, node attributes, subgraphs, and parallel-edge layouts via Graphviz DOT.
 *   [import_export.livemd](file:///home/mafinar/repos/elixir/yog_ex/livebooks/how_to/import_export.livemd): Importing/exporting graphs via CSV, JSON, DOT, GML, and GraphML.
 *   [maze_generation.livemd](file:///home/mafinar/repos/elixir/yog_ex/livebooks/how_to/maze_generation.livemd): A deep dive into generating spanning tree mazes using diverse algorithms.
 *   [mermaid_complete_guide.livemd](file:///home/mafinar/repos/elixir/yog_ex/livebooks/how_to/mermaid_complete_guide.livemd): Rendering interactive flowcharts, sequence diagrams, and network layouts using Mermaid.js.
