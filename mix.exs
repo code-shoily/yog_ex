@@ -79,7 +79,9 @@ defmodule YogEx.MixProject do
       licenses: ["Apache-2.0"],
       links: %{
         "GitHub" => @source_url,
-        "Changelog" => @source_url <> "/blob/main/CHANGELOG.md"
+        "Changelog" => @source_url <> "/blob/main/CHANGELOG.md",
+        "Examples" => @source_url <> "/blob/main/examples/README.md",
+        "Livebook Guides" => @source_url <> "/blob/main/livebooks/README.md"
       }
     ]
   end
