@@ -353,14 +353,6 @@ defmodule Yog.Flow.SuccessiveShortestPath do
     Enum.any?(dist1, fn {node, val} -> dist2[node] < val end)
   end
 
-  defp do_ssp(_supply, [], _demands, _adj, _caps, _costs, _num_orig, flow, cost, _pots) do
-    {:ok, flow, cost}
-  end
-
-  defp do_ssp([], _demand, _demands, _adj, _caps, _costs, _num_orig, _flow, _cost, _pots) do
-    :infeasible
-  end
-
   defp do_ssp(
          supply_nodes,
          demand_nodes,

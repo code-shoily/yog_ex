@@ -284,21 +284,17 @@ defmodule Yog.Community.Infomap do
 
   defp optimize_map_equation(graph, pagerank, assignments, nodes, options) do
     shuffled = Yog.Utils.fisher_yates(nodes, options.seed)
-    do_optimize_passes(graph, pagerank, assignments, shuffled, true, 0, options)
+    do_optimize_passes(graph, pagerank, assignments, shuffled, 0, options)
   end
 
-  defp do_optimize_passes(_graph, _pagerank, assignments, _nodes, false, _iteration, _options) do
-    assignments
-  end
-
-  defp do_optimize_passes(graph, pagerank, assignments, nodes, _changed, iteration, options) do
+  defp do_optimize_passes(graph, pagerank, assignments, nodes, iteration, options) do
     if iteration >= options.max_pagerank_iters do
       assignments
     else
       {new_assignments, improved} = do_optimize_pass(graph, pagerank, assignments, nodes, options)
 
       if improved do
-        do_optimize_passes(graph, pagerank, new_assignments, nodes, true, iteration + 1, options)
+        do_optimize_passes(graph, pagerank, new_assignments, nodes, iteration + 1, options)
       else
         new_assignments
       end
