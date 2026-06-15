@@ -5,7 +5,7 @@ Mix.install([
   {:yog_ex, "~> 0.98"},
   {:jason, "~> 1.4"}, # Optional, but needed for JSON serialization
   {:libgraph, "~> 0.16.0"},
-  {:kino_vizjs, "~> 0.8.0"} # Needed to render Graphviz DOT diagrams
+  {:kino_vizjs, "~> 0.9.0"} # Needed to render Graphviz DOT diagrams
 ])
 ```
 
