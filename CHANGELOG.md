@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`Yog.Layout`** — Implemented pure Elixir layout calculation algorithms: `Yog.Layout.circular/2` (circular placement), `Yog.Layout.random/2` (random uniform boundary placement), `Yog.Layout.spring/2` (Fruchterman-Reingold force-directed simulation), `Yog.Layout.tutte/3` (Tutte barycentric embedding via Gauss-Seidel relaxation), `Yog.Layout.shell/3` (concentric shells), and `Yog.Layout.multipartite/3` (parallel layers/columns). All layouts return a `%{node_id => {x, y}}` coordinate map where coordinates are represented as `{float, float}` tuples.
 - **`Yog.Render.SVG`** — Implemented a pure Elixir SVG renderer supporting simple graphs, directed graphs, and multigraphs. It computes parallel edge indices and multiplicities to render parallel edges as distinct curved quadratic Bézier curves, self-loops as cubic Bézier loops, and directed arrowheads with boundary-offset truncation math to keep arrowheads visible at the node borders.
 - **Livebook Layout Guide** — Created `livebooks/how_to/layout_guide.livemd` showcasing circular, spring, tutte, shell, and multipartite layouts rendered using both interactive Kino SVG (`Kino.HTML.new/1`) and Kino Vega-Lite (`Yog.Render.VegaLite`).
+- **`Yog.Pathfinding.Disjoint`** — Added `suurballe/4` implementing Suurballe's algorithm for finding two edge-disjoint shortest paths of minimum total cost in directed and undirected graphs. Supports custom weight functions, addition, subtraction, and comparison operations.
 
 ### Fixed
 

@@ -52,6 +52,7 @@ defmodule Yog.Pathfinding do
   alias Yog.Pathfinding.LCA
   alias Yog.Pathfinding.Matrix
   alias Yog.Pathfinding.Yen
+  alias Yog.Pathfinding.Disjoint
 
   # =============================================================================
   # Dijkstra
@@ -698,5 +699,36 @@ defmodule Yog.Pathfinding do
           {:ok, non_neg_integer()} | {:error, :node_not_found}
   def tree_distance(state, a, b) do
     LCA.tree_distance(state, a, b)
+  end
+
+  @doc """
+  Finds two edge-disjoint paths of minimum total weight between `from` and `to`.
+
+  Uses Suurballe's algorithm, executing Dijkstra's algorithm twice with edge weight
+  adjustments and edge reversals to find paths that do not share any edges.
+
+  ## Options
+
+    * `:zero` - Zero value for the weight type (default: `0`)
+    * `:add` - Addition function for weights (default: `&Kernel.+/2`)
+    * `:compare` - Comparison function for weights (default: `&Yog.Utils.compare/2`)
+    * `:subtract` - Subtraction function for weights (default: `&Kernel.-/2`)
+    * `:weight` - Function extracting a numeric weight from edge data
+
+  ## Returns
+
+    * `{:ok, [path1, path2]}` - List of two Path structs on success
+    * `:error` - If less than two edge-disjoint paths exist
+  """
+  @spec suurballe(Yog.graph(), Yog.node_id(), Yog.node_id(), keyword()) ::
+          {:ok, [Yog.Pathfinding.Path.t()]} | :error
+  def suurballe(graph, from, to, opts \\ []) do
+    zero = opts[:zero] || 0
+    add = opts[:add] || (&Kernel.+/2)
+    compare = opts[:compare] || (&Yog.Utils.compare/2)
+    subtract = opts[:subtract] || (&Kernel.-/2)
+    weight_fn = opts[:weight] || fn w -> if is_nil(w), do: 1, else: w end
+
+    Disjoint.suurballe(graph, from, to, zero, add, compare, subtract, weight_fn)
   end
 end

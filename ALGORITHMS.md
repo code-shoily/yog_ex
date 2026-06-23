@@ -22,6 +22,7 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | Path Utilities | `Yog.Pathfinding.Path` | Path reconstruction and manipulation | O(V) | O(V) |
 | Distance Matrix | `Yog.Pathfinding.Matrix` | Matrix-based distance operations | O(V²) | O(V²) |
 | All-Pairs Unweighted | `Yog.Pathfinding` | Parallel BFS all-pairs shortest paths | O(V(V+E)) | O(V²) |
+| Suurballe's | `Yog.Pathfinding.Disjoint` | Finds two edge-disjoint shortest paths of minimum total cost | O((V+E) log V) | O(V) |
 
 ## Flow & Cuts
 
