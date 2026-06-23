@@ -13,6 +13,9 @@ defmodule Yog.Layout do
   | **Circular** | `circular/2` | Uniform spacing on unit circle | Symmetric/small graphs, cycles | $O(V)$ |
   | **Random** | `random/2` | Uniform distribution in bounding box | Initial states, baseline checks | $O(V)$ |
   | **Spring** | `spring/2` | Fruchterman-Reingold force model | Social networks, general graphs | $O(I \\cdot (V^2 + E))$ |
+  | **Tutte** | `tutte/3` | Gauss-Seidel barycentric relaxation | Planar graphs, routing visual flow | $O(I \\cdot (V + E))$ |
+  | **Shell** | `shell/3` | Concentric circles placement | Hierarchies, core-periphery structures | $O(V)$ |
+  | **Multipartite** | `multipartite/3` | Parallel rows/columns alignment | Bipartite graphs, neural nets, flow nets | $O(V)$ |
 
   ## Graph Layout Visualization (Spring vs. Circular)
 
@@ -52,8 +55,11 @@ defmodule Yog.Layout do
 
   alias Yog.Graph
   alias Yog.Layout.Circular
+  alias Yog.Layout.Multipartite
   alias Yog.Layout.Random
+  alias Yog.Layout.Shell
   alias Yog.Layout.Spring
+  alias Yog.Layout.Tutte
 
   @doc """
   Positions nodes uniformly spaced on a circle.
@@ -83,5 +89,35 @@ defmodule Yog.Layout do
   @spec spring(Graph.t(), keyword()) :: %{Graph.node_id() => {float(), float()}}
   def spring(graph, opts \\ []) do
     Spring.layout(graph, opts)
+  end
+
+  @doc """
+  Positions nodes using Tutte's barycentric embedding.
+
+  Delegates to `Yog.Layout.Tutte.layout/3`.
+  """
+  @spec tutte(Graph.t(), [Graph.node_id()], keyword()) :: %{Graph.node_id() => {float(), float()}}
+  def tutte(graph, boundary_nodes, opts \\ []) do
+    Tutte.layout(graph, boundary_nodes, opts)
+  end
+
+  @doc """
+  Positions nodes in concentric circles (shells).
+
+  Delegates to `Yog.Layout.Shell.layout/3`.
+  """
+  @spec shell(Graph.t(), [[Graph.node_id()]], keyword()) :: %{Graph.node_id() => {float(), float()}}
+  def shell(graph, shells, opts \\ []) do
+    Shell.layout(graph, shells, opts)
+  end
+
+  @doc """
+  Positions nodes in parallel layers (columns or rows).
+
+  Delegates to `Yog.Layout.Multipartite.layout/3`.
+  """
+  @spec multipartite(Graph.t(), [[Graph.node_id()]], keyword()) :: %{Graph.node_id() => {float(), float()}}
+  def multipartite(graph, layers, opts \\ []) do
+    Multipartite.layout(graph, layers, opts)
   end
 end

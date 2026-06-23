@@ -134,4 +134,148 @@ defmodule Yog.LayoutTest do
       assert Map.keys(pos2) |> Enum.sort() == [1, 2]
     end
   end
+
+  describe "tutte/3" do
+    test "positions interior node at the center of a symmetric boundary" do
+      # Boundary nodes: 1, 2, 3. Interior node: 4 connected to 1, 2, 3.
+      graph = Yog.from_unweighted_edges(:undirected, [{1, 2}, {2, 3}, {3, 1}, {1, 4}, {2, 4}, {3, 4}])
+
+      pos = Layout.tutte(graph, [1, 2, 3], iterations: 50, center: {0.0, 0.0}, radius: 2.0)
+
+      assert Map.keys(pos) |> Enum.sort() == [1, 2, 3, 4]
+
+      # Boundary nodes are on a circle of radius 2.0
+      for id <- [1, 2, 3] do
+        {x, y} = Map.get(pos, id)
+        assert_in_delta :math.sqrt(x * x + y * y), 2.0, 1.0e-6
+      end
+
+      # Interior node 4 is at center of symmetric boundary
+      {x4, y4} = Map.get(pos, 4)
+      assert_in_delta x4, 0.0, 1.0e-6
+      assert_in_delta y4, 0.0, 1.0e-6
+    end
+
+    test "raises error for invalid boundary nodes count or missing nodes" do
+      graph = Yog.from_unweighted_edges(:undirected, [{1, 2}, {2, 3}, {3, 1}])
+
+      assert_raise ArgumentError, ~r/at least 3 boundary nodes/, fn ->
+        Layout.tutte(graph, [1, 2])
+      end
+
+      assert_raise ArgumentError, ~r/must exist within the graph/, fn ->
+        Layout.tutte(graph, [1, 2, 99])
+      end
+    end
+
+    test "handles isolated interior nodes" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_nodes_from([1, 2, 3, 4])
+        |> Yog.add_edges!([{1, 2, nil}, {2, 3, nil}, {3, 1, nil}])
+
+      pos = Layout.tutte(graph, [1, 2, 3], iterations: 10, center: {0.0, 0.0})
+      # Node 4 has no neighbors, so it should stay at the center
+      assert Map.get(pos, 4) == {0.0, 0.0}
+    end
+  end
+
+  describe "shell/3" do
+    test "arranges nodes in concentric circles based on shells grouping" do
+      graph = Yog.from_unweighted_edges(:undirected, [{1, 2}, {2, 3}, {3, 4}])
+
+      pos = Layout.shell(graph, [[1, 2], [3, 4]], center: {0.0, 0.0})
+
+      assert Map.keys(pos) |> Enum.sort() == [1, 2, 3, 4]
+
+      # Shell 1 has nodes 1 and 2 at radius 0.5
+      for id <- [1, 2] do
+        {x, y} = Map.get(pos, id)
+        assert_in_delta :math.sqrt(x * x + y * y), 0.5, 1.0e-6
+      end
+
+      # Shell 2 has nodes 3 and 4 at radius 1.0
+      for id <- [3, 4] do
+        {x, y} = Map.get(pos, id)
+        assert_in_delta :math.sqrt(x * x + y * y), 1.0, 1.0e-6
+      end
+    end
+
+    test "raises errors for empty shells, mismatched radii, or missing nodes" do
+      graph = Yog.from_unweighted_edges(:undirected, [{1, 2}, {2, 3}])
+
+      assert_raise ArgumentError, ~r/must not contain empty lists/, fn ->
+        Layout.shell(graph, [[1, 2], []])
+      end
+
+      assert_raise ArgumentError, ~r/must exist in the graph/, fn ->
+        Layout.shell(graph, [[1, 2], [99]])
+      end
+
+      assert_raise ArgumentError, ~r/radii list must match the number of shells/, fn ->
+        Layout.shell(graph, [[1], [2], [3]], radii: [1.0, 2.0])
+      end
+    end
+
+    test "handles empty shells list and single node shell" do
+      graph = Yog.undirected() |> Yog.add_node(1)
+      assert Layout.shell(graph, []) == %{}
+      assert Layout.shell(graph, [[1]], center: {3.0, 3.0}) == %{1 => {3.0, 3.0}}
+    end
+
+    test "supports custom radii list" do
+      graph = Yog.from_unweighted_edges(:undirected, [{1, 2}, {3, 4}])
+      pos = Layout.shell(graph, [[1, 2], [3, 4]], radii: [0.2, 0.9], center: {0.0, 0.0})
+      {x1, y1} = Map.get(pos, 1)
+      {x3, y3} = Map.get(pos, 3)
+      assert_in_delta :math.sqrt(x1 * x1 + y1 * y1), 0.2, 1.0e-6
+      assert_in_delta :math.sqrt(x3 * x3 + y3 * y3), 0.9, 1.0e-6
+    end
+  end
+
+  describe "multipartite/3" do
+    test "arranges layers in vertical columns" do
+      # 2 layers: layer 0 contains [1], layer 1 contains [2, 3]
+      graph = Yog.from_unweighted_edges(:undirected, [{1, 2}, {1, 3}])
+
+      pos = Layout.multipartite(graph, [[1], [2, 3]], align: :vertical, width: 2.0, height: 4.0, center: {0.0, 0.0})
+
+      # Column 0: x = -1.0. Column 1: x = 1.0.
+      assert Map.get(pos, 1) == {-1.0, 0.0} # Single node in layer 0 positioned at cy
+      assert Map.get(pos, 2) == {1.0, -2.0} # Node 2 is first in layer 1 -> cy - height/2
+      assert Map.get(pos, 3) == {1.0, 2.0}  # Node 3 is second in layer 1 -> cy + height/2
+    end
+
+    test "arranges layers in horizontal rows" do
+      graph = Yog.from_unweighted_edges(:undirected, [{1, 2}, {1, 3}])
+
+      pos = Layout.multipartite(graph, [[1], [2, 3]], align: :horizontal, width: 2.0, height: 4.0, center: {0.0, 0.0})
+
+      # Row 0: y = -2.0. Row 1: y = 2.0.
+      assert Map.get(pos, 1) == {0.0, -2.0}
+      assert Map.get(pos, 2) == {-1.0, 2.0}
+      assert Map.get(pos, 3) == {1.0, 2.0}
+    end
+
+    test "raises errors for empty layers, invalid align, or missing nodes" do
+      graph = Yog.from_unweighted_edges(:undirected, [{1, 2}])
+
+      assert_raise ArgumentError, ~r/must be either :vertical or :horizontal/, fn ->
+        Layout.multipartite(graph, [[1], [2]], align: :diagonal)
+      end
+
+      assert_raise ArgumentError, ~r/must not contain empty lists/, fn ->
+        Layout.multipartite(graph, [[1], []])
+      end
+
+      assert_raise ArgumentError, ~r/must exist in the graph/, fn ->
+        Layout.multipartite(graph, [[1], [99]])
+      end
+    end
+
+    test "handles empty layers" do
+      graph = Yog.undirected()
+      assert Layout.multipartite(graph, []) == %{}
+    end
+  end
 end
