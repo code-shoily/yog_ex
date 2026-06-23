@@ -68,7 +68,7 @@ defmodule YogEx.MixProject do
       {:benchee, "~> 1.3", only: :dev},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.18", only: :test},
-      {:jump_credo_checks, "~> 0.1", only: [:dev], runtime: false}
+      {:jump_credo_checks, "~> 0.4", only: [:dev], runtime: false}
     ]
   end
 
