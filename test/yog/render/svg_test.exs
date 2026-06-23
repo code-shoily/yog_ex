@@ -14,7 +14,7 @@ defmodule Yog.Render.SVGTest do
     assert String.ends_with?(String.trim(svg), "</svg>")
 
     # Check that it contains standard SVG tags
-    assert String.contains?(svg, "<line")
+    assert String.contains?(svg, "<path")
     assert String.contains?(svg, "<circle")
     assert String.contains?(svg, "<text")
 
@@ -32,7 +32,40 @@ defmodule Yog.Render.SVGTest do
   test "handles empty graph layout" do
     svg = SVG.to_svg(Yog.undirected(), %{})
     assert String.starts_with?(svg, "<svg")
-    refute String.contains?(svg, "<line")
+    refute String.contains?(svg, "<path")
     refute String.contains?(svg, "<circle")
+  end
+
+  test "supports directed graphs with arrow markers and path shortening" do
+    graph = Yog.from_unweighted_edges(:directed, [{1, 2}])
+    pos = Layout.circular(graph)
+
+    svg = SVG.to_svg(graph, pos)
+
+    assert String.contains?(svg, "<defs>")
+    assert String.contains?(svg, "<marker id=\"arrow\"")
+    assert String.contains?(svg, "marker-end=\"url(#arrow)\"")
+  end
+
+  test "supports multigraph layouts with curvy edges and self-loops" do
+    multi = Yog.Multi.undirected()
+    multi = Yog.Multi.add_node(multi, 1)
+    multi = Yog.Multi.add_node(multi, 2)
+    {multi, _} = Yog.Multi.add_edge(multi, 1, 2, nil)
+    {multi, _} = Yog.Multi.add_edge(multi, 1, 2, nil) # parallel edge
+    {multi, _} = Yog.Multi.add_edge(multi, 1, 1, nil) # self-loop
+
+    # Layout computed on simple graph version
+    simple = Yog.Multi.to_simple_graph(multi)
+    pos = Layout.circular(simple)
+
+    svg = SVG.to_svg(multi, pos)
+
+    # Must contain path definitions
+    assert String.contains?(svg, "<path")
+
+    # Check for presence of curve indicators: Q for quadratic curves, C for cubic loops
+    assert String.contains?(svg, " Q ")
+    assert String.contains?(svg, " C ")
   end
 end

@@ -45,7 +45,7 @@ defmodule Yog.Render.SVG do
       true
 
   """
-  @spec to_svg(Graph.t(), %{Graph.node_id() => {float(), float()}}, keyword()) :: String.t()
+  @spec to_svg(Graph.t() | Yog.Multi.Graph.t(), %{Graph.node_id() => {float(), float()}}, keyword()) :: String.t()
   def to_svg(graph, positions, opts \\ []) do
     width = Keyword.get(opts, :width, 600)
     height = Keyword.get(opts, :height, 400)
@@ -59,16 +59,88 @@ defmodule Yog.Render.SVG do
     show_labels = Keyword.get(opts, :show_labels, true)
     text_color = Keyword.get(opts, :text_color, "white")
     text_size = Keyword.get(opts, :text_size, 10)
+    edge_spacing = Keyword.get(opts, :edge_spacing, 20.0)
 
     scaled_positions = scale_to_pixels(positions, width, height, padding)
 
+    directed? = graph.kind == :directed
+    marker_attr = if directed?, do: ~s[marker-end="url(#arrow)"], else: ""
+
+    edges = get_edges(graph)
+
+    edges_with_multiplicity =
+      edges
+      |> Enum.group_by(fn {src, dst, _} -> {min(src, dst), max(src, dst)} end)
+      |> Enum.flat_map(fn {_pair, edge_list} ->
+        m = length(edge_list)
+        edge_list
+        |> Enum.with_index()
+        |> Enum.map(fn {edge, k} -> {edge, k, m} end)
+      end)
+
     edges_svg =
-      graph
-      |> Yog.all_edges()
-      |> Enum.map(fn {src, dst, _} ->
+      edges_with_multiplicity
+      |> Enum.map(fn {{src, dst, _}, k, m} ->
         case {Map.get(scaled_positions, src), Map.get(scaled_positions, dst)} do
           {{x1, y1}, {x2, y2}} ->
-            ~s(<line x1="#{x1}" y1="#{y1}" x2="#{x2}" y2="#{y2}" stroke="#{edge_color}" stroke-width="#{edge_width}" />)
+            if src == dst do
+              # Self-loop
+              c1x = x1 - 2 * node_radius
+              c1y = y1 - 3 * node_radius
+              c2x = x1 + 2 * node_radius
+              c2y = y1 - 3 * node_radius
+
+              {x_dst, y_dst} =
+                if directed? do
+                  tx = -2 * node_radius
+                  ty = 3 * node_radius
+                  t_len = :math.sqrt(tx * tx + ty * ty)
+                  if t_len > 0, do: {x1 - (tx / t_len) * node_radius, y1 - (ty / t_len) * node_radius}, else: {x1, y1}
+                else
+                  {x1, y1}
+                end
+
+              ~s(<path d="M #{x1} #{y1} C #{c1x} #{c1y}, #{c2x} #{c2y}, #{x_dst} #{y_dst}" stroke="#{edge_color}" stroke-width="#{edge_width}" fill="none" #{marker_attr} />)
+            else
+              # Midpoint and distance using canonical coordinates (min to max)
+              u = min(src, dst)
+              v = max(src, dst)
+              {x_u, y_u} = Map.fetch!(scaled_positions, u)
+              {x_v, y_v} = Map.fetch!(scaled_positions, v)
+
+              mx = (x_u + x_v) / 2.0
+              my = (y_u + y_v) / 2.0
+              dx = x_v - x_u
+              dy = y_v - y_u
+              len = :math.sqrt(dx * dx + dy * dy)
+
+              hk = edge_spacing * (k - (m - 1) / 2.0)
+
+              {cx, cy} =
+                if len > 0, do: {mx + hk * (-dy / len), my + hk * (dx / len)}, else: {mx, my}
+
+              # Tangent direction at target node dst
+              {tx, ty} =
+                cond do
+                  not directed? -> {0.0, 0.0}
+                  abs(hk) < 1.0e-5 -> {x2 - x1, y2 - y1}
+                  true -> {x2 - cx, y2 - cy}
+                end
+
+              {x2_new, y2_new} =
+                if directed? do
+                  t_len = :math.sqrt(tx * tx + ty * ty)
+                  if t_len > 0, do: {x2 - (tx / t_len) * node_radius, y2 - (ty / t_len) * node_radius}, else: {x2, y2}
+                else
+                  {x2, y2}
+                end
+
+              if abs(hk) < 1.0e-5 do
+                ~s(<path d="M #{x1} #{y1} L #{x2_new} #{y2_new}" stroke="#{edge_color}" stroke-width="#{edge_width}" fill="none" #{marker_attr} />)
+              else
+                ~s(<path d="M #{x1} #{y1} Q #{cx} #{cy} #{x2_new} #{y2_new}" stroke="#{edge_color}" stroke-width="#{edge_width}" fill="none" #{marker_attr} />)
+              end
+            end
 
           _ ->
             ""
@@ -87,22 +159,27 @@ defmodule Yog.Render.SVG do
             ""
           end
 
-        ~s"""
-        <g>
-            <circle cx="#{x}" cy="#{y}" r="#{node_radius}" fill="#{node_color}" stroke="#{node_stroke}" stroke-width="#{node_stroke_width}" />
-            #{label}
-          </g>
-        """
+        ~s(<g><circle cx="#{x}" cy="#{y}" r="#{node_radius}" fill="#{node_color}" stroke="#{node_stroke}" stroke-width="#{node_stroke_width}" />#{label}</g>)
       end)
       |> Enum.join("\n  ")
 
+    defs_svg =
+      if directed? do
+        ~s(<defs><marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#{edge_color}" /></marker></defs>\n  )
+      else
+        ""
+      end
+
     """
     <svg width="#{width}" height="#{height}" viewBox="0 0 #{width} #{height}" style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px;">
-      #{edges_svg}
+      #{defs_svg}#{edges_svg}
       #{nodes_svg}
     </svg>
     """
   end
+
+  defp get_edges(%Graph{} = graph), do: Yog.all_edges(graph)
+  defp get_edges(%Yog.Multi.Graph{edges: edges}), do: Map.values(edges)
 
   defp scale_to_pixels(positions, w, h, padding) do
     pos_values = Map.values(positions)

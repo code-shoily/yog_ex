@@ -10,9 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **`Yog.Layout`** — Implemented pure Elixir layout calculation algorithms: `Yog.Layout.circular/2` (circular placement), `Yog.Layout.random/2` (random uniform boundary placement), `Yog.Layout.spring/2` (Fruchterman-Reingold force-directed simulation), `Yog.Layout.tutte/3` (Tutte barycentric embedding via Gauss-Seidel relaxation), `Yog.Layout.shell/3` (concentric shells), and `Yog.Layout.multipartite/3` (parallel layers/columns). All layouts return a `%{node_id => {x, y}}` coordinate map where coordinates are represented as `{float, float}` tuples.
+- **`Yog.Render.SVG`** — Implemented a pure Elixir SVG renderer supporting simple graphs, directed graphs, and multigraphs. It computes parallel edge indices and multiplicities to render parallel edges as distinct curved quadratic Bézier curves, self-loops as cubic Bézier loops, and directed arrowheads with boundary-offset truncation math to keep arrowheads visible at the node borders.
+- **Livebook Layout Guide** — Created `livebooks/how_to/layout_guide.livemd` showcasing circular, spring, tutte, shell, and multipartite layouts rendered using both interactive Kino SVG (`Kino.HTML.new/1`) and Kino Vega-Lite (`Yog.Render.VegaLite`).
 
 ### Fixed
 
+- **`Yog.Render.SVG` Parentheses Sigil Bug** — Resolved a compiler syntax error caused by nested parentheses inside `~s(marker-end="url(#arrow)")` by changing the sigil delimiters to square brackets `~s[...]`.
 - **`Yog.Community.Walktrap`** — Corrected hierarchical merging logic by resolving a key mismatch bug (where community IDs were indices but caches were keyed by original node IDs). Also corrected the random walk probability merges to be degree-weighted and added Ward's size-weighting factor during the clustering step.
 
 ## 0.98.5 - 2026-06-14

@@ -301,6 +301,17 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | Match | `Yog.Functional.Model` | Decompose node + context | O(1) | O(1) |
 | Embed | `Yog.Functional.Model` | Insert node context | O(1) | O(1) |
 
+## Layout
+
+| Algorithm | Module | Purpose | Time Complexity | Space Complexity |
+|-----------|--------|---------|-----------------|------------------|
+| Circular | `Yog.Layout.Circular` | Spaces nodes uniformly along a circle | O(V) | O(V) |
+| Random | `Yog.Layout.Random` | Distributes nodes randomly in a bounding box | O(V) | O(V) |
+| Spring | `Yog.Layout.Spring` | Fruchterman-Reingold force-directed layout | O(I · (V² + E)) | O(V) |
+| Tutte | `Yog.Layout.Tutte` | Barycentric planar layout pinning boundary nodes | O(I · (V + E)) | O(V) |
+| Shell | `Yog.Layout.Shell` | Arranges nodes in concentric circle shells | O(V) | O(V) |
+| Multipartite | `Yog.Layout.Multipartite` | Layers partitioned nodes in parallel rows/columns | O(V) | O(V) |
+
 ## Rendering
 
 | Algorithm | Module | Purpose | Time Complexity | Space Complexity |
@@ -308,6 +319,8 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | ASCII Render | `Yog.Render.ASCII` | Terminal visualization | O(V+E) | O(V+E) |
 | DOT Export | `Yog.Render.DOT` | Graphviz DOT format | O(V+E) | O(V+E) |
 | Mermaid Export | `Yog.Render.Mermaid` | Mermaid.js diagram format | O(V+E) | O(V+E) |
+| SVG Render | `Yog.Render.SVG` | Pure Elixir SVG generator (with multigraph, curved parallel edges, self-loops, and arrowhead marker offsets) | O(V+E) | O(V+E) |
+| Vega-Lite Render | `Yog.Render.VegaLite` | Vega-Lite JSON plot specification | O(V+E) | O(V+E) |
 
 ## Data Structures
 
