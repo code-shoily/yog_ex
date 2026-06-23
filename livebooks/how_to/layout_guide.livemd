@@ -2,7 +2,7 @@
 
 ```elixir
 Mix.install([
-  {:yog_ex, github: "code-shoily/yog_ex", branch: "main"},
+  {:yog_ex, "~> 0.98.0"},
   {:kino, "~> 0.12.0"},
   {:vega_lite, "~> 0.1.8"},
   {:kino_vega_lite, "~> 0.1.11"}
@@ -16,10 +16,9 @@ Graph layouts are algorithms that compute a 2D coordinate position for each node
 Having the calculated coordinates (`%{node_id => {x, y}}`) inside Elixir gives you complete control over how to render and animate your graph.
 
 In this guide, you will learn:
-
 1. How to use `Yog.Layout` to compute coordinates for all 6 layout types: **Circular, Random, Spring (Force-Directed), Tutte, Shell, and Multipartite**.
-2. How to draw these layouts dynamically as interactive **SVG graphics** inside Livebook.
-3. How to plot layouts using **Vega-Lite** graphs.
+2. How to draw these layouts dynamically as interactive **SVG graphics** inside Livebook using `Yog.Render.SVG`.
+3. How to plot layouts using **Vega-Lite** and `Yog.Render.VegaLite`.
 
 ---
 
@@ -95,165 +94,37 @@ Layout.multipartite(graph, [[0], [1, 2], [3, 4, 5, 6]], align: :vertical, width:
 
 ## 2. Rendering Graph Layouts in SVG (using Kino SVG)
 
-Since SVG is just XML, we can render our graph layout directly in Elixir without any external JS graph libraries.
-
-Let's write a simple helper module `YogSVG` to convert a layout map and a graph into a rendered SVG string.
-
-```elixir
-defmodule YogSVG do
-  def render(graph, positions, opts \\ []) do
-    width = Keyword.get(opts, :width, 600)
-    height = Keyword.get(opts, :height, 400)
-    node_color = Keyword.get(opts, :node_color, "#3b82f6")
-    node_radius = Keyword.get(opts, :node_radius, 12)
-    edge_color = Keyword.get(opts, :edge_color, "#9ca3af")
-
-    # 1. Rescale positions to SVG pixel range (with 20px padding)
-    scaled_positions = scale_to_pixels(positions, width, height, 40)
-
-    # 2. Render SVG Lines (Edges)
-    edges_svg =
-      graph
-      |> Yog.all_edges()
-      |> Enum.map(fn {src, dst, _} ->
-        case {Map.get(scaled_positions, src), Map.get(scaled_positions, dst)} do
-          {{x1, y1}, {x2, y2}} ->
-            ~s(<line x1="#{x1}" y1="#{y1}" x2="#{x2}" y2="#{y2}" stroke="#{edge_color}" stroke-width="2" />)
-          _ ->
-            ""
-        end
-      end)
-      |> Enum.join("\n")
-
-    # 3. Render SVG Circles & Labels (Nodes)
-    nodes_svg =
-      scaled_positions
-      |> Enum.map(fn {node_id, {x, y}} ->
-        ~s"""
-        <g>
-          <circle cx="#{x}" cy="#{y}" r="#{node_radius}" fill="#{node_color}" stroke="#1e3a8a" stroke-width="2" />
-          <text x="#{x}" y="#{y + 4}" font-family="sans-serif" font-size="10" fill="white" font-weight="bold" text-anchor="middle">
-            #{node_id}
-          </text>
-        </g>
-        """
-      end)
-      |> Enum.join("\n")
-
-    # 4. Construct final SVG wrapper
-    svg_string = """
-    <svg width="#{width}" height="#{height}" viewBox="0 0 #{width} #{height}" style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px;">
-      #{edges_svg}
-      #{nodes_svg}
-    </svg>
-    """
-
-    Kino.HTML.new(svg_string)
-  end
-
-  defp scale_to_pixels(positions, w, h, padding) do
-    pos_values = Map.values(positions)
-    {min_x, max_x, min_y, max_y} =
-      case pos_values do
-        [] -> {0.0, 0.0, 0.0, 0.0}
-        [{x0, y0} | rest] ->
-          Enum.reduce(rest, {x0, x0, y0, y0}, fn {x, y}, {min_x, max_x, min_y, max_y} ->
-            {min(min_x, x), max(max_x, x), min(min_y, y), max(max_y, y)}
-          end)
-      end
-
-    w_span = max_x - min_x
-    h_span = max_y - min_y
-
-    Map.new(positions, fn {id, {x, y}} ->
-      px = if w_span > 0, do: padding + (x - min_x) * (w - 2 * padding) / w_span, else: w / 2.0
-      py = if h_span > 0, do: padding + (y - min_y) * (h - 2 * padding) / h_span, else: h / 2.0
-      {id, {px, py}}
-    end)
-  end
-end
-```
+`Yog.Render.SVG` converts a layout positions map and a graph into a raw XML/SVG string. Since this outputs a standard string, it can be rendered in Livebook by wrapping it in `Kino.HTML.new/1`.
 
 ### Visualizing Circular Layout
 
 ```elixir
 pos = Layout.circular(graph, radius: 1.0)
-YogSVG.render(graph, pos, node_color: "#ef4444")
+svg = Yog.Render.SVG.to_svg(graph, pos, node_color: "#ef4444")
+Kino.HTML.new(svg)
 ```
 
 ### Visualizing Spring Force-Directed Layout
 
 ```elixir
 pos = Layout.spring(graph, iterations: 100, seed: 12)
-YogSVG.render(graph, pos, node_color: "#10b981")
+svg = Yog.Render.SVG.to_svg(graph, pos, node_color: "#10b981")
+Kino.HTML.new(svg)
 ```
 
 ### Visualizing Tutte Layout
 
 ```elixir
 pos = Layout.tutte(graph, [1, 2, 3, 4, 5, 6], iterations: 50)
-YogSVG.render(graph, pos, node_color: "#8b5cf6")
+svg = Yog.Render.SVG.to_svg(graph, pos, node_color: "#8b5cf6")
+Kino.HTML.new(svg)
 ```
 
 ---
 
 ## 3. Rendering in Vega-Lite (using Kino Vega-Lite)
 
-You can also render layouts using Vega-Lite. We plot edges as line segment layers and nodes as scatter circles.
-
-Let's build a helper module `YogVega` to format the layout dataset and compile it into a `VegaLite` spec.
-
-```elixir
-defmodule YogVega do
-  import VegaLite
-
-  def render(graph, positions, opts \\ []) do
-    # 1. Format Nodes Dataset
-    node_data =
-      Enum.map(positions, fn {id, {x, y}} ->
-        %{"id" => to_string(id), "x" => x, "y" => y}
-      end)
-
-    # 2. Format Edges Dataset
-    edge_data =
-      graph
-      |> Yog.all_edges()
-      |> Enum.flat_map(fn {src, dst, _} ->
-        case {Map.get(positions, src), Map.get(positions, dst)} do
-          {{x1, y1}, {x2, y2}} ->
-            [
-              %{"edge_group" => "#{src}-#{dst}", "x" => x1, "y" => y1},
-              %{"edge_group" => "#{src}-#{dst}", "x" => x2, "y" => y2}
-            ]
-          _ ->
-            []
-        end
-      end)
-
-    # 3. Build Multi-Layer Plot
-    new(width: 500, height: 400, background: "#f8fafc")
-    |> data_from_values(node_data)
-    |> encode_field(:x, "x", type: :quantitative, scale: [zero: false], axis: [title: nil, labels: false, ticks: false])
-    |> encode_field(:y, "y", type: :quantitative, scale: [zero: false], axis: [title: nil, labels: false, ticks: false])
-    |> layers([
-      # Layer 1: Edges (lines linking points grouped by edge_group)
-      new()
-      |> data_from_values(edge_data)
-      |> mark(:line, stroke_width: 2, color: "#9ca3af")
-      |> encode_field(:detail, "edge_group"),
-
-      # Layer 2: Nodes (scatter circles)
-      new()
-      |> mark(:circle, size: 400, color: Keyword.get(opts, :node_color, "#3b82f6"), opacity: 1.0, stroke: "#1e3a8a", stroke_width: 1.5),
-
-      # Layer 3: Labels
-      new()
-      |> mark(:text, dy: 4, color: "white", font_weight: "bold", font_size: 11)
-      |> encode_field(:text, "id", type: :nominal)
-    ])
-  end
-end
-```
+`Yog.Render.VegaLite` builds a multi-layered `%VegaLite{}` plot specification. We plot edges as line segment layers and nodes as scatter circles.
 
 ### Visualizing Bipartite Layout (Multipartite)
 
@@ -275,7 +146,7 @@ layers = [
 
 pos = Layout.multipartite(bipartite_graph, layers, align: :vertical, width: 5.0, height: 4.0)
 
-YogVega.render(bipartite_graph, pos, node_color: "#f59e0b")
+Yog.Render.VegaLite.to_spec(bipartite_graph, pos, node_color: "#f59e0b")
 ```
 
 ### Visualizing Concentric Shell Layout
@@ -298,5 +169,5 @@ shells = [[0, 1, 2, 3], [4, 5, 6, 7, 8]]
 
 pos = Layout.shell(shell_graph, shells, radii: [0.3, 1.0])
 
-YogVega.render(shell_graph, pos, node_color: "#ec4899")
+Yog.Render.VegaLite.to_spec(shell_graph, pos, node_color: "#ec4899")
 ```
