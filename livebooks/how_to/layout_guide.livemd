@@ -2,7 +2,7 @@
 
 ```elixir
 Mix.install([
-  {:yog_ex, "~> 0.98.0"},
+  {:yog_ex, github: "code-shoily/yog_ex", branch: "main"},
   {:kino, "~> 0.12.0"},
   {:vega_lite, "~> 0.1.8"},
   {:kino_vega_lite, "~> 0.1.11"}
@@ -16,6 +16,7 @@ Graph layouts are algorithms that compute a 2D coordinate position for each node
 Having the calculated coordinates (`%{node_id => {x, y}}`) inside Elixir gives you complete control over how to render and animate your graph.
 
 In this guide, you will learn:
+
 1. How to use `Yog.Layout` to compute coordinates for all 6 layout types: **Circular, Random, Spring (Force-Directed), Tutte, Shell, and Multipartite**.
 2. How to draw these layouts dynamically as interactive **SVG graphics** inside Livebook.
 3. How to plot layouts using **Vega-Lite** graphs.
@@ -230,7 +231,7 @@ defmodule YogVega do
       end)
 
     # 3. Build Multi-Layer Plot
-    new()
+    new(width: 500, height: 400, background: "#f8fafc")
     |> data_from_values(node_data)
     |> encode_field(:x, "x", type: :quantitative, scale: [zero: false], axis: [title: nil, labels: false, ticks: false])
     |> encode_field(:y, "y", type: :quantitative, scale: [zero: false], axis: [title: nil, labels: false, ticks: false])
@@ -250,7 +251,6 @@ defmodule YogVega do
       |> mark(:text, dy: 4, color: "white", font_weight: "bold", font_size: 11)
       |> encode_field(:text, "id", type: :nominal)
     ])
-    |> properties(width: 500, height: 400, background: "#f8fafc")
   end
 end
 ```
