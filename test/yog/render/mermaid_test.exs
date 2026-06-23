@@ -171,6 +171,22 @@ defmodule Yog.Render.MermaidTest do
       assert String.contains?(mermaid, "style n_0 fill:#e1f5fe")
     end
 
+    test "converts snake_case custom styling attributes to kebab-case" do
+      graph =
+        Yog.directed()
+        |> Yog.add_node(1, "A")
+        |> Yog.add_node(2, "B")
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+
+      opts =
+        Map.put(Mermaid.default_options(), :node_attributes, fn id, _data ->
+          if id == 1, do: [{:stroke_dasharray, "5 5"}, {:font_size, "12px"}], else: []
+        end)
+
+      mermaid = Mermaid.to_mermaid(graph, opts)
+      assert String.contains?(mermaid, "style n_0 stroke-dasharray:5 5,font-size:12px")
+    end
+
     test "renders with per-element edge attributes" do
       graph =
         Yog.directed()

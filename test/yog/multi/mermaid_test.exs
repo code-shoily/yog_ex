@@ -306,6 +306,25 @@ defmodule Yog.Multi.MermaidTest do
       assert String.contains?(mermaid, "style n_0 fill:#e1f5fe,stroke:#0288d1")
     end
 
+    test "converts snake_case custom styling attributes to kebab-case" do
+      multi =
+        Yog.Multi.directed()
+        |> Yog.Multi.add_node(1, "A")
+        |> Yog.Multi.add_node(2, "B")
+
+      {multi, _} = Yog.Multi.add_edge(multi, 1, 2, 1.0)
+
+      opts = %{
+        Mermaid.default_options()
+        | node_attributes: fn id, _data ->
+            if id == 1, do: [{:stroke_dasharray, "5 5"}, {:font_size, "12px"}], else: []
+          end
+      }
+
+      mermaid = Mermaid.to_mermaid(multi, opts)
+      assert String.contains?(mermaid, "style n_0 stroke-dasharray:5 5,font-size:12px")
+    end
+
     test "renders with per-node shape function" do
       multi =
         Yog.Multi.directed()

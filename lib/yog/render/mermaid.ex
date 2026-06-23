@@ -757,7 +757,7 @@ defmodule Yog.Render.Mermaid do
           :color -> "stroke"
           :stroke_width -> "stroke-width"
           :stroke_width_px -> "stroke-width"
-          _ -> to_string(key)
+          _ -> key |> to_string() |> String.replace("_", "-")
         end
 
       "#{style_key}:#{value}"
