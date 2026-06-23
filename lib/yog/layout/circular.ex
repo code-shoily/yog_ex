@@ -67,7 +67,7 @@ defmodule Yog.Layout.Circular do
         nodes
         |> Enum.with_index()
         |> Map.new(fn {node_id, index} ->
-          theta = (two_pi * index) / n
+          theta = two_pi * index / n
           x = cx + radius * :math.cos(theta)
           y = cy + radius * :math.sin(theta)
           {node_id, {x, y}}

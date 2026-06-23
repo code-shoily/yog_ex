@@ -52,7 +52,9 @@ defmodule Yog.Layout.Tutte do
       [1, 2, 3, 4]
 
   """
-  @spec layout(Graph.t(), [Graph.node_id()], keyword()) :: %{Graph.node_id() => {float(), float()}}
+  @spec layout(Graph.t(), [Graph.node_id()], keyword()) :: %{
+          Graph.node_id() => {float(), float()}
+        }
   def layout(graph, boundary_nodes, opts \\ []) do
     iterations = Keyword.get(opts, :iterations, 100)
     radius = Keyword.get(opts, :radius, 1.0)
@@ -63,7 +65,8 @@ defmodule Yog.Layout.Tutte do
 
     cond do
       length(boundary_nodes) < 3 ->
-        raise ArgumentError, "Tutte layout requires at least 3 boundary nodes to form a convex polygon"
+        raise ArgumentError,
+              "Tutte layout requires at least 3 boundary nodes to form a convex polygon"
 
       Enum.any?(boundary_nodes, fn id -> id not in nodes end) ->
         raise ArgumentError, "All boundary nodes must exist within the graph"
@@ -90,7 +93,7 @@ defmodule Yog.Layout.Tutte do
     boundary_nodes
     |> Enum.with_index()
     |> Map.new(fn {node_id, index} ->
-      theta = (two_pi * index) / n
+      theta = two_pi * index / n
       x = cx + radius * :math.cos(theta)
       y = cy + radius * :math.sin(theta)
       {node_id, {x, y}}
@@ -98,6 +101,7 @@ defmodule Yog.Layout.Tutte do
   end
 
   defp relax_iterations(positions, _graph, _interiors, 0), do: positions
+
   defp relax_iterations(positions, graph, interiors, steps) do
     new_positions =
       Enum.reduce(interiors, positions, fn node, acc ->

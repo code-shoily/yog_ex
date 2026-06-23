@@ -1,6 +1,8 @@
 defmodule Yog.Render.SVGTest do
   use ExUnit.Case, async: true
 
+  doctest Yog.Render.SVG
+
   alias Yog.Layout
   alias Yog.Render.SVG
 
@@ -52,8 +54,10 @@ defmodule Yog.Render.SVGTest do
     multi = Yog.Multi.add_node(multi, 1)
     multi = Yog.Multi.add_node(multi, 2)
     {multi, _} = Yog.Multi.add_edge(multi, 1, 2, nil)
-    {multi, _} = Yog.Multi.add_edge(multi, 1, 2, nil) # parallel edge
-    {multi, _} = Yog.Multi.add_edge(multi, 1, 1, nil) # self-loop
+    # parallel edge
+    {multi, _} = Yog.Multi.add_edge(multi, 1, 2, nil)
+    # self-loop
+    {multi, _} = Yog.Multi.add_edge(multi, 1, 1, nil)
 
     # Layout computed on simple graph version
     simple = Yog.Multi.to_simple_graph(multi)

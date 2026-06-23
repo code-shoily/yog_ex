@@ -1,6 +1,8 @@
 defmodule Yog.Render.VegaLiteTest do
   use ExUnit.Case, async: true
 
+  doctest Yog.Render.VegaLite
+
   alias Yog.Layout
 
   test "generates VegaLite specification if module is loaded, otherwise raises error" do

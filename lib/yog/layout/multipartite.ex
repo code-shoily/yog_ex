@@ -55,7 +55,9 @@ defmodule Yog.Layout.Multipartite do
       [1, 2, 3]
 
   """
-  @spec layout(Graph.t(), [[Graph.node_id()]], keyword()) :: %{Graph.node_id() => {float(), float()}}
+  @spec layout(Graph.t(), [[Graph.node_id()]], keyword()) :: %{
+          Graph.node_id() => {float(), float()}
+        }
   def layout(graph, layers, opts \\ []) do
     align = Keyword.get(opts, :align, :vertical)
     width = Keyword.get(opts, :width, 1.0)
@@ -94,12 +96,12 @@ defmodule Yog.Layout.Multipartite do
     min_x = cx - width / 2.0
     min_y = cy - height / 2.0
 
-    x = if m == 1, do: cx, else: min_x + (j * width) / (m - 1)
+    x = if m == 1, do: cx, else: min_x + j * width / (m - 1)
 
     layer_nodes
     |> Enum.with_index()
     |> Map.new(fn {node_id, i} ->
-      y = if k == 1, do: cy, else: min_y + (i * height) / (k - 1)
+      y = if k == 1, do: cy, else: min_y + i * height / (k - 1)
       {node_id, {x, y}}
     end)
   end
@@ -109,12 +111,12 @@ defmodule Yog.Layout.Multipartite do
     min_x = cx - width / 2.0
     min_y = cy - height / 2.0
 
-    y = if m == 1, do: cy, else: min_y + (j * height) / (m - 1)
+    y = if m == 1, do: cy, else: min_y + j * height / (m - 1)
 
     layer_nodes
     |> Enum.with_index()
     |> Map.new(fn {node_id, i} ->
-      x = if k == 1, do: cx, else: min_x + (i * width) / (k - 1)
+      x = if k == 1, do: cx, else: min_x + i * width / (k - 1)
       {node_id, {x, y}}
     end)
   end

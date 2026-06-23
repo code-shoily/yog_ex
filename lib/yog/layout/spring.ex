@@ -56,7 +56,7 @@ defmodule Yog.Layout.Spring do
 
   ## Examples
 
-      iex> graph = Yog.undirected() |> Yog.add_nodes_from([1, 2, 3]) |> Yog.add_edges([{1, 2, 10}, {2, 3, 5}])
+      iex> graph = Yog.undirected() |> Yog.add_nodes_from([1, 2, 3]) |> Yog.add_edges!([{1, 2, 10}, {2, 3, 5}])
       iex> pos = Yog.Layout.Spring.layout(graph, iterations: 10)
       iex> Map.keys(pos) |> Enum.sort()
       [1, 2, 3]
@@ -141,20 +141,40 @@ defmodule Yog.Layout.Spring do
     end)
   end
 
-  defp run_iterations(positions, _edges, _k, _k_squared, _fixed, _use_weight, current, max_iterations, _initial_temp)
+  defp run_iterations(
+         positions,
+         _edges,
+         _k,
+         _k_squared,
+         _fixed,
+         _use_weight,
+         current,
+         max_iterations,
+         _initial_temp
+       )
        when current >= max_iterations do
     positions
   end
 
-  defp run_iterations(positions, edges, k, k_squared, fixed, use_weight, current, max_iterations, initial_temp) do
+  defp run_iterations(
+         positions,
+         edges,
+         k,
+         k_squared,
+         fixed,
+         use_weight,
+         current,
+         max_iterations,
+         initial_temp
+       ) do
     # Linear cooling
     temp = initial_temp * (1.0 - current / max_iterations)
 
-    # Step 1: Repulsive forces
-    displacements = compute_repulsion(positions, k_squared)
-
-    # Step 2: Attractive forces
-    displacements = compute_attraction(displacements, positions, edges, k, use_weight)
+    # Step 1 + 2: Repulsive and attractive forces
+    displacements =
+      positions
+      |> compute_repulsion(k_squared)
+      |> compute_attraction(positions, edges, k, use_weight)
 
     # Step 3: Apply displacements to non-fixed nodes
     new_positions =
@@ -167,8 +187,8 @@ defmodule Yog.Layout.Spring do
 
           if dist > 0.0 do
             limited_dist = min(dist, temp)
-            new_x = x + (dx / dist) * limited_dist
-            new_y = y + (dy / dist) * limited_dist
+            new_x = x + dx / dist * limited_dist
+            new_y = y + dy / dist * limited_dist
             {id, {new_x, new_y}}
           else
             {id, {x, y}}
@@ -176,7 +196,17 @@ defmodule Yog.Layout.Spring do
         end
       end)
 
-    run_iterations(new_positions, edges, k, k_squared, fixed, use_weight, current + 1, max_iterations, initial_temp)
+    run_iterations(
+      new_positions,
+      edges,
+      k,
+      k_squared,
+      fixed,
+      use_weight,
+      current + 1,
+      max_iterations,
+      initial_temp
+    )
   end
 
   defp compute_repulsion(positions, k_squared) do
@@ -187,6 +217,7 @@ defmodule Yog.Layout.Spring do
 
   defp accumulate_repulsion([], _k2, displacements), do: displacements
   defp accumulate_repulsion([_], _k2, displacements), do: displacements
+
   defp accumulate_repulsion([{u_id, {ux, uy}} | rest], k2, displacements) do
     displacements =
       Enum.reduce(rest, displacements, fn {v_id, {vx, vy}}, acc ->
@@ -207,8 +238,8 @@ defmodule Yog.Layout.Spring do
 
         # Repulsion force: fr = k^2 / dist
         fr = k2 / dist
-        fx = (dx / dist) * fr
-        fy = (dy / dist) * fr
+        fx = dx / dist * fr
+        fy = dy / dist * fr
 
         acc
         |> Map.update!(u_id, fn {ux_disp, uy_disp} -> {ux_disp + fx, uy_disp + fy} end)
@@ -223,8 +254,12 @@ defmodule Yog.Layout.Spring do
       w = if use_weight and is_number(weight), do: weight, else: 1.0
 
       case {Map.get(positions, u_id), Map.get(positions, v_id)} do
-        {nil, _} -> acc
-        {_, nil} -> acc
+        {nil, _} ->
+          acc
+
+        {_, nil} ->
+          acc
+
         {{ux, uy}, {vx, vy}} ->
           dx = ux - vx
           dy = uy - vy
@@ -236,9 +271,9 @@ defmodule Yog.Layout.Spring do
           else
             dist = :math.sqrt(dist_sq)
             # Attraction force: fa = dist^2 / k
-            fa = (dist * dist) / k * w
-            fx = (dx / dist) * fa
-            fy = (dy / dist) * fa
+            fa = dist * dist / k * w
+            fx = dx / dist * fa
+            fy = dy / dist * fa
 
             acc
             |> Map.update!(u_id, fn {ux_disp, uy_disp} -> {ux_disp - fx, uy_disp - fy} end)

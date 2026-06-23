@@ -1,6 +1,8 @@
 defmodule Yog.LayoutTest do
   use ExUnit.Case, async: true
 
+  doctest Yog.Layout
+
   alias Yog.Layout
 
   describe "circular/2" do
@@ -138,7 +140,8 @@ defmodule Yog.LayoutTest do
   describe "tutte/3" do
     test "positions interior node at the center of a symmetric boundary" do
       # Boundary nodes: 1, 2, 3. Interior node: 4 connected to 1, 2, 3.
-      graph = Yog.from_unweighted_edges(:undirected, [{1, 2}, {2, 3}, {3, 1}, {1, 4}, {2, 4}, {3, 4}])
+      graph =
+        Yog.from_unweighted_edges(:undirected, [{1, 2}, {2, 3}, {3, 1}, {1, 4}, {2, 4}, {3, 4}])
 
       pos = Layout.tutte(graph, [1, 2, 3], iterations: 50, center: {0.0, 0.0}, radius: 2.0)
 
@@ -238,18 +241,33 @@ defmodule Yog.LayoutTest do
       # 2 layers: layer 0 contains [1], layer 1 contains [2, 3]
       graph = Yog.from_unweighted_edges(:undirected, [{1, 2}, {1, 3}])
 
-      pos = Layout.multipartite(graph, [[1], [2, 3]], align: :vertical, width: 2.0, height: 4.0, center: {0.0, 0.0})
+      pos =
+        Layout.multipartite(graph, [[1], [2, 3]],
+          align: :vertical,
+          width: 2.0,
+          height: 4.0,
+          center: {0.0, 0.0}
+        )
 
       # Column 0: x = -1.0. Column 1: x = 1.0.
-      assert Map.get(pos, 1) == {-1.0, 0.0} # Single node in layer 0 positioned at cy
-      assert Map.get(pos, 2) == {1.0, -2.0} # Node 2 is first in layer 1 -> cy - height/2
-      assert Map.get(pos, 3) == {1.0, 2.0}  # Node 3 is second in layer 1 -> cy + height/2
+      # Single node in layer 0 positioned at cy
+      assert Map.get(pos, 1) == {-1.0, 0.0}
+      # Node 2 is first in layer 1 -> cy - height/2
+      assert Map.get(pos, 2) == {1.0, -2.0}
+      # Node 3 is second in layer 1 -> cy + height/2
+      assert Map.get(pos, 3) == {1.0, 2.0}
     end
 
     test "arranges layers in horizontal rows" do
       graph = Yog.from_unweighted_edges(:undirected, [{1, 2}, {1, 3}])
 
-      pos = Layout.multipartite(graph, [[1], [2, 3]], align: :horizontal, width: 2.0, height: 4.0, center: {0.0, 0.0})
+      pos =
+        Layout.multipartite(graph, [[1], [2, 3]],
+          align: :horizontal,
+          width: 2.0,
+          height: 4.0,
+          center: {0.0, 0.0}
+        )
 
       # Row 0: y = -2.0. Row 1: y = 2.0.
       assert Map.get(pos, 1) == {0.0, -2.0}

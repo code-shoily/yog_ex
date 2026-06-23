@@ -259,6 +259,7 @@ defmodule Yog.Community.Walktrap do
 
           s1 = Map.get(sizes, c1, 1)
           s2 = Map.get(sizes, c2, 1)
+
           next_sizes =
             sizes
             |> Map.delete(c2)
@@ -266,6 +267,7 @@ defmodule Yog.Community.Walktrap do
 
           d1 = Map.get(comm_degrees, c1, 1.0)
           d2 = Map.get(comm_degrees, c2, 1.0)
+
           next_comm_degrees =
             comm_degrees
             |> Map.delete(c2)
@@ -313,7 +315,7 @@ defmodule Yog.Community.Walktrap do
                 s1 = Map.get(sizes, c1, 1)
                 s2 = Map.get(sizes, c2, 1)
                 # Ward's merge criterion: ((|C1| * |C2|) / (|C1| + |C2|)) * r^2
-                ward_dist = (s1 * s2) / (s1 + s2) * r2
+                ward_dist = s1 * s2 / (s1 + s2) * r2
                 PairingHeap.push(inner_acc, {ward_dist, {c1, c2}})
               else
                 inner_acc

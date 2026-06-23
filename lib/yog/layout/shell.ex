@@ -46,7 +46,9 @@ defmodule Yog.Layout.Shell do
       [1, 2, 3, 4]
 
   """
-  @spec layout(Graph.t(), [[Graph.node_id()]], keyword()) :: %{Graph.node_id() => {float(), float()}}
+  @spec layout(Graph.t(), [[Graph.node_id()]], keyword()) :: %{
+          Graph.node_id() => {float(), float()}
+        }
   def layout(graph, shells, opts \\ []) do
     {cx, cy} = Keyword.get(opts, :center, {0.0, 0.0})
     custom_radii = Keyword.get(opts, :radii)
@@ -93,22 +95,20 @@ defmodule Yog.Layout.Shell do
   defp position_shell(shell_nodes, radius, cx, cy, total_shells) do
     n = length(shell_nodes)
 
-    cond do
-      n == 1 && total_shells == 1 ->
-        [single] = shell_nodes
-        Map.new([{single, {cx, cy}}])
+    if n == 1 && total_shells == 1 do
+      [single] = shell_nodes
+      Map.new([{single, {cx, cy}}])
+    else
+      two_pi = 2 * :math.pi()
 
-      true ->
-        two_pi = 2 * :math.pi()
-
-        shell_nodes
-        |> Enum.with_index()
-        |> Map.new(fn {node_id, index} ->
-          theta = (two_pi * index) / n
-          x = cx + radius * :math.cos(theta)
-          y = cy + radius * :math.sin(theta)
-          {node_id, {x, y}}
-        end)
+      shell_nodes
+      |> Enum.with_index()
+      |> Map.new(fn {node_id, index} ->
+        theta = two_pi * index / n
+        x = cx + radius * :math.cos(theta)
+        y = cy + radius * :math.sin(theta)
+        {node_id, {x, y}}
+      end)
     end
   end
 end

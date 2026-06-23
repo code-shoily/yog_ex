@@ -45,7 +45,11 @@ defmodule Yog.Render.SVG do
       true
 
   """
-  @spec to_svg(Graph.t() | Yog.Multi.Graph.t(), %{Graph.node_id() => {float(), float()}}, keyword()) :: String.t()
+  @spec to_svg(
+          Graph.t() | Yog.Multi.Graph.t(),
+          %{Graph.node_id() => {float(), float()}},
+          keyword()
+        ) :: String.t()
   def to_svg(graph, positions, opts \\ []) do
     width = Keyword.get(opts, :width, 600)
     height = Keyword.get(opts, :height, 400)
@@ -73,6 +77,7 @@ defmodule Yog.Render.SVG do
       |> Enum.group_by(fn {src, dst, _} -> {min(src, dst), max(src, dst)} end)
       |> Enum.flat_map(fn {_pair, edge_list} ->
         m = length(edge_list)
+
         edge_list
         |> Enum.with_index()
         |> Enum.map(fn {edge, k} -> {edge, k, m} end)
@@ -95,7 +100,10 @@ defmodule Yog.Render.SVG do
                   tx = -2 * node_radius
                   ty = 3 * node_radius
                   t_len = :math.sqrt(tx * tx + ty * ty)
-                  if t_len > 0, do: {x1 - (tx / t_len) * node_radius, y1 - (ty / t_len) * node_radius}, else: {x1, y1}
+
+                  if t_len > 0,
+                    do: {x1 - tx / t_len * node_radius, y1 - ty / t_len * node_radius},
+                    else: {x1, y1}
                 else
                   {x1, y1}
                 end
@@ -130,7 +138,10 @@ defmodule Yog.Render.SVG do
               {x2_new, y2_new} =
                 if directed? do
                   t_len = :math.sqrt(tx * tx + ty * ty)
-                  if t_len > 0, do: {x2 - (tx / t_len) * node_radius, y2 - (ty / t_len) * node_radius}, else: {x2, y2}
+
+                  if t_len > 0,
+                    do: {x2 - tx / t_len * node_radius, y2 - ty / t_len * node_radius},
+                    else: {x2, y2}
                 else
                   {x2, y2}
                 end
@@ -151,7 +162,7 @@ defmodule Yog.Render.SVG do
 
     nodes_svg =
       scaled_positions
-      |> Enum.map(fn {node_id, {x, y}} ->
+      |> Enum.map_join("\n  ", fn {node_id, {x, y}} ->
         label =
           if show_labels do
             ~s(<text x="#{x}" y="#{y + 4}" font-family="sans-serif" font-size="#{text_size}" fill="#{text_color}" font-weight="bold" text-anchor="middle">#{node_id}</text>)
@@ -161,7 +172,6 @@ defmodule Yog.Render.SVG do
 
         ~s(<g><circle cx="#{x}" cy="#{y}" r="#{node_radius}" fill="#{node_color}" stroke="#{node_stroke}" stroke-width="#{node_stroke_width}" />#{label}</g>)
       end)
-      |> Enum.join("\n  ")
 
     defs_svg =
       if directed? do

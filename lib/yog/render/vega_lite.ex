@@ -27,13 +27,15 @@ defmodule Yog.Render.VegaLite do
       iex> graph = Yog.from_unweighted_edges(:undirected, [{1, 2}])
       iex> pos = Yog.Layout.circular(graph)
       iex> spec = Yog.Render.VegaLite.to_spec(graph, pos)
-      # Returns %VegaLite{} struct
+      iex> is_struct(spec, VegaLite)
+      true
 
   """
   @spec to_spec(Graph.t(), %{Graph.node_id() => {float(), float()}}, keyword()) :: struct()
   def to_spec(graph, positions, opts \\ []) do
     unless Code.ensure_loaded?(VegaLite) do
-      raise RuntimeError, "VegaLite module is not loaded. Please add `{:vega_lite, \"~> 0.1\"}` to your dependencies."
+      raise RuntimeError,
+            "VegaLite module is not loaded. Please add `{:vega_lite, \"~> 0.1\"}` to your dependencies."
     end
 
     width = Keyword.get(opts, :width, 500)
@@ -68,8 +70,16 @@ defmodule Yog.Render.VegaLite do
 
     VegaLite.new(width: width, height: height, background: "#f8fafc")
     |> VegaLite.data_from_values(node_data)
-    |> VegaLite.encode_field(:x, "x", type: :quantitative, scale: [zero: false], axis: [title: nil, labels: false, ticks: false])
-    |> VegaLite.encode_field(:y, "y", type: :quantitative, scale: [zero: false], axis: [title: nil, labels: false, ticks: false])
+    |> VegaLite.encode_field(:x, "x",
+      type: :quantitative,
+      scale: [zero: false],
+      axis: [title: nil, labels: false, ticks: false]
+    )
+    |> VegaLite.encode_field(:y, "y",
+      type: :quantitative,
+      scale: [zero: false],
+      axis: [title: nil, labels: false, ticks: false]
+    )
     |> VegaLite.layers([
       # Layer 1: Edges
       VegaLite.new()
@@ -79,7 +89,13 @@ defmodule Yog.Render.VegaLite do
 
       # Layer 2: Nodes
       VegaLite.new()
-      |> VegaLite.mark(:circle, size: node_size, color: node_color, opacity: 1.0, stroke: "#1e3a8a", stroke_width: 1.5),
+      |> VegaLite.mark(:circle,
+        size: node_size,
+        color: node_color,
+        opacity: 1.0,
+        stroke: "#1e3a8a",
+        stroke_width: 1.5
+      ),
 
       # Layer 3: Labels
       VegaLite.new()

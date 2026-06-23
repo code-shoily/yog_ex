@@ -106,7 +106,9 @@ defmodule Yog.Layout do
 
   Delegates to `Yog.Layout.Shell.layout/3`.
   """
-  @spec shell(Graph.t(), [[Graph.node_id()]], keyword()) :: %{Graph.node_id() => {float(), float()}}
+  @spec shell(Graph.t(), [[Graph.node_id()]], keyword()) :: %{
+          Graph.node_id() => {float(), float()}
+        }
   def shell(graph, shells, opts \\ []) do
     Shell.layout(graph, shells, opts)
   end
@@ -116,7 +118,9 @@ defmodule Yog.Layout do
 
   Delegates to `Yog.Layout.Multipartite.layout/3`.
   """
-  @spec multipartite(Graph.t(), [[Graph.node_id()]], keyword()) :: %{Graph.node_id() => {float(), float()}}
+  @spec multipartite(Graph.t(), [[Graph.node_id()]], keyword()) :: %{
+          Graph.node_id() => {float(), float()}
+        }
   def multipartite(graph, layers, opts \\ []) do
     Multipartite.layout(graph, layers, opts)
   end
