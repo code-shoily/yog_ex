@@ -1,6 +1,30 @@
 defmodule Yog.Layout.Circular do
   @moduledoc """
   Circular layout algorithm for positioning graph nodes in Elixir.
+
+  Positions nodes uniformly spaced along the circumference of a circle. This layout
+  highlights the cyclic structure of graphs and prevents node overlapping by design,
+  making it highly suitable for symmetric networks or cycle structures.
+
+  ## Mathematical Model
+
+  Given a set of $N$ nodes, a circle centered at $(c_x, c_y)$ with radius $R$, the coordinates
+  for each node $i$ (where $0 \\le i < N$) are calculated using polar coordinates:
+
+  $$\\theta_i = \\frac{2 \\pi \\cdot i}{N}$$
+  $$x_i = c_x + R \\cdot \\cos(\\theta_i)$$
+  $$y_i = c_y + R \\cdot \\sin(\\theta_i)$$
+
+  For a single-node graph ($N=1$), the node is positioned directly at the center $(c_x, c_y)$.
+
+  ## Complexities
+
+  * **Time Complexity:** $O(V)$ where $V$ is the number of nodes.
+  * **Space Complexity:** $O(V)$ auxiliary space to allocate the coordinates map.
+
+  ## References
+
+  * [Graphviz circular layout (circo) engine](https://graphviz.org/docs/layouts/)
   """
 
   alias Yog.Graph

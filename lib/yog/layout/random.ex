@@ -1,6 +1,25 @@
 defmodule Yog.Layout.Random do
   @moduledoc """
   Random layout algorithm for positioning graph nodes in Elixir.
+
+  Positions nodes uniformly at random within a 2D bounding box. This layout serves
+  as a baseline layout, an initialization method for iterative layout algorithms (such
+  as the Spring layout), or a test benchmark.
+
+  ## Mathematical Model
+
+  Given a bounding box with width $W$, height $H$, and center $(c_x, c_y)$, the coordinates
+  for each node $i$ are generated as:
+
+  $$x_i \\sim U\\left(c_x - \\frac{W}{2}, c_x + \\frac{W}{2}\\right)$$
+  $$y_i \\sim U\\left(c_y - \\frac{H}{2}, c_y + \\frac{H}{2}\\right)$$
+
+  where $U(a, b)$ is the uniform distribution.
+
+  ## Complexities
+
+  * **Time Complexity:** $O(V)$ where $V$ is the number of nodes.
+  * **Space Complexity:** $O(V)$ auxiliary space to allocate the coordinates map.
   """
 
   alias Yog.Graph

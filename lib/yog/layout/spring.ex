@@ -1,6 +1,39 @@
 defmodule Yog.Layout.Spring do
   @moduledoc """
   Spring layout algorithm (Fruchterman-Reingold force-directed) for positioning graph nodes in Elixir.
+
+  This algorithm models a graph as a physical system of particles (nodes) and springs (edges) to
+  reach an aesthetically pleasing layout by minimizing the total system energy. Nodes repel
+  each other like electrically charged particles, while edges pull connected nodes closer like springs.
+
+  ## Mathematical Model
+
+  Given a graph $G = (V, E)$ in a 2D space of size $W \\times H$, the algorithm simulates two competing forces:
+
+  1. **Repulsive Force ($f_r$):** Pushes every pair of nodes $(u, v)$ apart to prevent overlap and ensure spacing.
+     $$f_r(d) = \\frac{k^2}{d}$$
+     where $d$ is the Euclidean distance between $u$ and $v$.
+  2. **Attractive Force ($f_a$):** Pulls connected nodes $(u, v) \\in E$ together to reflect topological proximity.
+     $$f_a(d) = \\frac{d^2}{k} \\cdot w$$
+     where $w$ is the optional edge weight multiplier.
+
+  ### Parameters
+
+  * **Optimal Node Distance ($k$):** Represents the target spacing between nodes. It is calculated based on the bounding box size:
+    $$k = \\sqrt{\\frac{W \\cdot H}{|V|}}$$
+  * **Cooling Schedule:** A maximum displacement limit ("temperature" $T$) decays linearly with each iteration to stabilize the simulation:
+    $$T_i = T_{\\text{initial}} \\cdot \\left(1 - \\frac{i}{I}\\right)$$
+    where $i$ is the current iteration and $I$ is the maximum number of iterations.
+
+  ## Complexities
+
+  * **Time Complexity:** $O(I \\cdot (V^2 + E))$ per simulation run, where $I$ is the number of iterations (default `50`), $V$ is the number of nodes, and $E$ is the number of edges.
+  * **Space Complexity:** $O(V + E)$ auxiliary space to store displacements and positions.
+
+  ## References
+
+  * [Fruchterman & Reingold 1991 - Graph Drawing by Force-directed Placement](https://doi.org/10.1002/spe.4380211102)
+  * [Wikipedia: Force-directed graph drawing](https://en.wikipedia.org/wiki/Force-directed_graph_drawing)
   """
 
   alias Yog.Graph
