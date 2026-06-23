@@ -146,4 +146,66 @@ defmodule Yog.Oracle.FlowTest do
       end
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # Network Simplex min-cost flow
+  # ---------------------------------------------------------------------------
+
+  @tag :oracle
+  property "P-ORAC-FLOW-005 Network Simplex min-cost flow agrees with NetworkX" do
+    check all(
+            graph <- Yog.Generators.min_cost_flow_problem_gen(),
+            max_runs: 50
+          ) do
+      get_demand = fn {d, _} -> d end
+      get_capacity = fn {c, _} -> c end
+      get_cost = fn {_, cost} -> cost end
+
+      yog_result =
+        Yog.Flow.NetworkSimplex.min_cost_flow(graph, get_demand, get_capacity, get_cost)
+
+      nodes = Yog.Model.all_nodes(graph)
+
+      demands_map =
+        Map.new(nodes, fn node -> {node, get_demand.(Yog.Model.node(graph, node))} end)
+
+      edge_attrs =
+        Enum.flat_map(nodes, fn from ->
+          Yog.Model.successors(graph, from)
+          |> Enum.map(fn {to, data} ->
+            %{
+              "from" => from,
+              "to" => to,
+              "capacity" => get_capacity.(data),
+              "cost" => get_cost.(data)
+            }
+          end)
+        end)
+
+      nx_result =
+        NetworkX.run("min_cost_flow", graph,
+          demands: demands_map,
+          edge_attrs: edge_attrs
+        )
+
+      case {yog_result, nx_result} do
+        {{:ok, yog_flow_res}, %{"status" => "ok", "cost" => nx_cost}} ->
+          assert yog_flow_res.cost == nx_cost
+
+        {{:error, :infeasible}, %{"status" => "error", "reason" => "infeasible"}} ->
+          :ok
+
+        {{:error, :unbalanced_demands}, %{"status" => "error", "reason" => "unbalanced"}} ->
+          :ok
+
+        {{:error, :unbounded}, %{"status" => "error", "reason" => "unbounded"}} ->
+          :ok
+
+        {yog, nx} ->
+          flunk(
+            "Mismatch between Yog and NetworkX. Yog: #{inspect(yog)}, NetworkX: #{inspect(nx)}"
+          )
+      end
+    end
+  end
 end

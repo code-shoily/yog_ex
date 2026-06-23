@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`Yog.Render.SVG`** — Implemented a pure Elixir SVG renderer supporting simple graphs, directed graphs, and multigraphs. It computes parallel edge indices and multiplicities to render parallel edges as distinct curved quadratic Bézier curves, self-loops as cubic Bézier loops, and directed arrowheads with boundary-offset truncation math to keep arrowheads visible at the node borders.
 - **Livebook Layout Guide** — Created `livebooks/how_to/layout_guide.livemd` showcasing circular, spring, tutte, shell, and multipartite layouts rendered using both interactive Kino SVG (`Kino.HTML.new/1`) and Kino Vega-Lite (`Yog.Render.VegaLite`).
 - **`Yog.Pathfinding.Disjoint`** — Added `suurballe/4` implementing Suurballe's algorithm for finding two edge-disjoint shortest paths of minimum total cost in directed and undirected graphs. Supports custom weight functions, addition, subtraction, and comparison operations.
+- **`Yog.Flow.NetworkSimplex`** — Implemented the primal Network Simplex algorithm for solving the Minimum Cost Flow (MCF) problem (`Yog.Flow.NetworkSimplex.min_cost_flow/4`). It supports demand/supply balances on nodes and capacity limits and cost values on edges, and handles infeasible, unbounded, or unbalanced flow networks correctly.
+- **Network Simplex Oracle Property** — Added oracle parity test `P-ORAC-FLOW-005` in `test/oracle/flow_oracle_test.exs` to verify cost parity between Yog and NetworkX on randomly generated flow networks, including edge cases and error conditions.
 
 ### Fixed
 

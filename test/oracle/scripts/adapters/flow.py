@@ -53,6 +53,8 @@ def min_cost_flow(graph, options):
         return {"status": "error", "reason": "infeasible"}
     except nx.NetworkXUnbalanced:
         return {"status": "error", "reason": "unbalanced"}
+    except nx.NetworkXUnbounded:
+        return {"status": "error", "reason": "unbounded"}
 
 
 DISPATCH = {
