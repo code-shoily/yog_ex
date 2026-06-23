@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Compile-time Circular Dependencies** — Resolved compile-time and export-time circular dependencies across several core modules (`Yog.MST`, `Yog.DAG`, and `Yog.Connectivity.KCore`) to clean up module dependencies and improve build speeds.
 - **`Yog.Render.SVG` Parentheses Sigil Bug** — Resolved a compiler syntax error caused by nested parentheses inside `~s(marker-end="url(#arrow)")` by changing the sigil delimiters to square brackets `~s[...]`.
 - **`Yog.Community.Walktrap`** — Corrected hierarchical merging logic by resolving a key mismatch bug (where community IDs were indices but caches were keyed by original node IDs). Also corrected the random walk probability merges to be degree-weighted and added Ward's size-weighting factor during the clustering step.
 
