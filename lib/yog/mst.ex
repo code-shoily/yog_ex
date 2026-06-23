@@ -352,26 +352,4 @@ defmodule Yog.MST do
           {:ok, Result.t()} | {:error, :undirected_only}
   def maximum_spanning_tree(opts) when is_list(opts), do: kruskal_max(opts)
   def maximum_spanning_tree(graph), do: kruskal_max(graph)
-
-  # =============================================================================
-  # Shared Internal Helpers
-  # =============================================================================
-
-  @doc false
-  def extract_edges(%Yog.Graph{kind: kind, out_edges: out_edges}) do
-    List.foldl(Map.to_list(out_edges), [], fn {from_id, targets}, acc ->
-      List.foldl(Map.to_list(targets), acc, fn {to_id, weight}, inner_acc ->
-        if kind == :undirected && from_id > to_id do
-          inner_acc
-        else
-          [%{from: from_id, to: to_id, weight: weight} | inner_acc]
-        end
-      end)
-    end)
-  end
-
-  @doc false
-  def push_all(pq, edges) do
-    List.foldl(edges, pq, fn edge, acc -> Yog.PairingHeap.push(acc, edge) end)
-  end
 end

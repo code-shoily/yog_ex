@@ -16,6 +16,7 @@ defmodule Yog.MST.Kruskal do
 
   alias Yog.DisjointSet
   alias Yog.MST.Result
+  alias Yog.MST.Utils
 
   @doc """
   Computes the Minimum Spanning Tree (MST) using Kruskal's algorithm.
@@ -24,24 +25,27 @@ defmodule Yog.MST.Kruskal do
 
   ## Parameters
 
-  - `graph`: The undirected graph to process.
-  - `compare`: A comparison function `(a, b -> :lt | :eq | :gt)` used to order
-    edge weights.
+  - `graph`: The input weighted undirected graph.
+  - `compare`: A function that compares two edge weights.
 
   ## Examples
 
       iex> graph = Yog.undirected()
-      ...> |> Yog.add_node(1, nil) |> Yog.add_node(2, nil) |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edges!([{1, 2, 10}, {2, 3, 5}, {1, 3, 20}])
+      ...> |> Yog.add_node(1, nil)
+      ...> |> Yog.add_node(2, nil)
+      ...> |> Yog.add_node(3, nil)
+      ...> |> Yog.add_edge_ensure(1, 2, 5)
+      ...> |> Yog.add_edge_ensure(2, 3, 10)
+      ...> |> Yog.add_edge_ensure(1, 3, 15)
       iex> {:ok, result} = Yog.MST.Kruskal.compute(graph, &Yog.Utils.compare/2)
-      iex> result.total_weight
+      iex> result.weight
       15
       iex> Enum.map(result.edges, fn e -> {e.from, e.to} end) |> Enum.sort()
       [{1, 2}, {2, 3}]
   """
   @spec compute(Yog.graph(), (term(), term() -> :lt | :eq | :gt)) :: {:ok, Result.t()}
   def compute(graph, compare) do
-    edges = Yog.MST.extract_edges(graph)
+    edges = Utils.extract_edges(graph)
     sorted_edges = Enum.sort(edges, fn a, b -> compare.(a.weight, b.weight) == :lt end)
 
     result = do_kruskal(sorted_edges, DisjointSet.new(), [])

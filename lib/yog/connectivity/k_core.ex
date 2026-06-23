@@ -123,7 +123,7 @@ defmodule Yog.Connectivity.KCore do
     pruned_nodes = do_prune(out_edges, to_prune, queue_set, degrees, k, MapSet.new())
 
     remaining = MapSet.difference(MapSet.new(nodes), pruned_nodes)
-    Yog.subgraph(graph, MapSet.to_list(remaining))
+    Yog.Transform.subgraph(graph, MapSet.to_list(remaining))
   end
 
   defp do_prune(_, [], _, _, _, pruned), do: pruned

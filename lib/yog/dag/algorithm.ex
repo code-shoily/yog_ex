@@ -7,7 +7,6 @@ defmodule Yog.DAG.Algorithm do
   longest path, transitive closure, and more.
   """
 
-  alias Yog.DAG.Model
   alias Yog.Pathfinding.Path
 
   @doc """
@@ -44,7 +43,7 @@ defmodule Yog.DAG.Algorithm do
   """
   @spec topological_sort(Yog.DAG.t()) :: [Yog.node_id()]
   def topological_sort(dag) do
-    graph = Model.to_graph(dag)
+    graph = dag.graph
 
     # We can safely unwrap because the graph is proven to be acyclic
     case Yog.Traversal.topological_sort(graph) do
@@ -85,7 +84,7 @@ defmodule Yog.DAG.Algorithm do
   """
   @spec topological_generations(Yog.DAG.t()) :: [[Yog.node_id()]]
   def topological_generations(dag) do
-    graph = Model.to_graph(dag)
+    graph = dag.graph
 
     {in_degrees, initial_zeros} =
       Enum.reduce(Yog.Model.all_nodes(graph), {%{}, []}, fn node, {deg_acc, zero_acc} ->
@@ -155,7 +154,7 @@ defmodule Yog.DAG.Algorithm do
   """
   @spec longest_path(Yog.DAG.t()) :: [Yog.node_id()]
   def longest_path(dag) do
-    graph = Model.to_graph(dag)
+    graph = dag.graph
     sorted_nodes = topological_sort(dag)
 
     {distances, predecessors} =
@@ -225,7 +224,7 @@ defmodule Yog.DAG.Algorithm do
   @spec shortest_path(Yog.DAG.t(), Yog.node_id(), Yog.node_id()) ::
           {:ok, Path.t()} | :error
   def shortest_path(dag, from, to) do
-    graph = Model.to_graph(dag)
+    graph = dag.graph
     sorted_nodes = topological_sort(dag)
 
     relevant_nodes = Enum.drop_while(sorted_nodes, fn node -> node != from end)
@@ -306,7 +305,7 @@ defmodule Yog.DAG.Algorithm do
   @spec lowest_common_ancestors(Yog.DAG.t(), Yog.node_id(), Yog.node_id()) ::
           [Yog.node_id()]
   def lowest_common_ancestors(dag, node_a, node_b) do
-    graph = Model.to_graph(dag)
+    graph = dag.graph
     ancestors_a = get_ancestors_set(dag, node_a)
     ancestors_b = get_ancestors_set(dag, node_b)
 
@@ -347,7 +346,7 @@ defmodule Yog.DAG.Algorithm do
   """
   @spec sources(Yog.DAG.t()) :: [Yog.node_id()]
   def sources(dag) do
-    graph = Model.to_graph(dag)
+    graph = dag.graph
 
     graph.nodes
     |> Map.keys()
@@ -378,7 +377,7 @@ defmodule Yog.DAG.Algorithm do
   """
   @spec sinks(Yog.DAG.t()) :: [Yog.node_id()]
   def sinks(dag) do
-    graph = Model.to_graph(dag)
+    graph = dag.graph
 
     graph.nodes
     |> Map.keys()
@@ -433,7 +432,7 @@ defmodule Yog.DAG.Algorithm do
   """
   @spec descendants(Yog.DAG.t(), Yog.node_id()) :: [Yog.node_id()]
   def descendants(dag, node) do
-    graph = Model.to_graph(dag)
+    graph = dag.graph
     collect_descendants(graph, [node], MapSet.new([node])) |> MapSet.to_list() |> Enum.sort()
   end
 
@@ -461,7 +460,7 @@ defmodule Yog.DAG.Algorithm do
   """
   @spec single_source_distances(Yog.DAG.t(), Yog.node_id()) :: %{Yog.node_id() => number()}
   def single_source_distances(dag, from) do
-    graph = Model.to_graph(dag)
+    graph = dag.graph
     sorted_nodes = topological_sort(dag)
 
     relevant_nodes = Enum.drop_while(sorted_nodes, fn node -> node != from end)
@@ -501,7 +500,7 @@ defmodule Yog.DAG.Algorithm do
   @spec longest_path(Yog.DAG.t(), Yog.node_id(), Yog.node_id()) ::
           {:ok, Path.t()} | :error
   def longest_path(dag, from, to) do
-    graph = Model.to_graph(dag)
+    graph = dag.graph
     sorted_nodes = topological_sort(dag)
 
     relevant_nodes = Enum.drop_while(sorted_nodes, fn node -> node != from end)
@@ -547,7 +546,7 @@ defmodule Yog.DAG.Algorithm do
   """
   @spec path_count(Yog.DAG.t(), Yog.node_id(), Yog.node_id()) :: non_neg_integer()
   def path_count(dag, from, to) do
-    graph = Model.to_graph(dag)
+    graph = dag.graph
     sorted_nodes = topological_sort(dag)
 
     relevant_nodes = Enum.drop_while(sorted_nodes, fn node -> node != from end)
@@ -619,7 +618,7 @@ defmodule Yog.DAG.Algorithm do
   end
 
   defp get_ancestors_set(dag, node) do
-    graph = Model.to_graph(dag)
+    graph = dag.graph
     collect_ancestors(graph, [node], MapSet.new([node]))
   end
 

@@ -14,6 +14,7 @@ defmodule Yog.MST.Prim do
   """
 
   alias Yog.MST.Result
+  alias Yog.MST.Utils
   alias Yog.PairingHeap, as: PQ
 
   @doc """
@@ -69,7 +70,7 @@ defmodule Yog.MST.Prim do
 
     initial_pq =
       PQ.new(fn a, b -> compare.(a.weight, b.weight) == :lt end)
-      |> Yog.MST.push_all(initial_edges)
+      |> Utils.push_all(initial_edges)
 
     initial_visited = %{start => true}
 
