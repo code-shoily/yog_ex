@@ -38,7 +38,7 @@ defmodule Yog.MST.Kruskal do
       ...> |> Yog.add_edge_ensure(2, 3, 10)
       ...> |> Yog.add_edge_ensure(1, 3, 15)
       iex> {:ok, result} = Yog.MST.Kruskal.compute(graph, &Yog.Utils.compare/2)
-      iex> result.weight
+      iex> result.total_weight
       15
       iex> Enum.map(result.edges, fn e -> {e.from, e.to} end) |> Enum.sort()
       [{1, 2}, {2, 3}]

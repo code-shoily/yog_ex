@@ -37,6 +37,7 @@ defmodule Yog.Layout.Spring do
   """
 
   alias Yog.Graph
+  alias Yog.Layout.Spring.BarnesHut
 
   @doc """
   Positions nodes using a force-directed model.
@@ -53,12 +54,19 @@ defmodule Yog.Layout.Spring do
     * `:fixed` - List of node IDs that should not move during simulation (default: `[]`).
     * `:initial_pos` - Map of `node_id => {x, y}` coordinates to use as initial layout. If not provided, random positions are used.
     * `:seed` - Seed for random positioning generator.
+    * `:barnes_hut` - Boolean indicating whether to use the Barnes-Hut approximation to reduce repulsive force computation complexity from $O(V^2)$ to $O(V \log V)$ (default: `false`).
+    * `:theta` - The Barnes-Hut threshold parameter $\theta$. A value of `0.0` yields exact computation, while higher values (e.g., `0.5` or `1.0`) trade layout quality for performance (default: `0.5`).
 
   ## Examples
 
       iex> graph = Yog.undirected() |> Yog.add_nodes_from([1, 2, 3]) |> Yog.add_edges!([{1, 2, 10}, {2, 3, 5}])
       iex> pos = Yog.Layout.Spring.layout(graph, iterations: 10)
       iex> Map.keys(pos) |> Enum.sort()
+      [1, 2, 3]
+
+      iex> graph = Yog.undirected() |> Yog.add_nodes_from([1, 2, 3]) |> Yog.add_edges!([{1, 2, 10}, {2, 3, 5}])
+      iex> pos_bh = Yog.Layout.Spring.layout(graph, iterations: 10, barnes_hut: true, theta: 0.5)
+      iex> Map.keys(pos_bh) |> Enum.sort()
       [1, 2, 3]
 
   """
@@ -73,6 +81,8 @@ defmodule Yog.Layout.Spring do
     fixed_nodes = Keyword.get(opts, :fixed, []) |> MapSet.new()
     initial_pos = Keyword.get(opts, :initial_pos)
     seed = Keyword.get(opts, :seed)
+    barnes_hut = Keyword.get(opts, :barnes_hut, false)
+    theta = Keyword.get(opts, :theta, 0.5)
 
     nodes = Yog.all_nodes(graph)
     n = length(nodes)
@@ -118,7 +128,9 @@ defmodule Yog.Layout.Spring do
             use_weight,
             0,
             iterations,
-            initial_temp
+            initial_temp,
+            barnes_hut,
+            theta
           )
 
         # 5. Rescale to fit neatly inside bounding box (unless there are fixed nodes)
@@ -150,7 +162,9 @@ defmodule Yog.Layout.Spring do
          _use_weight,
          current,
          max_iterations,
-         _initial_temp
+         _initial_temp,
+         _barnes_hut,
+         _theta
        )
        when current >= max_iterations do
     positions
@@ -165,7 +179,9 @@ defmodule Yog.Layout.Spring do
          use_weight,
          current,
          max_iterations,
-         initial_temp
+         initial_temp,
+         barnes_hut,
+         theta
        ) do
     # Linear cooling
     temp = initial_temp * (1.0 - current / max_iterations)
@@ -173,7 +189,7 @@ defmodule Yog.Layout.Spring do
     # Step 1 + 2: Repulsive and attractive forces
     displacements =
       positions
-      |> compute_repulsion(k_squared)
+      |> compute_repulsion(k_squared, barnes_hut, theta)
       |> compute_attraction(positions, edges, k, use_weight)
 
     # Step 3: Apply displacements to non-fixed nodes
@@ -205,14 +221,28 @@ defmodule Yog.Layout.Spring do
       use_weight,
       current + 1,
       max_iterations,
-      initial_temp
+      initial_temp,
+      barnes_hut,
+      theta
     )
   end
 
-  defp compute_repulsion(positions, k_squared) do
-    pos_list = Map.to_list(positions)
-    initial_displacements = Map.new(pos_list, fn {id, _} -> {id, {0.0, 0.0}} end)
-    accumulate_repulsion(pos_list, k_squared, initial_displacements)
+  defp compute_repulsion(positions, k_squared, barnes_hut, theta) do
+    if barnes_hut do
+      case BarnesHut.build_tree(positions) do
+        nil ->
+          Map.new(positions, fn {id, _} -> {id, {0.0, 0.0}} end)
+
+        {tree, size} ->
+          Map.new(positions, fn {id, {x, y}} ->
+            {id, BarnesHut.compute_force(tree, id, x, y, k_squared, theta, size)}
+          end)
+      end
+    else
+      pos_list = Map.to_list(positions)
+      initial_displacements = Map.new(pos_list, fn {id, _} -> {id, {0.0, 0.0}} end)
+      accumulate_repulsion(pos_list, k_squared, initial_displacements)
+    end
   end
 
   defp accumulate_repulsion([], _k2, displacements), do: displacements
@@ -318,6 +348,156 @@ defmodule Yog.Layout.Spring do
             {id, {scaled_x, scaled_y}}
           end)
         end
+    end
+  end
+end
+
+defmodule Yog.Layout.Spring.BarnesHut do
+  @moduledoc false
+
+  # Quadtree node types
+  # - nil (empty)
+  # - {:leaf, node_id, x, y}
+  # - {:internal, mass, cx, cy, nw, ne, sw, se}
+
+  def build_tree(positions) do
+    if map_size(positions) == 0 do
+      nil
+    else
+      pos_values = Map.values(positions)
+      [{x0, y0} | rest] = pos_values
+
+      {min_x, max_x, min_y, max_y} =
+        Enum.reduce(rest, {x0, x0, y0, y0}, fn {x, y}, {min_x, max_x, min_y, max_y} ->
+          {min(min_x, x), max(max_x, x), min(min_y, y), max(max_y, y)}
+        end)
+
+      width = max_x - min_x
+      height = max_y - min_y
+      size = max(width, height)
+      size = if size == 0.0, do: 1.0, else: size
+
+      cx = (min_x + max_x) / 2.0
+      cy = (min_y + max_y) / 2.0
+      half_size = size / 2.0
+
+      bounds = {cx - half_size, cy - half_size, cx + half_size, cy + half_size}
+
+      root =
+        Enum.reduce(positions, nil, fn {node_id, {x, y}}, acc ->
+          insert(acc, bounds, node_id, x, y)
+        end)
+
+      {root, size}
+    end
+  end
+
+  def compute_force(tree, u_id, ux, uy, k2, theta, size) do
+    compute_repulsion_force(tree, u_id, ux, uy, k2, theta, size)
+  end
+
+  defp insert(nil, _bounds, node_id, x, y) do
+    {:leaf, node_id, x, y}
+  end
+
+  defp insert({:leaf, leaf_id, lx, ly} = leaf, bounds, node_id, x, y) do
+    if lx == x and ly == y do
+      # Perturb slightly to avoid infinite subdivision
+      px = x + (:rand.uniform() - 0.5) * 1.0e-5
+      py = y + (:rand.uniform() - 0.5) * 1.0e-5
+      insert(leaf, bounds, node_id, px, py)
+    else
+      internal = {:internal, 1.0, lx, ly, nil, nil, nil, nil}
+      internal = insert_into_internal(internal, bounds, leaf_id, lx, ly)
+      insert_into_internal(internal, bounds, node_id, x, y)
+    end
+  end
+
+  defp insert({:internal, _, _, _, _, _, _, _} = internal, bounds, node_id, x, y) do
+    insert_into_internal(internal, bounds, node_id, x, y)
+  end
+
+  defp insert_into_internal(
+         {:internal, mass, cx, cy, nw, ne, sw, se},
+         {x_min, y_min, x_max, y_max},
+         node_id,
+         x,
+         y
+       ) do
+    new_mass = mass + 1.0
+    new_cx = (cx * mass + x) / new_mass
+    new_cy = (cy * mass + y) / new_mass
+
+    mid_x = (x_min + x_max) / 2.0
+    mid_y = (y_min + y_max) / 2.0
+
+    cond do
+      x < mid_x and y < mid_y ->
+        new_nw = insert(nw, {x_min, y_min, mid_x, mid_y}, node_id, x, y)
+        {:internal, new_mass, new_cx, new_cy, new_nw, ne, sw, se}
+
+      x >= mid_x and y < mid_y ->
+        new_ne = insert(ne, {mid_x, y_min, x_max, mid_y}, node_id, x, y)
+        {:internal, new_mass, new_cx, new_cy, nw, new_ne, sw, se}
+
+      x < mid_x and y >= mid_y ->
+        new_sw = insert(sw, {x_min, mid_y, mid_x, y_max}, node_id, x, y)
+        {:internal, new_mass, new_cx, new_cy, nw, ne, new_sw, se}
+
+      true ->
+        new_se = insert(se, {mid_x, mid_y, x_max, y_max}, node_id, x, y)
+        {:internal, new_mass, new_cx, new_cy, nw, ne, sw, new_se}
+    end
+  end
+
+  defp compute_repulsion_force(nil, _u_id, _ux, _uy, _k2, _theta, _s), do: {0.0, 0.0}
+
+  defp compute_repulsion_force({:leaf, leaf_id, lx, ly}, u_id, ux, uy, k2, _theta, _s) do
+    if leaf_id == u_id do
+      {0.0, 0.0}
+    else
+      dx = ux - lx
+      dy = uy - ly
+      dist_sq = dx * dx + dy * dy
+
+      {dx, dy, dist} =
+        if dist_sq == 0.0 do
+          px = (:rand.uniform() - 0.5) * 0.01
+          py = (:rand.uniform() - 0.5) * 0.01
+          {px, py, :math.sqrt(px * px + py * py)}
+        else
+          {dx, dy, :math.sqrt(dist_sq)}
+        end
+
+      fr = k2 / dist
+      {dx / dist * fr, dy / dist * fr}
+    end
+  end
+
+  defp compute_repulsion_force(
+         {:internal, mass, cx, cy, nw, ne, sw, se},
+         u_id,
+         ux,
+         uy,
+         k2,
+         theta,
+         s
+       ) do
+    dx = ux - cx
+    dy = uy - cy
+    dist_sq = dx * dx + dy * dy
+    dist = :math.sqrt(dist_sq)
+
+    if dist > 0.0 and s / dist < theta do
+      fr = k2 * mass / dist
+      {dx / dist * fr, dy / dist * fr}
+    else
+      half_s = s / 2.0
+      {fx1, fy1} = compute_repulsion_force(nw, u_id, ux, uy, k2, theta, half_s)
+      {fx2, fy2} = compute_repulsion_force(ne, u_id, ux, uy, k2, theta, half_s)
+      {fx3, fy3} = compute_repulsion_force(sw, u_id, ux, uy, k2, theta, half_s)
+      {fx4, fy4} = compute_repulsion_force(se, u_id, ux, uy, k2, theta, half_s)
+      {fx1 + fx2 + fx3 + fx4, fy1 + fy2 + fy3 + fy4}
     end
   end
 end
