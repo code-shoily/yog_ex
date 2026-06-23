@@ -2,7 +2,7 @@
 
 ```elixir
 Mix.install([
-  {:yog_ex, "~> 0.98.0"},
+  {:yog_ex, github: "code-shoily/yog_ex", branch: "main"},
   {:kino, "~> 0.12.0"},
   {:vega_lite, "~> 0.1.8"},
   {:kino_vega_lite, "~> 0.1.11"}
@@ -16,6 +16,7 @@ Graph layouts are algorithms that compute a 2D coordinate position for each node
 Having the calculated coordinates (`%{node_id => {x, y}}`) inside Elixir gives you complete control over how to render and animate your graph.
 
 In this guide, you will learn:
+
 1. How to use `Yog.Layout` to compute coordinates for all 6 layout types: **Circular, Random, Spring (Force-Directed), Tutte, Shell, and Multipartite**.
 2. How to draw these layouts dynamically as interactive **SVG graphics** inside Livebook using `Yog.Render.SVG`.
 3. How to plot layouts using **Vega-Lite** and `Yog.Render.VegaLite`.
@@ -120,6 +121,56 @@ svg = Yog.Render.SVG.to_svg(graph, pos, node_color: "#8b5cf6")
 Kino.HTML.new(svg)
 ```
 
+### Visualizing Multigraphs with Parallel Edges and Self-Loops
+
+SVG rendering is especially powerful for multigraphs because parallel edges and self-loops require mathematically calculated Bézier curves. To lay out a multigraph, we collapse it to a simple graph to generate positions, and then render the full multigraph. `Yog.Render.SVG` handles parallel edge spacing automatically.
+
+```elixir
+# Create a multigraph with multiple edges and a self-loop
+multi =
+  Yog.Multi.undirected()
+  |> Yog.Multi.add_node(:a)
+  |> Yog.Multi.add_node(:b)
+  |> Yog.Multi.add_node(:c)
+  |> Yog.Multi.add_node(:d)
+  |> Yog.Multi.add_node(:e)
+
+{multi, _} = Yog.Multi.add_edge(multi, :a, :b, "e1")
+{multi, _} = Yog.Multi.add_edge(multi, :a, :b, "e2")
+{multi, _} = Yog.Multi.add_edge(multi, :a, :b, "e3")
+{multi, _} = Yog.Multi.add_edge(multi, :b, :c, "e4")
+{multi, _} = Yog.Multi.add_edge(multi, :c, :d, "e5")
+{multi, _} = Yog.Multi.add_edge(multi, :a, :d, "e6")
+{multi, _} = Yog.Multi.add_edge(multi, :b, :d, "e7")
+{multi, _} = Yog.Multi.add_edge(multi, :e, :a, "e8")
+{multi, _} = Yog.Multi.add_edge(multi, :c, :c, "loop")
+
+# Calculate layout on the collapsed simple graph representation
+simple_graph = Yog.Multi.to_simple_graph(multi)
+pos = Layout.spring(simple_graph, iterations: 220, seed: 33)
+
+# Render the full multigraph showing parallel edges and self-loops
+svg = Yog.Render.SVG.to_svg(multi, pos, node_color: "#f43f5e")
+Kino.HTML.new(svg)
+```
+
+### Visualizing Directed Graphs with Arrowheads
+
+For directed graphs, `Yog.Render.SVG` renders direction arrows. To prevent arrowheads from being hidden under the node circles, the renderer automatically calculates the boundary intersection of the target node and truncates the edge line at the node boundary.
+
+```elixir
+# Create a simple directed cycle graph
+directed_graph = Yog.from_unweighted_edges(:directed, [
+  {1, 2}, {2, 3}, {3, 4}, {4, 1}
+])
+
+pos = Layout.circular(directed_graph)
+
+# Render with arrowheads indicating edge direction
+svg = Yog.Render.SVG.to_svg(directed_graph, pos, node_color: "#0ea5e9")
+Kino.HTML.new(svg)
+```
+
 ---
 
 ## 3. Rendering in Vega-Lite (using Kino Vega-Lite)
@@ -167,7 +218,24 @@ shell_graph =
 # Define shells
 shells = [[0, 1, 2, 3], [4, 5, 6, 7, 8]]
 
-pos = Layout.shell(shell_graph, shells, radii: [0.3, 1.0])
+pos = Layout.shell(shell_graph, shells, radii: [0.23, 0.10])
 
 Yog.Render.VegaLite.to_spec(shell_graph, pos, node_color: "#ec4899")
 ```
+
+---
+
+## 4. SVG vs. Vega-Lite Rendering Comparison
+
+When choosing between `Yog.Render.SVG` and `Yog.Render.VegaLite`, consider the characteristics of your graph:
+
+| Feature                          | `Yog.Render.SVG`                                           | `Yog.Render.VegaLite`                              |
+| -------------------------------- | ---------------------------------------------------------- | -------------------------------------------------- |
+| **Output Type**                  | Raw SVG String (wrapped in `Kino.HTML.new/1`)              | `%VegaLite{}` specification (interactive plot)     |
+| **Simple Graphs**                | Supported                                                  | Supported                                          |
+| **Multigraphs (Parallel Edges)** | **Yes** (rendered as curved parallel Bézier paths)        | No (parallel edges will overlap as straight lines) |
+| **Self-Loops**                   | **Yes** (rendered as loop Bézier curves)                  | No (loops will render as zero-length lines)        |
+| **Directed Arrowheads**          | **Yes** (automatic offset to sit perfectly at node border) | No (no native line marker/offset support)          |
+| **Interactivity**                | Basic hover effects (via CSS styling)                      | Advanced (pan, zoom, tooltips, selections)         |
+
+Choose **SVG rendering** for multigraphs, directed graphs with arrows, or when precise control over edge geometry is required. Choose **Vega-Lite rendering** for simple undirected graphs where interactive zooming or panning is preferred.
