@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **`Yog.Community.Walktrap`** — Corrected hierarchical merging logic by resolving a key mismatch bug (where community IDs were indices but caches were keyed by original node IDs). Also corrected the random walk probability merges to be degree-weighted and added Ward's size-weighting factor during the clustering step.
+
 ## 0.98.5 - 2026-06-14
 
 ### Fixed

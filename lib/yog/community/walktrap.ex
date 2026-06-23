@@ -169,7 +169,7 @@ defmodule Yog.Community.Walktrap do
         {u, max(d, 1.0)}
       end)
 
-    initial_assignments = Map.new(Enum.with_index(node_list), fn {node, i} -> {node, i} end)
+    initial_assignments = Map.new(node_list, fn node -> {node, node} end)
     initial_communities = Result.new(initial_assignments)
 
     initial_pt_cache =
@@ -177,7 +177,18 @@ defmodule Yog.Community.Walktrap do
         {node, Map.get(p_t, node, %{})}
       end)
 
-    do_walktrap_merge([initial_communities], p_t, degrees, node_list, initial_pt_cache)
+    initial_sizes = Map.new(node_list, fn node -> {node, 1} end)
+    initial_comm_degrees = Map.new(node_list, fn node -> {node, Map.get(degrees, node)} end)
+
+    do_walktrap_merge(
+      [initial_communities],
+      p_t,
+      degrees,
+      node_list,
+      initial_pt_cache,
+      initial_sizes,
+      initial_comm_degrees
+    )
   end
 
   # =============================================================================
@@ -231,13 +242,13 @@ defmodule Yog.Community.Walktrap do
   # =============================================================================
   # HIERARCHICAL MERGING
   # =============================================================================
-  defp do_walktrap_merge(levels, p_t, degrees, nodes, pt_cache) do
+  defp do_walktrap_merge(levels, p_t, degrees, nodes, pt_cache, sizes, comm_degrees) do
     current_level = List.first(levels)
 
     if current_level.num_communities <= 1 do
       Dendrogram.new(Enum.reverse(levels), [])
     else
-      case find_best_merge_pq(current_level, pt_cache, degrees) do
+      case find_best_merge_pq(current_level, pt_cache, degrees, sizes) do
         nil ->
           Dendrogram.new(Enum.reverse(levels), [])
 
@@ -246,21 +257,43 @@ defmodule Yog.Community.Walktrap do
           merged_map = Community.merge(map_level, source: c2, target: c1)
           next_level = Result.from_map(merged_map)
 
+          s1 = Map.get(sizes, c1, 1)
+          s2 = Map.get(sizes, c2, 1)
+          next_sizes =
+            sizes
+            |> Map.delete(c2)
+            |> Map.put(c1, s1 + s2)
+
+          d1 = Map.get(comm_degrees, c1, 1.0)
+          d2 = Map.get(comm_degrees, c2, 1.0)
+          next_comm_degrees =
+            comm_degrees
+            |> Map.delete(c2)
+            |> Map.put(c1, d1 + d2)
+
           p_c1 = Map.get(pt_cache, c1) || %{}
           p_c2 = Map.get(pt_cache, c2) || %{}
-          merged_pt = merge_community_pt(p_c1, p_c2)
+          merged_pt = merge_community_pt(p_c1, p_c2, d1, d2)
 
           next_pt_cache =
             pt_cache
             |> Map.delete(c2)
             |> Map.put(c1, merged_pt)
 
-          do_walktrap_merge([next_level | levels], p_t, degrees, nodes, next_pt_cache)
+          do_walktrap_merge(
+            [next_level | levels],
+            p_t,
+            degrees,
+            nodes,
+            next_pt_cache,
+            next_sizes,
+            next_comm_degrees
+          )
       end
     end
   end
 
-  defp find_best_merge_pq(communities, pt_cache, degrees) do
+  defp find_best_merge_pq(communities, pt_cache, degrees, sizes) do
     community_map = Community.to_dict(communities)
     ids = Map.keys(community_map)
 
@@ -276,8 +309,12 @@ defmodule Yog.Community.Walktrap do
           Enum.reduce(ids, PairingHeap.new(fn {d1, _}, {d2, _} -> d1 <= d2 end), fn c1, acc ->
             Enum.reduce(ids, acc, fn c2, inner_acc ->
               if c1 < c2 do
-                dist = calculate_cached_distance(c1, c2, pt_cache, degrees)
-                PairingHeap.push(inner_acc, {dist, {c1, c2}})
+                r2 = calculate_cached_distance(c1, c2, pt_cache, degrees)
+                s1 = Map.get(sizes, c1, 1)
+                s2 = Map.get(sizes, c2, 1)
+                # Ward's merge criterion: ((|C1| * |C2|) / (|C1| + |C2|)) * r^2
+                ward_dist = (s1 * s2) / (s1 + s2) * r2
+                PairingHeap.push(inner_acc, {ward_dist, {c1, c2}})
               else
                 inner_acc
               end
@@ -310,18 +347,20 @@ defmodule Yog.Community.Walktrap do
     end)
   end
 
-  defp merge_community_pt(p_c1, p_c2) do
+  defp merge_community_pt(p_c1, p_c2, d1, d2) do
     all_keys =
       Map.keys(p_c1)
       |> MapSet.new()
       |> MapSet.union(MapSet.new(Map.keys(p_c2)))
 
+    total_d = d1 + d2
+
     Enum.reduce(all_keys, %{}, fn k, acc ->
       v1 = Map.get(p_c1, k, 0.0)
       v2 = Map.get(p_c2, k, 0.0)
-      avg = (v1 + v2) / 2.0
+      avg = (d1 * v1 + d2 * v2) / total_d
 
-      if avg > 0.0 do
+      if avg > 1.0e-12 do
         Map.put(acc, k, avg)
       else
         acc
