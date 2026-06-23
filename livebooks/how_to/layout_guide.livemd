@@ -60,8 +60,10 @@ Layout.random(graph, width: 2.0, height: 2.0, seed: 42)
 
 A force-directed layout where connected nodes attract (springs) and all nodes repel (charge).
 
+For large graphs, computing repulsive forces between all pairs of nodes can be slow ($O(V^2)$ complexity). You can enable the **Barnes-Hut approximation** ($O(V \log V)$ complexity) by passing `barnes_hut: true` and an optional opening-angle threshold `theta` (default is `0.5`):
+
 ```elixir
-Layout.spring(graph, iterations: 50, seed: 42)
+Layout.spring(graph, iterations: 50, seed: 42, barnes_hut: true, theta: 0.5)
 ```
 
 ### Tutte Layout (Barycentric Planar)
