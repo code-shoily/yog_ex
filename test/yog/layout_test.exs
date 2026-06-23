@@ -94,5 +94,44 @@ defmodule Yog.LayoutTest do
 
       assert Map.get(pos, 2) == {1.0, 1.0}
     end
+
+    test "handles overlapping nodes with repulsion and attraction" do
+      # 1 and 2 start at exact same spot. Repulsion should push them apart.
+      graph = Yog.from_unweighted_edges(:undirected, [{1, 2}])
+      initial_pos = %{1 => {0.0, 0.0}, 2 => {0.0, 0.0}}
+      pos = Layout.spring(graph, initial_pos: initial_pos, iterations: 2, fixed: [1])
+
+      # Node 1 is fixed at 0,0, but Node 2 should have been pushed away by repulsion
+      assert Map.get(pos, 1) == {0.0, 0.0}
+      assert Map.get(pos, 2) != {0.0, 0.0}
+    end
+
+    test "ignores edges containing missing nodes in initial_pos" do
+      # Edge between 1 and 2, but node 2 is missing from initial_pos
+      graph = Yog.from_unweighted_edges(:undirected, [{1, 2}])
+      initial_pos = %{1 => {0.0, 0.0}}
+      pos = Layout.spring(graph, initial_pos: initial_pos, iterations: 2)
+      assert Map.keys(pos) == [1]
+    end
+
+    test "rescales nodes at identical positions to center" do
+      graph = Yog.from_unweighted_edges(:undirected, [{1, 2}])
+      initial_pos = %{1 => {1.0, 1.0}, 2 => {1.0, 1.0}}
+      # 0 iterations so they remain at {1.0, 1.0}, center is {5.0, 5.0}
+      pos = Layout.spring(graph, initial_pos: initial_pos, iterations: 0, center: {5.0, 5.0})
+      assert pos == %{1 => {5.0, 5.0}, 2 => {5.0, 5.0}}
+    end
+
+    test "works when weight option is disabled or weights are non-numeric" do
+      graph = Yog.from_edges(:undirected, [{1, 2, "heavy"}])
+
+      # Should run fine even with string weights
+      pos1 = Layout.spring(graph, weight: true, iterations: 5)
+      assert Map.keys(pos1) |> Enum.sort() == [1, 2]
+
+      # Should run fine with weight: false
+      pos2 = Layout.spring(graph, weight: false, iterations: 5)
+      assert Map.keys(pos2) |> Enum.sort() == [1, 2]
+    end
   end
 end
