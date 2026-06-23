@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`Yog.Layout`** — Implemented pure Elixir layout calculation algorithms: `Yog.Layout.circular/2` (uniformly spaces nodes on a circle), `Yog.Layout.random/2` (places nodes randomly within boundaries), and `Yog.Layout.spring/2` (Fruchterman-Reingold force-directed layout). All layouts return a `%{node_id => {x, y}}` coordinate map where coordinates are represented as `{float, float}` tuples.
+
 ### Fixed
 
 - **`Yog.Community.Walktrap`** — Corrected hierarchical merging logic by resolving a key mismatch bug (where community IDs were indices but caches were keyed by original node IDs). Also corrected the random walk probability merges to be degree-weighted and added Ward's size-weighting factor during the clustering step.
