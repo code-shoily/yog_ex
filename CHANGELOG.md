@@ -19,6 +19,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`Yog.Render.SVG` Parentheses Sigil Bug** — Resolved a compiler syntax error caused by nested parentheses inside `~s(marker-end="url(#arrow)")` by changing the sigil delimiters to square brackets `~s[...]`.
 - **`Yog.Community.Walktrap`** — Corrected hierarchical merging logic by resolving a key mismatch bug (where community IDs were indices but caches were keyed by original node IDs). Also corrected the random walk probability merges to be degree-weighted and added Ward's size-weighting factor during the clustering step.
 
+### Changed
+
+- **Semiring Parameter Ordering** — Standardized the positional parameter ordering of all graph algorithms that accept custom semiring parameters. Now, all algorithms use the consistent order **`zero, add, compare, subtract`**. This affects positional calls to:
+  - `Yog.Pathfinding.johnson/5` / `Yog.Pathfinding.Johnson.johnson/5`
+  - `Yog.Flow.MaxFlow.edmonds_karp/8`
+  - `Yog.Flow.MaxFlow.dinic/8`
+  - `Yog.Flow.MaxFlow.push_relabel/8`
+  - Internal helper functions within `Matrix` and `MaxFlow`.
+  This is a breaking change for direct positional calls to these low-level functions, but does not affect options-based facade calls.
+
 ## 0.98.5 - 2026-06-14
 
 ### Fixed

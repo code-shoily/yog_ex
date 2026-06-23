@@ -222,8 +222,8 @@ defmodule Yog.Flow.MaxFlow do
           Yog.node_id(),
           any(),
           (any(), any() -> any()),
-          (any(), any() -> any()),
           (any(), any() -> :lt | :eq | :gt),
+          (any(), any() -> any()),
           (any(), any() -> any())
         ) :: max_flow_result()
   def edmonds_karp(
@@ -232,8 +232,8 @@ defmodule Yog.Flow.MaxFlow do
         sink,
         zero \\ 0,
         add \\ &Kernel.+/2,
-        subtract \\ &Kernel.-/2,
         compare \\ &Yog.Utils.compare/2,
+        subtract \\ &Kernel.-/2,
         min_fn \\ &min/2
       ) do
     if source == sink do
@@ -242,7 +242,7 @@ defmodule Yog.Flow.MaxFlow do
       residual = build_residual_graph(graph, zero)
 
       {max_flow, final_residual} =
-        do_edmonds_karp(residual, source, sink, zero, add, subtract, compare, min_fn, zero)
+        do_edmonds_karp(residual, source, sink, zero, add, compare, subtract, min_fn, zero)
 
       final_residual_graph = residual_to_graph(graph, final_residual, zero, compare)
 
@@ -295,8 +295,8 @@ defmodule Yog.Flow.MaxFlow do
           Yog.node_id(),
           any(),
           (any(), any() -> any()),
-          (any(), any() -> any()),
           (any(), any() -> :lt | :eq | :gt),
+          (any(), any() -> any()),
           (any(), any() -> any())
         ) :: max_flow_result()
   def dinic(
@@ -305,8 +305,8 @@ defmodule Yog.Flow.MaxFlow do
         sink,
         zero \\ 0,
         add \\ &Kernel.+/2,
-        subtract \\ &Kernel.-/2,
         compare \\ &Yog.Utils.compare/2,
+        subtract \\ &Kernel.-/2,
         min_fn \\ &min/2
       ) do
     if source == sink do
@@ -315,7 +315,7 @@ defmodule Yog.Flow.MaxFlow do
       residual = build_residual_graph(graph, zero)
 
       {max_flow, final_residual} =
-        do_dinic(residual, source, sink, zero, add, subtract, compare, min_fn, zero)
+        do_dinic(residual, source, sink, zero, add, compare, subtract, min_fn, zero)
 
       final_residual_graph = residual_to_graph(graph, final_residual, zero, compare)
 
@@ -402,7 +402,7 @@ defmodule Yog.Flow.MaxFlow do
     end)
   end
 
-  defp do_edmonds_karp(residual, source, sink, zero, add, subtract, compare, min_fn, acc_flow) do
+  defp do_edmonds_karp(residual, source, sink, zero, add, compare, subtract, min_fn, acc_flow) do
     case find_augmenting_path(residual, source, sink, zero, compare, min_fn) do
       nil ->
         {acc_flow, residual}
@@ -410,7 +410,7 @@ defmodule Yog.Flow.MaxFlow do
       {path, bottleneck} ->
         new_residual =
           List.foldl(path, residual, fn {from, to}, acc ->
-            acc = update_forward_residual(acc, from, to, bottleneck, zero, subtract, compare)
+            acc = update_forward_residual(acc, from, to, bottleneck, zero, compare, subtract)
             update_backward_residual(acc, to, from, bottleneck, zero, add)
           end)
 
@@ -420,8 +420,8 @@ defmodule Yog.Flow.MaxFlow do
           sink,
           zero,
           add,
-          subtract,
           compare,
+          subtract,
           min_fn,
           add.(acc_flow, bottleneck)
         )
@@ -429,7 +429,7 @@ defmodule Yog.Flow.MaxFlow do
   end
 
   # Dinic's algorithm implementation
-  defp do_dinic(residual, source, sink, zero, add, subtract, compare, min_fn, flow) do
+  defp do_dinic(residual, source, sink, zero, add, compare, subtract, min_fn, flow) do
     case bfs_level(residual, source, sink, zero, compare) do
       nil ->
         {flow, residual}
@@ -447,8 +447,8 @@ defmodule Yog.Flow.MaxFlow do
             ptr,
             zero,
             add,
-            subtract,
             compare,
+            subtract,
             min_fn,
             zero
           )
@@ -462,8 +462,8 @@ defmodule Yog.Flow.MaxFlow do
             sink,
             zero,
             add,
-            subtract,
             compare,
+            subtract,
             min_fn,
             add.(flow, new_flow)
           )
@@ -524,8 +524,8 @@ defmodule Yog.Flow.MaxFlow do
          ptr,
          zero,
          add,
-         subtract,
          compare,
+         subtract,
          min_fn,
          total_flow
        ) do
@@ -538,8 +538,8 @@ defmodule Yog.Flow.MaxFlow do
         ptr,
         zero,
         add,
-        subtract,
         compare,
+        subtract,
         min_fn,
         :infinity
       )
@@ -555,15 +555,15 @@ defmodule Yog.Flow.MaxFlow do
         new_ptr,
         zero,
         add,
-        subtract,
         compare,
+        subtract,
         min_fn,
         add.(total_flow, pushed)
       )
     end
   end
 
-  defp dfs_send(residual, u, sink, level, ptr, zero, add, subtract, compare, min_fn, budget) do
+  defp dfs_send(residual, u, sink, level, ptr, zero, add, compare, subtract, min_fn, budget) do
     if u == sink do
       {budget, residual, ptr}
     else
@@ -577,8 +577,8 @@ defmodule Yog.Flow.MaxFlow do
         ptr,
         zero,
         add,
-        subtract,
         compare,
+        subtract,
         min_fn,
         budget,
         remaining,
@@ -595,8 +595,8 @@ defmodule Yog.Flow.MaxFlow do
          ptr,
          zero,
          add,
-         subtract,
          compare,
+         subtract,
          min_fn,
          budget,
          remaining,
@@ -622,15 +622,15 @@ defmodule Yog.Flow.MaxFlow do
             ptr,
             zero,
             add,
-            subtract,
             compare,
+            subtract,
             min_fn,
             child_budget
           )
 
         if compare.(pushed, zero) != :eq do
           new_residual =
-            update_forward_residual(new_residual, u, v, pushed, zero, subtract, compare)
+            update_forward_residual(new_residual, u, v, pushed, zero, compare, subtract)
 
           new_residual = update_backward_residual(new_residual, v, u, pushed, zero, add)
 
@@ -653,8 +653,8 @@ defmodule Yog.Flow.MaxFlow do
             next_ptr,
             zero,
             add,
-            subtract,
             compare,
+            subtract,
             min_fn,
             new_budget,
             next_remaining,
@@ -671,8 +671,8 @@ defmodule Yog.Flow.MaxFlow do
             next_ptr,
             zero,
             add,
-            subtract,
             compare,
+            subtract,
             min_fn,
             budget,
             rest,
@@ -690,8 +690,8 @@ defmodule Yog.Flow.MaxFlow do
           next_ptr,
           zero,
           add,
-          subtract,
           compare,
+          subtract,
           min_fn,
           budget,
           rest,
@@ -705,7 +705,7 @@ defmodule Yog.Flow.MaxFlow do
     Map.get(residual, u, %{}) |> Map.get(v, zero)
   end
 
-  defp update_forward_residual(residual, u, v, flow, zero, subtract, compare) do
+  defp update_forward_residual(residual, u, v, flow, zero, compare, subtract) do
     from_edges = Map.get(residual, u, %{}) |> Map.put_new(v, zero)
     old_cap = Map.fetch!(from_edges, v)
     new_cap = subtract.(old_cap, flow)
@@ -768,8 +768,8 @@ defmodule Yog.Flow.MaxFlow do
           Yog.node_id(),
           any(),
           (any(), any() -> any()),
-          (any(), any() -> any()),
           (any(), any() -> :lt | :eq | :gt),
+          (any(), any() -> any()),
           (any(), any() -> any())
         ) :: max_flow_result()
   def push_relabel(
@@ -778,8 +778,8 @@ defmodule Yog.Flow.MaxFlow do
         sink,
         zero \\ 0,
         add \\ &Kernel.+/2,
-        subtract \\ &Kernel.-/2,
         compare \\ &Yog.Utils.compare/2,
+        subtract \\ &Kernel.-/2,
         _min_fn \\ &min/2
       ) do
     if source == sink do
@@ -790,7 +790,7 @@ defmodule Yog.Flow.MaxFlow do
       nodes = Map.keys(graph.nodes)
 
       {max_flow, final_residual} =
-        do_push_relabel(residual, nodes, source, sink, n, zero, add, subtract, compare)
+        do_push_relabel(residual, nodes, source, sink, n, zero, add, compare, subtract)
 
       final_residual_graph = residual_to_graph(graph, final_residual, zero, compare)
 
@@ -806,7 +806,7 @@ defmodule Yog.Flow.MaxFlow do
     end
   end
 
-  defp do_push_relabel(residual, nodes, source, sink, n, zero, add, subtract, compare) do
+  defp do_push_relabel(residual, nodes, source, sink, n, zero, add, compare, subtract) do
     # Initialize heights and excess
     height =
       Map.new(nodes, fn u -> {u, 0} end)
@@ -834,7 +834,7 @@ defmodule Yog.Flow.MaxFlow do
               {res, exc, bks, mh}
             else
               {new_res, new_exc} =
-                push_flow(res, exc, source, v, cap, zero, add, subtract, compare)
+                push_flow(res, exc, source, v, cap, zero, add, compare, subtract)
 
               if v != sink and compare.(Map.get(new_exc, v), zero) != :eq do
                 new_bks = Map.update(bks, 0, MapSet.new([v]), &MapSet.put(&1, v))
@@ -986,7 +986,7 @@ defmodule Yog.Flow.MaxFlow do
           push_amount = if compare.(u_excess, cap) == :gt, do: cap, else: u_excess
 
           {new_residual, new_excess} =
-            push_flow(residual, excess, u, v, push_amount, zero, add, subtract, compare)
+            push_flow(residual, excess, u, v, push_amount, zero, add, compare, subtract)
 
           # v might become active
           new_buckets =
@@ -1131,9 +1131,9 @@ defmodule Yog.Flow.MaxFlow do
     {new_height, new_buckets, gap_height - 1}
   end
 
-  defp push_flow(residual, excess, u, v, amount, zero, add, subtract, compare) do
+  defp push_flow(residual, excess, u, v, amount, zero, add, compare, subtract) do
     new_residual =
-      update_forward_residual(residual, u, v, amount, zero, subtract, compare)
+      update_forward_residual(residual, u, v, amount, zero, compare, subtract)
       |> update_backward_residual(v, u, amount, zero, add)
 
     new_excess =

@@ -122,6 +122,8 @@ defmodule YogEx.MixProject do
          [filename: "multigraphs_and_collapsing", title: "Multigraphs & Collapsing"]},
         {"livebooks/how_to/mermaid_complete_guide.livemd",
          [filename: "mermaid_complete_guide", title: "Mermaid Complete Guide"]},
+        {"livebooks/how_to/layout_guide.livemd",
+         [filename: "layout_guide", title: "Layout Guide"]},
         "ALGORITHMS.md",
         "PROPERTIES.md",
         {"test/oracle/README.md", [filename: "oracle_readme", title: "Oracle Tests"]},
@@ -148,10 +150,10 @@ defmodule YogEx.MixProject do
           ~r/Yog\.(Pathfinding|Traversal)/
         ],
         "Network Algorithms": [
-          ~r/Yog\.(MST|Flow|Connectivity)/
+          ~r/Yog\.(MST|Flow|Connectivity|Matching)/
         ],
         "Network Analysis": [
-          ~r/Yog\.(Community|Centrality)/,
+          ~r/Yog\.(Community|Centrality|Approximate)/,
           Yog.Health
         ],
         Multi: [
@@ -171,7 +173,8 @@ defmodule YogEx.MixProject do
         ],
         "I/O & Rendering": [
           ~r/Yog\.IO/,
-          ~r/Yog\.Render/
+          ~r/Yog\.Render/,
+          ~r/Yog\.Layout/
         ],
         "Data Structures & Utils": [
           ~r/Yog\.(PriorityQueue|DisjointSet|PairingHeap)/,
@@ -195,7 +198,7 @@ defmodule YogEx.MixProject do
           "livebooks/guides/05_network_analysis.livemd",
           "livebooks/guides/06_network_flow.livemd",
           "livebooks/how_to/maze_generation.livemd",
-          "livebooks/how_to/customizing_visualizations.livemd",
+          "livebooks/how_to/layout_guide.livemd",
           "livebooks/how_to/import_export.livemd",
           "livebooks/how_to/multigraphs_and_collapsing.livemd",
           "livebooks/how_to/mermaid_complete_guide.livemd",

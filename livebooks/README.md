@@ -26,6 +26,7 @@ Practical walkthroughs addressing specific design patterns, configurations, or f
 *   [maze_generation.livemd](file:///home/mafinar/repos/elixir/yog_ex/livebooks/how_to/maze_generation.livemd): A deep dive into generating spanning tree mazes using diverse algorithms.
 *   [mermaid_complete_guide.livemd](file:///home/mafinar/repos/elixir/yog_ex/livebooks/how_to/mermaid_complete_guide.livemd): Rendering interactive flowcharts, sequence diagrams, and network layouts using Mermaid.js.
 *   [multigraphs_and_collapsing.livemd](file:///home/mafinar/repos/elixir/yog_ex/livebooks/how_to/multigraphs_and_collapsing.livemd): Working with multiple edges between same nodes and collapsing/simplifying graphs.
+*   [layout_guide.livemd](file:///home/mafinar/repos/elixir/yog_ex/livebooks/how_to/layout_guide.livemd): A guide to custom layout algorithms (spring, circular, tutte, shell, multipartite) and rendering them via Kino SVG and Vega-Lite.
 
 ### 3. [Galleries](file:///home/mafinar/repos/elixir/yog_ex/livebooks/gallery/)
 Interactive showcases of complex topologies, visual layouts, and algorithm comparisons:

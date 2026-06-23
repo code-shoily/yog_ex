@@ -97,8 +97,8 @@ defmodule Yog.Pathfinding.Johnson do
   - `graph` - The graph to analyze
   - `zero` - Identity element for addition
   - `add` - Function to add two weights
-  - `subtract` - Function to subtract two weights
   - `compare` - Function to compare two weights
+  - `subtract` - Function to subtract two weights
 
   ## Examples
 
@@ -111,7 +111,7 @@ defmodule Yog.Pathfinding.Johnson do
       ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: -3)
       ...> |> Yog.add_edge_ensure(from: 1, to: 3, with: 10)
       iex> compare = &Yog.Utils.compare/2
-      iex> {:ok, distances} = Yog.Pathfinding.Johnson.johnson(graph, 0, &(&1 + &2), &(&1 - &2), compare)
+      iex> {:ok, distances} = Yog.Pathfinding.Johnson.johnson(graph, 0, &(&1 + &2), compare, &(&1 - &2))
       iex> # Shortest path from 1 to 3 should be 1->2->3 = 1, not direct 10
       ...> distances[{1, 3}]
       1
@@ -123,28 +123,28 @@ defmodule Yog.Pathfinding.Johnson do
       ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
       ...> |> Yog.add_edge_ensure(from: 2, to: 1, with: -3)
       iex> compare = &Yog.Utils.compare/2
-      iex> Yog.Pathfinding.Johnson.johnson(bad_graph, 0, &(&1 + &2), &(&1 - &2), compare)
+      iex> Yog.Pathfinding.Johnson.johnson(bad_graph, 0, &(&1 + &2), compare, &(&1 - &2))
       {:error, :negative_cycle}
   """
   @spec johnson(
           Yog.graph(),
           any(),
           (any(), any() -> any()),
-          (any(), any() -> any()),
-          (any(), any() -> :lt | :eq | :gt)
+          (any(), any() -> :lt | :eq | :gt),
+          (any(), any() -> any())
         ) :: {:ok, distance_matrix()} | {:error, :negative_cycle}
   def johnson(
         graph,
         zero \\ 0,
         add \\ &Kernel.+/2,
-        subtract \\ &Kernel.-/2,
-        compare \\ &Yog.Utils.compare/2
+        compare \\ &Yog.Utils.compare/2,
+        subtract \\ &Kernel.-/2
       ) do
     nodes = Map.keys(graph.nodes)
 
     case compute_potentials(graph, nodes, zero, add, compare) do
       {:ok, potentials} ->
-        distances = run_dijkstra_from_all(graph, nodes, potentials, zero, add, subtract, compare)
+        distances = run_dijkstra_from_all(graph, nodes, potentials, zero, add, compare, subtract)
         {:ok, distances}
 
       {:error, :negative_cycle} ->
@@ -254,7 +254,7 @@ defmodule Yog.Pathfinding.Johnson do
   end
 
   # Run Dijkstra from each node with reweighted edges
-  defp run_dijkstra_from_all(graph, nodes, potentials, zero, add, subtract, compare) do
+  defp run_dijkstra_from_all(graph, nodes, potentials, zero, add, compare, subtract) do
     reweighted_graph =
       Transform.map_edges_indexed(graph, fn u, v, w ->
         h_u = Map.get(potentials, u, zero)

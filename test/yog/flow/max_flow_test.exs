@@ -251,8 +251,8 @@ defmodule Yog.Flow.MaxFlowTest do
           2,
           0.0,
           &(&1 + &2),
-          &(&1 - &2),
           &Yog.Utils.compare/2,
+          &(&1 - &2),
           &min/2
         )
 
@@ -290,7 +290,7 @@ defmodule Yog.Flow.MaxFlowTest do
         if compare.(r1, r2) == :lt, do: r1, else: r2
       end
 
-      result = MaxFlow.edmonds_karp(graph, 1, 3, zero, add, sub, compare, min_fn)
+      result = MaxFlow.edmonds_karp(graph, 1, 3, zero, add, compare, sub, min_fn)
 
       # Bottleneck is 1/2
       assert result.max_flow == {1, 2}
@@ -519,8 +519,8 @@ defmodule Yog.Flow.MaxFlowTest do
           2,
           0.0,
           &(&1 + &2),
-          &(&1 - &2),
           &Yog.Utils.compare/2,
+          &(&1 - &2),
           &min/2
         )
 
@@ -557,7 +557,7 @@ defmodule Yog.Flow.MaxFlowTest do
         if compare.(r1, r2) == :lt, do: r1, else: r2
       end
 
-      result = MaxFlow.dinic(graph, 1, 3, zero, add, sub, compare, min_fn)
+      result = MaxFlow.dinic(graph, 1, 3, zero, add, compare, sub, min_fn)
       assert result.max_flow == {1, 2}
     end
 
@@ -927,8 +927,8 @@ defmodule Yog.Flow.MaxFlowTest do
           2,
           0.0,
           &(&1 + &2),
-          &(&1 - &2),
           &Yog.Utils.compare/2,
+          &(&1 - &2),
           &min/2
         )
 
@@ -965,7 +965,7 @@ defmodule Yog.Flow.MaxFlowTest do
         if compare.(r1, r2) == :lt, do: r1, else: r2
       end
 
-      result = MaxFlow.push_relabel(graph, 1, 3, zero, add, sub, compare, min_fn)
+      result = MaxFlow.push_relabel(graph, 1, 3, zero, add, compare, sub, min_fn)
 
       assert result.max_flow == {1, 2}
     end
@@ -1154,8 +1154,8 @@ defmodule Yog.Flow.MaxFlowTest do
           2,
           0.0,
           &(&1 + &2),
-          &(&1 - &2),
           &Yog.Utils.compare/2,
+          &(&1 - &2),
           &min/2
         )
 

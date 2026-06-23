@@ -20,7 +20,7 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
       |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
 
-    result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
+    result = Johnson.johnson(graph, 0, &add/2, &compare/2, &subtract/2)
 
     assert {:ok, distances} = result
     assert distances[{1, 1}] == 0
@@ -38,7 +38,7 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_node(2, "B")
       |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
 
-    result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
+    result = Johnson.johnson(graph, 0, &add/2, &compare/2, &subtract/2)
 
     assert {:ok, distances} = result
     assert distances[{1, 1}] == 0
@@ -51,7 +51,7 @@ defmodule Yog.Pathfinding.JohnsonTest do
       Yog.directed()
       |> Yog.add_node(1, "A")
 
-    result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
+    result = Johnson.johnson(graph, 0, &add/2, &compare/2, &subtract/2)
 
     assert {:ok, distances} = result
     assert distances[{1, 1}] == 0
@@ -60,7 +60,7 @@ defmodule Yog.Pathfinding.JohnsonTest do
   test "johnson_empty_graph_test" do
     graph = Yog.directed()
 
-    result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
+    result = Johnson.johnson(graph, 0, &add/2, &compare/2, &subtract/2)
 
     assert {:ok, distances} = result
     assert map_size(distances) == 0
@@ -79,7 +79,7 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
       |> Yog.add_edge_ensure(from: 1, to: 3, with: 20)
 
-    result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
+    result = Johnson.johnson(graph, 0, &add/2, &compare/2, &subtract/2)
 
     assert {:ok, distances} = result
     # Should find shorter path 1 -> 2 -> 3 (15) instead of 1 -> 3 (20)
@@ -103,7 +103,7 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_edge_ensure(from: 3, to: 4, with: 3)
       |> Yog.add_edge_ensure(from: 4, to: 2, with: 2)
 
-    result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
+    result = Johnson.johnson(graph, 0, &add/2, &compare/2, &subtract/2)
 
     assert {:ok, distances} = result
     # Verify some key distances
@@ -133,7 +133,7 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_edge_ensure(from: 2, to: 4, with: 2)
       |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
 
-    result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
+    result = Johnson.johnson(graph, 0, &add/2, &compare/2, &subtract/2)
 
     assert {:ok, distances} = result
     # Should find path 1 -> 2 -> 4 (cost 3) not 1 -> 3 -> 4 (cost 5)
@@ -152,7 +152,7 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_edge_ensure(from: 2, to: 3, with: -3)
       |> Yog.add_edge_ensure(from: 1, to: 3, with: 2)
 
-    result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
+    result = Johnson.johnson(graph, 0, &add/2, &compare/2, &subtract/2)
 
     assert {:ok, distances} = result
     # Should find path 1 -> 2 -> 3 (cost 1) not 1 -> 3 (cost 2)
@@ -169,7 +169,7 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_edge_ensure(from: 2, to: 3, with: -2)
       |> Yog.add_edge_ensure(from: 1, to: 3, with: -5)
 
-    result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
+    result = Johnson.johnson(graph, 0, &add/2, &compare/2, &subtract/2)
 
     assert {:ok, distances} = result
     # Direct path 1 -> 3 (cost -5) is better than 1 -> 2 -> 3 (cost -3)
@@ -188,7 +188,7 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_edge_ensure(from: 2, to: 4, with: 3)
       |> Yog.add_edge_ensure(from: 3, to: 4, with: 20)
 
-    result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
+    result = Johnson.johnson(graph, 0, &add/2, &compare/2, &subtract/2)
 
     assert {:ok, distances} = result
     # Should take path 1 -> 2 -> 4 (cost 8) not 1 -> 3 -> 4 (cost 10)
@@ -206,7 +206,7 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
       |> Yog.add_edge_ensure(from: 2, to: 1, with: -3)
 
-    result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
+    result = Johnson.johnson(graph, 0, &add/2, &compare/2, &subtract/2)
 
     assert result == {:error, :negative_cycle}
   end
@@ -222,7 +222,7 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_edge_ensure(from: 2, to: 3, with: -2)
       |> Yog.add_edge_ensure(from: 3, to: 1, with: -2)
 
-    result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
+    result = Johnson.johnson(graph, 0, &add/2, &compare/2, &subtract/2)
 
     assert result == {:error, :negative_cycle}
   end
@@ -236,7 +236,7 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
       |> Yog.add_edge_ensure(from: 2, to: 1, with: 3)
 
-    result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
+    result = Johnson.johnson(graph, 0, &add/2, &compare/2, &subtract/2)
 
     assert {:ok, _distances} = result
   end
@@ -253,7 +253,7 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
       |> Yog.add_edge_ensure(from: 3, to: 4, with: 10)
 
-    result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
+    result = Johnson.johnson(graph, 0, &add/2, &compare/2, &subtract/2)
 
     assert {:ok, distances} = result
     # Reachable pairs
@@ -305,7 +305,7 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_edge_ensure(from: 1, to: 2, with: 0)
       |> Yog.add_edge_ensure(from: 2, to: 3, with: 0)
 
-    result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
+    result = Johnson.johnson(graph, 0, &add/2, &compare/2, &subtract/2)
 
     assert {:ok, distances} = result
     assert distances[{1, 3}] == 0
@@ -322,7 +322,7 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
       |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
 
-    result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
+    result = Johnson.johnson(graph, 0, &add/2, &compare/2, &subtract/2)
 
     assert {:ok, distances} = result
     # Undirected, so both directions should work
@@ -353,7 +353,7 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_edge_ensure(from: 4, to: 3, with: -5)
       |> Yog.add_edge_ensure(from: 5, to: 4, with: 6)
 
-    result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
+    result = Johnson.johnson(graph, 0, &add/2, &compare/2, &subtract/2)
 
     assert {:ok, distances} = result
     # Check some all-pairs distances
@@ -374,7 +374,7 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_edge_ensure(from: 1, to: 3, with: 2)
       |> Yog.add_edge_ensure(from: 1, to: 4, with: 3)
 
-    result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
+    result = Johnson.johnson(graph, 0, &add/2, &compare/2, &subtract/2)
 
     assert {:ok, distances} = result
     assert distances[{1, 2}] == 1
@@ -396,7 +396,7 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
       |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
 
-    result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
+    result = Johnson.johnson(graph, 0, &add/2, &compare/2, &subtract/2)
 
     assert {:ok, distances} = result
     # Check transitive closure
@@ -423,7 +423,7 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_edge_ensure(from: 4, to: 5, with: 1)
       |> Yog.add_edge_ensure(from: 1, to: 5, with: 10)
 
-    result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
+    result = Johnson.johnson(graph, 0, &add/2, &compare/2, &subtract/2)
 
     assert {:ok, distances} = result
     # Should find path through intermediates (cost 4) not direct (cost 10)
@@ -451,7 +451,7 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_edge_ensure(from: 4, to: 6, with: 2)
       |> Yog.add_edge_ensure(from: 2, to: 6, with: 10)
 
-    result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
+    result = Johnson.johnson(graph, 0, &add/2, &compare/2, &subtract/2)
 
     assert {:ok, distances} = result
     # Verify some paths
@@ -472,7 +472,7 @@ defmodule Yog.Pathfinding.JohnsonTest do
       |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
       |> Yog.add_edge_ensure(from: 1, to: 3, with: 20)
 
-    result = Johnson.johnson(graph, 0, &add/2, &subtract/2, &compare/2)
+    result = Johnson.johnson(graph, 0, &add/2, &compare/2, &subtract/2)
 
     assert {:ok, distances} = result
     # Should still find optimal path after reweighting

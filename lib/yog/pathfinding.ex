@@ -47,12 +47,12 @@ defmodule Yog.Pathfinding do
   alias Yog.Pathfinding.Bidirectional
   alias Yog.Pathfinding.ChinesePostman
   alias Yog.Pathfinding.Dijkstra
+  alias Yog.Pathfinding.Disjoint
   alias Yog.Pathfinding.FloydWarshall
   alias Yog.Pathfinding.Johnson
   alias Yog.Pathfinding.LCA
   alias Yog.Pathfinding.Matrix
   alias Yog.Pathfinding.Yen
-  alias Yog.Pathfinding.Disjoint
 
   # =============================================================================
   # Dijkstra
@@ -316,10 +316,10 @@ defmodule Yog.Pathfinding do
         graph,
         zero \\ 0,
         add \\ &Kernel.+/2,
-        subtract \\ &Kernel.-/2,
-        compare \\ &Yog.Utils.compare/2
+        compare \\ &Yog.Utils.compare/2,
+        subtract \\ &Kernel.-/2
       ) do
-    Johnson.johnson(graph, zero, add, subtract, compare)
+    Johnson.johnson(graph, zero, add, compare, subtract)
   end
 
   # =============================================================================

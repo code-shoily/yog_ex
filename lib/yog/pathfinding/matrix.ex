@@ -153,7 +153,7 @@ defmodule Yog.Pathfinding.Matrix do
       # Negative weight support needed: choose between Johnson's and Floyd-Warshall
       # Johnson's is better for sparse graphs (E < V²/4)
       if edge_count < div(node_count * node_count, 4) do
-        run_johnson(graph, points_of_interest, poi_set, zero, add, subtract, compare)
+        run_johnson(graph, points_of_interest, poi_set, zero, add, compare, subtract)
       else
         run_floyd_warshall(graph, points_of_interest, poi_set, zero, add, compare)
       end
@@ -183,8 +183,8 @@ defmodule Yog.Pathfinding.Matrix do
   # ============================================================
 
   # Run Johnson's algorithm and filter to POIs
-  defp run_johnson(graph, _points_of_interest, poi_set, zero, add, subtract, compare) do
-    case Johnson.johnson(graph, zero, add, subtract, compare) do
+  defp run_johnson(graph, _points_of_interest, poi_set, zero, add, compare, subtract) do
+    case Johnson.johnson(graph, zero, add, compare, subtract) do
       {:ok, all_distances} ->
         {:ok, filter_to_pois(all_distances, poi_set)}
 
