@@ -31,6 +31,7 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | Edmonds-Karp | `Yog.Flow.MaxFlow` | Maximum flow (BFS augmenting paths) | O(VE²) | O(V+E) |
 | Dinic's | `Yog.Flow.MaxFlow` | Maximum flow (blocking flow) | O(V²E) | O(V+E) |
 | Successive Shortest Path | `Yog.Flow.SuccessiveShortestPath` | Min-cost max-flow | O(F · E log V) | O(V+E) |
+| Network Simplex | `Yog.Flow.NetworkSimplex` | Minimum cost flow (large instances) | Empirically near-polynomial; worst-case exponential | O(V+E) |
 | Stoer-Wagner | `Yog.Flow.MinCut` | Global minimum cut | O(V³) | O(V²) |
 
 ## Spanning Tree
@@ -329,7 +330,7 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 |-----------|--------|---------|------------|-------|
 | Pairing Heap | `Yog.PairingHeap` | Priority queue for Dijkstra/Prim | insert: O(1), delete-min: O(log n) amortized | O(n) |
 | Disjoint Set | `Yog.DisjointSet` | Union-Find for Kruskal/SCC | find: O(α(n)), union: O(α(n)) | O(n) |
-| HyperLogLog | `Yog.Connectivity.Reachability` | Cardinality estimation | add: O(1), count: O(1) | O(1) fixed |
+| HyperLogLog | `Yog.Connectivity.Reachability` | Cardinality estimation (~3% error, 1024-byte registers) | add: O(1), count: O(1) | O(1) fixed |
 | :queue | Erlang stdlib | FIFO for BFS | enqueue/dequeue: O(1) | O(n) |
 
 ## Maze Generation
@@ -365,24 +366,6 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | Vertex Cover | `Yog.Approximate` | Greedy 2-approximation | O(V+E) | O(V) |
 | Max Clique | `Yog.Approximate` | Greedy heuristic | O(V²) | O(V) |
 
-## Underlying Algorithms & Data Structures
-
-Beyond graph algorithms, YogEx implements several fundamental computer science techniques:
-
-### Probabilistic Data Structures
-
-| Technique | Used In | Purpose |
-|-----------|---------|---------|
-| **HyperLogLog** | `Reachability.counts_estimate/2` | Memory-efficient cardinality estimation (O(V) vs O(V²)) for reachability counting with ~3% error |
-
-### Data Structures
-
-| Structure | Used In | Purpose |
-|-----------|---------|---------|
-| **Pairing Heap** | `Yog.PairingHeap` | O(1) insert, O(log n) amortized delete-min for Dijkstra, A*, Prim's |
-| **:queue (Erlang)** | BFS in `MaxFlow`, `Reachability` | O(1) enqueue/dequeue for FIFO operations |
-| **Binary-based HLL** | `Reachability` | 1024-byte fixed-size registers for cardinality estimation |
-
 ## I/O & Serialization
 
 | Format | Module | Purpose | Direction |
@@ -410,6 +393,71 @@ Beyond graph algorithms, YogEx implements several fundamental computer science t
 - **O(V!)**: Factorial worst case (isomorphism via brute force)
 
 ## Algorithm Selection Guide
+
+```mermaid
+flowchart TD
+    A[What problem are you solving?] --> B[Shortest path]
+    A --> C[Flow / cuts]
+    A --> D[Spanning tree]
+    A --> E[Matching]
+    A --> F[Community detection]
+    A --> G[Centrality]
+    A --> H[Connectivity]
+    A --> I[Traversal]
+
+    B --> B1[Edge weights?]
+    B1 -->|Unweighted| BFS
+    B1 -->|Heuristic available| AStar[A*]
+    B1 -->|Non-negative weights| B2[Single pair or all pairs?]
+    B2 -->|Single pair| Dijkstra
+    B2 -->|All pairs| B3[Graph density?]
+    B3 -->|Sparse| Johnson[Johnson's]
+    B3 -->|Dense| Floyd[Floyd-Warshall]
+    B1 -->|Negative weights| BF[Bellman-Ford]
+
+    C --> C1[Which flow problem?]
+    C1 -->|Max flow| Dinic[Dinic's / Edmonds-Karp]
+    C1 -->|Min-cost flow| C2[Instance size?]
+    C2 -->|Small / medium| SSP[Successive Shortest Path]
+    C2 -->|Large| NS[Network Simplex]
+    C1 -->|Global min cut| SW[Stoer-Wagner]
+
+    D --> D1[What kind of spanning tree?]
+    D1 -->|Dense graph| Prim[Prim's]
+    D1 -->|Sparse graph| Kruskal[Kruskal's]
+    D1 -->|Directed| Edmonds[Edmonds']
+    D1 -->|Maximum weight| MaxST[Max Spanning Tree]
+
+    E --> E1[What kind of matching?]
+    E1 -->|Bipartite unweighted| HK[Hopcroft-Karp]
+    E1 -->|Bipartite weighted| Hungarian[Hungarian]
+    E1 -->|General graph| Blossom[Blossom]
+
+    F --> F1[Priority?]
+    F1 -->|Speed| LP[Label Propagation]
+    F1 -->|Quality guarantee| Leiden[Leiden]
+    F1 -->|Modularity| Louvain[Louvain]
+    F1 -->|Overlapping| CP[Clique Percolation]
+
+    G --> G1[What to measure?]
+    G1 -->|Simple importance| Degree[Degree]
+    G1 -->|Distance-based| Closeness[Closeness / Harmonic]
+    G1 -->|Bridge detection| Betweenness[Betweenness]
+    G1 -->|Link quality| PageRank[PageRank]
+
+    H --> H1[What structure?]
+    H1 -->|Strongly connected components| SCC[Tarjan's / Kosaraju's]
+    H1 -->|Connected components| CC[Connected Components]
+    H1 -->|Bridge edges| Bridges[Tarjan's Bridges]
+    H1 -->|Articulation points| Artic[Tarjan's Articulation]
+
+    I --> I1[Traversal order?]
+    I1 -->|Level-order| BFS_T[BFS]
+    I1 -->|Depth-first| DFS[DFS]
+    I1 -->|DAG ordering| Topo[Topological Sort]
+```
+
+> For an interactive version of this decision tree, see the [`YogEx Algorithm Selector` livebook](https://github.com/code-shoily/choreo/blob/main/livebooks/integrations/yogex_algorithm_selector.livemd) in the Choreo project.
 
 ### Shortest Path
 
@@ -439,6 +487,7 @@ Beyond graph algorithms, YogEx implements several fundamental computer science t
 |----------|-----------|
 | Max flow, general case | Dinic's or Edmonds-Karp |
 | Min-cost max-flow | Successive Shortest Path |
+| Large min-cost flow instances | Network Simplex |
 | Global min cut | Stoer-Wagner |
 
 ### Centrality
@@ -450,3 +499,54 @@ Beyond graph algorithms, YogEx implements several fundamental computer science t
 | Bridge detection | Betweenness |
 | Link quality | PageRank |
 | Hub/authority | HITS |
+
+### Spanning Tree
+
+| Scenario | Algorithm |
+|----------|-----------|
+| Dense graphs | Prim's |
+| Sparse graphs | Kruskal's |
+| Parallel / distributed setting | Borůvka's |
+| Directed minimum spanning arborescence | Edmonds' |
+| Uniform random spanning tree | Wilson's |
+| Maximum weight spanning tree | Max Spanning Tree |
+
+### Matching
+
+| Scenario | Algorithm |
+|----------|-----------|
+| Maximum bipartite matching | Hopcroft-Karp |
+| Minimum/maximum weighted bipartite matching | Hungarian |
+| Maximum matching in general graphs | Blossom |
+
+### Connectivity & Components
+
+| Scenario | Algorithm |
+|----------|-----------|
+| Strongly connected components (directed) | Tarjan's SCC or Kosaraju's SCC |
+| Connected components (undirected) | Connected Components |
+| Bridge edges | Tarjan's Bridges |
+| Articulation points | Tarjan's Articulation |
+| Core decomposition | K-Core |
+| Approximate reachability counting | Reachability HLL |
+
+### Traversal & Search
+
+| Scenario | Algorithm |
+|----------|-----------|
+| Unweighted shortest path / level-order exploration | BFS |
+| Exhaustive search / cycle detection | DFS |
+| DAG vertex ordering | Topological Sort or Kahn's Algorithm |
+| Deterministic DAG ordering | Lexicographical TopSort |
+| Heuristic-guided traversal | Best-First Walk |
+
+### Graph Properties
+
+| Scenario | Algorithm |
+|----------|-----------|
+| Cycle detection | Acyclicity Test |
+| Bipartiteness check | Bipartite Check |
+| Eulerian path/circuit existence | Eulerian Path / Eulerian Circuit |
+| Planarity test | Planarity Test |
+| All maximal cliques | Bron-Kerbosch |
+| Largest clique (heuristic) | Max Clique |
