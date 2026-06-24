@@ -34,9 +34,6 @@ There is also [a similar library written in Gleam](https://hex.pm/packages/yog),
 
 Both libraries are actively maintained, with the Elixir version getting new features more frequently, and also sporting more experimental features.
 
-> [!WARNING]
-> **API Stability**: Until the version reaches `1.0.0`, there may be some hiccups in performance, and documentation quality may be less than optimal. Before version `0.99.0` is released in **December 2026**, the primary focus is on **performance**, **documentation**, and **bugfixes**. From v0.97.0 onwards, there will be no breaking changes until v2.0 (no plans for that).
-
 ## Features
 
 YogEx provides comprehensive graph algorithms organized into modules:

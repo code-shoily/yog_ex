@@ -296,6 +296,39 @@ defmodule Yog.Flow.NetworkSimplexTest do
       assert Enum.sort(result.flow) == [{1, 2, 10}, {2, 1, 5}]
     end
 
+    test "negative cost self loop with finite capacity is used" do
+      {:ok, graph} =
+        Yog.directed()
+        |> Yog.add_node(1, {-5, nil})
+        |> Yog.add_node(2, {5, nil})
+        |> Yog.add_edges([
+          {1, 2, {10, 10}},
+          # Self loop can absorb flow without affecting node balance
+          {1, 1, {5, -100}}
+        ])
+
+      get_demand = fn
+        {d, _} -> d
+        _ -> 0
+      end
+
+      get_capacity = fn {c, _} -> c end
+      get_cost = fn {_, cost} -> cost end
+
+      assert {:ok, result} =
+               NetworkSimplex.min_cost_flow(
+                 graph,
+                 get_demand,
+                 get_capacity,
+                 get_cost
+               )
+
+      # Optimal: saturate the negative self-loop (5 * -100 = -500)
+      # and send remaining 5 units through 1->2 (5 * 10 = 50)
+      assert result.cost == -450
+      assert Enum.sort(result.flow) == [{1, 1, 5}, {1, 2, 5}]
+    end
+
     test "negative cost cycle with infinite capacity is unbounded" do
       # Using a very large number for capacity to represent infinity
       inf_capacity = 100_000_000_000

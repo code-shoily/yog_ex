@@ -20,14 +20,35 @@ defmodule Yog.Flow.NetworkSimplex do
   - **Edge Costs**: Price per unit of flow on each edge
   - **Reduced Costs**: Modified costs ensuring optimality conditions
   - **Spanning Tree**: Basis for the simplex method on networks
+
+  ## Implementation Notes
+
+  - Internal state is stored in maps keyed by integer indices (nodes and edges).
+    For very dense graphs, switching to Erlang `:array` could reduce memory and
+    lookup overhead, but it would be a sizeable refactor.
+  - The pivot step uses `Enum.find_index/2` to locate the entering and leaving
+    edges inside the fundamental cycle. Each call is O(cycle length); building a
+    position map would speed up hot paths on large instances.
+  - The unboundedness test checks whether any original edge flow is at least
+    half of the artificial big-M cost (`faux_inf / 2`). This 2x buffer is a
+    defensive choice; NetworkX uses `flow >= faux_inf` directly.
+  - Zero-capacity edges are filtered out before solving. Self-loops are kept and
+    treated as non-tree edges, so finite negative-cost self-loops are saturated
+    when beneficial.
   """
 
   alias Yog.Model
+
+  # Capacity value used internally to represent infinity.
+  @infinity_threshold 100_000_000_000
 
   @typedoc """
   A flow vector assigning an amount of flow to each edge.
 
   Each tuple is `{from_node, to_node, flow_amount}`.
+
+  Note: the name `flow_map` is historical; the type is a list of flow tuples,
+  not a map.
   """
   @type flow_map :: [{Yog.node_id(), Yog.node_id(), integer()}]
 
@@ -144,22 +165,22 @@ defmodule Yog.Flow.NetworkSimplex do
     n = length(nodes)
 
     node_demands =
-      Enum.map(0..(n - 1), fn idx ->
+      Map.new(0..(n - 1), fn idx ->
         node = Map.fetch!(idx_to_node, idx)
-        Map.fetch!(demands, node)
+        {idx, Map.fetch!(demands, node)}
       end)
 
-    # Separate self loops and zero-capacity edges
-    # Python: edges = (e for e in edges if e[0] != e[1] and e[-1].get(capacity, inf) != 0)
-    {valid_edges, self_loops_and_zero_caps} =
-      Enum.split_with(edges, fn {from, to, capacity, _cost} ->
-        from != to and capacity != 0
+    # Separate zero-capacity edges (they can never carry flow).
+    {valid_edges, _zero_cap_edges} =
+      Enum.split_with(edges, fn {_from, _to, capacity, _cost} ->
+        capacity != 0
       end)
 
-    # Check for unboundedness in self loops
+    # Check for unboundedness in self loops. A self loop with negative cost and
+    # effectively infinite capacity can absorb an unbounded amount of flow.
     is_unbounded_self_loop =
-      Enum.any?(self_loops_and_zero_caps, fn {from, to, capacity, cost} ->
-        from == to and capacity >= 100_000_000_000 and cost < 0
+      Enum.any?(edges, fn {from, to, capacity, cost} ->
+        from == to and capacity >= @infinity_threshold and cost < 0
       end)
 
     if is_unbounded_self_loop do
@@ -193,7 +214,7 @@ defmodule Yog.Flow.NetworkSimplex do
       sum_caps =
         edge_capacities
         |> Map.values()
-        |> Enum.filter(&(&1 < 100_000_000_000))
+        |> Enum.filter(&(&1 < @infinity_threshold))
         |> Enum.sum()
 
       sum_costs =
@@ -204,6 +225,7 @@ defmodule Yog.Flow.NetworkSimplex do
 
       sum_demands =
         node_demands
+        |> Map.values()
         |> Enum.map(&abs/1)
         |> Enum.sum()
 
@@ -217,7 +239,7 @@ defmodule Yog.Flow.NetworkSimplex do
           0..(n - 1),
           {edge_sources, edge_targets, edge_capacities, edge_costs, %{}},
           fn i, {srcs, tgts, caps, csts, fls} ->
-            d = Enum.at(node_demands, i)
+            d = Map.fetch!(node_demands, i)
             art_idx = m + i
             {src, tgt} = if d > 0, do: {n, i}, else: {i, n}
 
@@ -242,7 +264,7 @@ defmodule Yog.Flow.NetworkSimplex do
       # Initialize spanning tree attributes
       node_potentials =
         Enum.reduce(0..(n - 1), %{n => 0}, fn i, pots ->
-          d = Enum.at(node_demands, i)
+          d = Map.fetch!(node_demands, i)
           val = if d <= 0, do: faux_inf, else: -faux_inf
           Map.put(pots, i, val)
         end)
@@ -283,6 +305,8 @@ defmodule Yog.Flow.NetworkSimplex do
           Map.put(lsts, i, i)
         end)
 
+      # Internal state is map-based. See moduledoc "Implementation Notes" for
+      # discussion of potential `:array` optimizations.
       state = %{
         node_count: n,
         edge_count: m,
@@ -321,7 +345,8 @@ defmodule Yog.Flow.NetworkSimplex do
         Map.fetch!(final_state.flows, idx) != 0
       end)
 
-    # Check for unboundedness: flow on any original edge exceeds half of faux_inf
+    # Check for unboundedness: flow on any original edge exceeds half of faux_inf.
+    # See moduledoc "Implementation Notes" for the 2x buffer discussion.
     has_unbounded_flow =
       if m > 0 do
         Enum.any?(0..(m - 1), fn idx ->
@@ -389,7 +414,8 @@ defmodule Yog.Flow.NetworkSimplex do
                   {s, t}
                 end
 
-              # Ensure q is in the subtree rooted at t
+              # Ensure q is in the subtree rooted at t.
+              # These scans are O(cycle length); see moduledoc notes.
               i_idx = Enum.find_index(we, &(&1 == i))
               j_idx = Enum.find_index(we, &(&1 == j))
 
