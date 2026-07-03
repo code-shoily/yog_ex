@@ -5,14 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.99.0] - 2026-07-03
 
 ### Added
 
 - **`Yog.Layout`** — Implemented pure Elixir layout calculation algorithms: `Yog.Layout.circular/2` (circular placement), `Yog.Layout.random/2` (random uniform boundary placement), `Yog.Layout.spring/2` (Fruchterman-Reingold force-directed simulation), `Yog.Layout.tutte/3` (Tutte barycentric embedding via Gauss-Seidel relaxation), `Yog.Layout.shell/3` (concentric shells), and `Yog.Layout.multipartite/3` (parallel layers/columns). All layouts return a `%{node_id => {x, y}}` coordinate map where coordinates are represented as `{float, float}` tuples.
 - **Barnes-Hut Simulation** — Implemented Barnes-Hut quadtree-based spatial approximation for `Yog.Layout.Spring` (activated via the `:barnes_hut` and `:theta` options). This reduces repulsive force computation complexity from $O(V^2)$ to $O(V \log V)$, facilitating fast force-directed layout computation on large graphs.
 - **`Yog.Render.SVG`** — Implemented a pure Elixir SVG renderer supporting simple graphs, directed graphs, and multigraphs. It computes parallel edge indices and multiplicities to render parallel edges as distinct curved quadratic Bézier curves, self-loops as cubic Bézier loops, and directed arrowheads with boundary-offset truncation math to keep arrowheads visible at the node borders.
-- **Livebook Layout Guide** — Created `livebooks/how_to/layout_guide.livemd` showcasing circular, spring, tutte, shell, and multipartite layouts rendered using both interactive Kino SVG (`Kino.HTML.new/1`) and Kino Vega-Lite (`Yog.Render.VegaLite`).
+- **Livebook Layout Guide** — Created `livebooks/how_to/layout_guide.livemd` showcasing circular, spring, tutte, shell, and multipartite layouts rendered using interactive Kino SVG (`Kino.HTML.new/1`).
 - **`Yog.Pathfinding.Disjoint`** — Added `suurballe/4` implementing Suurballe's algorithm for finding two edge-disjoint shortest paths of minimum total cost in directed and undirected graphs. Supports custom weight functions, addition, subtraction, and comparison operations.
 - **`Yog.Flow.NetworkSimplex`** — Implemented the primal Network Simplex algorithm for solving the Minimum Cost Flow (MCF) problem (`Yog.Flow.NetworkSimplex.min_cost_flow/4`). It supports demand/supply balances on nodes and capacity limits and cost values on edges, and handles infeasible, unbounded, or unbalanced flow networks correctly.
 - **Network Simplex Oracle Property** — Added oracle parity test `P-ORAC-FLOW-005` in `test/oracle/flow_oracle_test.exs` to verify cost parity between Yog and NetworkX on randomly generated flow networks, including edge cases and error conditions.

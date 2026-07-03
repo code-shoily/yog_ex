@@ -1,7 +1,7 @@
 defmodule YogEx.MixProject do
   use Mix.Project
 
-  @version "0.98.5"
+  @version "0.99.0"
   @source_url "https://github.com/code-shoily/yog_ex"
 
   def project do
@@ -61,7 +61,6 @@ defmodule YogEx.MixProject do
       {:saxy, "~> 1.5", optional: true},
       {:jason, "~> 1.4", optional: true},
       {:libgraph, "~> 0.16", optional: true},
-      {:vega_lite, "~> 0.1", optional: true},
       {:ex_doc, "~> 0.40", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:stream_data, "~> 1.1", only: [:dev, :test]},
