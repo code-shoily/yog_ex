@@ -101,18 +101,11 @@ defmodule Yog.Layout.Spring do
         k_squared = k * k
 
         # 2. Initial positions
-        positions =
-          cond do
-            initial_pos ->
-              initial_pos
+        if seed do
+          :rand.seed(:exsss, seed)
+        end
 
-            seed ->
-              :rand.seed(:exsss, seed)
-              generate_random_positions(nodes, width, height, center)
-
-            true ->
-              generate_random_positions(nodes, width, height, center)
-          end
+        positions = initialize_positions(nodes, width, height, center, initial_pos)
 
         # 3. Edges to simulate attraction
         edges = Yog.all_edges(graph)
@@ -140,6 +133,28 @@ defmodule Yog.Layout.Spring do
           rescale(final_positions, width, height, center)
         end
     end
+  end
+
+  defp initialize_positions(nodes, width, height, center, nil) do
+    generate_random_positions(nodes, width, height, center)
+  end
+
+  defp initialize_positions(nodes, width, height, {cx, cy}, initial_pos) do
+    min_x = cx - width / 2.0
+    min_y = cy - height / 2.0
+
+    Map.new(nodes, fn id ->
+      position =
+        case Map.fetch(initial_pos, id) do
+          {:ok, {x, y}} when is_number(x) and is_number(y) ->
+            {x, y}
+
+          _ ->
+            {min_x + :rand.uniform() * width, min_y + :rand.uniform() * height}
+        end
+
+      {id, position}
+    end)
   end
 
   defp generate_random_positions(nodes, width, height, {cx, cy}) do
@@ -358,7 +373,7 @@ defmodule Yog.Layout.Spring.BarnesHut do
   # Quadtree node types
   # - nil (empty)
   # - {:leaf, node_id, x, y}
-  # - {:internal, mass, cx, cy, nw, ne, sw, se}
+  # - {:internal, mass, cx, cy, ids, nw, ne, sw, se}
 
   def build_tree(positions) do
     if map_size(positions) == 0 do
@@ -407,18 +422,18 @@ defmodule Yog.Layout.Spring.BarnesHut do
       py = y + (:rand.uniform() - 0.5) * 1.0e-5
       insert(leaf, bounds, node_id, px, py)
     else
-      internal = {:internal, 1.0, lx, ly, nil, nil, nil, nil}
+      internal = {:internal, 0.0, 0.0, 0.0, MapSet.new(), nil, nil, nil, nil}
       internal = insert_into_internal(internal, bounds, leaf_id, lx, ly)
       insert_into_internal(internal, bounds, node_id, x, y)
     end
   end
 
-  defp insert({:internal, _, _, _, _, _, _, _} = internal, bounds, node_id, x, y) do
+  defp insert({:internal, _, _, _, _, _, _, _, _} = internal, bounds, node_id, x, y) do
     insert_into_internal(internal, bounds, node_id, x, y)
   end
 
   defp insert_into_internal(
-         {:internal, mass, cx, cy, nw, ne, sw, se},
+         {:internal, mass, cx, cy, ids, nw, ne, sw, se},
          {x_min, y_min, x_max, y_max},
          node_id,
          x,
@@ -427,6 +442,7 @@ defmodule Yog.Layout.Spring.BarnesHut do
     new_mass = mass + 1.0
     new_cx = (cx * mass + x) / new_mass
     new_cy = (cy * mass + y) / new_mass
+    new_ids = MapSet.put(ids, node_id)
 
     mid_x = (x_min + x_max) / 2.0
     mid_y = (y_min + y_max) / 2.0
@@ -434,19 +450,19 @@ defmodule Yog.Layout.Spring.BarnesHut do
     cond do
       x < mid_x and y < mid_y ->
         new_nw = insert(nw, {x_min, y_min, mid_x, mid_y}, node_id, x, y)
-        {:internal, new_mass, new_cx, new_cy, new_nw, ne, sw, se}
+        {:internal, new_mass, new_cx, new_cy, new_ids, new_nw, ne, sw, se}
 
       x >= mid_x and y < mid_y ->
         new_ne = insert(ne, {mid_x, y_min, x_max, mid_y}, node_id, x, y)
-        {:internal, new_mass, new_cx, new_cy, nw, new_ne, sw, se}
+        {:internal, new_mass, new_cx, new_cy, new_ids, nw, new_ne, sw, se}
 
       x < mid_x and y >= mid_y ->
         new_sw = insert(sw, {x_min, mid_y, mid_x, y_max}, node_id, x, y)
-        {:internal, new_mass, new_cx, new_cy, nw, ne, new_sw, se}
+        {:internal, new_mass, new_cx, new_cy, new_ids, nw, ne, new_sw, se}
 
       true ->
         new_se = insert(se, {mid_x, mid_y, x_max, y_max}, node_id, x, y)
-        {:internal, new_mass, new_cx, new_cy, nw, ne, sw, new_se}
+        {:internal, new_mass, new_cx, new_cy, new_ids, nw, ne, sw, new_se}
     end
   end
 
@@ -475,7 +491,7 @@ defmodule Yog.Layout.Spring.BarnesHut do
   end
 
   defp compute_repulsion_force(
-         {:internal, mass, cx, cy, nw, ne, sw, se},
+         {:internal, mass, cx, cy, ids, nw, ne, sw, se},
          u_id,
          ux,
          uy,
@@ -488,7 +504,7 @@ defmodule Yog.Layout.Spring.BarnesHut do
     dist_sq = dx * dx + dy * dy
     dist = :math.sqrt(dist_sq)
 
-    if dist > 0.0 and s / dist < theta do
+    if not MapSet.member?(ids, u_id) and dist > 0.0 and s / dist < theta do
       fr = k2 * mass / dist
       {dx / dist * fr, dy / dist * fr}
     else

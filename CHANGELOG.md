@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## UNRELEASED
+
+### Fixed
+
+- **Optional Dependency Warnings** — Silenced compile-time warnings generated when compiling without optional dependencies (`saxy` and `libgraph`). Wrapped Saxy handler behaviours in compile-time checks, removed `@impl` callback annotations from optional integration handlers, moved the `YogGraph` alias within the compile-time block in `Yog.IO.Libgraph`, and removed the duplicate `@moduledoc` tag.
+- **`Yog.Layout.Spring` Partial Initial Positions** — `initial_pos` may now be partial: missing graph nodes are initialized randomly instead of being silently omitted from the returned layout, extra nodes are ignored, and `:seed` is honored when filling missing positions.
+- **`Yog.Layout.Spring` Barnes-Hut Correctness** — Fixed Barnes-Hut quadtree mass accounting and prevented approximation of cells containing the target node, eliminating self-force leakage in approximate repulsion calculations.
+- **`Yog.Layout` Input Validation** — Added duplicate-node validation for Tutte boundary nodes, Shell shell membership, and Multipartite layer membership to avoid ambiguous layouts caused by overwriting coordinates in the result map.
+- **Release Documentation Version Snippets** — Normalized stale dependency examples in `Yog.IO.Libgraph` docs and Livebooks to use `{:yog_ex, "~> 0.99.0"}` consistently.
+
+
 ## [0.99.0] - 2026-07-03
 
 ### Added
@@ -19,7 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Optional Dependency Warnings** — Silenced compile-time warnings generated when compiling without optional dependencies (`saxy` and `libgraph`). Wrapped Saxy handler behaviours in compile-time checks, removed `@impl` callback annotations from optional integration handlers, moved the `YogGraph` alias within the compile-time block in `Yog.IO.Libgraph`, and removed the duplicate `@moduledoc` tag.
 - **Compile-time Circular Dependencies** — Resolved compile-time and export-time circular dependencies across several core modules (`Yog.MST`, `Yog.DAG`, and `Yog.Connectivity.KCore`) to clean up module dependencies and improve build speeds.
 - **`Yog.Render.SVG` Parentheses Sigil Bug** — Resolved a compiler syntax error caused by nested parentheses inside `~s(marker-end="url(#arrow)")` by changing the sigil delimiters to square brackets `~s[...]`.
 - **`Yog.Community.Walktrap`** — Corrected hierarchical merging logic by resolving a key mismatch bug (where community IDs were indices but caches were keyed by original node IDs). Also corrected the random walk probability merges to be degree-weighted and added Ward's size-weighting factor during the clustering step.
@@ -266,4 +276,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **`how_to/import_export`** — Added Graph6 and GDF format coverage.
   - **`how_to/maze_generation`** — Added Wilson's algorithm demonstration, algorithm property comparison table, path length analysis across algorithms.
   - **`how_to/multigraphs_and_collapsing`** — Added multigraph visualization (`Yog.Multi.DOT` and `Yog.Multi.Mermaid`), `Yog.Builder.Live.sync_multi/2` example, per-edge styled rendering, Eulerian circuits on multigraphs, BFS/DFS traversals.
-

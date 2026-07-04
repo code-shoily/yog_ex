@@ -24,6 +24,32 @@ defmodule Yog.Layout.SpringTest do
     end
   end
 
+  test "Barnes-Hut does not approximate cells containing the target node" do
+    graph = Yog.undirected() |> Yog.add_nodes_from([1, 2])
+    initial_pos = %{1 => {0.0, 0.0}, 2 => {1.0, 0.0}}
+
+    exact_pos =
+      Spring.layout(graph,
+        initial_pos: initial_pos,
+        fixed: [1],
+        iterations: 1,
+        initial_temp: 1.0,
+        barnes_hut: false
+      )
+
+    bh_pos =
+      Spring.layout(graph,
+        initial_pos: initial_pos,
+        fixed: [1],
+        iterations: 1,
+        initial_temp: 1.0,
+        barnes_hut: true,
+        theta: 10.0
+      )
+
+    assert bh_pos == exact_pos
+  end
+
   test "Barnes-Hut respects fixed nodes" do
     graph =
       Yog.undirected()

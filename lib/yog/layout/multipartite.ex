@@ -80,6 +80,9 @@ defmodule Yog.Layout.Multipartite do
       Enum.any?(layers, fn layer -> Enum.any?(layer, fn id -> id not in nodes end) end) ->
         raise ArgumentError, "All layer nodes must exist in the graph"
 
+      duplicate_node?(layers) ->
+        raise ArgumentError, "Layer nodes must not contain duplicates"
+
       true ->
         # Position each node in each layer
         layers
@@ -89,6 +92,11 @@ defmodule Yog.Layout.Multipartite do
           Map.merge(acc, layer_pos)
         end)
     end
+  end
+
+  defp duplicate_node?(groups) do
+    ids = Enum.flat_map(groups, & &1)
+    MapSet.size(MapSet.new(ids)) != length(ids)
   end
 
   defp position_layer(layer_nodes, j, m, :vertical, width, height, cx, cy) do

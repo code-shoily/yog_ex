@@ -108,12 +108,15 @@ defmodule Yog.LayoutTest do
       assert Map.get(pos, 2) != {0.0, 0.0}
     end
 
-    test "ignores edges containing missing nodes in initial_pos" do
-      # Edge between 1 and 2, but node 2 is missing from initial_pos
+    test "fills missing graph nodes when initial_pos is partial" do
       graph = Yog.from_unweighted_edges(:undirected, [{1, 2}])
-      initial_pos = %{1 => {0.0, 0.0}}
-      pos = Layout.spring(graph, initial_pos: initial_pos, iterations: 2)
-      assert Map.keys(pos) == [1]
+      initial_pos = %{1 => {0.0, 0.0}, 99 => {99.0, 99.0}}
+
+      pos = Layout.spring(graph, initial_pos: initial_pos, iterations: 0, seed: 42)
+
+      assert Map.keys(pos) |> Enum.sort() == [1, 2]
+      assert Map.get(pos, 1) != nil
+      refute Map.has_key?(pos, 99)
     end
 
     test "rescales nodes at identical positions to center" do
@@ -169,6 +172,10 @@ defmodule Yog.LayoutTest do
       assert_raise ArgumentError, ~r/must exist within the graph/, fn ->
         Layout.tutte(graph, [1, 2, 99])
       end
+
+      assert_raise ArgumentError, ~r/must not contain duplicates/, fn ->
+        Layout.tutte(graph, [1, 1, 2])
+      end
     end
 
     test "handles isolated interior nodes" do
@@ -217,6 +224,10 @@ defmodule Yog.LayoutTest do
 
       assert_raise ArgumentError, ~r/radii list must match the number of shells/, fn ->
         Layout.shell(graph, [[1], [2], [3]], radii: [1.0, 2.0])
+      end
+
+      assert_raise ArgumentError, ~r/must not contain duplicates/, fn ->
+        Layout.shell(graph, [[1], [1, 2]])
       end
     end
 
@@ -288,6 +299,10 @@ defmodule Yog.LayoutTest do
 
       assert_raise ArgumentError, ~r/must exist in the graph/, fn ->
         Layout.multipartite(graph, [[1], [99]])
+      end
+
+      assert_raise ArgumentError, ~r/must not contain duplicates/, fn ->
+        Layout.multipartite(graph, [[1], [1, 2]])
       end
     end
 

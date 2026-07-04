@@ -67,6 +67,9 @@ defmodule Yog.Layout.Shell do
       Enum.any?(shells, fn shell -> Enum.any?(shell, fn id -> id not in nodes end) end) ->
         raise ArgumentError, "All shell nodes must exist in the graph"
 
+      duplicate_node?(shells) ->
+        raise ArgumentError, "Shell nodes must not contain duplicates"
+
       true ->
         # Calculate radii for each shell
         radii =
@@ -90,6 +93,11 @@ defmodule Yog.Layout.Shell do
           Map.merge(acc, shell_pos)
         end)
     end
+  end
+
+  defp duplicate_node?(groups) do
+    ids = Enum.flat_map(groups, & &1)
+    MapSet.size(MapSet.new(ids)) != length(ids)
   end
 
   defp position_shell(shell_nodes, radius, cx, cy, total_shells) do

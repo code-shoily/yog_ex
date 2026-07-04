@@ -71,6 +71,9 @@ defmodule Yog.Layout.Tutte do
       Enum.any?(boundary_nodes, fn id -> id not in nodes end) ->
         raise ArgumentError, "All boundary nodes must exist within the graph"
 
+      MapSet.size(boundary_set) != length(boundary_nodes) ->
+        raise ArgumentError, "Boundary nodes must not contain duplicates"
+
       true ->
         # 1. Place boundary nodes on a circle
         boundary_pos = position_boundary_circle(boundary_nodes, radius, cx, cy)
