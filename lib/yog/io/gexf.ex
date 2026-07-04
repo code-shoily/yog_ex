@@ -1,4 +1,5 @@
 defmodule Yog.IO.GEXF do
+  @compile {:no_warn_undefined, [Saxy, Yog.IO.GEXF.SaxyHandler]}
   @moduledoc """
   GEXF (Graph Exchange XML Format) serialization support.
 

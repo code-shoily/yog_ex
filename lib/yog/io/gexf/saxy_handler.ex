@@ -1,6 +1,8 @@
 defmodule Yog.IO.GEXF.SaxyHandler do
   @moduledoc false
-  @behaviour Saxy.Handler
+  if Code.ensure_loaded?(Saxy) do
+    @behaviour Saxy.Handler
+  end
 
   defstruct node_folder: nil,
             edge_folder: nil,
@@ -15,17 +17,14 @@ defmodule Yog.IO.GEXF.SaxyHandler do
             current_attrs: %{},
             multigraph: false
 
-  @impl Saxy.Handler
   def handle_event(:start_document, _prolog, state) do
     {:ok, state}
   end
 
-  @impl Saxy.Handler
   def handle_event(:end_document, _data, state) do
     {:ok, state}
   end
 
-  @impl Saxy.Handler
   def handle_event(:start_element, {"graph", attrs}, state) do
     graph_type =
       case List.keyfind(attrs, "defaultedgetype", 0) do
@@ -222,7 +221,6 @@ defmodule Yog.IO.GEXF.SaxyHandler do
     {:ok, state}
   end
 
-  @impl Saxy.Handler
   def handle_event(:end_element, "node", state) do
     id = Map.get(state.current_attrs, "_id")
     label = Map.get(state.current_attrs, "label", "")
@@ -268,7 +266,6 @@ defmodule Yog.IO.GEXF.SaxyHandler do
     {:ok, state}
   end
 
-  @impl Saxy.Handler
   def handle_event(:characters, _chars, state) do
     {:ok, state}
   end

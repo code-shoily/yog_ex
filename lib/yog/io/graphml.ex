@@ -1,4 +1,5 @@
 defmodule Yog.IO.GraphML do
+  @compile {:no_warn_undefined, [Saxy, Yog.IO.GraphML.SaxyHandler]}
   @moduledoc """
   GraphML (Graph Markup Language) serialization support.
 

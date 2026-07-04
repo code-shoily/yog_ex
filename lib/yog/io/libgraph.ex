@@ -57,10 +57,10 @@ defmodule Yog.IO.Libgraph do
   - `{:error, reason}` - Conversion failed (e.g., cycle detected when creating DAG)
   """
 
-  alias Yog.Graph, as: YogGraph
-
   # Only compile this module if libgraph is available
   if Code.ensure_loaded?(Graph) do
+    alias Yog.Graph, as: YogGraph
+
     @doc """
     Converts a Libgraph graph to the appropriate Yog graph type.
 
@@ -268,22 +268,6 @@ defmodule Yog.IO.Libgraph do
     end
   else
     # libgraph is not available - provide helpful error messages
-    @moduledoc """
-    Interoperability with the [libgraph](https://hex.pm/packages/libgraph) library.
-
-    ## Installation Required
-
-    To use this module, you must add `libgraph` to your dependencies:
-
-        defp deps do
-          [
-            {:yog_ex, "~> 0.99.0"},
-            {:libgraph, "~> 0.16"}
-          ]
-        end
-
-    Then run `mix deps.get`.
-    """
 
     def from_libgraph(_libgraph, _opts \\ []) do
       raise "libgraph is not installed. Add {:libgraph, \"~> 0.16\"} to your deps to use this function."

@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Optional Dependency Warnings** — Silenced compile-time warnings generated when compiling without optional dependencies (`saxy` and `libgraph`). Wrapped Saxy handler behaviours in compile-time checks, removed `@impl` callback annotations from optional integration handlers, moved the `YogGraph` alias within the compile-time block in `Yog.IO.Libgraph`, and removed the duplicate `@moduledoc` tag.
 - **Compile-time Circular Dependencies** — Resolved compile-time and export-time circular dependencies across several core modules (`Yog.MST`, `Yog.DAG`, and `Yog.Connectivity.KCore`) to clean up module dependencies and improve build speeds.
 - **`Yog.Render.SVG` Parentheses Sigil Bug** — Resolved a compiler syntax error caused by nested parentheses inside `~s(marker-end="url(#arrow)")` by changing the sigil delimiters to square brackets `~s[...]`.
 - **`Yog.Community.Walktrap`** — Corrected hierarchical merging logic by resolving a key mismatch bug (where community IDs were indices but caches were keyed by original node IDs). Also corrected the random walk probability merges to be degree-weighted and added Ward's size-weighting factor during the clustering step.

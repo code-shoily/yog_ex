@@ -1,4 +1,5 @@
 defmodule Yog.IO.GEXF.Multi do
+  @compile {:no_warn_undefined, [Saxy, Yog.IO.GEXF.SaxyHandler]}
   @moduledoc """
   GEXF serialization support for **multigraphs** (`Yog.Multi.Graph`).
 

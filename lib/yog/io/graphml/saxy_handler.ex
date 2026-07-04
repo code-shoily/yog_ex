@@ -1,6 +1,8 @@
 defmodule Yog.IO.GraphML.SaxyHandler do
   @moduledoc false
-  @behaviour Saxy.Handler
+  if Code.ensure_loaded?(Saxy) do
+    @behaviour Saxy.Handler
+  end
 
   defstruct node_folder: nil,
             edge_folder: nil,
@@ -12,17 +14,14 @@ defmodule Yog.IO.GraphML.SaxyHandler do
             current_data_key: nil,
             current_data_value: ""
 
-  @impl Saxy.Handler
   def handle_event(:start_document, _prolog, state) do
     {:ok, state}
   end
 
-  @impl Saxy.Handler
   def handle_event(:end_document, _data, state) do
     {:ok, state}
   end
 
-  @impl Saxy.Handler
   def handle_event(:start_element, {"graph", attrs}, state) do
     graph_type =
       case List.keyfind(attrs, "edgedefault", 0) do
@@ -96,7 +95,6 @@ defmodule Yog.IO.GraphML.SaxyHandler do
     {:ok, state}
   end
 
-  @impl Saxy.Handler
   def handle_event(:end_element, "node", state) do
     id = Map.get(state.current_attrs, "_id")
     attrs = Map.delete(state.current_attrs, "_id")
@@ -134,7 +132,6 @@ defmodule Yog.IO.GraphML.SaxyHandler do
     {:ok, state}
   end
 
-  @impl Saxy.Handler
   def handle_event(:characters, chars, %{current_data_key: key} = state) when key != nil do
     {:ok, %{state | current_data_value: state.current_data_value <> chars}}
   end
