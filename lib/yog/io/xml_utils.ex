@@ -34,6 +34,9 @@ defmodule Yog.IO.XMLUtils do
     :exit, {:fatal, {{:error, {:wfc_Legal_Character, _}}, _, _, _}} ->
       {:error, :bad_character}
 
+    :exit, {:fatal, {{:unexpected_char, _}, _, _, _}} ->
+      {:error, :bad_character}
+
     :exit, reason ->
       {:error, inspect(reason)}
   end

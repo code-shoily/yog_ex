@@ -171,10 +171,8 @@ defmodule Yog.Pathfinding.FloydWarshall do
 
         has_negative =
           Enum.any?(nodes, fn i ->
-            case Map.fetch(new_dist, {i, i}) do
-              {:ok, d} -> compare_weights(d, zero, compare) == :lt
-              :error -> false
-            end
+            d = Map.fetch!(new_dist, {i, i})
+            compare_weights(d, zero, compare) == :lt
           end)
 
         if has_negative do
@@ -248,10 +246,8 @@ defmodule Yog.Pathfinding.FloydWarshall do
   # Check if any node has negative distance to itself
   defp has_negative_cycle?(nodes, dist, compare, zero) do
     Enum.any?(nodes, fn i ->
-      case Map.fetch(dist, {i, i}) do
-        {:ok, d} -> compare_weights(d, zero, compare) == :lt
-        :error -> false
-      end
+      d = Map.fetch!(dist, {i, i})
+      compare_weights(d, zero, compare) == :lt
     end)
   end
 

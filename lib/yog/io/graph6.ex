@@ -183,7 +183,8 @@ defmodule Yog.IO.Graph6 do
   # Private helpers - parsing
   # =============================================================================
 
-  defp parse_header(<<c, rest::binary>>) do
+  @doc false
+  def parse_header(<<c, rest::binary>>) do
     value = c - 63
 
     cond do
@@ -308,18 +309,19 @@ defmodule Yog.IO.Graph6 do
     |> :erlang.list_to_bitstring()
   end
 
-  defp encode_header(n) when n <= 62 do
+  @doc false
+  def encode_header(n) when n <= 62 do
     <<n + 63>>
   end
 
-  defp encode_header(n) when n <= 258_047 do
+  def encode_header(n) when n <= 258_047 do
     a = div(n, 4096)
     b = div(rem(n, 4096), 64)
     c = rem(n, 64)
     <<126, a + 63, b + 63, c + 63>>
   end
 
-  defp encode_header(n) do
+  def encode_header(n) do
     a = div(n, 1_073_741_824)
     r1 = rem(n, 1_073_741_824)
     b = div(r1, 16_777_216)

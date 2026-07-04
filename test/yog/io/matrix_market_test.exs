@@ -242,5 +242,86 @@ defmodule Yog.IO.MatrixMarketTest do
       {:ok, _} = MatrixMarket.read_with(@tmp_file, :directed, & &1, & &1)
       File.rm(@tmp_file)
     end
+
+    test "read and read_with file not found error" do
+      assert {:error, :enoent} = MatrixMarket.read("nonexistent_file.mtx")
+
+      assert {:error, :enoent} =
+               MatrixMarket.read_with("nonexistent_file.mtx", :directed, & &1, & &1)
+    end
+
+    test "header parsing invalid parts" do
+      input = "%%MatrixMarket matrix\n"
+      assert {:error, {:invalid_header, _}} = MatrixMarket.parse(input)
+    end
+
+    test "size line parsing skipping empty lines and comment lines" do
+      input = """
+      %%MatrixMarket matrix coordinate real general
+      % This is a comment
+
+      2 2 1
+      1 2 4.5
+      """
+
+      {:ok, {:matrix_market_result, graph, _warnings}} = MatrixMarket.parse(input)
+      assert Yog.Model.node_count(graph) == 2
+    end
+
+    test "size line parsing unexpected end of file" do
+      input = "%%MatrixMarket matrix coordinate real general\n"
+      assert {:error, :unexpected_end_of_file} = MatrixMarket.parse(input)
+    end
+
+    test "build graph with zero max_node" do
+      input = """
+      %%MatrixMarket matrix coordinate real general
+      0 0 0
+      """
+
+      {:ok, {:matrix_market_result, graph, _warnings}} = MatrixMarket.parse(input)
+      assert Yog.Model.node_count(graph) == 0
+    end
+
+    test "edge line parsing add_edge warning on nonexistent nodes" do
+      input = """
+      %%MatrixMarket matrix coordinate real general
+      1 1 1
+      1 99 5.5
+      """
+
+      {:ok, {:matrix_market_result, _, warnings}} = MatrixMarket.parse(input)
+      assert length(warnings) == 1
+    end
+
+    test "edge line parsing missing weight value or custom field fallback" do
+      # 1. Custom/unknown field type:
+      # We construct a header manually, or wait, parse parses the header.
+      # If header has custom field type, we can trigger {_, [w | _]} -> w fallback.
+      # Let's write an input with custom field "unknown_field":
+      input1 = """
+      %%MatrixMarket matrix coordinate unknown_field general
+      2 2 1
+      1 2 custom_val
+      """
+
+      # Use raw parser with custom parser mapping string directly
+      {:ok, {:matrix_market_result, graph1, _}} =
+        MatrixMarket.parse_with(input1, :directed, & &1, & &1)
+
+      {_, _, weight1} = hd(Yog.Model.all_edges(graph1))
+      assert weight1 == "custom_val"
+
+      # 2. Missing weight value for real field (defaults to 1.0):
+      input2 = """
+      %%MatrixMarket matrix coordinate real general
+      2 2 1
+      1 2
+      """
+
+      {:ok, {:matrix_market_result, graph2, _}} = MatrixMarket.parse(input2)
+      {_, _, weight2} = hd(Yog.Model.all_edges(graph2))
+      assert weight2 == 1.0
+    end
   end
 end

@@ -359,4 +359,74 @@ defmodule Yog.IO.LEDATest do
     # Cleanup
     File.rm(output_path)
   end
+
+  test "default options call" do
+    assert {:leda_options, _, _, _, _, _, _} = LEDA.default_options()
+  end
+
+  test "serialize with 5-element options tuple" do
+    graph = Yog.directed() |> Yog.add_node(1, nil)
+    options = {:leda_options, fn d -> d end, fn d -> d end, fn s -> s end, fn s -> s end}
+    assert String.contains?(LEDA.serialize_with(options, graph), "LEDA.GRAPH")
+  end
+
+  test "read and write file errors" do
+    graph = Yog.directed() |> Yog.add_node(1, nil)
+    assert {:error, :enoent} = LEDA.write("/nonexistent_dir/file.leda", graph)
+
+    assert {:error, :enoent} =
+             LEDA.write_with("/nonexistent_dir/file.leda", LEDA.default_options(), graph)
+
+    assert {:error, :enoent} = LEDA.read_with("/nonexistent_dir/file.leda", & &1, & &1)
+  end
+
+  test "parse truncated and malformed inputs" do
+    assert {:error, :missing_node_type} = LEDA.parse("LEDA.GRAPH")
+    assert {:error, :missing_edge_type} = LEDA.parse("LEDA.GRAPH\nstring")
+
+    input_no_edge_count = """
+    LEDA.GRAPH
+    string
+    string
+    -1
+    2
+    |{A}|
+    |{B}|
+    """
+
+    assert {:error, :missing_edge_count} = LEDA.parse(String.trim_trailing(input_no_edge_count))
+
+    input_invalid_edge_count = """
+    LEDA.GRAPH
+    string
+    string
+    -1
+    2
+    |{A}|
+    |{B}|
+    abc
+    """
+
+    assert {:error, :invalid_edge_count} = LEDA.parse(input_invalid_edge_count)
+  end
+
+  test "parse edges with empty lines" do
+    input = """
+    LEDA.GRAPH
+    string
+    string
+    -1
+    2
+    |{A}|
+    |{B}|
+    2
+    1 2 0 |{edge1}|
+
+    2 1 0 |{edge2}|
+    """
+
+    {:ok, {:leda_result, graph, warnings}} = LEDA.parse(input)
+    assert Yog.Model.edge_count(graph) == 2
+    assert warnings == []
+  end
 end

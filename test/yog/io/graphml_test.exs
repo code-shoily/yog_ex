@@ -693,4 +693,90 @@ defmodule Yog.IO.GraphMLTest do
     assert edge_data["since"] == "2020"
     assert edge_data["weight"] == "5"
   end
+
+  test "serialize with 3-element options tuple" do
+    graph = Yog.directed() |> Yog.add_node(1, "Alice")
+    options = {:graphml_options, 0, false}
+    node_attr = fn data -> %{"label" => data} end
+    edge_attr = fn _ -> %{} end
+    xml = GraphML.serialize_with_options(node_attr, edge_attr, options, graph)
+    assert String.contains?(xml, "<node id=\"1\">")
+  end
+
+  test "deserialize edge referencing undefined nodes ignores it" do
+    xml = """
+    <?xml version="1.0"?>
+    <graphml xmlns="http://graphml.graphdrawing.org/xmlns">
+      <graph id="G" edgedefault="directed">
+        <edge source="1" target="2"></edge>
+      </graph>
+    </graphml>
+    """
+
+    {:ok, graph} = GraphML.deserialize(xml)
+    # The nodes 1 and 2 are not created, and the edge is ignored
+    assert Yog.Model.node_count(graph) == 0
+    assert Yog.Model.edge_count(graph) == 0
+  end
+
+  test "write and read file errors" do
+    graph = Yog.directed() |> Yog.add_node(1, nil)
+    assert {:error, _} = GraphML.write("/nonexistent_directory_xyz/file.graphml", graph)
+
+    assert {:error, _} =
+             GraphML.write_with(
+               "/nonexistent_directory_xyz/file.graphml",
+               fn _ -> %{} end,
+               fn _ -> %{} end,
+               graph
+             )
+
+    assert {:error, _} =
+             GraphML.write_with_types(
+               "/nonexistent_directory_xyz/file.graphml",
+               fn _ -> %{} end,
+               fn _ -> %{} end,
+               graph
+             )
+
+    assert {:error, _} =
+             GraphML.read_with("/nonexistent_directory_xyz/file.graphml", fn _ -> %{} end, fn _ ->
+               %{}
+             end)
+  end
+
+  describe "parse_graphml_xmerl direct tests" do
+    test "xmerl parsing fallback success" do
+      xml = """
+      <graphml xmlns="http://graphml.graphdrawing.org/xmlns">
+        <graph id="G" edgedefault="directed">
+          <node id="1"><data key="label">A</data></node>
+          <edge source="1" target="1"></edge>
+        </graph>
+      </graphml>
+      """
+
+      assert {:ok, graph} = GraphML.parse_graphml_xmerl(xml, fn x -> x end, fn x -> x end)
+      assert Yog.Model.has_node?(graph, 1)
+    end
+
+    test "xmerl parsing with bad characters sanitized" do
+      xml = """
+      <graphml xmlns="http://graphml.graphdrawing.org/xmlns">
+        <graph id="G" edgedefault="directed">
+          <node id="1"><data key="label">A\x1B</data></node>
+          <edge source="1" target="1"></edge>
+        </graph>
+      </graphml>
+      """
+
+      assert {:ok, graph} = GraphML.parse_graphml_xmerl(xml, fn x -> x end, fn x -> x end)
+      assert Yog.Model.node(graph, 1)["label"] == "A"
+    end
+
+    test "xmerl parsing with completely invalid xml" do
+      assert {:error, {:parse_error, _}} =
+               GraphML.parse_graphml_xmerl("<graphml>invalid xml", fn x -> x end, fn x -> x end)
+    end
+  end
 end

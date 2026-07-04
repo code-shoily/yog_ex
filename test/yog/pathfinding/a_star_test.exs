@@ -207,4 +207,71 @@ defmodule Yog.Pathfinding.AStarTest do
 
     assert {:ok, 2} = result
   end
+
+  test "a_star and implicit_a_star default arguments" do
+    # a_star with defaults
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1)
+      |> Yog.add_node(2)
+      |> Yog.add_edge!(1, 2, 5)
+
+    {:ok, path} = AStar.a_star(graph, 1, 2, fn _, _ -> 0 end)
+    assert path.weight == 5
+
+    # implicit_a_star with defaults
+    assert {:ok, 2} =
+             AStar.implicit_a_star(1, fn n -> [{n + 1, 1}] end, fn n -> n == 3 end, fn n ->
+               3 - n
+             end)
+
+    # implicit_a_star_by with defaults
+    assert {:ok, 2} =
+             AStar.implicit_a_star_by(
+               1,
+               fn n -> [{n + 1, 1}] end,
+               fn n -> n end,
+               fn n -> n == 3 end,
+               fn n -> 3 - n end
+             )
+  end
+
+  test "a_star discards longer popped paths" do
+    # Graph structure:
+    # 1 -> 2 (10)
+    # 1 -> 3 (1)
+    # 3 -> 2 (1)
+    # 2 -> 4 (100)
+    # Target is 4. When 1 is processed, 2 gets queued with g=10, 3 gets queued with g=1.
+    # 3 gets popped, relaxes 3 -> 2, updates 2's g to 2, queues 2 with g=2.
+    # 2 with g=2 gets popped, relaxes 2 -> 4, updates 4's g to 102.
+    # Now queue has 2 with g=10 (f = 10) and 4 with g=102 (f = 102).
+    # 2 with g=10 gets popped. Its g (10) > best_g (2), so it is discarded.
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1)
+      |> Yog.add_node(2)
+      |> Yog.add_node(3)
+      |> Yog.add_node(4)
+      |> Yog.add_edge!(1, 2, 10)
+      |> Yog.add_edge!(1, 3, 1)
+      |> Yog.add_edge!(3, 2, 1)
+      |> Yog.add_edge!(2, 4, 100)
+
+    {:ok, path} = AStar.a_star(graph, 1, 4, fn _, _ -> 0 end)
+    assert path.weight == 102
+    assert path.nodes == [1, 3, 2, 4]
+  end
+
+  test "implicit_a_star discards longer popped paths" do
+    # Implicit version of the longer popped path test
+    successors = fn
+      1 -> [{2, 10}, {3, 1}]
+      3 -> [{2, 1}]
+      2 -> [{4, 100}]
+      4 -> []
+    end
+
+    assert {:ok, 102} = AStar.implicit_a_star(1, successors, fn n -> n == 4 end, fn _ -> 0 end)
+  end
 end

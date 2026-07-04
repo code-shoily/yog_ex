@@ -80,19 +80,13 @@ defmodule Yog.MST.Wilson do
     end
   end
 
-  # Performs a loop-erased random walk until hits tree
   defp perform_lerw(graph, current, tree, path_map) do
     if MapSet.member?(tree, current) do
       path_map
     else
-      neighbors = Map.get(graph.out_edges, current, %{}) |> Map.keys()
-
-      if neighbors == [] do
-        path_map
-      else
-        next_node = Enum.random(neighbors)
-        perform_lerw(graph, next_node, tree, Map.put(path_map, current, next_node))
-      end
+      neighbors = Map.fetch!(graph.out_edges, current) |> Map.keys()
+      next_node = Enum.random(neighbors)
+      perform_lerw(graph, next_node, tree, Map.put(path_map, current, next_node))
     end
   end
 

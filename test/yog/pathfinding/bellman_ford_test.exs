@@ -499,4 +499,52 @@ defmodule Yog.Pathfinding.BellmanFordTest do
 
     assert {:ok, 1} = result
   end
+
+  test "bellman_ford default arguments" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1)
+      |> Yog.add_node(2)
+      |> Yog.add_edge!(1, 2, 5)
+
+    # bellman_ford/3
+    {:ok, path} = BellmanFord.bellman_ford(graph, 1, 2)
+    assert path.weight == 5
+
+    # relaxation_passes/2
+    distances = BellmanFord.relaxation_passes(graph, 1)
+    assert distances[2] == 5
+
+    # relaxation_passes/3 (with zero)
+    distances2 = BellmanFord.relaxation_passes(graph, 1, 0)
+    assert distances2[2] == 5
+
+    # implicit_bellman_ford with defaults
+    assert {:ok, -4} =
+             BellmanFord.implicit_bellman_ford(
+               1,
+               fn n -> if n < 5, do: [{n + 1, -1}], else: [] end,
+               fn n -> n == 5 end
+             )
+
+    # implicit_bellman_ford_by with defaults
+    assert {:ok, -4} =
+             BellmanFord.implicit_bellman_ford_by(
+               1,
+               fn n -> if n < 5, do: [{n + 1, -1}], else: [] end,
+               fn n -> n end,
+               fn n -> n == 5 end
+             )
+  end
+
+  test "reconstruct_path helper and error paths" do
+    # Valid reconstruction
+    path = BellmanFord.reconstruct_path(%{2 => 1, 3 => 2}, 1, 3, 15)
+    assert path.weight == 15
+    assert path.nodes == [1, 2, 3]
+
+    # Predecessor mapping missing node (hits :error -> [])
+    path_err = BellmanFord.reconstruct_path(%{2 => 1}, 1, 3, 10)
+    assert path_err.nodes == []
+  end
 end

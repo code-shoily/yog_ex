@@ -81,15 +81,9 @@ defmodule Yog.MST.Edmonds do
         # 3. We found a cycle. Contract it.
         {contracted_graph, cycle_info} = contract_cycle(graph, cycle, best_in, compare)
 
-        case do_compute(contracted_graph, root, compare) do
-          {:ok, contracted_edges} ->
-            # 4. Expand cycle
-            expanded_edges = expand_cycle(contracted_edges, cycle_info, best_in)
-            {:ok, expanded_edges}
-
-          error ->
-            error
-        end
+        {:ok, contracted_edges} = do_compute(contracted_graph, root, compare)
+        expanded_edges = expand_cycle(contracted_edges, cycle_info, best_in)
+        {:ok, expanded_edges}
       end
     end
   end
@@ -103,13 +97,8 @@ defmodule Yog.MST.Edmonds do
             acc
 
           ins ->
-            case find_best_edge(ins, compare) do
-              nil ->
-                acc
-
-              {src, w} ->
-                Map.put(acc, node_id, %{from: src, to: node_id, weight: w})
-            end
+            {src, w} = find_best_edge(ins, compare)
+            Map.put(acc, node_id, %{from: src, to: node_id, weight: w})
         end
     end
   end
@@ -142,9 +131,6 @@ defmodule Yog.MST.Edmonds do
       :visiting ->
         # Found cycle! Extract it from path.
         [node | Enum.take_while(path, fn x -> x != node end)] |> Enum.reverse()
-
-      :visited ->
-        nil
 
       nil ->
         case Map.get(best_in, node) do

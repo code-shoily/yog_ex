@@ -115,8 +115,8 @@ defmodule Yog.IO.GEXF.Common do
         weight,
         edge_attr,
         edge_keys,
-        node_fmt \\ &Yog.Utils.safe_string/1,
-        edge_fmt \\ &Yog.Utils.safe_string/1
+        node_fmt,
+        edge_fmt
       ) do
     attrs = edge_attr.(weight)
     weight_val = Map.get(attrs, "weight") || Map.get(attrs, :weight) || ""

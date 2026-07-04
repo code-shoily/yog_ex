@@ -136,4 +136,15 @@ defmodule Yog.Community.GirvanNewmanTest do
     mod = Metrics.modularity(graph, %{assignments: result.assignments})
     assert mod >= 0.4
   end
+
+  test "detect on directed graph" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1)
+      |> Yog.add_node(2)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+
+    result = GirvanNewman.detect(graph)
+    assert result.num_communities == 1
+  end
 end

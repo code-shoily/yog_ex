@@ -477,17 +477,12 @@ defmodule Yog.Pathfinding.AStar do
   end
 
   defp maybe_expand_node(graph, node, g, rest, to, add, compare, heuristic, g_scores, preds) do
-    case Map.get(g_scores, node) do
-      best_g when not is_nil(best_g) ->
-        if compare.(g, best_g) == :gt do
-          do_a_star(graph, rest, to, add, compare, heuristic, g_scores, preds)
-        else
-          expand_node(graph, node, g, rest, to, add, compare, heuristic, g_scores, preds)
-        end
+    best_g = Map.fetch!(g_scores, node)
 
-      nil ->
-        # Should not happen if correctly initialized
-        do_a_star(graph, rest, to, add, compare, heuristic, g_scores, preds)
+    if compare.(g, best_g) == :gt do
+      do_a_star(graph, rest, to, add, compare, heuristic, g_scores, preds)
+    else
+      expand_node(graph, node, g, rest, to, add, compare, heuristic, g_scores, preds)
     end
   end
 
@@ -574,28 +569,23 @@ defmodule Yog.Pathfinding.AStar do
          g_scores
        ) do
     key = key_fn.(state)
+    best_g = Map.fetch!(g_scores, key)
 
-    case Map.get(g_scores, key) do
-      best_g when not is_nil(best_g) ->
-        if compare.(g, best_g) == :gt do
-          do_implicit_a_star(rest, successors, key_fn, is_goal, add, compare, heuristic, g_scores)
-        else
-          expand_implicit_node(
-            rest,
-            state,
-            g,
-            successors,
-            key_fn,
-            is_goal,
-            add,
-            compare,
-            heuristic,
-            g_scores
-          )
-        end
-
-      nil ->
-        do_implicit_a_star(rest, successors, key_fn, is_goal, add, compare, heuristic, g_scores)
+    if compare.(g, best_g) == :gt do
+      do_implicit_a_star(rest, successors, key_fn, is_goal, add, compare, heuristic, g_scores)
+    else
+      expand_implicit_node(
+        rest,
+        state,
+        g,
+        successors,
+        key_fn,
+        is_goal,
+        add,
+        compare,
+        heuristic,
+        g_scores
+      )
     end
   end
 

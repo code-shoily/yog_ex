@@ -1081,4 +1081,53 @@ defmodule Yog.TraversalTest do
     assert Yog.Traversal.Walk.random_walk(graph, 1, 0) == [1]
     assert Yog.Traversal.Walk.random_walk(graph, 1, -5) == [1]
   end
+
+  # ============= Yog.Traversal Facade & Constant Tests =============
+
+  test "traversal constants return expected atoms" do
+    assert Yog.Traversal.breadth_first() == :breadth_first
+    assert Yog.Traversal.depth_first() == :depth_first
+    assert Yog.Traversal.continue() == :continue
+    assert Yog.Traversal.stop() == :stop
+    assert Yog.Traversal.halt() == :halt
+  end
+
+  test "positional walk/3 works" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+
+    assert Yog.Traversal.walk(graph, 1, Yog.Traversal.breadth_first()) == [1, 2]
+    assert Yog.Traversal.walk(graph, 1, Yog.Traversal.depth_first()) == [1, 2]
+  end
+
+  test "positional walk_until/4 works" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_node(3, nil)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+
+    result = Yog.Traversal.walk_until(graph, 1, :breadth_first, fn node -> node == 2 end)
+    assert result == [1, 2]
+  end
+
+  test "positional fold_walk/5 works" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+
+    result =
+      Yog.Traversal.fold_walk(graph, 1, :breadth_first, [], fn acc, node, _meta ->
+        {:continue, [node | acc]}
+      end)
+
+    assert Enum.sort(result) == [1, 2]
+  end
 end

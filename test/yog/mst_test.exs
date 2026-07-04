@@ -820,4 +820,102 @@ defmodule Yog.MSTTest do
       assert res2.edge_count == 1
     end
   end
+
+  describe "MST facade edge cases and arities" do
+    test "prim_max positional arity" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_edge_ensure(1, 2, 5)
+
+      {:ok, result} = MST.prim_max(graph)
+      assert result.total_weight == 5
+    end
+
+    test "boruvka directed graph error" do
+      graph = Yog.directed() |> Yog.add_node(1, nil)
+      assert {:error, :undirected_only} = MST.boruvka(graph)
+    end
+
+    test "uniform_spanning_tree directed graph error" do
+      graph = Yog.directed() |> Yog.add_node(1, nil)
+      assert {:error, :undirected_only} = MST.uniform_spanning_tree(graph)
+    end
+
+    test "chu_liu_edmonds keyword options" do
+      graph =
+        Yog.directed()
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_edge_ensure(1, 2, 5)
+
+      {:ok, result} = MST.chu_liu_edmonds(in: graph, root: 1)
+      assert result.total_weight == 5
+    end
+
+    test "maximum_spanning_tree keyword options" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_edge_ensure(1, 2, 5)
+
+      {:ok, result} = MST.maximum_spanning_tree(in: graph)
+      assert result.total_weight == 5
+    end
+  end
+
+  describe "Boruvka and Edmonds edge cases" do
+    test "boruvka disconnected graph with cycles" do
+      # Component 1: 1-2-3-1 (cycle)
+      # Component 2: 4-5
+      graph =
+        Yog.undirected()
+        |> Yog.add_nodes_from([1, 2, 3, 4, 5])
+        |> Yog.add_edges!([
+          {1, 2, 1},
+          {2, 3, 2},
+          {3, 1, 3},
+          {4, 5, 1}
+        ])
+
+      {:ok, result} = MST.boruvka(in: graph)
+
+      # The MST should consist of edges {1, 2}, {2, 3} for component 1, and {4, 5} for component 2.
+      assert result.edge_count == 3
+      assert result.total_weight == 4
+    end
+
+    test "chu_liu_edmonds complex cycle contraction and expansion" do
+      # Root: 1
+      # Cycle: 2 -> 3 -> 4 -> 2
+      # Outside cycle: 5 -> 6
+      # Edges:
+      # 1 -> 2 (100) (enters cycle, worse)
+      # 1 -> 3 (10)  (enters cycle, better)
+      # 2 -> 3 (5)   (cycle)
+      # 3 -> 4 (15)  (cycle)
+      # 4 -> 2 (2)   (cycle)
+      # 1 -> 5 (10)  (enters outside)
+      # 5 -> 6 (20)  (between outside - hits true ->)
+      # 3 -> 6 (5)   (leaves cycle, better - hits u_in -> and e.from == s)
+      graph =
+        Yog.directed()
+        |> Yog.add_nodes_from([1, 2, 3, 4, 5, 6])
+        |> Yog.add_edges!([
+          {1, 2, 100},
+          {1, 3, 10},
+          {2, 3, 5},
+          {3, 4, 15},
+          {4, 2, 2},
+          {1, 5, 10},
+          {5, 6, 20},
+          {3, 6, 5}
+        ])
+
+      {:ok, result} = MST.minimum_arborescence(in: graph, root: 1)
+      assert result.total_weight == 42
+    end
+  end
 end

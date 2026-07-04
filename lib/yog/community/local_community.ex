@@ -195,11 +195,7 @@ defmodule Yog.Community.LocalCommunity do
        ) do
     frontier = MapSet.delete(frontier, new_node)
 
-    successors =
-      case Map.fetch(out_edges, new_node) do
-        {:ok, edges} -> Map.to_list(edges)
-        :error -> []
-      end
+    successors = Map.get(out_edges, new_node, %{}) |> Map.to_list()
 
     List.foldl(successors, {frontier, internal_weights}, fn {neighbor_id, w}, {front, wacc} ->
       w_float = weight_fn.(w)
@@ -217,63 +213,10 @@ defmodule Yog.Community.LocalCommunity do
     end)
   end
 
-  defp update_frontier_on_remove(
-         %Yog.Graph{out_edges: out_edges},
-         frontier,
-         internal_weights,
-         s,
-         removed_node,
-         weight_fn
-       ) do
-    s_without_node = MapSet.delete(s, removed_node)
-
-    successors =
-      case Map.fetch(out_edges, removed_node) do
-        {:ok, edges} -> Map.to_list(edges)
-        :error -> []
-      end
-
-    {new_frontier, new_internal_weights} =
-      List.foldl(successors, {frontier, internal_weights}, fn {neighbor_id, w}, {front, wacc} ->
-        w_float = weight_fn.(w)
-
-        if neighbor_id != removed_node and MapSet.member?(s_without_node, neighbor_id) do
-          new_wacc = Map.update(wacc, neighbor_id, 0.0, &(&1 - w_float))
-          {MapSet.put(front, neighbor_id), new_wacc}
-        else
-          {front, wacc}
-        end
-      end)
-
-    successors2 =
-      case Map.fetch(out_edges, removed_node) do
-        {:ok, edges} -> Map.to_list(edges)
-        :error -> []
-      end
-
-    has_internal_neighbor =
-      Enum.any?(successors2, fn {nid, _} -> MapSet.member?(s_without_node, nid) end)
-
-    final_frontier =
-      if has_internal_neighbor do
-        MapSet.put(new_frontier, removed_node)
-      else
-        new_frontier
-      end
-
-    final_weights = Map.delete(new_internal_weights, removed_node)
-
-    {final_frontier, final_weights}
-  end
-
   defp total_degree(%Yog.Graph{out_edges: out_edges}, node, cache, weight_fn) do
     case Map.get(cache, node) do
       nil ->
-        successors =
-          case Map.fetch(out_edges, node) do
-            {:ok, edges} -> Map.to_list(edges)
-            :error -> []
-          end
+        successors = Map.get(out_edges, node, %{}) |> Map.to_list()
 
         d =
           List.foldl(successors, 0.0, fn {_, w}, acc -> acc + weight_fn.(w) end)
@@ -332,32 +275,7 @@ defmodule Yog.Community.LocalCommunity do
         end
       end)
 
-    {best_op, _best_f, final_cache} =
-      if MapSet.size(s) <= 1 do
-        {best_add_op, best_add_f, cache_after_add}
-      else
-        Enum.reduce(
-          s,
-          {best_add_op, best_add_f, cache_after_add},
-          fn node, {best_op_acc, best_f_acc, current_cache} ->
-            {d, next_cache} = total_degree(graph, node, current_cache, weight_fn)
-
-            w_in = w_in_s_cached(internal_weights, node)
-
-            new_k_in = k_in - 2.0 * w_in
-            new_k_out = k_out - d + 2.0 * w_in
-            f = fitness(new_k_in, new_k_out, opts.alpha)
-
-            is_seed = MapSet.member?(seeds_set, node)
-
-            if f > best_f_acc and not is_seed do
-              {{:remove, node, new_k_in, new_k_out}, f, next_cache}
-            else
-              {best_op_acc, best_f_acc, next_cache}
-            end
-          end
-        )
-      end
+    {best_op, _best_f, final_cache} = {best_add_op, best_add_f, cache_after_add}
 
     case best_op do
       nil ->
@@ -368,30 +286,6 @@ defmodule Yog.Community.LocalCommunity do
 
         {new_frontier, new_internal_weights} =
           update_frontier_on_add(graph, frontier, internal_weights, s, node, weight_fn)
-
-        if iters >= opts.max_iterations do
-          new_s
-        else
-          do_detect(
-            graph,
-            new_s,
-            nk_in,
-            nk_out,
-            new_frontier,
-            new_internal_weights,
-            final_cache,
-            opts,
-            iters + 1,
-            weight_fn,
-            seeds_set
-          )
-        end
-
-      {:remove, node, nk_in, nk_out} ->
-        new_s = MapSet.delete(s, node)
-
-        {new_frontier, new_internal_weights} =
-          update_frontier_on_remove(graph, frontier, internal_weights, s, node, weight_fn)
 
         if iters >= opts.max_iterations do
           new_s

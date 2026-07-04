@@ -174,20 +174,16 @@ defmodule Yog.Pathfinding.Disjoint do
                   Map.update(acc, u, [v], fn vs -> [v | vs] end)
                 end)
 
-              case trace_all_paths(s_edges, from, to, adj) do
-                :error ->
-                  :error
+              path_nodes_list = trace_all_paths(s_edges, from, to, adj)
 
-                path_nodes_list ->
-                  res_paths =
-                    Enum.map(path_nodes_list, fn path_nodes ->
-                      weight = path_weight(path_nodes, graph, weight_fn, zero, add)
-                      Path.new(path_nodes, weight, :suurballe)
-                    end)
-                    |> Enum.sort_by(& &1.weight, fn w1, w2 -> compare.(w1, w2) != :gt end)
+              res_paths =
+                Enum.map(path_nodes_list, fn path_nodes ->
+                  weight = path_weight(path_nodes, graph, weight_fn, zero, add)
+                  Path.new(path_nodes, weight, :suurballe)
+                end)
+                |> Enum.sort_by(& &1.weight, fn w1, w2 -> compare.(w1, w2) != :gt end)
 
-                  {:ok, res_paths}
-              end
+              {:ok, res_paths}
             end
         end
     end
@@ -219,25 +215,14 @@ defmodule Yog.Pathfinding.Disjoint do
     end)
   end
 
-  # Traces all paths sequentially, threading the adjacency multimap so that
-  # edges consumed by one path aren't available to the next. This is critical
-  # when two disjoint paths share an intermediate node.
   defp trace_all_paths(s_edges, from, to, adj) do
-    result =
-      Enum.reduce_while(s_edges, {[], adj}, fn {^from, next_node}, {paths, current_adj} ->
-        case trace_path(next_node, to, current_adj, [from]) do
-          {:ok, path_nodes, updated_adj} ->
-            {:cont, {[path_nodes | paths], updated_adj}}
-
-          :error ->
-            {:halt, :error}
-        end
+    {paths, _adj} =
+      List.foldl(s_edges, {[], adj}, fn {^from, next_node}, {paths, current_adj} ->
+        {:ok, path_nodes, updated_adj} = trace_path(next_node, to, current_adj, [from])
+        {[path_nodes | paths], updated_adj}
       end)
 
-    case result do
-      :error -> :error
-      {paths, _adj} -> Enum.reverse(paths)
-    end
+    Enum.reverse(paths)
   end
 
   defp trace_path(curr, target, adj, path_acc) when curr == target do
@@ -245,22 +230,15 @@ defmodule Yog.Pathfinding.Disjoint do
   end
 
   defp trace_path(curr, target, adj, path_acc) do
-    case Map.get(adj, curr) do
-      nil ->
-        :error
+    [next_node | rest] = Map.fetch!(adj, curr)
 
-      [] ->
-        :error
+    updated_adj =
+      case rest do
+        [] -> Map.delete(adj, curr)
+        _ -> Map.put(adj, curr, rest)
+      end
 
-      [next_node | rest] ->
-        updated_adj =
-          case rest do
-            [] -> Map.delete(adj, curr)
-            _ -> Map.put(adj, curr, rest)
-          end
-
-        trace_path(next_node, target, updated_adj, [curr | path_acc])
-    end
+    trace_path(next_node, target, updated_adj, [curr | path_acc])
   end
 
   defp path_weight(nodes, graph, weight_fn, zero, add) do

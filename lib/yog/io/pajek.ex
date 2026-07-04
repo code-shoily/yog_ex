@@ -455,12 +455,13 @@ defmodule Yog.IO.Pajek do
   end
 
   defp parse_vertices_count(trimmed, rest) do
-    with [_, count_str] <- Regex.run(~r/^\*vertices\s+(\d+)/i, trimmed),
-         {count, _} <- Integer.parse(count_str) do
-      {:ok, count, rest}
-    else
-      :error -> {:error, {:invalid_vertex_count, 1, trimmed}}
-      nil -> {:error, {:invalid_vertices_line, 1, trimmed}}
+    case Regex.run(~r/^\*vertices\s+(\d+)/i, trimmed) do
+      [_, count_str] ->
+        {count, _} = Integer.parse(count_str)
+        {:ok, count, rest}
+
+      nil ->
+        {:error, {:invalid_vertices_line, 1, trimmed}}
     end
   end
 

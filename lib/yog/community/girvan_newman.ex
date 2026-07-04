@@ -110,10 +110,8 @@ defmodule Yog.Community.GirvanNewman do
   """
   @spec detect(Yog.graph()) :: Result.t()
   def detect(graph) do
-    case detect_with_options(graph, []) do
-      {:ok, communities} -> communities
-      {:error, _} -> Result.new(%{})
-    end
+    {:ok, communities} = detect_with_options(graph, [])
+    communities
   end
 
   @doc """
@@ -146,10 +144,7 @@ defmodule Yog.Community.GirvanNewman do
       num_communities ->
         case Enum.find(dendrogram.levels, fn c -> c.num_communities >= num_communities end) do
           nil ->
-            case List.last(dendrogram.levels) do
-              nil -> {:error, "Could not find suitable community partition"}
-              communities -> {:ok, communities}
-            end
+            {:ok, List.last(dendrogram.levels)}
 
           communities ->
             {:ok, communities}
@@ -206,7 +201,7 @@ defmodule Yog.Community.GirvanNewman do
         max_val =
           ebc
           |> Map.values()
-          |> Enum.max(fn -> 0.0 end)
+          |> Enum.max()
 
         edges_to_remove =
           Enum.filter(ebc, fn {_edge, score} -> score == max_val end)
@@ -259,8 +254,6 @@ defmodule Yog.Community.GirvanNewman do
   # =============================================================================
   # LEVEL SELECTION
   # =============================================================================
-
-  defp pick_best_level_by_modularity([], _graph), do: {:error, "Empty dendrogram"}
 
   defp pick_best_level_by_modularity(levels, graph) do
     best =

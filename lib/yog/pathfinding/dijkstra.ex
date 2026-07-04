@@ -457,8 +457,7 @@ defmodule Yog.Pathfinding.Dijkstra do
         compare \\ &Yog.Utils.compare/2
       ) do
     if Yog.Model.has_node?(graph, from) do
-      {_path, _weight, distances} = do_dijkstra(graph, from, zero, add, compare)
-      distances
+      do_dijkstra(graph, from, zero, add, compare)
     else
       %{}
     end
@@ -488,12 +487,10 @@ defmodule Yog.Pathfinding.Dijkstra do
     )
   end
 
-  # Main Dijkstra implementation for single_source_distances
   defp do_dijkstra_loop(graph, queue, add, compare, distances, predecessors) do
     case PQ.pop(queue) do
       :error ->
-        zero_val = zero_from_distances(distances)
-        {[], zero_val, distances}
+        distances
 
       {:ok, {dist, node}, rest} ->
         maybe_visit_node(graph, node, dist, rest, add, compare, distances, predecessors)
@@ -535,13 +532,6 @@ defmodule Yog.Pathfinding.Dijkstra do
 
   # Reconstruct path by backtracking through predecessors
   # Note: Only used as safety net; shortest_path now delegates to A*
-
-  defp zero_from_distances(distances) do
-    case Map.values(distances) do
-      [z | _] -> z
-      [] -> 0
-    end
-  end
 
   # ============================================================
   # Widest Path (Maximum Capacity Path)

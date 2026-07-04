@@ -776,9 +776,9 @@ defmodule Yog.IO.GEXFTest do
       <graph defaultedgetype="directed">
         <nodes>
           <node id="1" label="A">
-            <viz:color r="abc" g="10" b="20" a="invalid_float"/>
-            <viz:size value="invalid_float"/>
-            <viz:position x="invalid" y="2" z="3"/>
+            <viz:color r="abc" g="10"/> <!-- missing b, a -->
+            <viz:size/> <!-- missing value -->
+            <viz:position x="invalid" y="2"/> <!-- missing z -->
             <viz:shape/>
           </node>
         </nodes>
@@ -796,5 +796,145 @@ defmodule Yog.IO.GEXFTest do
     assert data["viz:position"].x == 0.0
     assert data["viz:position"].y == 2.0
     assert data["viz:shape"] == "disc"
+  end
+
+  test "deserialize with missing / wildcard attributes" do
+    xml = """
+    <?xml version="1.0"?>
+    <gexf version="1.3">
+      <graph>
+        <attributes class="node">
+          <attribute title="no_id"/> <!-- missing id -->
+          <attribute id="a1" type="float"/> <!-- float type attribute -->
+          <attribute id="a2" type="string"/>
+        </attributes>
+        <nodes>
+          <node label="no_id"/> <!-- missing id -->
+          <node id="1">
+            <attvalues>
+              <attvalue value="10"/> <!-- missing for -->
+              <attvalue for="a1" value="12.3"/>
+              <attvalue for="a2"/> <!-- missing value -->
+            </attvalues>
+          </node>
+        </nodes>
+        <edges>
+          <edge target="1"/> <!-- missing source -->
+          <edge source="1"/> <!-- missing target -->
+        </edges>
+      </graph>
+    </gexf>
+    """
+
+    {:ok, graph} = GEXF.deserialize(xml)
+    # Yog supports `nil` as a valid node ID, so the node without ID gets parsed as `nil`
+    assert Yog.Model.node_count(graph) == 2
+    assert Yog.Model.has_node?(graph, nil)
+    assert Yog.Model.has_node?(graph, 1)
+    assert Yog.Model.edge_count(graph) == 2
+  end
+
+  test "write and read file errors" do
+    graph = Yog.directed() |> Yog.add_node(1, nil)
+    assert {:error, _} = GEXF.write("/nonexistent_directory_xyz/file.gexf", graph)
+
+    assert {:error, _} =
+             GEXF.write_with(
+               "/nonexistent_directory_xyz/file.gexf",
+               fn _ -> %{} end,
+               fn _ -> %{} end,
+               graph
+             )
+
+    assert {:error, _} =
+             GEXF.read_with("/nonexistent_directory_xyz/file.gexf", fn _ -> %{} end, fn _ ->
+               %{}
+             end)
+  end
+
+  describe "parse_gexf_xmerl direct tests" do
+    test "xmerl parsing fallback success" do
+      xml = """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <gexf xmlns="http://gexf.net/1.3" xmlns:viz="http://gexf.net/1.3/viz" version="1.3">
+        <graph mode="static" defaultedgetype="undirected">
+          <attributes class="node">
+            <attribute id="a1" title="age" type="integer"/>
+            <attribute id="a2" title="weight" type="double"/>
+          </attributes>
+          <nodes>
+            <node id="1" label="A">
+              <attvalues>
+                <attvalue for="a1" value="30"/>
+                <attvalue for="a2" value="70.5"/>
+              </attvalues>
+              <viz:color r="255" g="128" b="64" a="0.5"/>
+              <viz:size value="10.0"/>
+              <viz:position x="1.0" y="2.0" z="3.0"/>
+              <viz:shape value="square"/>
+            </node>
+          </nodes>
+          <edges>
+            <edge id="1" source="1" target="1"/>
+            <edge id="2" source="99" target="99"/> <!-- nonexistent nodes edge -->
+          </edges>
+        </graph>
+      </gexf>
+      """
+
+      assert {:ok, graph} = GEXF.parse_gexf_xmerl(xml, fn x -> x end, fn x -> x end)
+      assert Yog.Model.has_node?(graph, 1)
+      node_data = Yog.Model.node(graph, 1)
+      assert node_data["age"] == 30
+      assert node_data["weight"] == 70.5
+      assert node_data["viz:color"] == %{r: 255, g: 128, b: 64, a: 0.5}
+      assert node_data["viz:size"] == 10.0
+      assert node_data["viz:position"] == %{x: 1.0, y: 2.0, z: 3.0}
+      assert node_data["viz:shape"] == "square"
+      assert Yog.Model.type(graph) == :undirected
+    end
+
+    test "xmerl parsing with invalid viz attribute numbers fallbacks" do
+      xml = """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <gexf xmlns="http://gexf.net/1.3" xmlns:viz="http://gexf.net/1.3/viz" version="1.3">
+        <graph defaultedgetype="directed">
+          <nodes>
+            <node id="1">
+              <viz:color r="abc" g="128" b="64" a="invalid_float"/>
+              <viz:size value="invalid_float"/>
+              <viz:position x="invalid" y="2" z="3"/>
+            </node>
+          </nodes>
+        </graph>
+      </gexf>
+      """
+
+      assert {:ok, graph} = GEXF.parse_gexf_xmerl(xml, fn x -> x end, fn x -> x end)
+      node_data = Yog.Model.node(graph, 1)
+      assert node_data["viz:color"].r == 0
+      assert node_data["viz:color"].a == 1.0
+      assert node_data["viz:size"] == 1.0
+      assert node_data["viz:position"].x == 0.0
+    end
+
+    test "xmerl parsing with bad characters sanitized" do
+      xml = """
+      <gexf version="1.3">
+        <graph mode="static" defaultedgetype="directed">
+          <nodes><node id="1" label="A\x1B"/></nodes>
+          <edges></edges>
+        </graph>
+      </gexf>
+      """
+
+      assert {:ok, graph} = GEXF.parse_gexf_xmerl(xml, fn x -> x end, fn x -> x end)
+      assert Yog.Model.node(graph, 1)["label"] == "A"
+    end
+
+    test "xmerl parsing with completely invalid xml" do
+      assert {:error, {:parse_error, _}} =
+               GEXF.parse_gexf_xmerl("<gexf>invalid xml", fn x -> x end, fn x -> x end)
+    end
   end
 end

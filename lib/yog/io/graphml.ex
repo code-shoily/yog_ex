@@ -325,11 +325,10 @@ defmodule Yog.IO.GraphML do
           end)
 
         edge_content =
-          if data_elements != "" do
-            "\n" <> data_elements <> "\n" <> indent_str <> indent_str
-          else
-            ""
-          end
+          if(data_elements != "",
+            do: "\n" <> data_elements <> "\n" <> indent_str <> indent_str,
+            else: ""
+          )
 
         indent_str <>
           indent_str <>
@@ -703,7 +702,8 @@ defmodule Yog.IO.GraphML do
     end
   end
 
-  defp parse_graphml_xmerl(xml, node_folder, edge_folder) do
+  @doc false
+  def parse_graphml_xmerl(xml, node_folder, edge_folder) do
     Xmerl.parse_graphml_xmerl(xml, node_folder, edge_folder)
   end
 end

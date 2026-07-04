@@ -188,8 +188,6 @@ defmodule Yog.Pathfinding.LCA do
     end
   end
 
-  defp ancestor_at(_state, _k, nil), do: nil
-
   defp ancestor_at(state, k, v) do
     state.up |> Map.fetch!(k) |> Map.get(v)
   end

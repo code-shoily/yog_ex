@@ -512,27 +512,77 @@ defmodule Yog.IO.PajekTest do
     fixture_path = "test/fixtures/io/sample.net"
     output_path = "/tmp/test_yog_pajek_output.net"
 
-    # Read original fixture
     {:ok, {:pajek_result, original, _}} = Pajek.read(fixture_path)
 
-    # Write to temp file
     assert :ok = Pajek.write(output_path, original)
     assert File.exists?(output_path)
 
-    # Read back the written file
     {:ok, {:pajek_result, reloaded, _}} = Pajek.read(output_path)
 
-    # Verify structure matches
     assert Yog.Model.node_count(reloaded) == Yog.Model.node_count(original)
     assert Yog.Model.edge_count(reloaded) == Yog.Model.edge_count(original)
     assert Yog.Model.type(reloaded) == Yog.Model.type(original)
 
-    # Verify node data matches
     assert Yog.Model.node(reloaded, 1) == "Alice"
     assert Yog.Model.node(reloaded, 2) == "Bob"
     assert Yog.Model.node(reloaded, 3) == "Charlie"
 
-    # Cleanup
     File.rm(output_path)
+  end
+
+  # =============================================================================
+  # FILE I/O ERROR TESTS
+  # =============================================================================
+
+  test "read file not found" do
+    assert {:error, :enoent} = Pajek.read("nonexistent.net")
+  end
+
+  test "read_with file not found" do
+    assert {:error, :enoent} = Pajek.read_with("nonexistent.net", & &1, & &1)
+  end
+
+  test "write_with roundtrip" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "Alice")
+      |> Yog.add_node(2, "Bob")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 3.5)
+
+    options =
+      Pajek.options_with(
+        fn d -> d end,
+        fn w -> {:some, w} end,
+        fn _ -> Pajek.default_node_attributes() end,
+        false,
+        false
+      )
+
+    path = "/tmp/test_yog_pajek_write_with.net"
+    assert :ok = Pajek.write_with(path, options, graph)
+    assert File.exists?(path)
+    {:ok, {:pajek_result, loaded, _}} = Pajek.read(path)
+    assert Yog.Model.node_count(loaded) == 2
+    File.rm(path)
+  end
+
+  test "parse invalid vertex count" do
+    # Triggers nil -> {:error, {:invalid_vertices_line, ...}} in parse_vertices_count
+    input = "*Vertices abc\n1 \"A\"\n"
+    assert {:error, {:invalid_vertices_line, _, _}} = Pajek.parse(input)
+  end
+
+  test "parse unexpected end of nodes" do
+    # Triggers parse_nodes_loop([], ...) error path
+    input = "*Vertices 3\n1 \"A\"\n2 \"B\"\n"
+    assert {:error, :unexpected_end_of_nodes} = Pajek.parse(input)
+  end
+
+  test "parse edge header empty input" do
+    # parse_edge_header([]) returns {:ok, :directed, []}
+    input = "*Vertices 1\n1 \"A\"\n"
+    {:ok, {:pajek_result, graph, _}} = Pajek.parse(input)
+    assert Yog.Model.node_count(graph) == 1
+    assert Yog.Model.edge_count(graph) == 0
   end
 end

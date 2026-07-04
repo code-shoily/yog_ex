@@ -857,4 +857,27 @@ defmodule Yog.Pathfinding.DijkstraTest do
     assert path.nodes == [1, 2, 3]
     assert path.weight == 10
   end
+
+  test "dijkstra default arguments and arities" do
+    graph = Yog.directed() |> Yog.add_node(1, nil)
+    # single_source_distances arities
+    assert %{1 => 0} = Dijkstra.single_source_distances(graph, 1)
+    assert %{1 => 0} = Dijkstra.single_source_distances(graph, 1, 0)
+    assert %{1 => 0} = Dijkstra.single_source_distances(graph, 1, 0, &Kernel.+/2)
+    # implicit_dijkstra arities
+    successors = fn _ -> [] end
+    is_goal = fn _ -> false end
+    assert :error = Dijkstra.implicit_dijkstra(1, successors, is_goal)
+    assert :error = Dijkstra.implicit_dijkstra(1, successors, is_goal, 0)
+    assert :error = Dijkstra.implicit_dijkstra(1, successors, is_goal, 0, &Kernel.+/2)
+    # implicit_dijkstra_by arities
+    key_fn = fn x -> x end
+    assert :error = Dijkstra.implicit_dijkstra_by(1, successors, key_fn, is_goal)
+    assert :error = Dijkstra.implicit_dijkstra_by(1, successors, key_fn, is_goal, 0)
+    assert :error = Dijkstra.implicit_dijkstra_by(1, successors, key_fn, is_goal, 0, &Kernel.+/2)
+    # shortest_path arities
+    assert {:ok, _} = Dijkstra.shortest_path(graph, 1, 1)
+    assert {:ok, _} = Dijkstra.shortest_path(graph, 1, 1, 0)
+    assert {:ok, _} = Dijkstra.shortest_path(graph, 1, 1, 0, &Kernel.+/2)
+  end
 end

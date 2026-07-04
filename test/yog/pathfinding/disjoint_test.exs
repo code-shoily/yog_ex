@@ -318,4 +318,37 @@ defmodule Yog.Pathfinding.DisjointTest do
     # Total cost should be 8 (4 + 4)
     assert p1.weight + p2.weight == 8
   end
+
+  test "suurballe handles graphs with unreachable components/edges" do
+    # 1 -> 2 -> 3 exists
+    # 4 -> 5 is unreachable from 1
+    graph =
+      Yog.directed()
+      |> Yog.add_nodes_from([1, 2, 3, 4, 5])
+      |> Yog.add_edges!([
+        {1, 2, 1},
+        {2, 3, 1},
+        {4, 5, 1}
+      ])
+
+    # Only one path exists from 1 to 3, so it should return :error,
+    # but it must compile and run past the g_prime construction where
+    # unreachable nodes 4 and 5 are handled.
+    assert Disjoint.suurballe(graph, 1, 3) == :error
+  end
+
+  test "suurballe default arguments and arities" do
+    graph = Yog.directed() |> Yog.add_node(1, nil) |> Yog.add_node(3, nil)
+    # Arity 3
+    assert :error = Disjoint.suurballe(graph, 1, 3)
+    # Arity 4
+    assert :error = Disjoint.suurballe(graph, 1, 3, 0)
+    # Arity 5
+    assert :error = Disjoint.suurballe(graph, 1, 3, 0, &Kernel.+/2)
+    # Arity 6
+    assert :error = Disjoint.suurballe(graph, 1, 3, 0, &Kernel.+/2, &Yog.Utils.compare/2)
+    # Arity 7
+    assert :error =
+             Disjoint.suurballe(graph, 1, 3, 0, &Kernel.+/2, &Yog.Utils.compare/2, &Kernel.-/2)
+  end
 end

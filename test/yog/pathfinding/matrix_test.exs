@@ -108,20 +108,48 @@ defmodule Yog.Pathfinding.MatrixTest do
 
       assert distances == %{}
     end
+
+    test "uses default arguments with different arities" do
+      graph =
+        Yog.undirected()
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+
+      # Arity 2
+      assert {:ok, d2} = Matrix.distance_matrix(graph, [1, 2])
+      assert d2[{1, 2}] == 5
+
+      # Arity 3
+      assert {:ok, d3} = Matrix.distance_matrix(graph, [1, 2], 0)
+      assert d3[{1, 2}] == 5
+
+      # Arity 4
+      assert {:ok, d4} = Matrix.distance_matrix(graph, [1, 2], 0, &Kernel.+/2)
+      assert d4[{1, 2}] == 5
+
+      # Arity 5
+      assert {:ok, d5} =
+               Matrix.distance_matrix(graph, [1, 2], 0, &Kernel.+/2, &Yog.Utils.compare/2)
+
+      assert d5[{1, 2}] == 5
+    end
   end
 
   describe "distance_matrix/6 with negative weights" do
     test "uses Johnson for sparse graphs with negative weights" do
-      # Sparse graph: 3 nodes, 2 edges, V²/4 = 9/4 = 2.25, E = 2 < 2.25
+      # Sparse graph: 4 nodes, 3 edges, V²/4 = 16/4 = 4, E = 3 < 4
       graph =
         Yog.directed()
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
         |> Yog.add_node(3, nil)
+        |> Yog.add_node(4, nil)
         |> Yog.add_edge_ensure(from: 1, to: 2, with: 4)
         |> Yog.add_edge_ensure(from: 2, to: 3, with: -2)
+        |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
 
-      pois = [1, 3]
+      pois = [1, 4]
 
       assert {:ok, distances} =
                Matrix.distance_matrix(
@@ -133,20 +161,24 @@ defmodule Yog.Pathfinding.MatrixTest do
                  &(&1 - &2)
                )
 
-      # Shortest path 1->2->3 = 4 + (-2) = 2
-      assert distances[{1, 3}] == 2
+      # Shortest path 1->2->3->4 = 4 + (-2) + 1 = 3
+      assert distances[{1, 4}] == 3
     end
 
     test "detects negative cycles" do
-      # Graph with negative cycle: 1 -> 2 (1), 2 -> 1 (-3)
+      # Graph with negative cycle: 4 nodes, 3 edges (so uses Johnson).
+      # Negative cycle: 2 -> 3 -> 2 of cost -2.
       graph =
         Yog.directed()
         |> Yog.add_node(1, nil)
         |> Yog.add_node(2, nil)
+        |> Yog.add_node(3, nil)
+        |> Yog.add_node(4, nil)
         |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
-        |> Yog.add_edge_ensure(from: 2, to: 1, with: -3)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+        |> Yog.add_edge_ensure(from: 3, to: 2, with: -3)
 
-      pois = [1, 2]
+      pois = [1, 4]
 
       assert {:error, :negative_cycle} =
                Matrix.distance_matrix(
@@ -229,6 +261,59 @@ defmodule Yog.Pathfinding.MatrixTest do
       assert distances[{1, 9}] == 8
       assert distances[{1, 5}] == 4
       assert distances[{3, 7}] == 4
+    end
+
+    test "detects negative cycles in dense graphs (Floyd-Warshall)" do
+      # Dense graph: 4 nodes, 6 edges (complete graph), V²/4 = 4. Edges = 6 >= 4.
+      # And a negative cycle: 1 -> 2 (1), 2 -> 1 (-3).
+      graph =
+        Yog.directed()
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_node(3, nil)
+        |> Yog.add_node(4, nil)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 2, to: 1, with: -3)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
+        |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
+        |> Yog.add_edge_ensure(from: 4, to: 1, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 3, with: 1)
+
+      pois = [1, 3]
+
+      assert {:error, :negative_cycle} =
+               Matrix.distance_matrix(
+                 graph,
+                 pois,
+                 0,
+                 &(&1 + &2),
+                 &Yog.Utils.compare/2,
+                 &(&1 - &2)
+               )
+    end
+
+    test "computes distances using Floyd-Warshall on dense graphs (non-negative weights)" do
+      # Dense graph: 4 nodes, 6 edges (complete graph), V²/4 = 4. Edges = 6 >= 4.
+      graph =
+        Yog.directed()
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_node(3, nil)
+        |> Yog.add_node(4, nil)
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 2)
+        |> Yog.add_edge_ensure(from: 3, to: 4, with: 1)
+        |> Yog.add_edge_ensure(from: 1, to: 3, with: 5)
+        |> Yog.add_edge_ensure(from: 2, to: 4, with: 3)
+        |> Yog.add_edge_ensure(from: 1, to: 4, with: 10)
+
+      pois = [1, 2, 3, 4]
+
+      assert {:ok, distances} =
+               Matrix.distance_matrix(graph, pois, 0, &(&1 + &2), &Yog.Utils.compare/2)
+
+      # 1->2->3->4 = 1+2+1 = 4
+      assert distances[{1, 4}] == 4
     end
   end
 end

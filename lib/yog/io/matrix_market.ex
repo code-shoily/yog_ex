@@ -357,10 +357,7 @@ defmodule Yog.IO.MatrixMarket do
         f
 
       :error ->
-        case Integer.parse(str) do
-          {i, _} -> i / 1
-          :error -> str
-        end
+        str
     end
   end
 

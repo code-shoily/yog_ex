@@ -845,7 +845,7 @@ defmodule Yog.IO.JSON do
         end
 
       if from != nil and to != nil do
-        Yog.add_edge!(g, from, to, weight)
+        Yog.Model.add_edge_ensure(g, from, to, weight)
       else
         g
       end

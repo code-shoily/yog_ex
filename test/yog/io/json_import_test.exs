@@ -244,4 +244,55 @@ defmodule Yog.IO.JSONImportTest do
       assert Yog.Property.Cyclicity.acyclic?(loaded_graph)
     end
   end
+
+  describe "simple format parser and graph types" do
+    test "parses simple format with various edge structures" do
+      # We omit "nodes" and "edges" keys to force fallback to :simple format.
+      # "links" is parsed under :simple format.
+      json = """
+      {
+        "links": [
+          {"from": 1, "to": 2, "weight": 5},
+          [2, 1, 10],
+          {"node1": 1, "node2": 2},
+          {"bad": "edge"},
+          [1, 2]
+        ]
+      }
+      """
+
+      {:ok, graph} = JSON.from_json(json)
+      assert Yog.Model.order(graph) == 2
+      assert Yog.Model.edge_count(graph) == 1
+    end
+
+    test "parses various graph types from string and boolean" do
+      for {type_str, expected} <- [
+            {"directed", :directed},
+            {"undirected", :undirected},
+            {"digraph", :directed},
+            {"graph", :undirected},
+            {true, :directed},
+            {"other", :undirected}
+          ] do
+        map = %{
+          "graph_type" => type_str,
+          "nodes" => [],
+          "edges" => []
+        }
+
+        {:ok, graph} = JSON.from_map(map)
+        assert Yog.Model.type(graph) == expected
+      end
+    end
+
+    test "handles read and parse errors" do
+      # invalid json structure
+      assert {:error, %Jason.DecodeError{}} = JSON.json_type("invalid json")
+
+      assert_raise ArgumentError, ~r/Failed to detect JSON format/, fn ->
+        JSON.json_type!("invalid json")
+      end
+    end
+  end
 end

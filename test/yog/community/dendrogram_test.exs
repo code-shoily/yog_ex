@@ -173,6 +173,18 @@ defmodule Yog.Community.DendrogramTest do
     assert restored.merge_order == [{0, 1}]
   end
 
+  test "from_map without merge_order" do
+    legacy_map = %{
+      levels: [
+        %{assignments: %{1 => 0, 2 => 0}, num_communities: 1}
+      ]
+    }
+
+    restored = Dendrogram.from_map(legacy_map)
+    assert Dendrogram.num_levels(restored) == 1
+    assert restored.merge_order == []
+  end
+
   # ============================================================
   # Flatten Tests
   # ============================================================

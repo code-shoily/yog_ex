@@ -478,4 +478,30 @@ defmodule Yog.Pathfinding.JohnsonTest do
     # Should still find optimal path after reweighting
     assert distances[{1, 3}] == 15
   end
+
+  test "johnson linear chain of negative edges forces full iterations in Bellman-Ford" do
+    # V = 4, node_count = 5.
+    # 1 --(-1)--> 2 --(-1)--> 3 --(-1)--> 4
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_node(3, nil)
+      |> Yog.add_node(4, nil)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: -1)
+      |> Yog.add_edge_ensure(from: 2, to: 3, with: -1)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: -1)
+
+    assert {:ok, distances} = Johnson.johnson(graph, 0, &add/2, &compare/2, &subtract/2)
+    assert distances[{1, 4}] == -3
+  end
+
+  test "johnson default arguments and arities" do
+    graph = Yog.directed() |> Yog.add_node(1, nil)
+    # johnson arities
+    assert {:ok, _} = Johnson.johnson(graph)
+    assert {:ok, _} = Johnson.johnson(graph, 0)
+    assert {:ok, _} = Johnson.johnson(graph, 0, &Kernel.+/2)
+    assert {:ok, _} = Johnson.johnson(graph, 0, &Kernel.+/2, &Yog.Utils.compare/2)
+  end
 end

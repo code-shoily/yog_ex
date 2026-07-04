@@ -235,4 +235,24 @@ defmodule Yog.IO.GEXF.MultiTest do
     assert {:error, {:parse_error, _}} =
              Multi.parse_gexf_multi_xmerl(xml, fn _ -> %{} end, fn _ -> %{} end)
   end
+
+  test "deserialize multigraph with edge missing id defaults id" do
+    xml = """
+    <?xml version="1.0"?>
+    <gexf version="1.3">
+      <graph defaultedgetype="directed">
+        <nodes>
+          <node id="1" label="A"/>
+          <node id="2" label="B"/>
+        </nodes>
+        <edges>
+          <edge source="1" target="2"/> <!-- missing id -->
+        </edges>
+      </graph>
+    </gexf>
+    """
+
+    {:ok, graph} = Multi.deserialize(xml)
+    assert Yog.Multi.Model.size(graph) == 1
+  end
 end

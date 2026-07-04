@@ -604,4 +604,113 @@ defmodule Yog.Multi.DOTTest do
       assert String.contains?(dot, "arrowtail=myarrowtail")
     end
   end
+
+  describe "layout and style string functions" do
+    test "all layout options render correctly" do
+      multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "A")
+
+      for layout <- [:circo, :fdp, :sfdp, :twopi, :osage] do
+        opts = %{DOT.default_options() | layout: layout}
+        dot = DOT.to_dot(multi, opts)
+        assert String.contains?(dot, "layout=#{layout}")
+      end
+    end
+
+    test "rankdir bt and rl render correctly" do
+      multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "A")
+
+      for {dir, expected} <- [{:bt, "BT"}, {:rl, "RL"}] do
+        opts = %{DOT.default_options() | rankdir: dir}
+        dot = DOT.to_dot(multi, opts)
+        assert String.contains?(dot, "rankdir=#{expected}")
+      end
+    end
+
+    test "all uncovered node shapes render correctly" do
+      multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "A")
+
+      for shape <- [
+            :cloud,
+            :house,
+            :invhouse,
+            :octagon,
+            :parallelogram,
+            :pentagon,
+            :plain,
+            :plaintext,
+            :point,
+            :rect,
+            :rectangle,
+            :square,
+            :tab,
+            :trapezoid,
+            :triangle,
+            :underline
+          ] do
+        opts = %{DOT.default_options() | node_shape: shape}
+        dot = DOT.to_dot(multi, opts)
+        assert String.contains?(dot, "shape=#{shape}")
+      end
+    end
+
+    test "all uncovered style options render correctly" do
+      multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "A")
+
+      for style <- [:dotted, :bold, :rounded, :diagonals, :striped, :wedged] do
+        opts = %{DOT.default_options() | node_style: style}
+        dot = DOT.to_dot(multi, opts)
+        assert String.contains?(dot, "style=#{style}")
+      end
+    end
+
+    test "arrowhead only renders just arrowhead attribute" do
+      multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "A")
+
+      opts = %{DOT.default_options() | arrowhead: :normal, arrowtail: nil}
+      dot = DOT.to_dot(multi, opts)
+      assert String.contains?(dot, "arrowhead=normal")
+    end
+
+    test "arrowtail only renders just arrowtail attribute" do
+      multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "A")
+
+      opts = %{DOT.default_options() | arrowtail: :normal, arrowhead: nil}
+      dot = DOT.to_dot(multi, opts)
+      assert String.contains?(dot, "arrowtail=normal")
+    end
+
+    test "overlap custom string renders correctly" do
+      multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "A")
+
+      opts = %{DOT.default_options() | overlap: {:custom, "vpsc"}}
+      dot = DOT.to_dot(multi, opts)
+      assert String.contains?(dot, "overlap=vpsc")
+    end
+
+    test "path_to_options with empty path list" do
+      # Covers do_path_to_edges([], acc) and do_path_to_edges([_], acc) base cases
+      opts1 = DOT.path_to_options(%{nodes: []})
+      assert opts1.highlighted_nodes == []
+      assert opts1.highlighted_edges == []
+
+      opts2 = DOT.path_to_options(%{nodes: [1]})
+      assert opts2.highlighted_nodes == [1]
+      assert opts2.highlighted_edges == []
+    end
+
+    test "build_subgraphs with empty subgraphs list" do
+      # Renders empty string for no subgraphs
+      multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "A")
+      opts = %{DOT.default_options() | subgraphs: []}
+      dot = DOT.to_dot(multi, opts)
+      assert is_binary(dot)
+    end
+
+    test "highlighted node renders fillcolor" do
+      multi = Yog.Multi.directed() |> Yog.Multi.add_node(1, "A")
+      opts = %{DOT.default_options() | highlighted_nodes: MapSet.new([1])}
+      dot = DOT.to_dot(multi, opts)
+      assert String.contains?(dot, "fillcolor")
+    end
+  end
 end

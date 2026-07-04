@@ -333,4 +333,29 @@ defmodule Yog.HealthTest do
     g = Classic.empty(0)
     assert Health.average_local_efficiency(g, opts()) == 0.0
   end
+
+  test "health metrics parallel execution with >= 50 nodes" do
+    # Graph has 55 nodes (>= 50), which triggers Task.async_stream parallel execution paths
+    g = Classic.path(55)
+
+    assert Health.diameter(g) == 54
+    assert Health.radius(g) == 27
+    assert Health.eccentricity(g, 0) == 54
+    assert Health.average_path_length(g) > 0.0
+    assert Health.global_efficiency(g) > 0.0
+    assert Health.average_local_efficiency(g) == 0.0
+  end
+
+  test "health metrics custom edge weight mappings" do
+    g = Classic.path(4)
+    custom_opts = [with: fn w -> (w || 1.0) * 2.0 end]
+
+    assert Health.diameter(g, custom_opts) == 6.0
+    assert Health.radius(g, custom_opts) == 4.0
+    assert Health.eccentricity(g, 0, custom_opts) == 6.0
+    assert Health.average_path_length(g, custom_opts) > 0.0
+    assert Health.global_efficiency(g, custom_opts) > 0.0
+    assert Health.average_local_efficiency(g, custom_opts) == 0.0
+    assert Health.efficiency(g, 0, 3, custom_opts) == 1.0 / 6.0
+  end
 end

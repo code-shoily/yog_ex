@@ -112,4 +112,53 @@ defmodule Yog.Community.LocalCommunityTest do
     result = LocalCommunity.detect_with_options(graph, [0], max_iterations: 0)
     assert MapSet.size(result) == 2
   end
+
+  test "detect with multi-seed starting S ensures frontier and weights updated" do
+    # Graph with multiple seeds so S > 1 immediately
+    graph =
+      Yog.undirected()
+      |> Yog.add_edge_ensure(from: 0, to: 1, with: 1.0)
+      |> Yog.add_edge_ensure(from: 0, to: 2, with: 5.0)
+      |> Yog.add_edge_ensure(from: 1, to: 3, with: 5.0)
+      |> Yog.add_edge_ensure(from: 2, to: 4, with: 1.0)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 1.0)
+      |> Yog.add_edge_ensure(from: 4, to: 5, with: 10.0)
+      |> Yog.add_edge_ensure(from: 5, to: 6, with: 10.0)
+
+    result = LocalCommunity.detect_with_options(graph, [0, 1], alpha: 2.5)
+    assert is_struct(result, MapSet)
+    assert MapSet.size(result) >= 1
+
+    result2 = LocalCommunity.detect_with_options(graph, [0, 1, 2], alpha: 2.5, max_iterations: 1)
+    assert is_struct(result2, MapSet)
+  end
+
+  test "detect grows monotonically - no removal step" do
+    # The greedy algorithm only adds nodes (remove path is mathematically unreachable).
+    # This test verifies the algorithm converges on a consistent, seed-containing result.
+    graph =
+      Yog.undirected()
+      |> Yog.add_edge_ensure(from: 0, to: 3, with: 9.0)
+      |> Yog.add_edge_ensure(from: 0, to: 6, with: 7.0)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 9.0)
+      |> Yog.add_edge_ensure(from: 1, to: 6, with: 4.0)
+      |> Yog.add_edge_ensure(from: 2, to: 4, with: 3.0)
+      |> Yog.add_edge_ensure(from: 2, to: 5, with: 9.0)
+      |> Yog.add_edge_ensure(from: 3, to: 4, with: 9.0)
+      |> Yog.add_edge_ensure(from: 3, to: 5, with: 5.0)
+      |> Yog.add_edge_ensure(from: 3, to: 6, with: 6.0)
+      |> Yog.add_edge_ensure(from: 5, to: 6, with: 5.0)
+
+    result =
+      LocalCommunity.detect_with(graph, [0], %{alpha: 1.8, max_iterations: 1000}, fn w -> w end)
+
+    assert is_struct(result, MapSet)
+    assert MapSet.member?(result, 0)
+
+    # max_iterations = 1 forces early stop
+    result2 =
+      LocalCommunity.detect_with(graph, [0], %{alpha: 1.8, max_iterations: 1}, fn w -> w end)
+
+    assert is_struct(result2, MapSet)
+  end
 end

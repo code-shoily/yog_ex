@@ -207,29 +207,26 @@ defmodule Yog.Pathfinding.FloydWarshallTest do
     assert result == {:error, :negative_cycle}
   end
 
-  # Note: detect_negative_cycle? has compatibility issues with Gleam implementation
-  # Using the main floyd_warshall function with error return is preferred
-  #
-  # test "detect_negative_cycle_true_test" do
-  #   graph =
-  #     Yog.directed()
-  #     |> Yog.add_node(1, "A")
-  #     |> Yog.add_node(2, "B")
-  #     |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
-  #     |> Yog.add_edge_ensure(from: 2, to: 1, with: -3)
-  #
-  #   assert FloydWarshall.detect_negative_cycle?(graph, 0, &add/2, &compare/2) == true
-  # end
-  #
-  # test "detect_negative_cycle_false_test" do
-  #   graph =
-  #     Yog.directed()
-  #     |> Yog.add_node(1, "A")
-  #     |> Yog.add_node(2, "B")
-  #     |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
-  #
-  #   assert FloydWarshall.detect_negative_cycle?(graph, 0, &add/2, &compare/2) == false
-  # end
+  test "detect_negative_cycle_true_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+      |> Yog.add_edge_ensure(from: 2, to: 1, with: -3)
+
+    assert FloydWarshall.detect_negative_cycle?(graph, 0, &add/2, &compare/2) == true
+  end
+
+  test "detect_negative_cycle_false_test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+
+    assert FloydWarshall.detect_negative_cycle?(graph, 0, &add/2, &compare/2) == false
+  end
 
   test "floyd_warshall_positive_cycle_test" do
     # Positive cycle should not be detected as negative
@@ -432,5 +429,25 @@ defmodule Yog.Pathfinding.FloydWarshallTest do
     assert {:ok, distances} = result
     # Should find path through intermediates (cost 4) not direct (cost 10)
     assert distances[{1, 5}] == 4
+  end
+
+  test "floyd_warshall with positive self loop" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, nil)
+      |> Yog.add_edge_ensure(from: 1, to: 1, with: 5)
+
+    assert {:ok, distances} = FloydWarshall.floyd_warshall(graph, 0, &add/2, &compare/2)
+
+    # The distance from 1 to 1 should still be 0 (the shortest path to self is 0, not taking the loop)
+    assert distances[{1, 1}] == 0
+  end
+
+  test "floyd_warshall detect_negative_cycle? arities and defaults" do
+    graph = Yog.directed() |> Yog.add_node(1, nil)
+    # detect_negative_cycle? arities
+    refute FloydWarshall.detect_negative_cycle?(graph)
+    refute FloydWarshall.detect_negative_cycle?(graph, 0)
+    refute FloydWarshall.detect_negative_cycle?(graph, 0, &Kernel.+/2)
   end
 end

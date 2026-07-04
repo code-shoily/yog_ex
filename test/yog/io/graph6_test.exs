@@ -313,5 +313,43 @@ defmodule Yog.IO.Graph6Test do
       assert Yog.Model.node_count(graph) == 5
       File.rm(@tmp_file)
     end
+
+    test "read and write file errors" do
+      assert {:error, :enoent} = Graph6.read("/nonexistent_dir/nonexistent_file.g6")
+
+      assert {:error, :enoent} =
+               Graph6.write(
+                 "/nonexistent_dir/nonexistent_file.g6",
+                 Yog.undirected() |> Yog.add_node(0)
+               )
+    end
+
+    test "read file with invalid graph6 line" do
+      File.write!(@tmp_file, <<127, 0, 0>>)
+
+      try do
+        assert {:error, :invalid_header} = Graph6.read(@tmp_file)
+      after
+        File.rm(@tmp_file)
+      end
+    end
+
+    test "write list containing invalid serialization" do
+      g1 = Yog.undirected() |> Yog.add_node(0)
+      g2 = Yog.directed() |> Yog.add_node(0)
+      assert {:error, :directed_graph_not_supported} = Graph6.write(@tmp_file, [g1, g2])
+    end
+
+    test "extended header encoding and decoding" do
+      n = 300_000
+      encoded = Graph6.encode_header(n)
+      assert byte_size(encoded) == 8
+      assert <<126, 126, _a, _b, _c, _d, _e, _f>> = encoded
+      assert {:ok, ^n, ""} = Graph6.parse_header(encoded)
+    end
+
+    test "invalid header character > 126" do
+      assert {:error, :invalid_header} = Graph6.parse_header(<<127, "rest">>)
+    end
   end
 end

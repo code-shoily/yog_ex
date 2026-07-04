@@ -172,11 +172,6 @@ defmodule Yog.Pathfinding.Johnson do
     end
   end
 
-  # Run Bellman-Ford with early termination optimization
-  defp run_bellman_ford_with_early_stop(_edges, distances, 0, _add, _compare) do
-    distances
-  end
-
   defp run_bellman_ford_with_early_stop(edges, distances, iterations_left, add, compare) do
     new_distances = relax_all_edges(edges, distances, add, compare)
 
@@ -218,38 +213,29 @@ defmodule Yog.Pathfinding.Johnson do
     temp_edges ++ regular_edges
   end
 
-  # Relax all edges once
   defp relax_all_edges(edges, distances, add, compare) do
     List.foldl(edges, distances, fn {u, v, weight}, dist ->
-      case Map.fetch(dist, u) do
-        {:ok, dist_u} ->
-          new_dist_v = add.(dist_u, weight)
+      dist_u = Map.fetch!(dist, u)
+      new_dist_v = add.(dist_u, weight)
 
-          case Map.fetch(dist, v) do
-            {:ok, current_dist_v} ->
-              if compare.(new_dist_v, current_dist_v) == :lt do
-                Map.put(dist, v, new_dist_v)
-              else
-                dist
-              end
-
-            :error ->
-              Map.put(dist, v, new_dist_v)
+      case Map.fetch(dist, v) do
+        {:ok, current_dist_v} ->
+          if compare.(new_dist_v, current_dist_v) == :lt do
+            Map.put(dist, v, new_dist_v)
+          else
+            dist
           end
 
         :error ->
-          dist
+          Map.put(dist, v, new_dist_v)
       end
     end)
   end
 
-  # Check if distances changed (for negative cycle detection)
   defp distances_changed?(old_dist, new_dist, compare) do
     Enum.any?(new_dist, fn {node, new_val} ->
-      case Map.fetch(old_dist, node) do
-        {:ok, old_val} -> compare.(new_val, old_val) == :lt
-        :error -> true
-      end
+      old_val = Map.fetch!(old_dist, node)
+      compare.(new_val, old_val) == :lt
     end)
   end
 

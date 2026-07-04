@@ -128,4 +128,31 @@ defmodule Yog.Community.LabelPropagationTest do
     assert result.num_communities <= 12
     assert map_size(result.assignments) == 34
   end
+
+  test "default options and arities" do
+    assert is_map(LabelPropagation.default_options())
+  end
+
+  test "detect on directed graph" do
+    # Exercises get_neighbors in_edges traversal branch
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1)
+      |> Yog.add_node(2)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+
+    comms = LabelPropagation.detect(graph)
+    assert comms.num_communities > 0
+  end
+
+  test "detect with max_iterations 1 triggers base case recursion" do
+    graph =
+      Yog.undirected()
+      |> Yog.add_node(1)
+      |> Yog.add_node(2)
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
+
+    comms = LabelPropagation.detect_with_options(graph, max_iterations: 1)
+    assert comms.num_communities > 0
+  end
 end

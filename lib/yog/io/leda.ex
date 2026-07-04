@@ -512,24 +512,19 @@ defmodule Yog.IO.LEDA do
     end
   end
 
-  defp add_parsed_edge(graph, from_str, to_str, edge_data, edge_parser, line) do
-    with {:ok, from} <- parse_int(from_str),
-         {:ok, to} <- parse_int(to_str) do
-      weight = edge_parser.(edge_data)
-      try_add_edge(graph, from, to, weight)
-    else
-      :error -> {:warning, {:invalid_edge_format, line}}
-    end
+  defp add_parsed_edge(graph, from_str, to_str, edge_data, edge_parser, _line) do
+    from = String.to_integer(from_str)
+    to = String.to_integer(to_str)
+    weight = edge_parser.(edge_data)
+    try_add_edge(graph, from, to, weight)
   end
 
   defp try_add_edge(graph, from, to, weight) do
     %Yog.Graph{nodes: nodes_map} = graph
 
     if Map.has_key?(nodes_map, from) and Map.has_key?(nodes_map, to) do
-      case Yog.Model.add_edge(graph, from, to, weight) do
-        {:ok, new_graph} -> {:ok, new_graph}
-        {:error, reason} -> {:warning, {:edge_add_failed, reason}}
-      end
+      {:ok, new_graph} = Yog.Model.add_edge(graph, from, to, weight)
+      {:ok, new_graph}
     else
       {:warning, {:nonexistent_nodes, from, to}}
     end
