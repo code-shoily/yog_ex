@@ -95,15 +95,13 @@ defmodule Yog.Layout.SpringTest do
     # Measure exact time
     t0 = System.monotonic_time(:microsecond)
     Spring.layout(graph, iterations: 10, barnes_hut: false, seed: 123)
-    exact_duration = System.monotonic_time(:microsecond) - t0
+    _exact_duration = System.monotonic_time(:microsecond) - t0
 
     # Measure Barnes-Hut time
     t1 = System.monotonic_time(:microsecond)
     Spring.layout(graph, iterations: 10, barnes_hut: true, theta: 0.5, seed: 123)
     bh_duration = System.monotonic_time(:microsecond) - t1
 
-    IO.puts("\nExact duration (100 nodes): #{exact_duration} µs")
-    IO.puts("Barnes-Hut duration (100 nodes): #{bh_duration} µs")
     assert bh_duration > 0
   end
 end
