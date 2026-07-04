@@ -1,0 +1,131 @@
+name: Module audit
+description: Audit and harden a YogEx module for pre-1.0 stabilization
+title: "[Module Audit] "
+labels: ["audit", "module-audit", "pre-1.0"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for the module-by-module YogEx 1.0 hardening pass.
+
+  - type: input
+    id: module
+    attributes:
+      label: Module
+      description: Fully-qualified module or module group being audited.
+      placeholder: Yog.Pathfinding.Dijkstra
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - core
+        - pathfinding
+        - traversal
+        - transform
+        - flow
+        - matching
+        - mst
+        - property
+        - centrality
+        - connectivity
+        - community
+        - builder
+        - generator
+        - layout
+        - rendering
+        - io
+        - docs
+        - other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Risk level
+      options:
+        - low
+        - medium
+        - high
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: api_review
+    attributes:
+      label: API review
+      options:
+        - label: Public function names are consistent with related modules
+        - label: Argument order is consistent
+        - label: Options are documented and validated
+        - label: Return values are documented
+        - label: Error values are documented
+        - label: Typespecs match implementation
+
+  - type: checkboxes
+    id: edge_cases
+    attributes:
+      label: Edge cases
+      options:
+        - label: Empty graph
+        - label: Single-node graph
+        - label: Missing source/target nodes, if applicable
+        - label: Disconnected graph, if applicable
+        - label: Directed graph behavior
+        - label: Undirected graph behavior
+        - label: Self-loops
+        - label: Parallel edges or multigraph semantics, if applicable
+        - label: Duplicate inputs
+        - label: Invalid options
+        - label: Weight-specific cases, if applicable
+
+  - type: checkboxes
+    id: tests
+    attributes:
+      label: Tests
+      options:
+        - label: Unit tests cover happy paths
+        - label: Regression tests cover known edge cases
+        - label: Property tests added or reviewed
+        - label: Oracle tests added or reviewed, if applicable
+        - label: Doctests pass
+
+  - type: checkboxes
+    id: docs
+    attributes:
+      label: Docs
+      options:
+        - label: moduledoc explains purpose and caveats
+        - label: Public docs include examples
+        - label: Complexity is documented
+        - label: ALGORITHMS.md is accurate
+        - label: PROPERTIES.md is updated, if applicable
+        - label: CHANGELOG.md is updated, if behavior changed
+
+  - type: checkboxes
+    id: performance
+    attributes:
+      label: Performance
+      options:
+        - label: Obvious avoidable inefficiencies reviewed
+        - label: Complexity comments match implementation
+        - label: Known performance cliffs documented
+
+  - type: checkboxes
+    id: validation
+    attributes:
+      label: Validation
+      options:
+        - label: Focused tests run
+        - label: Full test suite run if module is central
+        - label: Docs build if docs changed
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes / findings / follow-ups
+      description: Add decisions, findings, tradeoffs, and links to follow-up issues here.
