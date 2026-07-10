@@ -55,6 +55,7 @@ defmodule Yog.Layout do
 
   alias Yog.Graph
   alias Yog.Layout.Circular
+  alias Yog.Layout.Grid
   alias Yog.Layout.Multipartite
   alias Yog.Layout.Random
   alias Yog.Layout.Shell
@@ -123,6 +124,16 @@ defmodule Yog.Layout do
         }
   def multipartite(graph, layers, opts \\ []) do
     Multipartite.layout(graph, layers, opts)
+  end
+
+  @doc """
+  Positions nodes deterministically on a 2D grid based on user-supplied rows or columns.
+
+  Delegates to `Yog.Layout.Grid.layout/2`.
+  """
+  @spec grid(Graph.t(), keyword()) :: %{Graph.node_id() => {float(), float()}}
+  def grid(graph, opts) do
+    Grid.layout(graph, opts)
   end
 
   @doc """

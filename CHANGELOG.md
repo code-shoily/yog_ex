@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`Yog.Layout.grid/2`** — Added deterministic grid layout algorithm (`Yog.Layout.Grid.layout/2`) for placing nodes in a 2D row- or column-based matrix. Supports cell dimensions, custom grid origins, and validation for duplicate or missing node IDs, and handles empty cells via placeholders (`nil` or `:_`).
 - **`Yog.Layout.manual/3`** — Implemented manual layout algorithm for explicit node placement. Callers can supply known coordinate maps, validate nodes in strict mode, filter out extra coordinates, and customize strategies (`:center`, `:random`, `:ignore`, `:error`, or generator functions) for filling in missing node coordinates.
 - **`Yog.Layout` Coordinate Transform Utilities** — Added `bounds/1`, `translate/3`, `scale/2`, `scale/3`, `center/2`, and `fit/2` helpers in `Yog.Layout` to translate, scale, center, and fit layout coordinate maps, and refactored `Yog.Layout.Spring` to reuse them.
 - **`mix yog.test_livebooks` Task** — Added a Mix task and CI action to automatically validate the execution of Elixir code blocks inside all project Livebooks in a headless environment.
