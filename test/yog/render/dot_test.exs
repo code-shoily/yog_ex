@@ -111,6 +111,26 @@ defmodule Yog.Render.DOTTest do
       assert String.contains?(dot, "shape=box")
       assert String.contains?(dot, "fillcolor=\"green\"")
     end
+
+    test "supports node positioning, scale, and pin attributes" do
+      graph =
+        Yog.directed()
+        |> Yog.add_node(1, "A")
+        |> Yog.add_node(2, "B")
+
+      opts =
+        Map.merge(DOT.default_options(), %{
+          positions: %{1 => {1.5, 2.0}, 2 => {-3.0, 4.0}},
+          pin: true,
+          position_scale: 10.0
+        })
+
+      dot = DOT.to_dot(graph, opts)
+
+      assert String.contains?(dot, "pos=\"15.0,20.0\"")
+      assert String.contains?(dot, "pos=\"-30.0,40.0\"")
+      assert String.contains?(dot, "pin=\"true\"")
+    end
   end
 
   describe "edge cases" do

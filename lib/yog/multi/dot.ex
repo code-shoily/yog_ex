@@ -153,7 +153,12 @@ defmodule Yog.Multi.DOT do
           arrowhead: arrow_style() | nil,
           arrowtail: arrow_style() | nil,
           highlight_color: String.t(),
-          highlight_penwidth: float()
+          highlight_penwidth: float(),
+          # Layout positioning
+          positions: %{Yog.Model.node_id() => {float(), float()}} | nil,
+          pin: boolean(),
+          position_scale: float() | nil,
+          position_unit: :point | :inch
         }
 
   @doc """
@@ -192,7 +197,12 @@ defmodule Yog.Multi.DOT do
       arrowhead: nil,
       arrowtail: nil,
       highlight_color: "red",
-      highlight_penwidth: 2.0
+      highlight_penwidth: 2.0,
+      # Layout positioning
+      positions: nil,
+      pin: false,
+      position_scale: nil,
+      position_unit: :point
     }
   end
 
@@ -517,6 +527,37 @@ defmodule Yog.Multi.DOT do
       id_str = Yog.Utils.safe_string(id)
 
       attrs = [{:label, label}]
+
+      # Add positioning attributes if present
+      attrs =
+        case Map.get(options, :positions) do
+          positions when is_map(positions) ->
+            case Map.get(positions, id) do
+              {x, y} when is_number(x) and is_number(y) ->
+                scale = Map.get(options, :position_scale) || 1.0
+                scaled_x = x * scale
+                scaled_y = y * scale
+
+                pos_val = "#{scaled_x},#{scaled_y}"
+
+                base_pos_attrs = [{:pos, pos_val}]
+
+                base_pos_attrs =
+                  if Map.get(options, :pin, false) do
+                    [{:pin, "true"} | base_pos_attrs]
+                  else
+                    base_pos_attrs
+                  end
+
+                base_pos_attrs ++ attrs
+
+              _ ->
+                attrs
+            end
+
+          _ ->
+            attrs
+        end
 
       attrs =
         if options.highlighted_nodes && MapSet.member?(options.highlighted_nodes, id) do
