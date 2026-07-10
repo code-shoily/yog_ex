@@ -344,39 +344,52 @@ defmodule Yog.MatchingTest do
 
     # Try to find an augmenting path from any unmatched node
     not Enum.any?(unmatched, fn start ->
-      find_augmenting_path(start, adj, matching, MapSet.new([start]))
+      has_augmenting_path?(start, adj, matching)
     end)
   end
 
-  defp find_augmenting_path(current, adj, matching, visited) do
-    neighbors = Map.get(adj, current, [])
+  defp has_augmenting_path?(start, adj, matching) do
+    queue = :queue.from_list([{start, :even}])
+    visited = MapSet.new([start])
+    bfs(queue, visited, adj, matching)
+  end
 
-    Enum.reduce_while(neighbors, false, fn v, _acc ->
-      if MapSet.member?(visited, v) do
-        {:cont, false}
-      else
-        new_visited = MapSet.put(visited, v)
+  defp bfs(queue, visited, adj, matching) do
+    case :queue.out(queue) do
+      {{:value, {node, level}}, queue} ->
+        case level do
+          :even ->
+            neighbors = Map.get(adj, node, [])
+            matched_partner = Map.get(matching, node)
 
-        case Map.get(matching, v) do
-          nil ->
-            # Found a free node on the other side -> augmenting path exists
-            {:halt, true}
+            next_nodes =
+              neighbors
+              |> Enum.reject(fn v -> v == matched_partner or MapSet.member?(visited, v) end)
 
-          u when u != current ->
-            # v is matched to u, continue the alternating path
-            visited_with_u = MapSet.put(new_visited, u)
+            new_visited = Enum.reduce(next_nodes, visited, fn v, acc -> MapSet.put(acc, v) end)
+            new_queue = Enum.reduce(next_nodes, queue, fn v, acc -> :queue.in({v, :odd}, acc) end)
 
-            if find_augmenting_path(u, adj, matching, visited_with_u) do
-              {:halt, true}
-            else
-              {:cont, false}
+            bfs(new_queue, new_visited, adj, matching)
+
+          :odd ->
+            case Map.get(matching, node) do
+              nil ->
+                true
+
+              u ->
+                if MapSet.member?(visited, u) do
+                  bfs(queue, visited, adj, matching)
+                else
+                  new_visited = MapSet.put(visited, u)
+                  new_queue = :queue.in({u, :even}, queue)
+                  bfs(new_queue, new_visited, adj, matching)
+                end
             end
-
-          _ ->
-            {:cont, false}
         end
-      end
-    end)
+
+      {:empty, _queue} ->
+        false
+    end
   end
 
   defp matching_size(matching), do: div(map_size(matching), 2)
