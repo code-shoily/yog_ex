@@ -311,4 +311,167 @@ defmodule Yog.LayoutTest do
       assert Layout.multipartite(graph, []) == %{}
     end
   end
+
+  describe "manual/3" do
+    test "positions existing nodes based on coordinates map" do
+      graph = Yog.undirected() |> Yog.add_nodes_from([1, 2])
+      pos = %{1 => {1.0, 1.0}, 2 => {2.0, 2.0}}
+      assert Layout.manual(graph, pos) == pos
+    end
+
+    test "filters out extra positions if not strict" do
+      graph = Yog.undirected() |> Yog.add_nodes_from([1, 2])
+      pos = %{1 => {1.0, 1.0}, 2 => {2.0, 2.0}, 99 => {9.0, 9.0}}
+      assert Layout.manual(graph, pos, strict: false) == %{1 => {1.0, 1.0}, 2 => {2.0, 2.0}}
+    end
+
+    test "raises ArgumentError on extra positions if strict: true" do
+      graph = Yog.undirected() |> Yog.add_nodes_from([1, 2])
+      pos = %{1 => {1.0, 1.0}, 2 => {2.0, 2.0}, 99 => {9.0, 9.0}}
+
+      assert_raise ArgumentError, ~r/Strict mode: positions map contains extra nodes/, fn ->
+        Layout.manual(graph, pos, strict: true)
+      end
+    end
+
+    test "raises ArgumentError on missing nodes if missing: :error" do
+      graph = Yog.undirected() |> Yog.add_nodes_from([1, 2, 3])
+      pos = %{1 => {1.0, 1.0}, 2 => {2.0, 2.0}}
+
+      assert_raise ArgumentError, ~r/Missing coordinates for nodes/, fn ->
+        Layout.manual(graph, pos, missing: :error)
+      end
+    end
+
+    test "places missing nodes at center if missing: :center" do
+      graph = Yog.undirected() |> Yog.add_nodes_from([1, 2, 3])
+      pos = %{1 => {1.0, 1.0}, 2 => {2.0, 2.0}}
+
+      assert Layout.manual(graph, pos, missing: :center, center: {5.0, 5.0}) == %{
+               1 => {1.0, 1.0},
+               2 => {2.0, 2.0},
+               3 => {5.0, 5.0}
+             }
+    end
+
+    test "omits missing nodes if missing: :ignore" do
+      graph = Yog.undirected() |> Yog.add_nodes_from([1, 2, 3])
+      pos = %{1 => {1.0, 1.0}, 2 => {2.0, 2.0}}
+
+      assert Layout.manual(graph, pos, missing: :ignore) == %{
+               1 => {1.0, 1.0},
+               2 => {2.0, 2.0}
+             }
+    end
+
+    test "places missing nodes randomly if missing: :random" do
+      graph = Yog.undirected() |> Yog.add_nodes_from([1, 2, 3])
+      pos = %{1 => {1.0, 1.0}, 2 => {2.0, 2.0}}
+
+      # Deterministic random fallback using seed
+      res =
+        Layout.manual(graph, pos,
+          missing: {:random, [width: 10.0, height: 10.0, center: {0.0, 0.0}]},
+          seed: 123
+        )
+
+      assert Map.keys(res) |> Enum.sort() == [1, 2, 3]
+      assert Map.get(res, 1) == {1.0, 1.0}
+      assert Map.get(res, 2) == {2.0, 2.0}
+      {x3, y3} = Map.get(res, 3)
+      assert x3 >= -5.0 and x3 <= 5.0
+      assert y3 >= -5.0 and y3 <= 5.0
+    end
+
+    test "uses custom generator function if missing: fun" do
+      graph = Yog.undirected() |> Yog.add_nodes_from([1, 2, 3])
+      pos = %{1 => {1.0, 1.0}, 2 => {2.0, 2.0}}
+      generator = fn id -> {id * 10.0, id * 20.0} end
+
+      assert Layout.manual(graph, pos, missing: generator) == %{
+               1 => {1.0, 1.0},
+               2 => {2.0, 2.0},
+               3 => {30.0, 60.0}
+             }
+    end
+
+    test "raises ArgumentError if custom generator function returns invalid value" do
+      graph = Yog.undirected() |> Yog.add_nodes_from([1, 2, 3])
+      pos = %{1 => {1.0, 1.0}, 2 => {2.0, 2.0}}
+      generator = fn _id -> :invalid_coord end
+
+      assert_raise ArgumentError,
+                   ~r/Custom generator function must return a {float, float}/,
+                   fn ->
+                     Layout.manual(graph, pos, missing: generator)
+                   end
+    end
+  end
+
+  describe "coordinate transform helpers" do
+    test "bounds/1 calculates correct bounding box" do
+      assert Layout.bounds(%{}) == nil
+      assert Layout.bounds(%{1 => {2.5, 4.0}}) == {2.5, 2.5, 4.0, 4.0}
+
+      assert Layout.bounds(%{1 => {1.0, 2.0}, 2 => {5.0, -3.0}, 3 => {0.0, 10.0}}) ==
+               {0.0, 5.0, -3.0, 10.0}
+    end
+
+    test "translate/3 shifts coordinates correctly" do
+      pos = %{1 => {1.0, 2.0}, 2 => {-3.0, 5.0}}
+      assert Layout.translate(pos, 2.5, -1.0) == %{1 => {3.5, 1.0}, 2 => {-0.5, 4.0}}
+      assert Layout.translate(%{}, 1.0, 1.0) == %{}
+    end
+
+    test "scale/2 and scale/3 scale coordinates correctly" do
+      pos = %{1 => {1.0, 2.0}, 2 => {-3.0, 5.0}}
+      assert Layout.scale(pos, 3.0) == %{1 => {3.0, 6.0}, 2 => {-9.0, 15.0}}
+      assert Layout.scale(pos, 2.0, -1.0) == %{1 => {2.0, -2.0}, 2 => {-6.0, -5.0}}
+      assert Layout.scale(%{}, 2.0) == %{}
+    end
+
+    test "center/2 centers layout correctly" do
+      assert Layout.center(%{}) == %{}
+
+      pos = %{1 => {0.0, 0.0}, 2 => {4.0, 2.0}}
+      # Center is at {2.0, 1.0}
+      # Moving center to {0.0, 0.0} -> translate by -2.0, -1.0
+      assert Layout.center(pos) == %{1 => {-2.0, -1.0}, 2 => {2.0, 1.0}}
+
+      # Moving center to {5.0, 5.0} -> translate by +3.0, +4.0
+      assert Layout.center(pos, at: {5.0, 5.0}) == %{1 => {3.0, 4.0}, 2 => {7.0, 6.0}}
+    end
+
+    test "fit/2 fits layout into bounding box with aspect ratio preserved" do
+      assert Layout.fit(%{}) == %{}
+
+      # Single node should be placed at the center of the box
+      assert Layout.fit(%{1 => {5.0, 5.0}}, width: 100.0, height: 200.0) == %{1 => {50.0, 100.0}}
+
+      pos = %{1 => {0.0, 0.0}, 2 => {10.0, 5.0}}
+      # width = 100, height = 100. padding = 10.
+      # target width = 80, target height = 80.
+      # aspect ratio of input: width/height = 2.0.
+      # If preserve_aspect: true:
+      # scale factor is min(80 / 10, 80 / 5) = min(8, 16) = 8.
+      # input center is at {5.0, 2.5}.
+      # output center is at {50.0, 50.0}.
+      # Node 1: {50.0 + (0 - 5.0)*8, 50.0 + (0 - 2.5)*8} = {10.0, 30.0}
+      # Node 2: {50.0 + (10 - 5.0)*8, 50.0 + (5 - 2.5)*8} = {90.0, 70.0}
+      fitted_aspect = Layout.fit(pos, width: 100.0, height: 100.0, padding: 10.0)
+      assert Map.get(fitted_aspect, 1) == {10.0, 30.0}
+      assert Map.get(fitted_aspect, 2) == {90.0, 70.0}
+
+      # If preserve_aspect: false:
+      # scale_x = 80 / 10 = 8.
+      # scale_y = 80 / 5 = 16.
+      # Node 1: {50.0 + (0 - 5.0)*8, 50.0 + (0 - 2.5)*16} = {10.0, 10.0}
+      # Node 2: {50.0 + (10 - 5.0)*8, 50.0 + (5 - 2.5)*16} = {90.0, 90.0}
+      fitted_stretch =
+        Layout.fit(pos, width: 100.0, height: 100.0, padding: 10.0, preserve_aspect: false)
+
+      assert Map.get(fitted_stretch, 1) == {10.0, 10.0}
+      assert Map.get(fitted_stretch, 2) == {90.0, 90.0}
+    end
+  end
 end

@@ -328,42 +328,13 @@ defmodule Yog.Layout.Spring do
     end)
   end
 
-  defp rescale(positions, width, height, {cx, cy}) do
-    pos_values = Map.values(positions)
-
-    case pos_values do
-      [] ->
-        %{}
-
-      [{x0, y0} | rest] ->
-        {min_x, max_x, min_y, max_y} =
-          Enum.reduce(rest, {x0, x0, y0, y0}, fn {x, y}, {min_x, max_x, min_y, max_y} ->
-            {min(min_x, x), max(max_x, x), min(min_y, y), max(max_y, y)}
-          end)
-
-        if min_x == max_x and min_y == max_y do
-          Map.new(positions, fn {id, _} -> {id, {cx, cy}} end)
-        else
-          margin = 0.90
-          w_span = max_x - min_x
-          h_span = max_y - min_y
-
-          target_w = width * margin
-          target_h = height * margin
-
-          scale_x = if w_span > 0, do: target_w / w_span, else: 1.0
-          scale_y = if h_span > 0, do: target_h / h_span, else: 1.0
-
-          curr_cx = (min_x + max_x) / 2.0
-          curr_cy = (min_y + max_y) / 2.0
-
-          Map.new(positions, fn {id, {x, y}} ->
-            scaled_x = cx + (x - curr_cx) * scale_x
-            scaled_y = cy + (y - curr_cy) * scale_y
-            {id, {scaled_x, scaled_y}}
-          end)
-        end
-    end
+  defp rescale(positions, width, height, center) do
+    Yog.Layout.fit(positions,
+      width: width * 0.90,
+      height: height * 0.90,
+      center: center,
+      preserve_aspect: false
+    )
   end
 end
 

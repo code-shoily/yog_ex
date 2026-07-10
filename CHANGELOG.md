@@ -7,8 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## UNRELEASED
 
+### Added
+
+- **`Yog.Layout.manual/3`** — Implemented manual layout algorithm for explicit node placement. Callers can supply known coordinate maps, validate nodes in strict mode, filter out extra coordinates, and customize strategies (`:center`, `:random`, `:ignore`, `:error`, or generator functions) for filling in missing node coordinates.
+- **`Yog.Layout` Coordinate Transform Utilities** — Added `bounds/1`, `translate/3`, `scale/2`, `scale/3`, `center/2`, and `fit/2` helpers in `Yog.Layout` to translate, scale, center, and fit layout coordinate maps, and refactored `Yog.Layout.Spring` to reuse them.
+- **`mix yog.test_livebooks` Task** — Added a Mix task and CI action to automatically validate the execution of Elixir code blocks inside all project Livebooks in a headless environment.
+
 ### Fixed
 
+- **`Yog.MatchingTest` Timeout** — Fixed an exponential DFS backtracking timeout in `hopcroft_karp_large_random_bipartite_test` by implementing a linear-time BFS search in `maximal_matching?/2`.
 - **Optional Dependency Warnings** — Silenced compile-time warnings generated when compiling without optional dependencies (`saxy` and `libgraph`). Wrapped Saxy handler behaviours in compile-time checks, removed `@impl` callback annotations from optional integration handlers, moved the `YogGraph` alias within the compile-time block in `Yog.IO.Libgraph`, and removed the duplicate `@moduledoc` tag.
 - **`Yog.Layout.Spring` Partial Initial Positions** — `initial_pos` may now be partial: missing graph nodes are initialized randomly instead of being silently omitted from the returned layout, extra nodes are ignored, and `:seed` is honored when filling missing positions.
 - **`Yog.Layout.Spring` Barnes-Hut Correctness** — Fixed Barnes-Hut quadtree mass accounting and prevented approximation of cells containing the target node, eliminating self-force leakage in approximate repulsion calculations.

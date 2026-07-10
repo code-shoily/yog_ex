@@ -124,4 +124,304 @@ defmodule Yog.Layout do
   def multipartite(graph, layers, opts \\ []) do
     Multipartite.layout(graph, layers, opts)
   end
+
+  @doc """
+  Positions nodes manually based on a supplied map of coordinates, with options to validate and fill in missing nodes.
+
+  ## Options
+
+    * `:strict` - If `true`, raises `ArgumentError` if there are extra coordinates in `positions` for nodes not in the graph (default: `false`).
+    * `:missing` - Strategy for placing nodes that are present in the graph but missing in the `positions` map:
+      * `:error` - Raises `ArgumentError` if any nodes are missing coordinates.
+      * `:center` - Places missing nodes at `:center`.
+      * `:ignore` - Omit missing nodes from the returned coordinate map.
+      * `:random` - Places missing nodes randomly.
+      * `{:random, random_opts}` - Places missing nodes randomly with custom bounds (e.g. `[width: 10.0, height: 10.0]`).
+      * `function` - A 1-arity function `(node_id -> {x, y})` that generates coordinates for each missing node.
+      * Default: `{:random, []}`.
+    * `:center` - The `{x, y}` coordinates of the center, used as default center for `:center` and `:random` missing placement (default: `{0.0, 0.0}`).
+    * `:seed` - Seed for random positioning generator.
+
+  ## Examples
+
+      iex> graph = Yog.undirected() |> Yog.add_nodes_from([1, 2, 3])
+      iex> pos = %{1 => {1.0, 2.0}, 2 => {3.0, 4.0}}
+      iex> manual_pos = Yog.Layout.manual(graph, pos, missing: :center, center: {0.0, 0.0})
+      iex> manual_pos
+      %{1 => {1.0, 2.0}, 2 => {3.0, 4.0}, 3 => {0.0, 0.0}}
+
+  """
+  @spec manual(
+          Graph.t(),
+          %{Graph.node_id() => {float(), float()}},
+          keyword()
+        ) :: %{Graph.node_id() => {float(), float()}}
+  def manual(graph, positions, opts \\ []) do
+    strict = Keyword.get(opts, :strict, false)
+    missing = Keyword.get(opts, :missing, {:random, []})
+    center = Keyword.get(opts, :center, {0.0, 0.0})
+    seed = Keyword.get(opts, :seed)
+
+    graph_nodes = Yog.all_nodes(graph) |> MapSet.new()
+
+    # 1. Validation for strict mode (extra positions)
+    if strict do
+      extra_nodes = MapSet.difference(Map.keys(positions) |> MapSet.new(), graph_nodes)
+
+      if MapSet.size(extra_nodes) > 0 do
+        raise ArgumentError,
+              "Strict mode: positions map contains extra nodes not present in the graph: #{inspect(MapSet.to_list(extra_nodes))}"
+      end
+    end
+
+    # 2. Filter out extra positions
+    filtered_positions =
+      Map.filter(positions, fn {id, _coords} -> MapSet.member?(graph_nodes, id) end)
+
+    # 3. Identify missing nodes
+    missing_nodes = MapSet.difference(graph_nodes, Map.keys(filtered_positions) |> MapSet.new())
+
+    # 4. Fill in missing nodes if any
+    if MapSet.size(missing_nodes) > 0 do
+      filled =
+        case missing do
+          :error ->
+            raise ArgumentError,
+                  "Missing coordinates for nodes: #{inspect(MapSet.to_list(missing_nodes))}"
+
+          :center ->
+            Map.new(missing_nodes, fn id -> {id, center} end)
+
+          :ignore ->
+            %{}
+
+          random
+          when random in [:random, :random_opts] or
+                 (is_tuple(random) and elem(random, 0) == :random) ->
+            random_opts =
+              case random do
+                :random -> []
+                {:random, ropts} -> ropts
+              end
+
+            width = Keyword.get(random_opts, :width, 1.0)
+            height = Keyword.get(random_opts, :height, 1.0)
+
+            {rcx, rcy} =
+              case Keyword.get(random_opts, :center) do
+                {cx, cy} -> {cx, cy}
+                nil -> center
+              end
+
+            rseed = Keyword.get(random_opts, :seed, seed)
+
+            if rseed do
+              :rand.seed(:exsss, rseed)
+            end
+
+            min_x = rcx - width / 2.0
+            min_y = rcy - height / 2.0
+
+            Map.new(missing_nodes, fn id ->
+              x = min_x + :rand.uniform() * width
+              y = min_y + :rand.uniform() * height
+              {id, {x, y}}
+            end)
+
+          fun when is_function(fun, 1) ->
+            Map.new(missing_nodes, fn id ->
+              case fun.(id) do
+                {x, y} when is_number(x) and is_number(y) ->
+                  {id, {x, y}}
+
+                other ->
+                  raise ArgumentError,
+                        "Custom generator function must return a {float, float} coordinate tuple, got: #{inspect(other)}"
+              end
+            end)
+
+          other ->
+            raise ArgumentError, "Invalid option for :missing: #{inspect(other)}"
+        end
+
+      Map.merge(filtered_positions, filled)
+    else
+      filtered_positions
+    end
+  end
+
+  # ============= COORDINATE TRANSFORM HELPERS =============
+
+  @doc """
+  Calculates the bounding box `{min_x, max_x, min_y, max_y}` of the positions map.
+
+  Returns `nil` if the positions map is empty.
+
+  ## Examples
+
+      iex> Yog.Layout.bounds(%{1 => {1.0, 2.0}, 2 => {5.0, -3.0}})
+      {1.0, 5.0, -3.0, 2.0}
+
+      iex> Yog.Layout.bounds(%{})
+      nil
+
+  """
+  @spec bounds(%{Graph.node_id() => {float(), float()}}) ::
+          {float(), float(), float(), float()} | nil
+  def bounds(positions) when positions == %{}, do: nil
+
+  def bounds(positions) do
+    pos_values = Map.values(positions)
+    [{x0, y0} | rest] = pos_values
+
+    Enum.reduce(rest, {x0, x0, y0, y0}, fn {x, y}, {min_x, max_x, min_y, max_y} ->
+      {min(min_x, x), max(max_x, x), min(min_y, y), max(max_y, y)}
+    end)
+  end
+
+  @doc """
+  Translates all coordinates by `dx` and `dy`.
+
+  ## Examples
+
+      iex> Yog.Layout.translate(%{1 => {1.0, 2.0}}, 2.0, -1.0)
+      %{1 => {3.0, 1.0}}
+
+  """
+  @spec translate(%{Graph.node_id() => {float(), float()}}, float(), float()) :: %{
+          Graph.node_id() => {float(), float()}
+        }
+  def translate(positions, dx, dy) do
+    Map.new(positions, fn {id, {x, y}} -> {id, {x + dx, y + dy}} end)
+  end
+
+  @doc """
+  Scales all coordinates by a single factor.
+
+  ## Examples
+
+      iex> Yog.Layout.scale(%{1 => {1.0, 2.0}}, 3.0)
+      %{1 => {3.0, 6.0}}
+
+  """
+  @spec scale(%{Graph.node_id() => {float(), float()}}, float()) :: %{
+          Graph.node_id() => {float(), float()}
+        }
+  def scale(positions, factor) do
+    Map.new(positions, fn {id, {x, y}} -> {id, {x * factor, y * factor}} end)
+  end
+
+  @doc """
+  Scales all coordinates by separate `sx` and `sy` factors.
+
+  ## Examples
+
+      iex> Yog.Layout.scale(%{1 => {1.0, 2.0}}, 3.0, -1.0)
+      %{1 => {3.0, -2.0}}
+
+  """
+  @spec scale(%{Graph.node_id() => {float(), float()}}, float(), float()) :: %{
+          Graph.node_id() => {float(), float()}
+        }
+  def scale(positions, sx, sy) do
+    Map.new(positions, fn {id, {x, y}} -> {id, {x * sx, y * sy}} end)
+  end
+
+  @doc """
+  Centers the layout at the specified coordinates.
+
+  ## Options
+
+    * `:at` - Bounding box center coordinates `{cx, cy}` (default: `{0.0, 0.0}`).
+
+  ## Examples
+
+      iex> Yog.Layout.center(%{1 => {0.0, 0.0}, 2 => {4.0, 2.0}}, at: {1.0, 1.0})
+      %{1 => {-1.0, 0.0}, 2 => {3.0, 2.0}}
+
+  """
+  @spec center(%{Graph.node_id() => {float(), float()}}, keyword()) :: %{
+          Graph.node_id() => {float(), float()}
+        }
+  def center(positions, opts \\ []) do
+    {cx, cy} = Keyword.get(opts, :at, {0.0, 0.0})
+
+    case bounds(positions) do
+      nil ->
+        %{}
+
+      {min_x, max_x, min_y, max_y} ->
+        curr_cx = (min_x + max_x) / 2.0
+        curr_cy = (min_y + max_y) / 2.0
+        translate(positions, cx - curr_cx, cy - curr_cy)
+    end
+  end
+
+  @doc """
+  Fits the layout coordinates inside a target bounding box, preserving aspect ratio by default.
+
+  ## Options
+
+    * `:width` - Target bounding box width (default: `1.0`).
+    * `:height` - Target bounding box height (default: `1.0`).
+    * `:padding` - Bounding box padding (default: `0.0`).
+    * `:preserve_aspect` - Preserve aspect ratio of coordinate box (default: `true`).
+    * `:center` - Center of layout space (default: `{width / 2.0, height / 2.0}`).
+
+  ## Examples
+
+      iex> pos = %{1 => {0.0, 0.0}, 2 => {10.0, 5.0}}
+      iex> fitted = Yog.Layout.fit(pos, width: 100.0, height: 100.0, padding: 10.0, preserve_aspect: false)
+      iex> Yog.Layout.bounds(fitted)
+      {10.0, 90.0, 10.0, 90.0}
+
+  """
+  @spec fit(%{Graph.node_id() => {float(), float()}}, keyword()) :: %{
+          Graph.node_id() => {float(), float()}
+        }
+  def fit(positions, opts \\ []) do
+    width = Keyword.get(opts, :width, 1.0)
+    height = Keyword.get(opts, :height, 1.0)
+    padding = Keyword.get(opts, :padding, 0.0)
+    preserve_aspect = Keyword.get(opts, :preserve_aspect, true)
+
+    case bounds(positions) do
+      nil ->
+        %{}
+
+      {min_x, max_x, min_y, max_y} ->
+        {cx, cy} =
+          case Keyword.get(opts, :center) do
+            {cx, cy} -> {cx, cy}
+            nil -> {width / 2.0, height / 2.0}
+          end
+
+        w_span = max_x - min_x
+        h_span = max_y - min_y
+
+        if w_span == 0.0 and h_span == 0.0 do
+          Map.new(positions, fn {id, _} -> {id, {cx, cy}} end)
+        else
+          target_w = width - 2.0 * padding
+          target_h = height - 2.0 * padding
+
+          {scale_x, scale_y} =
+            if preserve_aspect do
+              s = min(target_w / w_span, target_h / h_span)
+              {s, s}
+            else
+              {target_w / w_span, target_h / h_span}
+            end
+
+          curr_cx = (min_x + max_x) / 2.0
+          curr_cy = (min_y + max_y) / 2.0
+
+          Map.new(positions, fn {id, {x, y}} ->
+            sx = cx + (x - curr_cx) * scale_x
+            sy = cy + (y - curr_cy) * scale_y
+            {id, {sx, sy}}
+          end)
+        end
+    end
+  end
 end
