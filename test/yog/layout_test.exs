@@ -601,4 +601,78 @@ defmodule Yog.LayoutTest do
       assert Map.get(fitted_stretch, 2) == {90.0, 90.0}
     end
   end
+
+  describe "merge_position_maps/1" do
+    test "merges disjoint position maps" do
+      map_a = %{1 => {10.0, 20.0}}
+      map_b = %{2 => {30.0, 40.0}}
+      assert Layout.merge_position_maps([map_a, map_b]) == %{1 => {10.0, 20.0}, 2 => {30.0, 40.0}}
+    end
+
+    test "raises ArgumentError on duplicate node IDs" do
+      map_a = %{1 => {10.0, 20.0}}
+      map_b = %{1 => {30.0, 40.0}}
+
+      assert_raise ArgumentError, ~r/Duplicate node IDs found across position maps/, fn ->
+        Layout.merge_position_maps([map_a, map_b])
+      end
+    end
+  end
+
+  describe "pack/2" do
+    test "packs empty list to empty map" do
+      assert Layout.pack([]) == %{}
+    end
+
+    test "packs horizontally with non-zero origins and negative coordinates" do
+      # Bounding box A: min_x = -10.0, max_x = 10.0, min_y = 20.0, max_y = 40.0 (width = 20.0)
+      map_a = %{1 => {-10.0, 20.0}, 2 => {10.0, 40.0}}
+
+      # Bounding box B: min_x = 5.0, max_x = 15.0, min_y = -30.0, max_y = -10.0 (width = 10.0)
+      map_b = %{3 => {5.0, -30.0}, 4 => {15.0, -10.0}}
+
+      # Horizontal Packing:
+      # Map A is translated so min_x = 0.0. dx = 0.0 - (-10.0) = 10.0.
+      # Translated A: {0.0, 20.0} and {20.0, 40.0}.
+      # offset becomes 0.0 + width + gap = 20.0 + 10.0 = 30.0.
+      # Map B is translated so min_x = 30.0. dx = 30.0 - 5.0 = 25.0.
+      # Translated B: {30.0, -30.0} and {40.0, -10.0}.
+      packed = Layout.pack([map_a, map_b], direction: :horizontal, gap: 10.0)
+
+      assert packed[1] == {0.0, 20.0}
+      assert packed[2] == {20.0, 40.0}
+      assert packed[3] == {30.0, -30.0}
+      assert packed[4] == {40.0, -10.0}
+    end
+
+    test "packs vertically with non-zero origins and negative coordinates" do
+      # Bounding box A: min_x = 20.0, max_x = 40.0, min_y = -10.0, max_y = 10.0 (height = 20.0)
+      map_a = %{1 => {20.0, -10.0}, 2 => {40.0, 10.0}}
+
+      # Bounding box B: min_x = -30.0, max_x = -10.0, min_y = 5.0, max_y = 15.0 (height = 10.0)
+      map_b = %{3 => {-30.0, 5.0}, 4 => {-10.0, 15.0}}
+
+      # Vertical Packing:
+      # Map A is translated so min_y = 0.0. dy = 0.0 - (-10.0) = 10.0.
+      # Translated A: {20.0, 0.0} and {40.0, 20.0}.
+      # offset becomes 0.0 + height + gap = 20.0 + 5.0 = 25.0.
+      # Map B is translated so min_y = 25.0. dy = 25.0 - 5.0 = 20.0.
+      # Translated B: {-30.0, 25.0} and {-10.0, 35.0}.
+      packed = Layout.pack([map_a, map_b], direction: :vertical, gap: 5.0)
+
+      assert packed[1] == {20.0, 0.0}
+      assert packed[2] == {40.0, 20.0}
+      assert packed[3] == {-30.0, 25.0}
+      assert packed[4] == {-10.0, 35.0}
+    end
+
+    test "raises ArgumentError on duplicate node IDs across packed maps" do
+      map_a = %{1 => {0.0, 0.0}}
+      map_b = %{1 => {10.0, 10.0}}
+
+      assert_raise ArgumentError, ~r/Duplicate node IDs found across position maps/, fn ->
+        Layout.pack([map_a, map_b])
+      end
+    end
+  end
 end

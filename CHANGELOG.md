@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`Yog.Layout.pack/2` & `Yog.Layout.merge_position_maps/1`** — Added layout composition and packing helpers. `pack/2` places multiple coordinate maps side-by-side (horizontally) or stacked (vertically) with a custom gap, and `merge_position_maps/1` merges disjoint coordinate maps while raising clean errors for duplicate node IDs.
 - **`Yog.Layout.multipartite/3` Enhancements** — Extended the multipartite layout algorithm with spacing and direction controls. Callers can now specify `:direction` (`:left_to_right`, `:right_to_left`, `:top_to_bottom`, or `:bottom_to_top`), custom gaps (`:layer_gap` and `:node_gap`), layout `:origin` offset, node alignment (`:align_nodes` as `:start`, `:center`, or `:end`), and sorting options (`:order_by`).
 - **`Yog.Layout.grid/2`** — Added deterministic grid layout algorithm (`Yog.Layout.Grid.layout/2`) for placing nodes in a 2D row- or column-based matrix. Supports cell dimensions, custom grid origins, and validation for duplicate or missing node IDs, and handles empty cells via placeholders (`nil` or `:_`).
 - **`Yog.Layout.manual/3`** — Implemented manual layout algorithm for explicit node placement. Callers can supply known coordinate maps, validate nodes in strict mode, filter out extra coordinates, and customize strategies (`:center`, `:random`, `:ignore`, `:error`, or generator functions) for filling in missing node coordinates.

@@ -261,6 +261,104 @@ defmodule Yog.Layout do
     end
   end
 
+  @doc """
+  Packs multiple position maps sequentially either horizontally or vertically with a gap.
+
+  Useful for placing independent subgraphs side-by-side or stacked without overlapping.
+
+  ## Options
+
+    * `:direction` - Packing direction, either `:horizontal` or `:vertical` (default: `:horizontal`).
+    * `:gap` - Gap size between consecutive bounding boxes (default: `0.0`).
+
+  ## Examples
+
+      iex> map_a = %{a: {0.0, 0.0}, b: {10.0, 10.0}}
+      iex> map_b = %{c: {0.0, 0.0}, d: {5.0, 5.0}}
+      iex> Yog.Layout.pack([map_a, map_b], direction: :horizontal, gap: 5.0)
+      %{
+        a: {0.0, 0.0},
+        b: {10.0, 10.0},
+        c: {15.0, 0.0},
+        d: {20.0, 5.0}
+      }
+
+  """
+  @spec pack([%{Graph.node_id() => {float(), float()}}], keyword()) :: %{
+          Graph.node_id() => {float(), float()}
+        }
+  def pack(position_maps, opts \\ []) do
+    direction = Keyword.get(opts, :direction, :horizontal)
+    gap = Keyword.get(opts, :gap, 0.0) * 1.0
+
+    if direction not in [:horizontal, :vertical] do
+      raise ArgumentError, "Option :direction must be either :horizontal or :vertical"
+    end
+
+    # Fail fast on duplicate node IDs
+    _merged = merge_position_maps(position_maps)
+
+    pack_loop(position_maps, direction, gap, 0.0, [])
+  end
+
+  defp pack_loop([], _direction, _gap, _offset, acc) do
+    Enum.reduce(Enum.reverse(acc), %{}, &Map.merge/2)
+  end
+
+  defp pack_loop([map | rest], direction, gap, offset, acc) do
+    if map == %{} do
+      pack_loop(rest, direction, gap, offset, [map | acc])
+    else
+      {min_x, max_x, min_y, max_y} = bounds(map)
+
+      case direction do
+        :horizontal ->
+          width = max_x - min_x
+          dx = offset - min_x
+          translated = translate(map, dx, 0.0)
+          pack_loop(rest, direction, gap, offset + width + gap, [translated | acc])
+
+        :vertical ->
+          height = max_y - min_y
+          dy = offset - min_y
+          translated = translate(map, 0.0, dy)
+          pack_loop(rest, direction, gap, offset + height + gap, [translated | acc])
+      end
+    end
+  end
+
+  @doc """
+  Merges a list of position maps into a single position map.
+
+  Raises `ArgumentError` if there are duplicate node IDs across the maps.
+
+  ## Examples
+
+      iex> map_a = %{a: {1.0, 2.0}}
+      iex> map_b = %{b: {3.0, 4.0}}
+      iex> Yog.Layout.merge_position_maps([map_a, map_b])
+      %{a: {1.0, 2.0}, b: {3.0, 4.0}}
+
+  """
+  @spec merge_position_maps([%{Graph.node_id() => {float(), float()}}]) :: %{
+          Graph.node_id() => {float(), float()}
+        }
+  def merge_position_maps(position_maps) do
+    keys = Enum.flat_map(position_maps, &Map.keys/1)
+
+    if length(keys) != MapSet.size(MapSet.new(keys)) do
+      duplicates =
+        keys
+        |> Enum.frequencies()
+        |> Enum.filter(fn {_, count} -> count > 1 end)
+        |> Enum.map(&elem(&1, 0))
+
+      raise ArgumentError, "Duplicate node IDs found across position maps: #{inspect(duplicates)}"
+    end
+
+    Enum.reduce(position_maps, %{}, &Map.merge/2)
+  end
+
   # ============= COORDINATE TRANSFORM HELPERS =============
 
   @doc """
