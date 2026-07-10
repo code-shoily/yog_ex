@@ -64,6 +64,15 @@ defmodule Yog.Layout.Multipartite do
     height = Keyword.get(opts, :height, 1.0)
     {cx, cy} = Keyword.get(opts, :center, {0.0, 0.0})
 
+    # New options
+    direction = Keyword.get(opts, :direction)
+    layer_gap = Keyword.get(opts, :layer_gap, 100.0) * 1.0
+    node_gap = Keyword.get(opts, :node_gap, 50.0) * 1.0
+    origin = Keyword.get(opts, :origin, {0.0, 0.0})
+    {ox, oy} = origin
+    align_nodes = Keyword.get(opts, :align_nodes, :center)
+    order_by = Keyword.get(opts, :order_by)
+
     nodes = Yog.all_nodes(graph)
     m = length(layers)
 
@@ -71,8 +80,16 @@ defmodule Yog.Layout.Multipartite do
       m == 0 ->
         %{}
 
-      align not in [:vertical, :horizontal] ->
+      direction &&
+          direction not in [:left_to_right, :right_to_left, :top_to_bottom, :bottom_to_top] ->
+        raise ArgumentError,
+              "Option :direction must be one of :left_to_right, :right_to_left, :top_to_bottom, or :bottom_to_top"
+
+      is_nil(direction) and align not in [:vertical, :horizontal] ->
         raise ArgumentError, "Option :align must be either :vertical or :horizontal"
+
+      align_nodes not in [:start, :center, :end] ->
+        raise ArgumentError, "Option :align_nodes must be one of :start, :center, or :end"
 
       Enum.any?(layers, &Enum.empty?/1) ->
         raise ArgumentError, "Layers must not contain empty lists"
@@ -84,13 +101,105 @@ defmodule Yog.Layout.Multipartite do
         raise ArgumentError, "Layer nodes must not contain duplicates"
 
       true ->
-        # Position each node in each layer
-        layers
-        |> Enum.with_index()
-        |> Enum.reduce(%{}, fn {layer_nodes, j}, acc ->
-          layer_pos = position_layer(layer_nodes, j, m, align, width, height, cx, cy)
-          Map.merge(acc, layer_pos)
-        end)
+        # 1. Sort layers if order_by is specified
+        sorted_layers =
+          case order_by do
+            nil ->
+              layers
+
+            :node_id ->
+              Enum.map(layers, &Enum.sort/1)
+
+            fun when is_function(fun, 1) ->
+              Enum.map(layers, fn layer -> Enum.sort_by(layer, fun) end)
+
+            fun when is_function(fun, 2) ->
+              Enum.map(layers, fn layer -> Enum.sort(layer, fun) end)
+
+            other ->
+              raise ArgumentError, "Invalid option for :order_by: #{inspect(other)}"
+          end
+
+        # 2. Position nodes
+        if direction do
+          spans =
+            Enum.map(sorted_layers, fn layer_nodes ->
+              k = length(layer_nodes)
+              if k > 1, do: (k - 1) * node_gap, else: 0.0
+            end)
+
+          max_span = if Enum.empty?(spans), do: 0.0, else: Enum.max(spans)
+
+          case direction do
+            dir when dir in [:left_to_right, :right_to_left] ->
+              sorted_layers
+              |> Enum.zip(spans)
+              |> Enum.with_index()
+              |> Enum.reduce(%{}, fn {{layer_nodes, span}, j}, acc ->
+                x =
+                  if dir == :left_to_right do
+                    ox + j * layer_gap
+                  else
+                    ox + (m - 1 - j) * layer_gap
+                  end
+
+                start_y =
+                  case align_nodes do
+                    :start -> oy
+                    :end -> oy + max_span - span
+                    :center -> oy + (max_span - span) / 2.0
+                  end
+
+                layer_pos =
+                  layer_nodes
+                  |> Enum.with_index()
+                  |> Map.new(fn {node_id, i} ->
+                    y = start_y + i * node_gap
+                    {node_id, {x, y}}
+                  end)
+
+                Map.merge(acc, layer_pos)
+              end)
+
+            dir when dir in [:top_to_bottom, :bottom_to_top] ->
+              sorted_layers
+              |> Enum.zip(spans)
+              |> Enum.with_index()
+              |> Enum.reduce(%{}, fn {{layer_nodes, span}, j}, acc ->
+                y =
+                  if dir == :top_to_bottom do
+                    oy + j * layer_gap
+                  else
+                    oy + (m - 1 - j) * layer_gap
+                  end
+
+                start_x =
+                  case align_nodes do
+                    :start -> ox
+                    :end -> ox + max_span - span
+                    :center -> ox + (max_span - span) / 2.0
+                  end
+
+                layer_pos =
+                  layer_nodes
+                  |> Enum.with_index()
+                  |> Map.new(fn {node_id, i} ->
+                    x = start_x + i * node_gap
+                    {node_id, {x, y}}
+                  end)
+
+                Map.merge(acc, layer_pos)
+              end)
+          end
+        else
+          # Bounding Box Mode (Backward Compatible)
+          sorted_layers
+          |> Enum.with_index()
+          |> Enum.reduce(%{}, fn {layer_nodes, j}, acc ->
+            layer_pos = position_layer(layer_nodes, j, m, align, width, height, cx, cy)
+            Map.merge(acc, layer_pos)
+          end)
+        end
     end
   end
 

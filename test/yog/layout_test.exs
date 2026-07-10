@@ -310,6 +310,133 @@ defmodule Yog.LayoutTest do
       graph = Yog.undirected()
       assert Layout.multipartite(graph, []) == %{}
     end
+
+    test "supports directional flow with node gaps and origin offsets" do
+      # 2 layers: layer 0 = [1], layer 1 = [2, 3]
+      graph = Yog.from_unweighted_edges(:undirected, [{1, 2}, {1, 3}])
+
+      # Test direction: :left_to_right
+      pos_lr =
+        Layout.multipartite(graph, [[1], [2, 3]],
+          direction: :left_to_right,
+          layer_gap: 150.0,
+          node_gap: 60.0,
+          origin: {10.0, 20.0},
+          align_nodes: :start
+        )
+
+      # x_origin = 10, y_origin = 20.
+      # layer 0: x = 10. k = 1 -> start_y = 20. Node 1: {10, 20}.
+      # layer 1: x = 10 + 150 = 160. k = 2 -> start_y = 20. Node 2: {160, 20}, Node 3: {160, 80}.
+      assert pos_lr[1] == {10.0, 20.0}
+      assert pos_lr[2] == {160.0, 20.0}
+      assert pos_lr[3] == {160.0, 80.0}
+
+      # Test direction: :right_to_left
+      pos_rl =
+        Layout.multipartite(graph, [[1], [2, 3]],
+          direction: :right_to_left,
+          layer_gap: 150.0,
+          node_gap: 60.0,
+          origin: {10.0, 20.0},
+          align_nodes: :start
+        )
+
+      # layer 0: x = 10 + 150 = 160. Node 1: {160, 20}.
+      # layer 1: x = 10. Node 2: {10, 20}, Node 3: {10, 80}.
+      assert pos_rl[1] == {160.0, 20.0}
+      assert pos_rl[2] == {10.0, 20.0}
+      assert pos_rl[3] == {10.0, 80.0}
+
+      # Test direction: :top_to_bottom
+      pos_tb =
+        Layout.multipartite(graph, [[1], [2, 3]],
+          direction: :top_to_bottom,
+          layer_gap: 150.0,
+          node_gap: 60.0,
+          origin: {10.0, 20.0},
+          align_nodes: :start
+        )
+
+      # y_origin = 20, x_origin = 10.
+      # layer 0: y = 20. start_x = 10. Node 1: {10, 20}.
+      # layer 1: y = 20 + 150 = 170. start_x = 10. Node 2: {10, 170}, Node 3: {70, 170}.
+      assert pos_tb[1] == {10.0, 20.0}
+      assert pos_tb[2] == {10.0, 170.0}
+      assert pos_tb[3] == {70.0, 170.0}
+    end
+
+    test "supports node alignment options" do
+      # 2 layers: layer 0 = [1], layer 1 = [2, 3]
+      # max_span = (2-1)*60 = 60. span_0 = 0. span_1 = 60.
+      graph = Yog.from_unweighted_edges(:undirected, [{1, 2}, {1, 3}])
+
+      # align_nodes: :center
+      pos_center =
+        Layout.multipartite(graph, [[1], [2, 3]],
+          direction: :left_to_right,
+          layer_gap: 100.0,
+          node_gap: 60.0,
+          origin: {0.0, 0.0},
+          align_nodes: :center
+        )
+
+      # layer 0: start_y = 0 + (60 - 0)/2 = 30. Node 1: {0, 30}.
+      # layer 1: start_y = 0 + (60 - 60)/2 = 0. Node 2: {100, 0}, Node 3: {100, 60}.
+      assert pos_center[1] == {0.0, 30.0}
+      assert pos_center[2] == {100.0, 0.0}
+      assert pos_center[3] == {100.0, 60.0}
+
+      # align_nodes: :end
+      pos_end =
+        Layout.multipartite(graph, [[1], [2, 3]],
+          direction: :left_to_right,
+          layer_gap: 100.0,
+          node_gap: 60.0,
+          origin: {0.0, 0.0},
+          align_nodes: :end
+        )
+
+      # layer 0: start_y = 0 + 60 - 0 = 60. Node 1: {0, 60}.
+      # layer 1: start_y = 0 + 60 - 60 = 0. Node 2: {100, 0}, Node 3: {100, 60}.
+      assert pos_end[1] == {0.0, 60.0}
+      assert pos_end[2] == {100.0, 0.0}
+      assert pos_end[3] == {100.0, 60.0}
+    end
+
+    test "supports sorting layers with order_by" do
+      graph = Yog.from_unweighted_edges(:undirected, [{3, 2}, {2, 1}])
+
+      # order_by: :node_id
+      pos_id =
+        Layout.multipartite(graph, [[3, 2, 1]],
+          direction: :left_to_right,
+          node_gap: 10.0,
+          origin: {0.0, 0.0},
+          align_nodes: :start,
+          order_by: :node_id
+        )
+
+      # Sorted layer should be [1, 2, 3]
+      assert pos_id[1] == {0.0, 0.0}
+      assert pos_id[2] == {0.0, 10.0}
+      assert pos_id[3] == {0.0, 20.0}
+
+      # order_by: 1-arity function (descending order)
+      pos_fun1 =
+        Layout.multipartite(graph, [[3, 2, 1]],
+          direction: :left_to_right,
+          node_gap: 10.0,
+          origin: {0.0, 0.0},
+          align_nodes: :start,
+          order_by: fn id -> -id end
+        )
+
+      # Sorted layer: [3, 2, 1]
+      assert pos_fun1[3] == {0.0, 0.0}
+      assert pos_fun1[2] == {0.0, 10.0}
+      assert pos_fun1[1] == {0.0, 20.0}
+    end
   end
 
   describe "manual/3" do
