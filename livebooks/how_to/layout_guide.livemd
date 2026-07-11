@@ -1,7 +1,7 @@
 # How-To: Controlled Placement and Coordinate Workflows
 
 ```elixir
-Mix.install([{:yog_ex, "~> 0.99.0"}, {:kino, "~> 0.12.0"}])
+Mix.install([{:yog_ex, path: "../.."}, {:kino, "~> 0.12.0"}])
 alias Yog.Layout
 ```
 
@@ -67,14 +67,14 @@ IO.inspect(pos, label: "positions")
 
 The `missing:` option accepts several strategies:
 
-| Value | Behaviour |
-|---|---|
-| `:error` | Raises if any node lacks a coordinate |
-| `:center` | Places missing nodes at `center:` |
-| `:ignore` | Omits missing nodes from the result |
-| `:random` | Uniform random inside the default box |
-| `{:random, opts}` | Random with custom `width:`, `height:`, `center:` |
-| `fn id -> {x, y} end` | Custom generator per node |
+| Value                 | Behaviour                                         |
+| --------------------- | ------------------------------------------------- |
+| `:error`              | Raises if any node lacks a coordinate             |
+| `:center`             | Places missing nodes at `center:`                 |
+| `:ignore`             | Omits missing nodes from the result               |
+| `:random`             | Uniform random inside the default box             |
+| `{:random, opts}`     | Random with custom `width:`, `height:`, `center:` |
+| `fn id -> {x, y} end` | Custom generator per node                         |
 
 ```elixir
 # Custom generator: stack unknown nodes vertically on the right margin
@@ -170,13 +170,13 @@ IO.inspect(pipe_pos, label: "pipeline positions")
 
 Key options for the `:direction` mode:
 
-| Option | Effect |
-|---|---|
-| `:direction` | `:left_to_right`, `:right_to_left`, `:top_to_bottom`, `:bottom_to_top` |
-| `:layer_gap` | Distance (px) between consecutive layers |
-| `:node_gap` | Distance (px) between nodes within a layer |
-| `:align_nodes` | `:start`, `:center`, or `:end` for cross-axis alignment |
-| `:origin` | `{x, y}` top-left origin of the layout |
+| Option         | Effect                                                                 |
+| -------------- | ---------------------------------------------------------------------- |
+| `:direction`   | `:left_to_right`, `:right_to_left`, `:top_to_bottom`, `:bottom_to_top` |
+| `:layer_gap`   | Distance (px) between consecutive layers                               |
+| `:node_gap`    | Distance (px) between nodes within a layer                             |
+| `:align_nodes` | `:start`, `:center`, or `:end` for cross-axis alignment                |
+| `:origin`      | `{x, y}` top-left origin of the layout                                 |
 
 ---
 
@@ -422,17 +422,17 @@ to get a rough automatic layout, then refine specific nodes with `Layout.manual/
 
 ## Appendix: All Layout Algorithms Quick Reference
 
-| Algorithm | Function | Best For |
-|-----------|----------|----------|
-| Circular | `circular/2` | Cycles, symmetric small graphs |
-| Random | `random/2` | Baseline checks, initial states |
-| Spring | `spring/2` | Social networks, general undirected |
-| Tutte | `tutte/3` | Planar graphs, zero edge-crossing embedding |
-| Shell | `shell/3` | Core-periphery, hierarchical groups |
-| Multipartite | `multipartite/3` | Pipelines, bipartite, neural nets |
-| Grid | `grid/2` | Architecture diagrams, structured layouts |
-| Manual | `manual/3` | Fully controlled, pixel-exact placement |
-| GraphViz | `graphviz/2` | Import external engine results into Elixir |
+| Algorithm    | Function         | Best For                                    |
+| ------------ | ---------------- | ------------------------------------------- |
+| Circular     | `circular/2`     | Cycles, symmetric small graphs              |
+| Random       | `random/2`       | Baseline checks, initial states             |
+| Spring       | `spring/2`       | Social networks, general undirected         |
+| Tutte        | `tutte/3`        | Planar graphs, zero edge-crossing embedding |
+| Shell        | `shell/3`        | Core-periphery, hierarchical groups         |
+| Multipartite | `multipartite/3` | Pipelines, bipartite, neural nets           |
+| Grid         | `grid/2`         | Architecture diagrams, structured layouts   |
+| Manual       | `manual/3`       | Fully controlled, pixel-exact placement     |
+| GraphViz     | `graphviz/2`     | Import external engine results into Elixir  |
 
 ### SVG Rendering Examples
 
