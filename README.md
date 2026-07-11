@@ -42,7 +42,9 @@ YogEx provides comprehensive graph algorithms organized into modules:
 
 **[Pathfinding & Flow](https://hexdocs.pm/yog_ex/Yog.Pathfinding.html)** — Shortest paths (Dijkstra, A*, Bellman-Ford, Floyd-Warshall, Johnson's), maximum flow (Edmonds-Karp), min-cut (Stoer-Wagner), and implicit state-space search for on-demand graphs.
 
-**[Network Analysis](https://hexdocs.pm/yog_ex/Yog.Centrality.html)** — Centrality measures (PageRank, betweenness, closeness, eigenvector, Katz), community detection (Louvain, Leiden, Infomap, Walktrap), and network health metrics.
+**[Network Analysis](https://hexdocs.pm/yog_ex/Yog.Centrality.html)** — Centrality measures (PageRank, betweenness, closeness, eigenvector, Katz) and network health metrics.
+
+**[Community Detection](https://hexdocs.pm/yog_ex/Yog.Community.html)** — Detect communities and cluster structures using Louvain, Leiden, Infomap, and Walktrap, with modularity and coverage metrics.
 
 **[Connectivity & Structure](https://hexdocs.pm/yog_ex/Yog.Connectivity.html)** — SCCs (Tarjan/Kosaraju), bridges, articulation points, K-core decomposition, and reachability analysis with exact and HyperLogLog-based estimation.
 
@@ -51,6 +53,8 @@ YogEx provides comprehensive graph algorithms organized into modules:
 ### Developer Experience
 
 **[Generators & Builders](https://hexdocs.pm/yog_ex/Yog.Generator.Classic.html)** — Classic patterns (complete, cycle, grid, Petersen), random models (SBM, R-MAT), and a comprehensive **Maze Generation** suite (Recursive Backtracker, Wilson's, Kruskal's, Eller's, etc.) with labeled and grid builders.
+
+**[Graph Layouts](https://hexdocs.pm/yog_ex/Yog.Layout.html)** — Compute 2D node coordinates in pure Elixir (Circular, Random, Spring/Barnes-Hut, Tutte, Concentric Shell, Multipartite, Grid, and Manual placement) or import layouts from GraphViz.
 
 **[I/O & Visualization](https://hexdocs.pm/yog_ex/Yog.IO.GraphML.html)** — GraphML, GDF, Pajek, LEDA, TGF, JSON serialization plus ASCII, DOT, and Mermaid rendering.
 
@@ -180,7 +184,7 @@ Detailed examples are located in the [examples/README.md](examples/README.md) fi
 
 YogEx is used to solve [Advent of Code](https://adventofcode.com/) challenges. 
 
-See all Advent of Code solutions tagged with `graph` that demonstrate usage of YogEx algorithms in the [Advent of Code repository](https://github.com/code-shoily/advent_of_code).
+See all Advent of Code solutions tagged with `graph` that demonstrate usage of YogEx algorithms in the [Advent of Code Repository](https://github.com/code-shoily/advent_of_code/blob/main/wiki/tags/graph.md).
 
 ## Projects Using Yog
 
