@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`Yog.Layout.graphviz/2` — GraphViz Layout Import** — Added `Yog.Layout.GraphViz.layout/2` (exposed as `Yog.Layout.graphviz/2`) to shell out to an installed GraphViz engine (`:dot`, `:neato`, `:fdp`, `:circo`, etc.) and import the computed node coordinates back as a `Yog.Layout` position map. Supports both simple (`Yog.Graph`) and multi-graphs (`Yog.Multi.Graph`), configurable coordinate scaling, custom DOT options, and clear error handling when the GraphViz CLI is not found.
 - **DOT Renderer Position Support** — Added options (`:positions`, `:pin`, `:position_scale`, `:position_unit`) to `Yog.Render.DOT` and `Yog.Multi.DOT` to output GraphViz `pos` and `pin` attributes from `Yog.Layout` coordinate maps.
 - **`Yog.Layout.pack/2` & `Yog.Layout.merge_position_maps/1`** — Added layout composition and packing helpers. `pack/2` places multiple coordinate maps side-by-side (horizontally) or stacked (vertically) with a custom gap, and `merge_position_maps/1` merges disjoint coordinate maps while raising clean errors for duplicate node IDs.
 - **`Yog.Layout.multipartite/3` Enhancements** — Extended the multipartite layout algorithm with spacing and direction controls. Callers can now specify `:direction` (`:left_to_right`, `:right_to_left`, `:top_to_bottom`, or `:bottom_to_top`), custom gaps (`:layer_gap` and `:node_gap`), layout `:origin` offset, node alignment (`:align_nodes` as `:start`, `:center`, or `:end`), and sorting options (`:order_by`).

@@ -55,6 +55,7 @@ defmodule Yog.Layout do
 
   alias Yog.Graph
   alias Yog.Layout.Circular
+  alias Yog.Layout.GraphViz
   alias Yog.Layout.Grid
   alias Yog.Layout.Multipartite
   alias Yog.Layout.Random
@@ -134,6 +135,18 @@ defmodule Yog.Layout do
   @spec grid(Graph.t(), keyword()) :: %{Graph.node_id() => {float(), float()}}
   def grid(graph, opts) do
     Grid.layout(graph, opts)
+  end
+
+  @doc """
+  Positions nodes using an external GraphViz layout engine.
+
+  Delegates to `Yog.Layout.GraphViz.layout/2`.
+  """
+  @spec graphviz(Graph.t() | Yog.Multi.Graph.t(), keyword()) :: %{
+          any() => {float(), float()}
+        }
+  def graphviz(graph, opts \\ []) do
+    GraphViz.layout(graph, opts)
   end
 
   @doc """
