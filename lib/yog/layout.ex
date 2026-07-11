@@ -55,6 +55,7 @@ defmodule Yog.Layout do
 
   alias Yog.Graph
   alias Yog.Layout.Circular
+  alias Yog.Layout.Geometry
   alias Yog.Layout.GraphViz
   alias Yog.Layout.Grid
   alias Yog.Layout.Multipartite
@@ -148,6 +149,35 @@ defmodule Yog.Layout do
   def graphviz(graph, opts \\ []) do
     GraphViz.layout(graph, opts)
   end
+
+  @doc """
+  Converts a center-based position map to bounding rectangle maps.
+
+  Delegates to `Yog.Layout.Geometry.rects/2`.
+  """
+  @spec rects(%{any() => {float(), float()}}, keyword()) :: %{
+          any() => {float(), float(), float(), float()}
+        }
+  def rects(positions, opts \\ []), do: Geometry.rects(positions, opts)
+
+  @doc """
+  Returns an anchor point on a bounding rectangle edge.
+
+  Delegates to `Yog.Layout.Geometry.anchor/2`.
+  """
+  @spec anchor({float(), float(), float(), float()}, atom()) :: {float(), float()}
+  def anchor(rect, direction), do: Geometry.anchor(rect, direction)
+
+  @doc """
+  Computes connector endpoints between nodes for a list of edges.
+
+  Delegates to `Yog.Layout.Geometry.edge_endpoints/3`.
+  """
+  @spec edge_endpoints(%{any() => {float(), float()}}, [{any(), any()}], keyword()) :: [
+          {{float(), float()}, {float(), float()}}
+        ]
+  def edge_endpoints(positions, edges, opts \\ []),
+    do: Geometry.edge_endpoints(positions, edges, opts)
 
   @doc """
   Positions nodes manually based on a supplied map of coordinates, with options to validate and fill in missing nodes.

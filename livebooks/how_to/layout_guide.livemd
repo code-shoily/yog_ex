@@ -1,177 +1,489 @@
-# How-To: Graph Layouts and Rendering Guide
+# How-To: Controlled Placement and Coordinate Workflows
 
 ```elixir
-Mix.install([
-  {:yog_ex, "~> 0.99.0"},
-  {:kino, "~> 0.12.0"}
-])
+Mix.install([{:yog_ex, "~> 0.99.0"}, {:kino, "~> 0.12.0"}])
+alias Yog.Layout
 ```
 
 ## Introduction
 
-Graph layouts are algorithms that compute a 2D coordinate position for each node in a graph. While standard renderers like Graphviz (DOT) or Mermaid calculate layouts internally using external binaries or JavaScript engines, `Yog.Layout` calculates coordinates directly in pure Elixir.
+`Yog.Layout` is a **pure Elixir coordinate layer** that sits below any rendering
+backend. It produces a plain Elixir map of the form `%{node_id => {x, y}}` — no
+external processes, no side effects. You can then pipe those coordinates into
+`Yog.Render.SVG`, `Yog.Render.DOT`, a Phoenix LiveView component, a JSON API
+response, or anything else you like.
 
-Having the calculated coordinates (`%{node_id => {x, y}}`) inside Elixir gives you complete control over how to render and animate your graph.
+This means your layout logic is:
 
-In this guide, you will learn:
+* **Deterministic** — seed-based random algorithms produce identical results
+  across machines, CI runs, and snapshot tests.
+* **Testable** — just assert on map values; no visual diffing required.
+* **Renderer-agnostic** — swap SVG for DOT for Cytoscape.js without touching
+  the layout code.
 
-1. How to use `Yog.Layout` to compute coordinates for all 6 layout types: **Circular, Random, Spring (Force-Directed), Tutte, Shell, and Multipartite**.
-2. How to draw these layouts dynamically as interactive **SVG graphics** inside Livebook using `Yog.Render.SVG`.
+This guide covers the full controlled-placement workflow:
+
+1. Manual placement with fallback strategies
+2. Grid placement for structured diagrams
+3. Multipartite (layered) placement for pipelines
+4. Transform and fit pipeline for multi-view layouts
+5. DOT fixed-position output with `neato`/`fdp`
+6. Importing positions from a GraphViz layout run
+7. Geometry helpers (coming soon)
+8. When to use GraphViz rank controls vs explicit coordinates
 
 ---
 
-## 1. Calculating Layout Coordinates
+## Section 1: Manual Placement
 
-First, let's create a sample graph. We will build a simple "wheel graph" (a central hub node connected to a surrounding cycle).
+`Layout.manual/3` lets you specify exact coordinates for whichever nodes you
+care about and delegate the rest to a *missing* strategy.
 
 ```elixir
-alias Yog.Layout
-
-# Build a wheel graph with 6 outer nodes and a central hub (node 0)
+# A small service graph: api gateway, two services, one shared db
 graph =
+  Yog.from_unweighted_edges(:directed, [
+    {:gateway, :auth},
+    {:gateway, :catalog},
+    {:auth, :db},
+    {:catalog, :db}
+  ])
+
+# Pin the nodes we care about precisely; let :db fall to :center
+pinned = %{
+  gateway: {400.0, 50.0},
+  auth:    {200.0, 250.0},
+  catalog: {600.0, 250.0}
+}
+
+pos =
+  Layout.manual(graph, pinned,
+    missing: :center,
+    center: {400.0, 450.0}
+  )
+
+IO.inspect(pos, label: "positions")
+```
+
+The `missing:` option accepts several strategies:
+
+| Value | Behaviour |
+|---|---|
+| `:error` | Raises if any node lacks a coordinate |
+| `:center` | Places missing nodes at `center:` |
+| `:ignore` | Omits missing nodes from the result |
+| `:random` | Uniform random inside the default box |
+| `{:random, opts}` | Random with custom `width:`, `height:`, `center:` |
+| `fn id -> {x, y} end` | Custom generator per node |
+
+```elixir
+# Custom generator: stack unknown nodes vertically on the right margin
+pos_custom =
+  Layout.manual(
+    graph,
+    %{gateway: {400.0, 50.0}},
+    missing: fn _id -> {750.0, :rand.uniform() * 500.0} end
+  )
+
+IO.inspect(Map.keys(pos_custom) |> Enum.sort(), label: "all nodes covered")
+```
+
+---
+
+## Section 2: Grid Placement
+
+`Layout.grid/2` places nodes on a deterministic 2D grid from a `:rows` (or
+`:columns`) specification. Use `nil` as a placeholder for empty cells.
+
+```elixir
+# 3-column architecture diagram:
+#   Row 0: [client,  nil,     loadbalancer]
+#   Row 1: [api_a,   api_b,   api_c      ]
+#   Row 2: [nil,     db,      nil        ]
+
+arch_graph =
+  Yog.undirected()
+  |> Yog.add_nodes_from([:client, :loadbalancer, :api_a, :api_b, :api_c, :db])
+
+grid_pos =
+  Layout.grid(arch_graph,
+    rows: [
+      [:client, nil, :loadbalancer],
+      [:api_a, :api_b, :api_c],
+      [nil, :db, nil]
+    ],
+    cell: {200.0, 150.0},
+    origin: {0.0, 0.0}
+  )
+
+IO.inspect(grid_pos, label: "grid positions")
+```
+
+The result maps every real node to `{col * cell_width, row * cell_height}`.
+`nil` slots are skipped — they just keep subsequent nodes aligned:
+
+```elixir
+# Verify the loadbalancer is at column 2, row 0 => {400.0, 0.0}
+{lx, ly} = grid_pos[:loadbalancer]
+IO.puts("loadbalancer => x=#{lx}, y=#{ly}")
+# db is at column 1, row 2 => {200.0, 300.0}
+{dx, dy} = grid_pos[:db]
+IO.puts("db           => x=#{dx}, y=#{dy}")
+```
+
+---
+
+## Section 3: Multipartite with Spacing
+
+`Layout.multipartite/3` with `:direction` gives you an explicit layer-gap /
+node-gap model — ideal for pipeline and flow-network diagrams.
+
+```elixir
+# Pipeline: source -> [parse, validate] -> [transform, enrich] -> sink
+pipeline =
+  Yog.from_unweighted_edges(:directed, [
+    {:source, :parse},
+    {:source, :validate},
+    {:parse, :transform},
+    {:validate, :enrich},
+    {:transform, :sink},
+    {:enrich, :sink}
+  ])
+
+layers = [
+  [:source],
+  [:parse, :validate],
+  [:transform, :enrich],
+  [:sink]
+]
+
+pipe_pos =
+  Layout.multipartite(pipeline, layers,
+    direction: :left_to_right,
+    layer_gap: 180.0,
+    node_gap: 100.0,
+    align_nodes: :center
+  )
+
+IO.inspect(pipe_pos, label: "pipeline positions")
+```
+
+Key options for the `:direction` mode:
+
+| Option | Effect |
+|---|---|
+| `:direction` | `:left_to_right`, `:right_to_left`, `:top_to_bottom`, `:bottom_to_top` |
+| `:layer_gap` | Distance (px) between consecutive layers |
+| `:node_gap` | Distance (px) between nodes within a layer |
+| `:align_nodes` | `:start`, `:center`, or `:end` for cross-axis alignment |
+| `:origin` | `{x, y}` top-left origin of the layout |
+
+---
+
+## Section 4: Transform and Fit Pipeline
+
+This section shows a common multi-view pattern: compute two independent layouts,
+pack them side-by-side, then fit the combined result into a viewport.
+
+```elixir
+# Two separate subgraphs
+graph_a =
+  Yog.from_unweighted_edges(:undirected, [{:a1, :a2}, {:a2, :a3}, {:a3, :a1}])
+
+graph_b =
+  Yog.from_unweighted_edges(:undirected, [
+    {:b1, :b2}, {:b2, :b3}, {:b3, :b4}, {:b4, :b1}
+  ])
+
+# Independent circular layouts
+pos_a = Layout.circular(graph_a, radius: 50.0)
+pos_b = Layout.circular(graph_b, radius: 70.0)
+
+# Bounding boxes before packing
+IO.inspect(Layout.bounds(pos_a), label: "bounds(pos_a) before pack")
+IO.inspect(Layout.bounds(pos_b), label: "bounds(pos_b) before pack")
+```
+
+```elixir
+# Pack side-by-side with a 20px gap between bounding boxes
+combined = Layout.pack([pos_a, pos_b], direction: :horizontal, gap: 20.0)
+
+IO.inspect(Layout.bounds(combined), label: "bounds(combined) after pack")
+```
+
+```elixir
+# Fit the combined layout into an 800x600 viewport with 20px padding
+fitted = Layout.fit(combined, width: 800.0, height: 600.0, padding: 20.0)
+
+IO.inspect(Layout.bounds(fitted), label: "bounds(fitted)")
+```
+
+The full chain reads left-to-right and is entirely functional:
+
+```elixir
+result =
+  [
+    Layout.circular(graph_a, radius: 50.0),
+    Layout.circular(graph_b, radius: 70.0)
+  ]
+  |> Layout.pack(direction: :horizontal, gap: 20.0)
+  |> Layout.fit(width: 800.0, height: 600.0, padding: 20.0)
+
+Layout.bounds(result)
+```
+
+---
+
+## Section 5: DOT Fixed-Position Output
+
+`Yog.Render.DOT.to_dot/2` accepts a `:positions` map and a `:pin` flag.  When
+positions are supplied, every node gets a `pos="x,y"` attribute embedded in the
+DOT output.
+
+> **Note:** Only the `neato` and `fdp` Graphviz engines respect `pos=`
+> attributes and use them as starting or fixed positions. The default `dot`
+> engine uses rank-based layout and **ignores** `pos=` entirely. Pass `pin:
+> true` to lock nodes in place and prevent `neato`/`fdp` from nudging them.
+
+```elixir
+service_graph =
+  Yog.from_unweighted_edges(:directed, [
+    {:gateway, :auth},
+    {:gateway, :catalog},
+    {:auth, :db},
+    {:catalog, :db}
+  ])
+
+# Build explicit positions
+service_pos = %{
+  gateway: {400.0, 50.0},
+  auth:    {200.0, 300.0},
+  catalog: {600.0, 300.0},
+  db:      {400.0, 550.0}
+}
+
+dot_opts = %{
+  Yog.Render.DOT.default_options()
+  | positions: service_pos,
+    pin: true,
+    graph_name: "Services"
+}
+
+dot_string = Yog.Render.DOT.to_dot(service_graph, dot_opts)
+IO.puts(dot_string)
+```
+
+To render with fixed positions, save `dot_string` to a file and run:
+
+```
+neato -Tsvg -n services.dot -o services.svg
+# or
+fdp  -Tsvg    services.dot -o services.svg
+```
+
+The `-n` flag tells `neato` to skip its own layout pass and use the embedded
+`pos=` coordinates directly.
+
+---
+
+## Section 6: GraphViz Layout Import
+
+`Layout.graphviz/2` calls the `dot` (or another) GraphViz engine as an external
+process, parses the output, and returns a standard `%{node_id => {x, y}}` map.
+You can then pipe it through any of the transform helpers.
+
+> **Requires:** GraphViz CLI installed (`dot`, `neato`, `fdp`, ...).
+
+```elixir
+import_graph =
+  Yog.from_unweighted_edges(:directed, [
+    {1, 2}, {1, 3}, {2, 4}, {3, 4}, {4, 5}
+  ])
+
+try do
+  pos = Layout.graphviz(import_graph, engine: :dot)
+  fitted = Layout.fit(pos, width: 800.0, height: 600.0)
+  IO.inspect(Layout.bounds(fitted), label: "fitted GraphViz layout bounds")
+  fitted
+rescue
+  RuntimeError ->
+    IO.puts("GraphViz not available in this environment — skipping.")
+    %{}
+end
+```
+
+Once you have the positions map back in Elixir you can combine it with other
+layouts using `pack/2`, annotate it with `translate/3` or `scale/2`, and render
+it via any backend.
+
+---
+
+## Section 7: Geometry Helpers (Rect-Based Renderers)
+
+`Yog.Layout` coordinates are center-based `{x, y}` floats. Rect-based renderers (Excalidraw,
+canvas, D3, Konva, SVG foreignObject) need bounding boxes and connector endpoints instead.
+The geometry helpers bridge that gap without any external dependency.
+
+```elixir
+# Build a small directed graph and compute spring positions
+pipeline =
+  Yog.from_unweighted_edges(:directed, [
+    {:input, :parse},
+    {:parse, :validate},
+    {:validate, :output}
+  ])
+
+pos = Layout.spring(pipeline, iterations: 80, seed: 7)
+      |> Layout.fit(width: 600.0, height: 200.0, padding: 40.0)
+
+# Convert center positions to bounding rectangles {left_x, top_y, width, height}
+node_w = 100.0
+node_h = 40.0
+
+rects = Layout.rects(pos, size: {node_w, node_h})
+```
+
+```elixir
+# Inspect the rectangle for the :input node
+{x, y, w, h} = rects[:input]
+IO.puts("input node rect — x=#{x}, y=#{y}, w=#{w}, h=#{h}")
+
+# Get anchor points on the rect boundary
+right_anchor  = Layout.anchor(rects[:input], :right)
+center_anchor = Layout.anchor(rects[:input], :center)
+IO.inspect(right_anchor,  label: "right anchor")
+IO.inspect(center_anchor, label: "center anchor")
+```
+
+```elixir
+# Compute per-edge connector endpoints (clips to the nearest side midpoint)
+edges = [
+  {:input, :parse},
+  {:parse, :validate},
+  {:validate, :output}
+]
+
+endpoints = Layout.edge_endpoints(pos, edges, node_size: {node_w, node_h})
+
+for {from_pt, to_pt} <- endpoints do
+  IO.inspect({from_pt, to_pt}, label: "edge")
+end
+```
+
+The `:node_size` option accepts either a uniform `{w, h}` tuple or an arity-2 function
+`fn node_id, {cx, cy} -> {w, h} end` for per-node dimensions.
+
+---
+
+## Section 8: When to Use GraphViz Rank Controls vs Explicit Coordinates
+
+Both approaches produce node positions, but they optimise for different goals.
+
+### GraphViz rank attributes (`rankdir`, `rank=same`)
+
+```elixir
+# Use DOT rank constraints when you want Graphviz to figure out the layout
+ranked_opts = %{
+  Yog.Render.DOT.default_options()
+  | rankdir: :lr,
+    ranks: [
+      {:source, [:gateway]},
+      {:same, [:auth, :catalog]},
+      {:sink, [:db]}
+    ]
+}
+
+ranked_dot = Yog.Render.DOT.to_dot(service_graph, ranked_opts)
+# Print first 400 chars as a sanity check
+IO.puts(String.slice(ranked_dot, 0, 400))
+```
+
+**GraphViz rank controls are great when:**
+
+* You have a DAG and want automatic hierarchical placement
+* You need Graphviz's sophisticated edge routing (curved splines, port attachment)
+* You're happy to depend on an external binary at render time
+* The exact pixel positions don't matter — only the topological order does
+
+### Explicit `Yog.Layout` coordinates
+
+**Explicit coordinates are great when:**
+
+* You need **reproducible**, seed-deterministic positions (snapshot tests, docs)
+* You're driving a renderer that isn't Graphviz (SVG, canvas, web, PDF)
+* You're building an interactive diagram editor where users drag nodes
+* You want to combine multiple independent subgraphs with precise spacing using `pack/2`
+* You need **no external binary dependency** (pure Elixir, works in CI)
+
+The two approaches are also composable: import positions from `Layout.graphviz/2`
+to get a rough automatic layout, then refine specific nodes with `Layout.manual/3`.
+
+---
+
+## Appendix: All Layout Algorithms Quick Reference
+
+| Algorithm | Function | Best For |
+|-----------|----------|----------|
+| Circular | `circular/2` | Cycles, symmetric small graphs |
+| Random | `random/2` | Baseline checks, initial states |
+| Spring | `spring/2` | Social networks, general undirected |
+| Tutte | `tutte/3` | Planar graphs, zero edge-crossing embedding |
+| Shell | `shell/3` | Core-periphery, hierarchical groups |
+| Multipartite | `multipartite/3` | Pipelines, bipartite, neural nets |
+| Grid | `grid/2` | Architecture diagrams, structured layouts |
+| Manual | `manual/3` | Fully controlled, pixel-exact placement |
+| GraphViz | `graphviz/2` | Import external engine results into Elixir |
+
+### SVG Rendering Examples
+
+All algorithms produce the same shape of output — a positions map — so the SVG
+rendering code is always the same wrapper:
+
+```elixir
+# Build a wheel graph for demonstration
+demo_graph =
   Yog.from_unweighted_edges(:undirected, [
     {0, 1}, {0, 2}, {0, 3}, {0, 4}, {0, 5}, {0, 6},
     {1, 2}, {2, 3}, {3, 4}, {4, 5}, {5, 6}, {6, 1}
   ])
 ```
 
-We can now compute the positions of the nodes using any of the available layout functions.
-
-### Circular Layout
-
-Uniformly spaces nodes along the circumference of a circle.
-
 ```elixir
-Layout.circular(graph, radius: 10.0, center: {0.0, 0.0})
+# Circular layout
+pos_circ = Layout.circular(demo_graph, radius: 1.0)
+Kino.HTML.new(Yog.Render.SVG.to_svg(demo_graph, pos_circ, node_color: "#3b82f6"))
 ```
 
-### Random Layout
-
-Uniformly distributes nodes inside a bounding box.
-
 ```elixir
-Layout.random(graph, width: 2.0, height: 2.0, seed: 42)
+# Spring layout (force-directed)
+pos_spring = Layout.spring(demo_graph, iterations: 100, seed: 42)
+Kino.HTML.new(Yog.Render.SVG.to_svg(demo_graph, pos_spring, node_color: "#10b981"))
 ```
 
-### Spring Layout (Fruchterman-Reingold)
-
-A force-directed layout where connected nodes attract (springs) and all nodes repel (charge).
-
-For large graphs, computing repulsive forces between all pairs of nodes can be slow ($O(V^2)$ complexity). You can enable the **Barnes-Hut approximation** ($O(V \log V)$ complexity) by passing `barnes_hut: true` and an optional opening-angle threshold `theta` (default is `0.5`):
-
 ```elixir
-Layout.spring(graph, iterations: 50, seed: 42, barnes_hut: true, theta: 0.5)
+# Shell layout (hub in centre, cycle on outer ring)
+pos_shell = Layout.shell(demo_graph, [[0], [1, 2, 3, 4, 5, 6]], radii: [0.2, 1.0])
+Kino.HTML.new(Yog.Render.SVG.to_svg(demo_graph, pos_shell, node_color: "#f59e0b"))
 ```
 
-### Tutte Layout (Barycentric Planar)
-
-Embeds a planar graph with zero edge crossings by pinning a convex boundary and placing interior nodes at the barycenter of their neighbors.
-
 ```elixir
-# Pin nodes [1, 2, 3, 4, 5, 6] to the boundary circle, placing hub node 0 in the center
-Layout.tutte(graph, [1, 2, 3, 4, 5, 6], iterations: 50, radius: 5.0)
+# Tutte layout (boundary pinned, hub at barycenter)
+pos_tutte = Layout.tutte(demo_graph, [1, 2, 3, 4, 5, 6], iterations: 50, radius: 5.0)
+Kino.HTML.new(Yog.Render.SVG.to_svg(demo_graph, pos_tutte, node_color: "#8b5cf6"))
 ```
 
-### Shell Layout (Concentric Circles)
-
-Groups nodes into concentric circles.
-
 ```elixir
-# Place hub node 0 in the inner shell, cycle nodes in the outer shell
-Layout.shell(graph, [[0], [1, 2, 3, 4, 5, 6]], radii: [0.2, 1.0])
+# Multipartite layout (layered columns)
+layered_graph =
+  Yog.from_unweighted_edges(:undirected, [{0, 1}, {0, 2}, {1, 3}, {2, 3}])
+
+pos_multi =
+  Layout.multipartite(layered_graph, [[0], [1, 2], [3]],
+    direction: :left_to_right,
+    layer_gap: 150.0,
+    node_gap: 100.0,
+    align_nodes: :center
+  )
+
+Kino.HTML.new(Yog.Render.SVG.to_svg(layered_graph, pos_multi, node_color: "#ef4444"))
 ```
-
-### Multipartite Layout (Layered Rows/Columns)
-
-Arranges partitioned nodes in parallel rows or columns.
-
-```elixir
-# Grouping into layers: layer 0: [0], layer 1: [1, 2], layer 2: [3, 4, 5, 6]
-Layout.multipartite(graph, [[0], [1, 2], [3, 4, 5, 6]], align: :vertical, width: 4.0)
-```
-
----
-
-## 2. Rendering Graph Layouts in SVG (using Kino SVG)
-
-`Yog.Render.SVG` converts a layout positions map and a graph into a raw XML/SVG string. Since this outputs a standard string, it can be rendered in Livebook by wrapping it in `Kino.HTML.new/1`.
-
-### Visualizing Circular Layout
-
-```elixir
-pos = Layout.circular(graph, radius: 1.0)
-svg = Yog.Render.SVG.to_svg(graph, pos, node_color: "#ef4444")
-Kino.HTML.new(svg)
-```
-
-### Visualizing Spring Force-Directed Layout
-
-```elixir
-pos = Layout.spring(graph, iterations: 100, seed: 12)
-svg = Yog.Render.SVG.to_svg(graph, pos, node_color: "#10b981")
-Kino.HTML.new(svg)
-```
-
-### Visualizing Tutte Layout
-
-```elixir
-pos = Layout.tutte(graph, [1, 2, 3, 4, 5, 6], iterations: 50)
-svg = Yog.Render.SVG.to_svg(graph, pos, node_color: "#8b5cf6")
-Kino.HTML.new(svg)
-```
-
-### Visualizing Multigraphs with Parallel Edges and Self-Loops
-
-SVG rendering is especially powerful for multigraphs because parallel edges and self-loops require mathematically calculated Bézier curves. To lay out a multigraph, we collapse it to a simple graph to generate positions, and then render the full multigraph. `Yog.Render.SVG` handles parallel edge spacing automatically.
-
-```elixir
-# Create a multigraph with multiple edges and a self-loop
-multi =
-  Yog.Multi.undirected()
-  |> Yog.Multi.add_node(:a)
-  |> Yog.Multi.add_node(:b)
-  |> Yog.Multi.add_node(:c)
-  |> Yog.Multi.add_node(:d)
-  |> Yog.Multi.add_node(:e)
-
-{multi, _} = Yog.Multi.add_edge(multi, :a, :b, "e1")
-{multi, _} = Yog.Multi.add_edge(multi, :a, :b, "e2")
-{multi, _} = Yog.Multi.add_edge(multi, :a, :b, "e3")
-{multi, _} = Yog.Multi.add_edge(multi, :b, :c, "e4")
-{multi, _} = Yog.Multi.add_edge(multi, :c, :d, "e5")
-{multi, _} = Yog.Multi.add_edge(multi, :a, :d, "e6")
-{multi, _} = Yog.Multi.add_edge(multi, :b, :d, "e7")
-{multi, _} = Yog.Multi.add_edge(multi, :e, :a, "e8")
-{multi, _} = Yog.Multi.add_edge(multi, :c, :c, "loop")
-
-# Calculate layout on the collapsed simple graph representation
-simple_graph = Yog.Multi.to_simple_graph(multi)
-pos = Layout.spring(simple_graph, iterations: 220, seed: 33)
-
-# Render the full multigraph showing parallel edges and self-loops
-svg = Yog.Render.SVG.to_svg(multi, pos, node_color: "#f43f5e")
-Kino.HTML.new(svg)
-```
-
-### Visualizing Directed Graphs with Arrowheads
-
-For directed graphs, `Yog.Render.SVG` renders direction arrows. To prevent arrowheads from being hidden under the node circles, the renderer automatically calculates the boundary intersection of the target node and truncates the edge line at the node boundary.
-
-```elixir
-# Create a simple directed cycle graph
-directed_graph = Yog.from_unweighted_edges(:directed, [
-  {1, 2}, {2, 3}, {3, 4}, {4, 1}
-])
-
-pos = Layout.circular(directed_graph)
-
-# Render with arrowheads indicating edge direction
-svg = Yog.Render.SVG.to_svg(directed_graph, pos, node_color: "#0ea5e9")
-Kino.HTML.new(svg)
-```
-
----
-
-## Summary
-
-`Yog.Layout` gives you the mathematical foundation to position nodes, and `Yog.Render.SVG` provides a clean, dependency-free visualizer in Elixir.
