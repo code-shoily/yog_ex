@@ -19,13 +19,15 @@ defmodule Yog.Utils do
   - `:eq` when `a == b`
   - `:gt` when `a > b`
 
-  It works for both integers and floats.
+  It works for integers, floats, and the `:infinity` sentinel.
 
   While this function initially was influenced by the Gleamy origin of Yog,
-  it felt more of a direction agnotic way to handle comparisons in algorithms
+  it felt more of a direction-agnostic way to handle comparisons in algorithms
   that needed comparators passed into them, for instance, Dijkstra's algorithm
   could sometimes show `compare.(a, b) == true` but we would need to remember if
   it means a < b or a > b (what if the comparator passed in was > instead of < ?).
+
+  It treats `:infinity` as greater than any finite numeric value.
 
   We could name the parameter `less_than` and `greater_than` to address this, but
   ternary operator felt more explicit, especially in cases where the algorithms need
@@ -43,8 +45,17 @@ defmodule Yog.Utils do
       :gt
       iex> Yog.Utils.compare(1.5, 3.2)
       :lt
+      iex> Yog.Utils.compare(:infinity, 10)
+      :gt
+      iex> Yog.Utils.compare(10, :infinity)
+      :lt
+      iex> Yog.Utils.compare(:infinity, :infinity)
+      :eq
   """
-  @spec compare(number(), number()) :: :lt | :eq | :gt
+  @spec compare(number() | :infinity, number() | :infinity) :: :lt | :eq | :gt
+  def compare(:infinity, :infinity), do: :eq
+  def compare(:infinity, _), do: :gt
+  def compare(_, :infinity), do: :lt
   def compare(a, b) when a < b, do: :lt
   def compare(a, b) when a > b, do: :gt
   def compare(_, _), do: :eq
@@ -90,20 +101,27 @@ defmodule Yog.Utils do
 
   ## Examples
 
-      iex> Utils.norm_diff(%{a: 1, b: 2}, %{a: 3, b: 4}, :l1)
+      iex> Yog.Utils.norm_diff(%{a: 1, b: 2}, %{a: 3, b: 4}, :l1)
       4.0
 
-      iex> Utils.norm_diff(%{a: 1, b: 2}, %{a: 3, b: 4}, :l2)
+      iex> Yog.Utils.norm_diff(%{a: 1, b: 2}, %{a: 3, b: 4}, :l2)
       2.8284271247461903
 
-      iex> Utils.norm_diff(%{a: 1.1, b: 2}, %{a: 3, b: 4}, :max)
+      iex> Yog.Utils.norm_diff(%{a: 1.1, b: 2}, %{a: 3, b: 4}, :max)
       2.0
   """
   @spec norm_diff(map(), map(), :l1 | :l2 | :max) :: float()
   def norm_diff(m1, m2, type) do
     case type do
       :l1 ->
-        acc = map_fold(m1, 0.0, fn k, v1, acc -> acc + abs(v1 - Map.get(m2, k, 0)) end)
+        acc =
+          map_fold(
+            m1,
+            0.0,
+            fn k, v1, acc ->
+              acc + abs(v1 - Map.get(m2, k, 0))
+            end
+          )
 
         map_fold(m2, acc, fn k, v2, acc ->
           if Map.has_key?(m1, k) do
@@ -132,7 +150,14 @@ defmodule Yog.Utils do
         :math.sqrt(sum_sq)
 
       :max ->
-        max_val = map_fold(m1, 0.0, fn k, v1, acc -> max(acc, abs(v1 - Map.get(m2, k, 0))) end)
+        max_val =
+          map_fold(
+            m1,
+            0.0,
+            fn k, v1, acc ->
+              max(acc, abs(v1 - Map.get(m2, k, 0)))
+            end
+          )
 
         max_val =
           map_fold(m2, max_val, fn k, v2, acc ->
@@ -155,7 +180,13 @@ defmodule Yog.Utils do
   def norm_diff_same_keys(m1, m2, type) do
     case type do
       :l1 ->
-        map_fold(m1, 0.0, fn k, v1, acc -> acc + abs(v1 - Map.get(m2, k, 0.0)) end)
+        map_fold(
+          m1,
+          0.0,
+          fn k, v1, acc ->
+            acc + abs(v1 - Map.get(m2, k, 0.0))
+          end
+        )
 
       :l2 ->
         sum_sq =
@@ -169,10 +200,11 @@ defmodule Yog.Utils do
   end
 
   @doc """
-  Fisher-Yates shuffle: O(n) unbiased shuffling.
+  Deterministic Fisher–Yates-style shuffle.
 
-  Uses Erlang's :array for efficient mutable-style operations.
-  Deterministic when given a seed (for reproducibility).
+  Uses a simple linear congruential generator for reproducibility. This is suitable
+  for tests and algorithm tie-breaking, but is not cryptographically secure and may
+  have small modulo bias.
 
   ## Examples
 
@@ -193,6 +225,7 @@ defmodule Yog.Utils do
       a = 1_103_515_245
       c = 12_345
       m = 2_147_483_648
+      seed = Integer.mod(seed, m)
 
       {shuffled_arr, _final_seed} =
         Enum.reduce(0..(n - 2), {arr, seed}, fn i, {arr_acc, current_seed} ->
@@ -225,13 +258,21 @@ defmodule Yog.Utils do
       iex> Yog.Utils.combinations([1, 2, 3], 0)
       [[]]
   """
-  @spec combinations([a], integer()) :: [[a]] when a: var
-  def combinations(_list, 0), do: [[]]
-  def combinations([], _k), do: []
+  @spec combinations([a], non_neg_integer()) :: [[a]] when a: var
+  def combinations(list, k) when is_integer(k) and k >= 0 do
+    do_combinations(list, k, length(list))
+  end
 
-  def combinations([h | t], k) do
-    with_h = for(l <- combinations(t, k - 1), do: [h | l])
-    without_h = combinations(t, k)
+  def combinations(_list, _k), do: []
+
+  defp do_combinations(_list, 0, _n), do: [[]]
+  defp do_combinations([], _k, _n), do: []
+  defp do_combinations(_list, k, n) when k > n, do: []
+  defp do_combinations(list, k, n) when k == n, do: [list]
+
+  defp do_combinations([h | t], k, n) do
+    with_h = for combo <- do_combinations(t, k - 1, n - 1), do: [h | combo]
+    without_h = do_combinations(t, k, n - 1)
     with_h ++ without_h
   end
 
