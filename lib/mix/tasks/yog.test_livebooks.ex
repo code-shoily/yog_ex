@@ -81,9 +81,7 @@ defmodule Mix.Tasks.Yog.TestLivebooks do
       Mix.shell().info("\n\e[32mAll Livebooks executed successfully!\e[0m")
       :ok
     else
-      Mix.shell().info("\n\e[31m#{length(failures)} Livebook(s) failed validation.\e[0m")
-      System.at_exit(fn _ -> System.halt(1) end)
-      :error
+      Mix.raise("#{length(failures)} Livebook(s) failed validation.")
     end
   end
 
