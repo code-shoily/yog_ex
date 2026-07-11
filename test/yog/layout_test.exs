@@ -599,6 +599,30 @@ defmodule Yog.LayoutTest do
 
       assert Map.get(fitted_stretch, 1) == {10.0, 10.0}
       assert Map.get(fitted_stretch, 2) == {90.0, 90.0}
+
+      # Horizontal line (min_y == max_y, h_span == 0.0)
+      h_line = %{1 => {1.0, 5.0}, 2 => {5.0, 5.0}}
+      fitted_h_aspect = Layout.fit(h_line, width: 100.0, height: 100.0, padding: 10.0)
+      assert Map.get(fitted_h_aspect, 1) == {10.0, 50.0}
+      assert Map.get(fitted_h_aspect, 2) == {90.0, 50.0}
+
+      fitted_h_stretch =
+        Layout.fit(h_line, width: 100.0, height: 100.0, padding: 10.0, preserve_aspect: false)
+
+      assert Map.get(fitted_h_stretch, 1) == {10.0, 50.0}
+      assert Map.get(fitted_h_stretch, 2) == {90.0, 50.0}
+
+      # Vertical line (min_x == max_x, w_span == 0.0)
+      v_line = %{1 => {3.0, 2.0}, 2 => {3.0, 10.0}}
+      fitted_v_aspect = Layout.fit(v_line, width: 100.0, height: 100.0, padding: 10.0)
+      assert Map.get(fitted_v_aspect, 1) == {50.0, 10.0}
+      assert Map.get(fitted_v_aspect, 2) == {50.0, 90.0}
+
+      fitted_v_stretch =
+        Layout.fit(v_line, width: 100.0, height: 100.0, padding: 10.0, preserve_aspect: false)
+
+      assert Map.get(fitted_v_stretch, 1) == {50.0, 10.0}
+      assert Map.get(fitted_v_stretch, 2) == {50.0, 90.0}
     end
   end
 

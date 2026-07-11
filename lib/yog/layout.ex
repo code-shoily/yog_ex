@@ -559,10 +559,18 @@ defmodule Yog.Layout do
 
           {scale_x, scale_y} =
             if preserve_aspect do
-              s = min(target_w / w_span, target_h / h_span)
+              s =
+                cond do
+                  w_span == 0.0 -> target_h / h_span
+                  h_span == 0.0 -> target_w / w_span
+                  true -> min(target_w / w_span, target_h / h_span)
+                end
+
               {s, s}
             else
-              {target_w / w_span, target_h / h_span}
+              sx = if w_span == 0.0, do: 1.0, else: target_w / w_span
+              sy = if h_span == 0.0, do: 1.0, else: target_h / h_span
+              {sx, sy}
             end
 
           curr_cx = (min_x + max_x) / 2.0

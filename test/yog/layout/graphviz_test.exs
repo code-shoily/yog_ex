@@ -5,7 +5,11 @@ defmodule Yog.Layout.GraphVizTest do
 
   alias Yog.Layout.GraphViz
 
+  @dot_available System.find_executable("dot") != nil
+  @neato_available System.find_executable("neato") != nil
+
   describe "layout/2" do
+    @tag if @dot_available, do: :graphviz, else: [skip: "GraphViz 'dot' executable not found"]
     test "positions nodes in a simple graph using dot engine" do
       graph =
         Yog.directed()
@@ -26,6 +30,7 @@ defmodule Yog.Layout.GraphVizTest do
       assert is_float(x2) and is_float(y2)
     end
 
+    @tag if @neato_available, do: :graphviz, else: [skip: "GraphViz 'neato' executable not found"]
     test "positions nodes in a multigraph using neato engine" do
       multi =
         Yog.Multi.directed()

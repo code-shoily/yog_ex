@@ -2,7 +2,7 @@
 
 ```elixir
 Mix.install([
-  {:yog_ex, "~> 0.99.0"},
+  {:yog_ex, path: "../.."},
   {:kino_vizjs, "~> 0.9.0"}
 ])
 ```
