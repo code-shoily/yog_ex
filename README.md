@@ -186,28 +186,13 @@ See all Advent of Code solutions tagged with `graph` that demonstrate usage of Y
 
 Yog powers the following open-source libraries that build domain-specific abstractions on top of its graph engine:
 
-### [Choreo](https://github.com/code-shoily/choreo) — Domain-Specific Diagram Builders
+### [Choreo](https://github.com/code-shoily/choreo)
 
-Analysis-first diagramming for Elixir. Instead of drawing static pictures, you model systems and get live answers — reachability, cycles, bottlenecks, threat generation, and more.
+An analysis-first diagramming library for Elixir that models systems (including infrastructure, FSMs, dataflows, threat models, and workflows) to perform live queries like reachability, cycle detection, and bottleneck analysis.
 
-- **Choreo** — Infrastructure architecture diagrams (databases, caches, services, queues)
-- **Choreo.FSM** — Finite state machines with determinism checks and shortest accepting paths
-- **Choreo.Dataflow** — Pipeline diagrams with throughput simulation and backpressure detection
-- **Choreo.Dependency** — Software dependency graphs with cycle detection and layer enforcement
-- **Choreo.DecisionTree** — Classification trees with feature importance and pruning
-- **Choreo.MindMap** — Concept mapping with orphan detection and root-to-leaf paths
-- **Choreo.ThreatModel** — STRIDE threat modeling with auto-generated severity scoring
-- **Choreo.Workflow** — Task orchestration with critical-path analysis and Saga-pattern compensations
+### [Meridian](https://github.com/code-shoily/meridian)
 
-
-### [Meridian](https://github.com/code-shoily/meridian) — Spatial Graphs
-
-Projection-aware spatial graphs for Elixir. Brings geography into graph theory with coordinate-reference-system safety, map ingestion, and spatial algorithms.
-
-- Build graphs from H3 hex grids and geohash rectangles
-- Ingest and render GeoJSON for road networks and geographic data
-- Spatially-informed A*, Dijkstra, and widest-path routing
-- CRS-aware edge weights with earth-distance heuristics
+A projection-aware spatial graph library for Elixir that integrates geographic coordinate systems, road networks (GeoJSON), and hex grids (H3) directly into graph theory algorithms.
 
 ## Development
 
