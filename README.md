@@ -199,14 +199,6 @@ Analysis-first diagramming for Elixir. Instead of drawing static pictures, you m
 - **Choreo.ThreatModel** — STRIDE threat modeling with auto-generated severity scoring
 - **Choreo.Workflow** — Task orchestration with critical-path analysis and Saga-pattern compensations
 
-### [Tapestry](https://github.com/code-shoily/tapestry) — Graph-Native Domain Engine
-
-Model structured domains as typed multigraphs. Kanban boards, timelines, dependency networks, and structural analysis are all projections of the same underlying graph.
-
-- Project management with milestones, tasks, users, and labels
-- Query what blocks a task, what's ready to start, and who's the bottleneck
-- Critical-path analysis and transitive dependency tracking
-- Renders natively to Mermaid for GitHub, Notion, and Obsidian
 
 ### [Meridian](https://github.com/code-shoily/meridian) — Spatial Graphs
 
