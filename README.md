@@ -67,7 +67,7 @@ Add YogEx to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:yog_ex, "~> 0.99.0"}
+    {:yog_ex, "~> 0.99.1"}
   ]
 end
 ```
@@ -93,7 +93,7 @@ To use these features, add the optional dependencies to your `mix.exs`:
 ```elixir
 def deps do
   [
-    {:yog_ex, "~> 0.99.0"},
+    {:yog_ex, "~> 0.99.1"},
     {:saxy, "~> 1.5"},       # For fast GraphML/XML parsing
     {:jason, "~> 1.4"},      # For JSON import/export
     {:libgraph, "~> 0.16"}   # For libgraph interoperability
@@ -137,7 +137,7 @@ For livebook, add the following:
 
 ```elixir
 Mix.install(
-  {:yog_ex, "~> 0.99.0"}
+  {:yog_ex, "~> 0.99.1"}
 )
 ```
 

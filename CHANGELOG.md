@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Fixed
+
+### Changed
+
+
+## [0.99.1] - 2026-07-10
+
+### Added
+
 - **`Yog.Layout` Geometry Helpers** — Added `Yog.Layout.Geometry` (exposed as `Yog.Layout.rects/2`, `Yog.Layout.anchor/2`, and `Yog.Layout.edge_endpoints/3`) for converting center-based position maps into bounding rectangles, computing anchor points on rect edges (`:top`, `:bottom`, `:left`, `:right`, corners, and `:center`), and calculating connector endpoints between nodes. Supports per-node size callbacks, making the helpers suitable as a renderer-agnostic geometry layer for Excalidraw, SVG, or any rect-based diagram system.
 - **Controlled Placement Layout Guide** — Expanded `livebooks/how_to/layout_guide.livemd` to comprehensively document using `Yog.Layout` as a deterministic coordinate backend. Covers manual placement, grid layout, multipartite spacing, transform/fit pipelines, DOT fixed-position output, GraphViz layout import, geometry helpers, and a prose guide on when to use GraphViz rank controls vs explicit coordinates.
 - **`Yog.Layout.graphviz/2` — GraphViz Layout Import** — Added `Yog.Layout.GraphViz.layout/2` (exposed as `Yog.Layout.graphviz/2`) to shell out to an installed GraphViz engine (`:dot`, `:neato`, `:fdp`, `:circo`, etc.) and import the computed node coordinates back as a `Yog.Layout` position map. Supports both simple (`Yog.Graph`) and multi-graphs (`Yog.Multi.Graph`), configurable coordinate scaling, custom DOT options, and clear error handling when the GraphViz CLI is not found.
@@ -22,12 +31,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`Yog.Layout.fit/2` Division by Zero** — Resolved a potential arithmetic division-by-zero crash when fitting layouts where all nodes align perfectly on a single horizontal or vertical line.
+- **Robust GraphViz Layout Tests** — GraphViz layout unit tests now check for the presence of the `dot` and `neato` executables and skip gracefully if they are missing from the system's `PATH`.
 - **`Yog.MatchingTest` Timeout** — Fixed an exponential DFS backtracking timeout in `hopcroft_karp_large_random_bipartite_test` by implementing a linear-time BFS search in `maximal_matching?/2`.
 - **Optional Dependency Warnings** — Silenced compile-time warnings generated when compiling without optional dependencies (`saxy` and `libgraph`). Wrapped Saxy handler behaviours in compile-time checks, removed `@impl` callback annotations from optional integration handlers, moved the `YogGraph` alias within the compile-time block in `Yog.IO.Libgraph`, and removed the duplicate `@moduledoc` tag.
 - **`Yog.Layout.Spring` Partial Initial Positions** — `initial_pos` may now be partial: missing graph nodes are initialized randomly instead of being silently omitted from the returned layout, extra nodes are ignored, and `:seed` is honored when filling missing positions.
 - **`Yog.Layout.Spring` Barnes-Hut Correctness** — Fixed Barnes-Hut quadtree mass accounting and prevented approximation of cells containing the target node, eliminating self-force leakage in approximate repulsion calculations.
 - **`Yog.Layout` Input Validation** — Added duplicate-node validation for Tutte boundary nodes, Shell shell membership, and Multipartite layer membership to avoid ambiguous layouts caused by overwriting coordinates in the result map.
-- **Release Documentation Version Snippets** — Normalized stale dependency examples in `Yog.IO.Libgraph` docs and Livebooks to use `{:yog_ex, "~> 0.99.0"}` consistently.
+- **Release Documentation Version Snippets** — Normalized stale dependency examples in `Yog.IO.Libgraph` docs and Livebooks to use `{:yog_ex, "~> 0.99.1"}` consistently.
+
+### Changed
+
+- **Portable Livebook Dependencies** — Normalized all `.livemd` files under the `livebooks/` directory to reference the local `yog_ex` package via relative paths (`path: "../.."`) rather than remote Hex versions, enabling clean local development without dependency conflicts.
 
 
 ## [0.99.0] - 2026-07-03
