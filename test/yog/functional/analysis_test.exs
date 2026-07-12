@@ -24,6 +24,15 @@ defmodule Yog.Functional.AnalysisTest do
       assert MapSet.new([3, 4]) in comp_sets
       assert MapSet.new([5]) in comp_sets
     end
+
+    test "empty graph has no connected components" do
+      assert Analysis.connected_components(Model.new(:undirected)) == []
+    end
+
+    test "single-node graph has one singleton component" do
+      graph = Model.new(:undirected) |> Model.put_node(1, "A")
+      assert Analysis.connected_components(graph) == [[1]]
+    end
   end
 
   describe "analyze_connectivity" do
@@ -57,6 +66,43 @@ defmodule Yog.Functional.AnalysisTest do
       # Points: 3 and 4
       assert MapSet.new(result.points) == MapSet.new([3, 4])
     end
+
+    test "empty graph has no bridges or articulation points" do
+      assert Analysis.analyze_connectivity(Model.new(:undirected)) == %{bridges: [], points: []}
+    end
+
+    test "pure cycle has no bridges or articulation points" do
+      g =
+        Model.new(:undirected)
+        |> Model.put_node(1, "A")
+        |> Model.put_node(2, "B")
+        |> Model.put_node(3, "C")
+        |> Model.add_edge!(1, 2)
+        |> Model.add_edge!(2, 3)
+        |> Model.add_edge!(3, 1)
+
+      result = Analysis.analyze_connectivity(g)
+
+      assert result.bridges == []
+      assert result.points == []
+    end
+
+    test "handles disconnected graph with independent bridges" do
+      g =
+        Model.new(:undirected)
+        |> Model.put_node(1, "A")
+        |> Model.put_node(2, "B")
+        |> Model.put_node(3, "C")
+        |> Model.put_node(4, "D")
+        |> Model.add_edge!(1, 2)
+        |> Model.add_edge!(3, 4)
+
+      result = Analysis.analyze_connectivity(g)
+      bridges = Enum.map(result.bridges, fn {u, v} -> {min(u, v), max(u, v)} end) |> MapSet.new()
+
+      assert bridges == MapSet.new([{1, 2}, {3, 4}])
+      assert result.points == []
+    end
   end
 
   describe "transitive_closure" do
@@ -73,6 +119,27 @@ defmodule Yog.Functional.AnalysisTest do
       assert Enum.sort(tc[1]) == [1, 2, 3]
       assert Enum.sort(tc[2]) == [2, 3]
       assert Enum.sort(tc[3]) == [3]
+    end
+
+    test "empty graph closure is empty" do
+      assert Analysis.transitive_closure(Model.empty()) == %{}
+    end
+
+    test "cycle reaches every node in the strongly connected component" do
+      g =
+        Model.empty()
+        |> Model.put_node(1, "A")
+        |> Model.put_node(2, "B")
+        |> Model.put_node(3, "C")
+        |> Model.add_edge!(1, 2)
+        |> Model.add_edge!(2, 3)
+        |> Model.add_edge!(3, 1)
+
+      tc = Analysis.transitive_closure(g)
+
+      assert Enum.sort(tc[1]) == [1, 2, 3]
+      assert Enum.sort(tc[2]) == [1, 2, 3]
+      assert Enum.sort(tc[3]) == [1, 2, 3]
     end
   end
 
@@ -150,9 +217,48 @@ defmodule Yog.Functional.AnalysisTest do
       g = Model.new(:undirected) |> Model.put_node(1, "A")
       assert Analysis.biconnected_components(g) == []
     end
+
+    test "empty graph" do
+      assert Analysis.biconnected_components(Model.new(:undirected)) == []
+    end
+
+    test "disconnected graph with two independent edges" do
+      g =
+        Model.new(:undirected)
+        |> Model.put_node(1, "A")
+        |> Model.put_node(2, "B")
+        |> Model.put_node(3, "C")
+        |> Model.put_node(4, "D")
+        |> Model.add_edge!(1, 2)
+        |> Model.add_edge!(3, 4)
+
+      bccs = Analysis.biconnected_components(g)
+
+      normalized =
+        Enum.map(bccs, fn comp -> Enum.map(comp, fn {u, v} -> {min(u, v), max(u, v)} end) end)
+
+      assert [{1, 2}] in normalized
+      assert [{3, 4}] in normalized
+    end
   end
 
   describe "dominators" do
+    test "returns empty map when start node is missing" do
+      graph = Model.empty() |> Model.put_node(1, "A")
+      assert Analysis.dominators(graph, 99) == %{}
+    end
+
+    test "omits nodes unreachable from the start node" do
+      graph =
+        Model.empty()
+        |> Model.put_node(1, "A")
+        |> Model.put_node(2, "B")
+        |> Model.put_node(3, "C")
+        |> Model.add_edge!(1, 2)
+
+      assert Analysis.dominators(graph, 1) == %{1 => 1, 2 => 1}
+    end
+
     test "finds dominator sets" do
       g =
         Model.empty()

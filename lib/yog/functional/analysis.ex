@@ -1,27 +1,51 @@
 defmodule Yog.Functional.Analysis do
   @moduledoc """
-  Structural analysis for inductive graphs — components, bridges, and articulation points.
+  Structural analysis for inductive graphs — components, bridges, articulation
+  points, reachability closure, biconnected components, and dominators.
 
-  This module analyzes connectivity and vulnerability in graphs using the inductive
-  `match/2` operation for component extraction and Tarjan's DFS for bridge/cut-vertex
-  detection.
+  This module analyzes graph structure using the inductive primitives from
+  `Yog.Functional.Model`. Component extraction uses `match/2`, while bridge,
+  articulation-point, and biconnected-component detection use Tarjan-style DFS.
 
   ## Available Analyses
 
   | Analysis | Function | Description |
   |----------|----------|-------------|
-  | Connected Components | `connected_components/1` | Find all connected components |
-  | Bridges & Articulation Points | `analyze_connectivity/1` | Single-pass Tarjan DFS |
-  | Transitive Closure | `transitive_closure/1` | Compute complete reachability |
-  | Biconnected Components | `biconnected_components/1` | Find maximal non-separable subgraphs |
-  | Dominators | `dominators/2` | Compute node dominance for flow graphs |
+  | Connected Components | `connected_components/1` | Extract components by following outgoing adjacency |
+  | Bridges & Articulation Points | `analyze_connectivity/1` | Single-pass Tarjan DFS for undirected graphs |
+  | Transitive Closure | `transitive_closure/1` | Compute complete directed reachability |
+  | Biconnected Components | `biconnected_components/1` | Find maximal non-separable edge components in undirected graphs |
+  | Dominators | `dominators/2` | Compute immediate dominators for reachable flow-graph nodes |
+
+  ## Semantics and Caveats
+
+  - `connected_components/1`, `analyze_connectivity/1`, and
+    `biconnected_components/1` are intended for undirected graphs. They operate on
+    each context's `out_edges`; undirected functional graphs store symmetric
+    out-edges, so this represents ordinary adjacency.
+  - On directed graphs, `connected_components/1` follows outgoing edges only. It is
+    therefore not a weakly-connected-components or strongly-connected-components
+    algorithm.
+  - `transitive_closure/1` and `dominators/2` are directed reachability analyses.
+  - `dominators/2` returns immediate dominators only for nodes reachable from the
+    provided start node. A missing start node returns an empty map.
 
   ## Key Concepts
 
-  - **Bridge** (cut-edge): An edge whose removal disconnects the graph
-  - **Articulation Point** (cut-vertex): A node whose removal disconnects the graph
+  - **Bridge** (cut-edge): An edge whose removal disconnects the graph.
+  - **Articulation Point** (cut-vertex): A node whose removal disconnects the graph.
+  - **Biconnected Component**: A maximal edge set that remains connected after
+    removing any single non-articulation vertex.
   - Components are extracted inductively via `match/2`, naturally preventing
-    revisits without an explicit visited set
+    revisits without an explicit visited set.
+
+  ## Complexity
+
+  `connected_components/1`, `analyze_connectivity/1`, `transitive_closure/1`, and
+  `biconnected_components/1` are `O(V + E)` over the relevant traversal work,
+  except `transitive_closure/1`, which performs reachability from every node and is
+  `O(V * (V + E))`. `dominators/2` uses a fixed-point algorithm suitable for small
+  functional flow graphs rather than maximum raw throughput.
 
   ## References
 
@@ -34,7 +58,11 @@ defmodule Yog.Functional.Analysis do
 
   @doc """
   Finds all connected components in an undirected graph.
-  Returns a list of lists of node IDs.
+
+  Returns a list of lists of node IDs. This function follows `out_edges`; for an
+  undirected functional graph those edges are symmetric and represent ordinary
+  adjacency. On directed graphs this is an outgoing-reachability component
+  extraction, not weak or strong connectivity.
 
   ## Examples
 
@@ -67,6 +95,10 @@ defmodule Yog.Functional.Analysis do
   @doc """
   Identifies bridges (cut-edges) and articulation points (cut-vertices)
   in an undirected graph using a single-pass DFS.
+
+  The function assumes undirected adjacency represented by symmetric `out_edges`,
+  which `Yog.Functional.Model` maintains for graphs created with
+  `Model.new(:undirected)`.
 
   ## Examples
 
@@ -182,7 +214,10 @@ defmodule Yog.Functional.Analysis do
 
   @doc """
   Computes the transitive closure of the graph as a map of node reachability.
-  Returns `%{node_id => [reachable_node_ids]}`.
+
+  Returns `%{node_id => [reachable_node_ids]}`. Each reachable list includes the
+  source node itself because reachability is computed via traversal starting at
+  that node.
 
   ## Examples
 
@@ -205,7 +240,10 @@ defmodule Yog.Functional.Analysis do
 
   @doc """
   Finds the biconnected components of an undirected graph.
-  Each component is represented as a list of edge tuples `{u, v}`.
+
+  Each component is represented as a list of edge tuples `{u, v}`. Isolated nodes
+  do not form edge-biconnected components and therefore do not appear in the
+  result.
 
   ## Examples
 
@@ -308,10 +346,13 @@ defmodule Yog.Functional.Analysis do
 
   @doc """
   Finds immediate dominators of all reachable nodes from a start node.
-  Returns `%{node_id => idom_id}`.
 
-  Uses a recursive fixed-point implementation suitable for functional graphs.
-  The start node dominates itself.
+  Returns `%{node_id => idom_id}`. The start node dominates itself. Nodes that are
+  not reachable from `start` are omitted. If `start` is not present in the graph,
+  the result is `%{}`.
+
+  Uses a recursive fixed-point implementation suitable for small functional flow
+  graphs and proof-oriented examples.
   """
   @spec dominators(Model.t(), Model.node_id()) :: %{Model.node_id() => Model.node_id()}
   def dominators(graph, start) do
