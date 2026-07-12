@@ -2,7 +2,7 @@
 
 > Functional inductive graphs for Elixir researchers and learners.
 
-This package provides an **inductive graph representation** based on Martin Erwig's [Functional Graph Library (FGL)](https://web.engr.oregonstate.edu/~erwig/fgl/). Unlike the traditional adjacency-list approach used in `Yog.Graph`, these graphs are defined recursively, enabling algorithms to be written as pure, recursive functions without explicit "visited" sets.
+This package provides an **inductive graph representation** based on Martin Erwig's [Functional Graph Library (FGL)](https://web.engr.oregonstate.edu/~erwig/fgl/). Unlike the traditional adjacency-list approach used in `Yog.Graph`, these graphs are viewed recursively: each step can extract one node context and continue with a smaller graph. This often lets traversal-style algorithms use the remaining graph itself as the visited-state boundary.
 
 ## Philosophy: The Inductive Principle
 
@@ -22,7 +22,7 @@ alias Yog.Functional.Model
 {:ok, context, shrunken_graph} = Model.match(graph, 1)
 
 # Embed it back (potentially into a transformed graph)
-new_graph = Model.embed(shrunken_graph, context)
+new_graph = Model.embed(context, shrunken_graph)
 ```
 
 ### Pattern Matching Friendly
@@ -32,9 +32,9 @@ Just as lists are defined as `[head | tail]`, these graphs are defined as `conte
 1.  Base case: `Model.empty()` (the empty graph).
 2.  Recursive case: `match(graph, id)` gives you the context (head) and the shrunken world view (tail).
 
-Every time you recurse with the `shrunken_graph`, you are operating on a self-contained "sub-universe" where the earlier nodes simply do not exist.
+Every time you recurse with the `shrunken_graph`, you are operating on a self-contained "sub-universe" where the earlier matched nodes simply do not exist.
 
-By working with `remaining_graph`, algorithms naturally prevent revisits: once a node is matched, it and all its edges are gone from the perspective of the recursion. The algorithm terminates when `Model.empty?(graph)` is true.
+By working with `remaining_graph`, algorithms naturally prevent revisits to matched nodes: once a node is matched, it and all incident edge references are gone from the perspective of the recursion. Full-graph traversals terminate when `Model.empty?(graph)` is true.
 
 ## Data Example: Shrinking the Graph
 
@@ -88,8 +88,8 @@ graph = Model.empty()
 The inverse operation restores a context into a graph. This enables **transform-then-rebuild** workflows:
 
 ```elixir
-# Transform the context (e.g., increment a counter in the label)
-new_ctx = %{ctx | label: %{ctx.label | visits: ctx.label.visits + 1}}
+# Transform the context (e.g., update the node label)
+new_ctx = %{ctx | label: "visited: #{ctx.label}"}
 
 # Build it back into a (possibly different) graph
 restored_graph = Model.embed(new_ctx, remaining)
@@ -134,9 +134,9 @@ In traditional graphs, you iterate over node IDs and look up data. In FGL:
 
 - **The context bundles identity, data, AND connectivity** — you have everything needed to decide "what next" without additional lookups
 - **The remaining graph IS your visited set** — burned nodes simply don't exist anymore
-- **No back-edges possible** — once you `match` a node, it cannot be reached from any future recursive call
+- **No revisit to matched nodes** — once you `match` a node, future recursive calls over the remaining graph cannot match that same node again
 
-This makes algorithms like DFS trivially correct without explicit cycle detection:
+This makes algorithms like DFS straightforward to express without a separate visited set:
 
 ```elixir
 def dfs(graph, []), do: []
@@ -177,4 +177,4 @@ end
 
 ---
 
-**Note**: This module is primarily for **research and educational purposes**. For high-performance production workloads involving millions of edges, the ephemeral `Yog.Graph` is generally recommended.
+**Note**: This module is primarily for **research and educational purposes**. For high-performance production workloads involving millions of edges, the adjacency-based `Yog.Graph` is generally recommended.

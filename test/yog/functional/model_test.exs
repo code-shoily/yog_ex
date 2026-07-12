@@ -262,6 +262,26 @@ defmodule Yog.Functional.ModelTest do
       {:ok, ctx} = Model.get_node(fg2, 1)
       assert ctx.label == "A"
     end
+
+    test "undirected roundtrip conversion preserves direction and symmetric edges" do
+      fg =
+        Model.new(:undirected)
+        |> Model.put_node(1, "A")
+        |> Model.put_node(2, "B")
+        |> Model.add_edge!(1, 2, "w")
+
+      eg = Model.to_adjacency_graph(fg)
+      assert eg.kind == :undirected
+      assert eg.out_edges[1][2] == "w"
+      assert eg.out_edges[2][1] == "w"
+      assert eg.in_edges[1][2] == "w"
+      assert eg.in_edges[2][1] == "w"
+
+      fg2 = Model.from_adjacency_graph(eg)
+      assert fg2.direction == :undirected
+      assert Model.has_edge?(fg2, 1, 2)
+      assert Model.has_edge?(fg2, 2, 1)
+    end
   end
 
   describe "match and embed" do
@@ -294,6 +314,20 @@ defmodule Yog.Functional.ModelTest do
       assert Model.has_edge?(shrunken, 2, 3)
     end
 
+    test "match/2 preserves graph direction in the remaining graph" do
+      graph =
+        Model.new(:undirected)
+        |> Model.put_node(1, "A")
+        |> Model.put_node(2, "B")
+        |> Model.add_edge!(1, 2, :edge)
+
+      {:ok, _ctx, shrunken} = Model.match(graph, 1)
+
+      assert shrunken.direction == :undirected
+      refute Model.has_node?(shrunken, 1)
+      assert Model.has_node?(shrunken, 2)
+    end
+
     test "embed/2 restores a node and its edges", %{graph: graph} do
       {:ok, ctx, shrunken} = Model.match(graph, 1)
 
@@ -302,6 +336,65 @@ defmodule Yog.Functional.ModelTest do
       assert Model.has_node?(restored, 1)
       assert Model.has_edge?(restored, 1, 2)
       assert Model.has_edge?(restored, 3, 1)
+    end
+
+    test "embed/2 preserves target graph direction" do
+      graph =
+        Model.new(:undirected)
+        |> Model.put_node(1, "A")
+        |> Model.put_node(2, "B")
+        |> Model.add_edge!(1, 2, :edge)
+
+      {:ok, ctx, shrunken} = Model.match(graph, 1)
+      restored = Model.embed(ctx, shrunken)
+
+      assert restored.direction == :undirected
+      assert Model.has_edge?(restored, 1, 2)
+      assert Model.has_edge?(restored, 2, 1)
+    end
+
+    test "embed/2 does not restore reverse references to missing neighbors" do
+      graph =
+        Model.empty()
+        |> Model.put_node(1, "A")
+        |> Model.put_node(2, "B")
+        |> Model.add_edge!(1, 2, :edge)
+
+      {:ok, ctx, shrunken} = Model.match(graph, 1)
+      {:ok, shrunken_without_neighbor} = Model.remove_node(shrunken, 2)
+      restored = Model.embed(ctx, shrunken_without_neighbor)
+
+      assert Model.has_node?(restored, 1)
+      assert Model.has_edge?(restored, 1, 2)
+      refute Model.has_node?(restored, 2)
+    end
+  end
+
+  describe "edge overwrite and self-loop semantics" do
+    test "adding an existing edge overwrites its label" do
+      graph =
+        Model.empty()
+        |> Model.put_node(1, "A")
+        |> Model.put_node(2, "B")
+        |> Model.add_edge!(1, 2, :old)
+        |> Model.add_edge!(1, 2, :new)
+
+      assert {:ok, :new} = Model.get_edge(graph, 1, 2)
+
+      {:ok, in_neighbors} = Model.in_neighbors(graph, 2)
+      assert in_neighbors[1] == :new
+    end
+
+    test "self-loop contributes to both in-degree and out-degree" do
+      graph =
+        Model.empty()
+        |> Model.put_node(1, "A")
+        |> Model.add_edge!(1, 1, :loop)
+
+      assert {:ok, 1} = Model.out_degree(graph, 1)
+      assert {:ok, 1} = Model.in_degree(graph, 1)
+      assert {:ok, 2} = Model.degree(graph, 1)
+      assert {:ok, :loop} = Model.get_edge(graph, 1, 1)
     end
   end
 end

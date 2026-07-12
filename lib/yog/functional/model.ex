@@ -4,8 +4,13 @@ defmodule Yog.Functional.Model do
   [Functional Graph Library](https://web.engr.oregonstate.edu/~erwig/fgl/) (FGL).
 
   Unlike the adjacency-list representation in `Yog.Graph`, an inductive graph is
-  defined recursively: a graph is either empty, or a node context "patched" into
-  an existing graph.
+  viewed recursively: a graph is either empty, or a node context "patched" into
+  a smaller graph.
+
+  The central operation is `match/2`: it removes one node from the graph and
+  returns both that node's full context and the remaining graph. Recursing on the
+  remaining graph gives algorithms a natural "visited set": a matched node is no
+  longer present and cannot be matched again.
 
   ## Core Operations
 
@@ -19,16 +24,17 @@ defmodule Yog.Functional.Model do
 
   ## Key Concepts
 
-  - **Context**: A node's identity, label, and its incident edges (`in_edges`, `out_edges`)
-  - **Match**: The primary operation — extracts a node and removes all its edges from
-    the graph. This enables recursive algorithms that naturally terminate without
-    explicit visited sets.
-  - **Embed**: The inverse of `match` — restores a node and its edges into a graph.
+  - **Context**: A node's identity, label, and its incident edges (`in_edges`, `out_edges`).
+  - **Match**: The primary operation — extracts a node and removes all incident
+    references to it from the remaining graph. This enables recursive algorithms
+    that naturally terminate without an external visited set for matched nodes.
+  - **Embed**: The inverse of `match` when used with the matching remaining graph —
+    restores a node context and reconnects it to neighbors that are present.
 
   ## Example Use Cases
 
-  - **Recursive algorithms**: DFS, BFS, Dijkstra, SCC — all implemented via
-    repeated `match/2` calls that shrink the graph at each step
+  - **Recursive algorithms**: DFS, BFS, Dijkstra, SCC — implemented via repeated
+    `match/2` calls that shrink the graph at each step
   - **Functional transformations**: Map over nodes/edges, filter, reverse
   - **Teaching**: The inductive structure makes graph algorithm correctness proofs
     straightforward
@@ -184,7 +190,12 @@ defmodule Yog.Functional.Model do
   @spec has_node?(t(), node_id()) :: boolean()
   def has_node?(%__MODULE__{nodes: nodes}, id), do: Map.has_key?(nodes, id)
 
-  @doc "Gets a node's context from the graph."
+  @doc """
+  Gets a node's context from the graph.
+
+  Returns `{:ok, context}` when the node exists, or `{:error, :not_found}` when it
+  does not.
+  """
   @spec get_node(t(), node_id()) :: {:ok, Context.t()} | {:error, :not_found}
   def get_node(%__MODULE__{nodes: nodes}, id) do
     case Map.fetch(nodes, id) do
@@ -193,7 +204,9 @@ defmodule Yog.Functional.Model do
     end
   end
 
-  @doc "Gets a node's context from the graph, raising if not found."
+  @doc """
+  Gets a node's context from the graph, raising `KeyError` if not found.
+  """
   @spec get_node!(t(), node_id()) :: Context.t()
   def get_node!(%__MODULE__{nodes: nodes}, id) do
     Map.fetch!(nodes, id)
@@ -207,7 +220,11 @@ defmodule Yog.Functional.Model do
   @spec nodes(t()) :: [Context.t()]
   def nodes(%__MODULE__{nodes: nodes}), do: Map.values(nodes)
 
-  @doc "Returns the outgoing neighbors of a node."
+  @doc """
+  Returns the outgoing neighbors of a node as `%{neighbor_id => edge_label}`.
+
+  Returns `{:error, :not_found}` if the source node is missing.
+  """
   @spec out_neighbors(t(), node_id()) ::
           {:ok, %{node_id() => edge_label()}} | {:error, :not_found}
   def out_neighbors(%__MODULE__{nodes: nodes}, id) do
@@ -217,7 +234,11 @@ defmodule Yog.Functional.Model do
     end
   end
 
-  @doc "Returns the incoming neighbors of a node."
+  @doc """
+  Returns the incoming neighbors of a node as `%{neighbor_id => edge_label}`.
+
+  Returns `{:error, :not_found}` if the target node is missing.
+  """
   @spec in_neighbors(t(), node_id()) :: {:ok, %{node_id() => edge_label()}} | {:error, :not_found}
   def in_neighbors(%__MODULE__{nodes: nodes}, id) do
     case Map.fetch(nodes, id) do
@@ -226,7 +247,12 @@ defmodule Yog.Functional.Model do
     end
   end
 
-  @doc "Returns all unique neighbors (both incoming and outgoing) of a node."
+  @doc """
+  Returns all unique neighbors of a node, combining incoming and outgoing edges.
+
+  For directed graphs this is the union of predecessors and successors. For
+  undirected graphs the incoming and outgoing maps are symmetric by convention.
+  """
   @spec neighbors(t(), node_id()) :: {:ok, [node_id()]} | {:error, :not_found}
   def neighbors(%__MODULE__{nodes: nodes}, id) do
     case Map.fetch(nodes, id) do
@@ -277,7 +303,15 @@ defmodule Yog.Functional.Model do
     end
   end
 
-  @doc "Adds an edge, respecting the graph's directionality."
+  @doc """
+  Adds an edge, respecting the graph's directionality.
+
+  For directed graphs, only `from_id -> to_id` is added. For undirected graphs,
+  both directions are represented internally so neighbor queries remain simple.
+
+  Returns `{:error, :source_not_found}` or `{:error, :target_not_found}` if either
+  endpoint is missing.
+  """
   @spec add_edge(t(), node_id(), node_id(), edge_label()) ::
           {:ok, t()} | {:error, :source_not_found | :target_not_found}
   def add_edge(graph, from_id, to_id, label \\ nil)
@@ -355,7 +389,12 @@ defmodule Yog.Functional.Model do
     end
   end
 
-  @doc "Removes an edge, respecting graph directionality."
+  @doc """
+  Removes an edge, respecting graph directionality.
+
+  Missing endpoints or missing edges are ignored; the function always returns
+  `{:ok, graph}`.
+  """
   @spec remove_edge(t(), node_id(), node_id()) :: {:ok, t()}
   def remove_edge(%__MODULE__{direction: :undirected} = graph, u, v) do
     remove_undirected_edge(graph, u, v)
@@ -374,7 +413,12 @@ defmodule Yog.Functional.Model do
     {:ok, %{graph | nodes: new_nodes}}
   end
 
-  @doc "Removes an undirected edge between two nodes."
+  @doc """
+  Removes an undirected edge between two nodes.
+
+  Missing endpoints or missing edges are ignored; the function always returns
+  `{:ok, graph}`.
+  """
   @spec remove_undirected_edge(t(), node_id(), node_id()) :: {:ok, t()}
   def remove_undirected_edge(%__MODULE__{nodes: nodes} = graph, u, v) do
     new_nodes =
@@ -393,14 +437,14 @@ defmodule Yog.Functional.Model do
     {:ok, %{graph | nodes: new_nodes}}
   end
 
-  @doc "Removes an undirected edge, raising on error."
+  @doc "Removes an undirected edge and returns the updated graph."
   @spec remove_undirected_edge!(t(), node_id(), node_id()) :: t()
   def remove_undirected_edge!(graph, u, v) do
     {:ok, new_graph} = remove_undirected_edge(graph, u, v)
     new_graph
   end
 
-  @doc "Removes an edge, raising on error."
+  @doc "Removes an edge and returns the updated graph."
   @spec remove_edge!(t(), node_id(), node_id()) :: t()
   def remove_edge!(graph, from_id, to_id) do
     {:ok, new_graph} = remove_edge(graph, from_id, to_id)
@@ -410,10 +454,31 @@ defmodule Yog.Functional.Model do
   @doc """
   Matches a node in the graph, returning its context and the remaining graph.
 
-  This operation extracts the node and all its incident edges (both incoming and
-  outgoing). If the node is found, it returns `{:ok, context, remaining_graph}`.
-  Otherwise, it returns `{:error, :not_found}`.
+  This is the defining inductive operation. It extracts the node's `Context` and
+  removes the node plus all incident edge references from the returned graph.
+  Recursing on the remaining graph means this node cannot be visited again.
+
+  If the node is found, returns `{:ok, context, remaining_graph}`. Otherwise,
+  returns `{:error, :not_found}`.
+
+  ## Examples
+
+      iex> graph =
+      ...>   Yog.Functional.Model.empty()
+      ...>   |> Yog.Functional.Model.put_node(1, "A")
+      ...>   |> Yog.Functional.Model.put_node(2, "B")
+      ...>   |> Yog.Functional.Model.add_edge!(1, 2, :edge)
+      iex> {:ok, ctx, remaining} = Yog.Functional.Model.match(graph, 1)
+      iex> ctx.id
+      1
+      iex> Yog.Functional.Model.has_node?(remaining, 1)
+      false
+      iex> Yog.Functional.Model.has_edge?(remaining, 1, 2)
+      false
+      iex> Yog.Functional.Model.has_node?(remaining, 2)
+      true
   """
+  @spec match(t(), node_id()) :: {:ok, Context.t(), t()} | {:error, :not_found}
   def match(%__MODULE__{nodes: nodes} = graph, id) do
     case Map.pop(nodes, id) do
       {nil, _} ->
@@ -446,15 +511,31 @@ defmodule Yog.Functional.Model do
   end
 
   @doc """
-  Embeds (patches) a node context back into the graph.
+  Embeds (patches) a node context back into a graph.
 
-  This operation restores the node and all the incident edges described in the
-  provided context. Note that it assumes the neighbors referenced in the context
-  already exist in the target graph.
+  This is the inverse of `match/2` when used with the remaining graph returned by
+  that same match. It restores the node and reconnects incident edges to neighbor
+  nodes that are present in the target graph.
+
+  If the context references neighbors that are absent from the target graph, those
+  reverse references are not recreated, but the context itself is still inserted.
+
+  ## Examples
+
+      iex> graph =
+      ...>   Yog.Functional.Model.empty()
+      ...>   |> Yog.Functional.Model.put_node(1, "A")
+      ...>   |> Yog.Functional.Model.put_node(2, "B")
+      ...>   |> Yog.Functional.Model.add_edge!(1, 2, :edge)
+      iex> {:ok, ctx, remaining} = Yog.Functional.Model.match(graph, 1)
+      iex> restored = Yog.Functional.Model.embed(ctx, remaining)
+      iex> Yog.Functional.Model.has_edge?(restored, 1, 2)
+      true
   """
-  def embed(%Context{id: id} = ctx, %__MODULE__{nodes: nodes}) do
+  @spec embed(Context.t(), t()) :: t()
+  def embed(%Context{id: id} = ctx, %__MODULE__{nodes: nodes} = graph) do
     new_nodes = restore_all_links_from(nodes, ctx)
-    %__MODULE__{nodes: Map.put(new_nodes, id, ctx)}
+    %{graph | nodes: Map.put(new_nodes, id, ctx)}
   end
 
   @doc "Ensures a node exists in the graph."
