@@ -9,20 +9,37 @@ defmodule Yog.Functional.Traversal do
 
   ## Available Traversals
 
-  | Traversal | Function | Data Structure |
-  |-----------|----------|----------------|
-  | [DFS](https://en.wikipedia.org/wiki/Depth-first_search) | `dfs/2` | Stack (list) |
-  | [BFS](https://en.wikipedia.org/wiki/Breadth-first_search) | `bfs/2` | Queue (`:queue`) |
-  | Preorder | `preorder/2` | Node IDs in visit order |
-  | Postorder | `postorder/2` | Node IDs in finish order |
-  | Reachable | `reachable/2` | All reachable node IDs |
+  | Traversal | Function | Data Structure | Return value |
+  |-----------|----------|----------------|--------------|
+  | [DFS](https://en.wikipedia.org/wiki/Depth-first_search) | `dfs/2` | Stack (list) | Node contexts |
+  | [BFS](https://en.wikipedia.org/wiki/Breadth-first_search) | `bfs/2` | Queue (`:queue`) | Node contexts |
+  | Preorder | `preorder/2` | DFS wrapper | Node IDs in visit order |
+  | Postorder | `postorder/2` | Recursive finishing order | Node IDs in finish order |
+  | Reachable | `reachable/2` | DFS wrapper | Reachable node IDs |
 
   ## Key Principle
 
   Iterating with the shrunken graph naturally prevents revisiting nodes and
-  terminates when the graph is empty — no `MapSet` of visited nodes needed.
+  terminates when no queued start/candidate nodes remain — no `MapSet` of visited
+  nodes is needed.
 
-  **Time Complexity:** O(V + E) for both BFS and DFS.
+  ## Semantics
+
+  - Traversal starts can be a single node ID or a list of node IDs.
+  - Missing start nodes are skipped.
+  - Duplicate start nodes or duplicate neighbor discoveries are visited at most once
+    because already-matched nodes are absent from the remaining graph.
+  - Directed graphs follow outgoing edges only. Undirected graphs store edges
+    symmetrically, so outgoing edges represent all adjacent nodes.
+  - Neighbor order follows map key iteration order and should be treated as
+    unspecified.
+
+  ## Complexity
+
+  BFS and DFS are `O(V + E)` over the reachable portion of the graph. Because this
+  is an inductive/persistent representation, traversals allocate shrunken graph
+  versions as they progress; use adjacency-based `Yog.Traversal.Walk` for raw
+  traversal throughput on large production graphs.
 
   ## References
 
@@ -32,9 +49,10 @@ defmodule Yog.Functional.Traversal do
   alias Yog.Functional.Model
 
   @doc """
-  Performs a Depth-First Search starting from the given node ID(s).
+  Performs a depth-first search starting from the given node ID or node IDs.
 
-  Returns a list of node contexts in the order they were visited.
+  Returns a list of node contexts in the order they were visited. Missing start
+  nodes are skipped.
 
   This is an inductive DFS: each step calls `match/2` to simultaneously
   extract a node and obtain the *shrunken* graph without that node.
@@ -74,9 +92,10 @@ defmodule Yog.Functional.Traversal do
   end
 
   @doc """
-  Performs a Breadth-First Search starting from the given node ID(s).
+  Performs a breadth-first search starting from the given node ID or node IDs.
 
-  Returns a list of node contexts in the order they were visited.
+  Returns a list of node contexts in the order they were visited. Missing start
+  nodes are skipped.
 
   This is an inductive BFS: each step calls `match/2` to extract a node
   and obtain the shrunken graph, ensuring nodes are visited at most once.
@@ -116,7 +135,7 @@ defmodule Yog.Functional.Traversal do
   end
 
   @doc """
-  Returns node IDs in Preorder (visit order).
+  Returns node IDs in preorder (DFS visit order).
 
   ## Examples
 
@@ -132,7 +151,7 @@ defmodule Yog.Functional.Traversal do
   end
 
   @doc """
-  Returns node IDs in Postorder (finishing order, last node finishing first).
+  Returns node IDs in postorder (finishing order).
 
   ## Examples
 
@@ -151,7 +170,9 @@ defmodule Yog.Functional.Traversal do
   def postorder(graph, start_node), do: postorder(graph, [start_node])
 
   @doc """
-  Returns all node IDs reachable from the start node(s).
+  Returns all node IDs reachable from the start node or node IDs.
+
+  This is a thin wrapper around `dfs/2`, returning IDs instead of contexts.
 
   ## Examples
 
@@ -166,7 +187,9 @@ defmodule Yog.Functional.Traversal do
     dfs(graph, start) |> Enum.map(& &1.id)
   end
 
-  # Internal finishing order logic (exposed for Algorithms as well)
+  @doc false
+  @spec finishing_order(Model.t(), [Model.node_id()], [Model.node_id()]) ::
+          {[Model.node_id()], Model.t()}
   def finishing_order(graph, [], acc), do: {acc, graph}
 
   def finishing_order(graph, [current | queue], acc) do
