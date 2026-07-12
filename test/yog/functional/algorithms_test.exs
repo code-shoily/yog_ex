@@ -98,6 +98,20 @@ defmodule Yog.Functional.AlgorithmsTest do
   end
 
   describe "topsort edge cases" do
+    test "topsort on empty graph" do
+      assert {:ok, []} = Algorithms.topsort(Model.empty())
+    end
+
+    test "topsort on single-node graph" do
+      graph = Model.empty() |> Model.put_node(1, "A")
+      assert {:ok, [1]} = Algorithms.topsort(graph)
+    end
+
+    test "topsort handles self-loop as cycle" do
+      graph = Model.empty() |> Model.put_node(1, "A") |> Model.add_edge!(1, 1)
+      assert {:error, :cycle_detected} = Algorithms.topsort(graph)
+    end
+
     test "topsort handles already-matched node in zero list" do
       # Create a graph where a zero-in-degree node gets added to the list
       # but is already processed by the time we get to it.
@@ -130,6 +144,23 @@ defmodule Yog.Functional.AlgorithmsTest do
   end
 
   describe "shortest_path edge cases" do
+    test "shortest path returns no_path for missing source or target" do
+      graph = Model.empty() |> Model.put_node(1, "A") |> Model.put_node(2, "B")
+
+      assert {:error, :no_path} = Algorithms.shortest_path(graph, 99, 2)
+      assert {:error, :no_path} = Algorithms.shortest_path(graph, 1, 99)
+    end
+
+    test "shortest path treats nil edge labels as weight 1" do
+      graph =
+        Model.empty()
+        |> Model.put_node(1, "A")
+        |> Model.put_node(2, "B")
+        |> Model.add_edge!(1, 2, nil)
+
+      assert {:ok, [1, 2], 1} = Algorithms.shortest_path(graph, 1, 2)
+    end
+
     test "shortest path start equals target" do
       g = Model.empty() |> Model.put_node(1, "A")
       assert {:ok, [1], 0} = Algorithms.shortest_path(g, 1, 1)
@@ -208,6 +239,32 @@ defmodule Yog.Functional.AlgorithmsTest do
   end
 
   describe "distances edge cases" do
+    test "distances from missing source is empty" do
+      graph = Model.empty() |> Model.put_node(1, "A")
+      assert Algorithms.distances(graph, 99) == %{}
+    end
+
+    test "distances omit unreachable nodes" do
+      graph =
+        Model.empty()
+        |> Model.put_node(1, "A")
+        |> Model.put_node(2, "B")
+        |> Model.put_node(3, "C")
+        |> Model.add_edge!(1, 2, 1)
+
+      assert Algorithms.distances(graph, 1) == %{1 => 0, 2 => 1}
+    end
+
+    test "distances treats nil edge labels as weight 1" do
+      graph =
+        Model.empty()
+        |> Model.put_node(1, "A")
+        |> Model.put_node(2, "B")
+        |> Model.add_edge!(1, 2, nil)
+
+      assert Algorithms.distances(graph, 1) == %{1 => 0, 2 => 1}
+    end
+
     test "distances skips already-settled nodes" do
       g =
         Model.empty()
@@ -232,9 +289,48 @@ defmodule Yog.Functional.AlgorithmsTest do
       g = Model.new(:undirected) |> Model.put_node(1, "A")
       assert {:ok, []} = Algorithms.mst_prim(g)
     end
+
+    test "mst_prim treats nil edge labels as weight 1" do
+      g =
+        Model.new(:undirected)
+        |> Model.put_node(1, "A")
+        |> Model.put_node(2, "B")
+        |> Model.add_edge!(1, 2, nil)
+
+      assert {:ok, [{_, _, 1}]} = Algorithms.mst_prim(g)
+    end
+
+    test "mst_prim returns one component tree for disconnected graphs" do
+      g =
+        Model.new(:undirected)
+        |> Model.put_node(1, "A")
+        |> Model.put_node(2, "B")
+        |> Model.put_node(3, "C")
+        |> Model.put_node(4, "D")
+        |> Model.add_edge!(1, 2, 1)
+        |> Model.add_edge!(3, 4, 2)
+
+      assert {:ok, edges} = Algorithms.mst_prim(g)
+      assert length(edges) == 1
+      assert Enum.map(edges, fn {_u, _v, w} -> w end) in [[1], [2]]
+    end
   end
 
   describe "scc" do
+    test "scc on empty graph" do
+      assert Algorithms.scc(Model.empty()) == []
+    end
+
+    test "scc on single node graph" do
+      graph = Model.empty() |> Model.put_node(1, "A")
+      assert Algorithms.scc(graph) == [[1]]
+    end
+
+    test "scc with self-loop is one singleton component" do
+      graph = Model.empty() |> Model.put_node(1, "A") |> Model.add_edge!(1, 1)
+      assert Algorithms.scc(graph) == [[1]]
+    end
+
     test "strongly connected components", %{graph: graph} do
       g =
         graph

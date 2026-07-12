@@ -9,13 +9,26 @@ defmodule Yog.Functional.Algorithms do
 
   ## Available Algorithms
 
-  | Algorithm | Function | Time Complexity |
-  |-----------|----------|-----------------|
-  | [Topological Sort](https://en.wikipedia.org/wiki/Topological_sorting) | `topsort/1` | O(V + E) |
-  | [Dijkstra's Shortest Path](https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm) | `shortest_path/3` | O((V + E) log V) |
-  | Distances | `distances/2` | Compute all-node distances from source |
-  | [Prim's MST](https://en.wikipedia.org/wiki/Prim%27s_algorithm) | `mst_prim/1` | O(E log V) |
-  | [Kosaraju's SCC](https://en.wikipedia.org/wiki/Kosaraju%27s_algorithm) | `scc/1` | O(V + E) |
+  | Algorithm | Function | Time Complexity | Return value |
+  |-----------|----------|-----------------|--------------|
+  | [Topological Sort](https://en.wikipedia.org/wiki/Topological_sorting) | `topsort/1` | O(V + E) | `{:ok, ids}` or `{:error, :cycle_detected}` |
+  | [Dijkstra's Shortest Path](https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm) | `shortest_path/3` | O((V + E) log V) | `{:ok, path, distance}` or `{:error, :no_path}` |
+  | Distances | `distances/2` | O((V + E) log V) | `%{node_id => distance}` |
+  | [Prim's MST](https://en.wikipedia.org/wiki/Prim%27s_algorithm) | `mst_prim/1` | O(E log V) | `{:ok, [{from, to, weight}]}` |
+  | [Kosaraju's SCC](https://en.wikipedia.org/wiki/Kosaraju%27s_algorithm) | `scc/1` | O(V + E) | `[[node_id]]` |
+
+  ## Semantics and Caveats
+
+  - Dijkstra-based functions assume non-negative numeric edge labels. `nil` edge
+    labels are treated as weight `1`.
+  - `mst_prim/1` treats the graph as undirected by looking at both incoming and
+    outgoing edge maps. It returns the minimum spanning tree for the connected
+    component containing the first node encountered by map iteration, not a full
+    spanning forest for disconnected graphs.
+  - `scc/1` is for directed graphs and raises `ArgumentError` for undirected graphs.
+  - These implementations favor the inductive/FGL model's clarity over raw
+    throughput. For large production graphs, prefer the adjacency-based Yog
+    algorithm modules.
 
   ## Key Principle
 
@@ -51,6 +64,7 @@ defmodule Yog.Functional.Algorithms do
       iex> order
       [1, 2]
   """
+  @spec topsort(Model.t()) :: {:ok, [Model.node_id()]} | {:error, :cycle_detected}
   def topsort(graph) do
     zeros =
       Enum.filter(Model.nodes(graph), fn ctx -> map_size(ctx.in_edges) == 0 end)
@@ -91,7 +105,8 @@ defmodule Yog.Functional.Algorithms do
   Finds the shortest path between two nodes using Dijkstra's algorithm.
   Returns `{:ok, [node_ids], total_distance}` or `{:error, :no_path}`.
 
-  Edge labels are used as weights (defaults to 1 if `nil`).
+  Edge labels are used as weights (`nil` defaults to `1`). Weights should be
+  non-negative numbers; negative weights are outside Dijkstra's assumptions.
 
   Inductive approach: we maintain a sorted priority queue of `{dist, node, path}`
   entries. Each step extracts the minimum-distance frontier node using `match/2`.
@@ -106,6 +121,8 @@ defmodule Yog.Functional.Algorithms do
       iex> Algorithms.shortest_path(graph, 1, 2)
       {:ok, [1, 2], 10}
   """
+  @spec shortest_path(Model.t(), Model.node_id(), Model.node_id()) ::
+          {:ok, [Model.node_id()], number()} | {:error, :no_path}
   def shortest_path(graph, start_id, target_id) do
     if start_id == target_id do
       if Model.has_node?(graph, start_id),
@@ -194,10 +211,13 @@ defmodule Yog.Functional.Algorithms do
   end
 
   @doc """
-  Finds the Minimum Spanning Tree of the connected component containing the first node.
+  Finds the minimum spanning tree of the connected component containing the first node.
+
   Returns `{:ok, [{from, to, weight}]}` or `{:ok, []}` for empty graphs.
 
-  Treats the graph as undirected by extracting both in and out edges from each context.
+  Treats the graph as undirected by extracting both incoming and outgoing edges
+  from each context. For disconnected graphs this returns a tree for one component,
+  not a spanning forest across all components.
 
   Inductive approach (Prim's): start from any node (extracted via `match/2`),
   insert its adjacent edges into a sorted priority queue, then repeatedly
@@ -205,6 +225,7 @@ defmodule Yog.Functional.Algorithms do
   `match/2` is used to extract the target: if it's already been visited,
   `match/2` returns `{:error, :not_found}` and we skip to the next candidate.
   """
+  @spec mst_prim(Model.t()) :: {:ok, [{Model.node_id(), Model.node_id(), number()}]}
   def mst_prim(graph) do
     case Model.node_ids(graph) do
       [] ->
@@ -243,8 +264,10 @@ defmodule Yog.Functional.Algorithms do
   end
 
   @doc """
-  Finds the Strongly Connected Components (SCCs) of a directed graph.
+  Finds the strongly connected components (SCCs) of a directed graph.
+
   Returns a list of lists, where each inner list contains the node IDs of one SCC.
+  Raises `ArgumentError` for undirected graphs.
 
   Uses Kosaraju's two-pass algorithm, adapted for functional inductive graphs:
   1. Pass 1: compute the DFS finishing order of all nodes.
@@ -264,6 +287,7 @@ defmodule Yog.Functional.Algorithms do
       iex> Enum.map(sccs, &Enum.sort/1) |> Enum.sort()
       [[1, 2]]
   """
+  @spec scc(Model.t()) :: [[Model.node_id()]]
   def scc(%Model{direction: :undirected}) do
     raise ArgumentError, "Strongly Connected Components requires a directed graph"
   end
