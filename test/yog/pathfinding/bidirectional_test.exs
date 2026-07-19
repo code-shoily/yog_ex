@@ -127,4 +127,35 @@ defmodule Yog.Pathfinding.BidirectionalTest do
 
     assert bi_path.weight == std_path.weight
   end
+
+  test "options validation - missing required keys" do
+    assert_raise KeyError, fn ->
+      Bidirectional.shortest_path(from: 1, to: 3)
+    end
+
+    assert_raise KeyError, fn ->
+      Bidirectional.shortest_path_unweighted(from: 1, to: 3)
+    end
+  end
+
+  test "options validation - unknown option keys" do
+    graph = Yog.directed() |> Yog.add_node(1) |> Yog.add_node(2)
+
+    assert_raise ArgumentError, ~r/unknown option :invalid_key/, fn ->
+      Bidirectional.shortest_path(in: graph, from: 1, to: 2, invalid_key: true)
+    end
+
+    assert_raise ArgumentError, ~r/unknown option :invalid_key/, fn ->
+      Bidirectional.shortest_path_unweighted(in: graph, from: 1, to: 2, invalid_key: true)
+    end
+  end
+
+  test "early error on missing nodes in graph" do
+    graph = Yog.directed() |> Yog.add_node(1)
+
+    assert :error = Bidirectional.shortest_path(graph, 1, 2)
+    assert :error = Bidirectional.shortest_path(graph, 2, 1)
+    assert :error = Bidirectional.shortest_path_unweighted(graph, 1, 2)
+    assert :error = Bidirectional.shortest_path_unweighted(graph, 2, 1)
+  end
 end

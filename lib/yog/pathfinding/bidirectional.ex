@@ -90,6 +90,7 @@ defmodule Yog.Pathfinding.Bidirectional do
   """
   @spec shortest_path_unweighted(keyword()) :: path_result()
   def shortest_path_unweighted(opts) do
+    Yog.Utils.validate_opts!(opts, [:in, :from, :to], [])
     graph = Keyword.fetch!(opts, :in)
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
@@ -126,6 +127,7 @@ defmodule Yog.Pathfinding.Bidirectional do
   """
   @spec shortest_path(keyword()) :: path_result()
   def shortest_path(opts) do
+    Yog.Utils.validate_opts!(opts, [:in, :from, :to], [:zero, :add, :compare])
     graph = Keyword.fetch!(opts, :in)
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
@@ -171,10 +173,11 @@ defmodule Yog.Pathfinding.Bidirectional do
   @spec shortest_path_unweighted(Yog.t(), Yog.node_id(), Yog.node_id()) ::
           path_result() | :error
   def shortest_path_unweighted(graph, from, to) do
-    if from == to do
-      {:ok, Path.new([from], 0, :bidirectional_bfs)}
-    else
-      do_bidirectional_bfs(graph, from, to)
+    cond do
+      not Yog.Model.has_node?(graph, from) -> :error
+      not Yog.Model.has_node?(graph, to) -> :error
+      from == to -> {:ok, Path.new([from], 0, :bidirectional_bfs)}
+      true -> do_bidirectional_bfs(graph, from, to)
     end
   end
 
@@ -224,10 +227,11 @@ defmodule Yog.Pathfinding.Bidirectional do
         add \\ &Kernel.+/2,
         compare \\ &Yog.Utils.compare/2
       ) do
-    if from == to do
-      {:ok, Path.new([from], zero, :bidirectional_dijkstra)}
-    else
-      do_bidirectional_dijkstra(graph, from, to, zero, add, compare)
+    cond do
+      not Yog.Model.has_node?(graph, from) -> :error
+      not Yog.Model.has_node?(graph, to) -> :error
+      from == to -> {:ok, Path.new([from], zero, :bidirectional_dijkstra)}
+      true -> do_bidirectional_dijkstra(graph, from, to, zero, add, compare)
     end
   end
 
