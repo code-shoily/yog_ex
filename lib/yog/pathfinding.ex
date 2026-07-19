@@ -290,6 +290,7 @@ defmodule Yog.Pathfinding do
     * `:compare` - Comparison function (default: &Yog.Utils.compare/2)
   """
   def floyd_warshall(opts) do
+    Yog.Utils.validate_opts!(opts, [:in], [:zero, :add, :compare])
     graph = Keyword.fetch!(opts, :in)
     zero = opts[:zero] || 0
     add = opts[:add] || (&Kernel.+/2)

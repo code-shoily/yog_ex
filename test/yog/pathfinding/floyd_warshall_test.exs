@@ -450,4 +450,18 @@ defmodule Yog.Pathfinding.FloydWarshallTest do
     refute FloydWarshall.detect_negative_cycle?(graph, 0)
     refute FloydWarshall.detect_negative_cycle?(graph, 0, &Kernel.+/2)
   end
+
+  test "floyd_warshall options validation - missing required keys" do
+    assert_raise KeyError, fn ->
+      Yog.Pathfinding.floyd_warshall(zero: 0)
+    end
+  end
+
+  test "floyd_warshall options validation - unknown option keys" do
+    graph = Yog.directed() |> Yog.add_node(1)
+
+    assert_raise ArgumentError, ~r/unknown option :invalid_key/, fn ->
+      Yog.Pathfinding.floyd_warshall(in: graph, invalid_key: true)
+    end
+  end
 end

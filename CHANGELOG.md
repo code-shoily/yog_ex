@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`Yog.Pathfinding.FloydWarshall` Options Validation** — Hardened Floyd-Warshall search facade by validating keyword list options (raising `KeyError` for missing required options and `ArgumentError` for unknown options).
 - **`Yog.Pathfinding.BellmanFord` Options & Node Validation** — Hardened Bellman-Ford search by validating keyword list options (raising `KeyError` for missing required options and `ArgumentError` for unknown options), and adding early-return checks for missing source or target nodes in the graph, resolving edge cases like empty and disconnected graphs.
 - **`Yog.Pathfinding.Dijkstra` Options & Node Validation** — Hardened Dijkstra search by validating keyword list options (raising `KeyError` for missing required options and `ArgumentError` for unknown options), resolving edge cases like empty and disconnected graphs via delegated node existence checks.
 - **`Yog.Pathfinding.AStar` Options & Node Validation** — Hardened A* search by validating keyword list options (raising `KeyError` for missing required options and `ArgumentError` for unknown options) and early-returning `:error` for missing source or target nodes in the graph, resolving edge cases like empty and disconnected graphs.
