@@ -186,4 +186,52 @@ defmodule Yog.Pathfinding.YenTest do
     assert path.nodes == [1]
     assert path.weight == 0
   end
+
+  test "k_shortest_paths keyword API test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, nil)
+      |> Yog.add_node(2, nil)
+      |> Yog.add_edges!([{1, 2, 5}])
+
+    assert {:ok, [path]} =
+             Yog.Pathfinding.k_shortest_paths(
+               in: graph,
+               from: 1,
+               to: 2,
+               k: 1
+             )
+
+    assert path.nodes == [1, 2]
+    assert path.weight == 5
+  end
+
+  test "options validation - missing required keys in keyword" do
+    assert_raise KeyError, fn ->
+      Yog.Pathfinding.k_shortest_paths(from: 1, to: 2)
+    end
+  end
+
+  test "options validation - unknown option keys in keyword" do
+    graph = Yog.directed() |> Yog.add_node(1) |> Yog.add_node(2)
+
+    assert_raise ArgumentError, ~r/unknown option :invalid_key/, fn ->
+      Yog.Pathfinding.k_shortest_paths(in: graph, from: 1, to: 2, k: 1, invalid_key: true)
+    end
+  end
+
+  test "options validation - unknown option keys in positional" do
+    graph = Yog.directed() |> Yog.add_node(1) |> Yog.add_node(2)
+
+    assert_raise ArgumentError, ~r/unknown option :invalid_key/, fn ->
+      Yog.Pathfinding.k_shortest_paths(graph, 1, 2, 1, invalid_key: true)
+    end
+  end
+
+  test "early error on missing nodes in graph" do
+    graph = Yog.directed() |> Yog.add_node(1)
+
+    assert :error = Yog.Pathfinding.k_shortest_paths(graph, 1, 2, 1)
+    assert :error = Yog.Pathfinding.k_shortest_paths(graph, 2, 1, 1)
+  end
 end

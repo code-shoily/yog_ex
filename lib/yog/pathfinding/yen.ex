@@ -57,6 +57,28 @@ defmodule Yog.Pathfinding.Yen do
   - `{:ok, [Path.t()]}` — list of paths sorted by total weight, shortest first
   - `:error` — if no path exists at all
   """
+  @spec k_shortest_paths(keyword()) :: {:ok, [Path.t()]} | :error
+  def k_shortest_paths(opts) when is_list(opts) do
+    Yog.Utils.validate_opts!(opts, [:in, :from, :to, :k], [:with, :zero, :add, :compare])
+    graph = Keyword.fetch!(opts, :in)
+    source = Keyword.fetch!(opts, :from)
+    target = Keyword.fetch!(opts, :to)
+    k = Keyword.fetch!(opts, :k)
+
+    # Convert options
+    zero = opts[:zero] || 0
+    add = opts[:add] || (&Kernel.+/2)
+    compare = opts[:compare] || (&Yog.Utils.compare/2)
+    weight_fn = opts[:with] || (&Function.identity/1)
+
+    k_shortest_paths(graph, source, target, k,
+      zero: zero,
+      add: add,
+      compare: compare,
+      with: weight_fn
+    )
+  end
+
   @spec k_shortest_paths(
           Graph.t(),
           Yog.node_id(),
@@ -65,52 +87,63 @@ defmodule Yog.Pathfinding.Yen do
           keyword()
         ) :: {:ok, [Path.t()]} | :error
   def k_shortest_paths(graph, source, target, k, opts \\ []) when k >= 1 do
-    zero = opts[:zero] || 0
-    add = opts[:add] || (&Kernel.+/2)
-    compare = opts[:compare] || (&Yog.Utils.compare/2)
-    weight_fn = opts[:with] || (&Function.identity/1)
+    Yog.Utils.validate_opts!(opts, [], [:with, :zero, :add, :compare])
 
-    graph =
-      if weight_fn != (&Function.identity/1),
-        do: Transform.map_edges(graph, weight_fn),
-        else: graph
-
-    case Dijkstra.shortest_path(graph, source, target, zero, add, compare) do
-      :error ->
+    cond do
+      not Yog.Model.has_node?(graph, source) ->
         :error
 
-      {:ok, first_path} ->
-        paths = [first_path]
-        seen_paths = MapSet.new([first_path.nodes])
-        seen_candidates = MapSet.new()
-        heap = PairingHeap.new(fn {w1, _}, {w2, _} -> compare.(w1, w2) != :gt end)
+      not Yog.Model.has_node?(graph, target) ->
+        :error
 
-        {candidates, seen_candidates} =
-          generate_candidates(
-            graph,
-            first_path,
-            paths,
-            seen_paths,
-            seen_candidates,
-            heap,
-            target,
-            zero,
-            add,
-            compare
-          )
+      true ->
+        zero = opts[:zero] || 0
+        add = opts[:add] || (&Kernel.+/2)
+        compare = opts[:compare] || (&Yog.Utils.compare/2)
+        weight_fn = opts[:with] || (&Function.identity/1)
 
-        do_k_iterations(
-          graph,
-          k - 1,
-          paths,
-          seen_paths,
-          seen_candidates,
-          candidates,
-          target,
-          zero,
-          add,
-          compare
-        )
+        graph =
+          if weight_fn != (&Function.identity/1),
+            do: Transform.map_edges(graph, weight_fn),
+            else: graph
+
+        case Dijkstra.shortest_path(graph, source, target, zero, add, compare) do
+          :error ->
+            :error
+
+          {:ok, first_path} ->
+            paths = [first_path]
+            seen_paths = MapSet.new([first_path.nodes])
+            seen_candidates = MapSet.new()
+            heap = PairingHeap.new(fn {w1, _}, {w2, _} -> compare.(w1, w2) != :gt end)
+
+            {candidates, seen_candidates} =
+              generate_candidates(
+                graph,
+                first_path,
+                paths,
+                seen_paths,
+                seen_candidates,
+                heap,
+                target,
+                zero,
+                add,
+                compare
+              )
+
+            do_k_iterations(
+              graph,
+              k - 1,
+              paths,
+              seen_paths,
+              seen_candidates,
+              candidates,
+              target,
+              zero,
+              add,
+              compare
+            )
+        end
     end
   end
 

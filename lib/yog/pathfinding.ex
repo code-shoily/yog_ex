@@ -190,9 +190,16 @@ defmodule Yog.Pathfinding do
       iex> length(paths)
       2
   """
+  @spec k_shortest_paths(keyword()) :: {:ok, [Path.t()]} | :error
   @spec k_shortest_paths(Yog.Graph.t(), Yog.node_id(), Yog.node_id(), pos_integer(), keyword()) ::
           {:ok, [Path.t()]} | :error
-  defdelegate k_shortest_paths(graph, source, target, k, opts \\ []), to: Yen
+  def k_shortest_paths(opts) when is_list(opts) do
+    Yen.k_shortest_paths(opts)
+  end
+
+  def k_shortest_paths(graph, source, target, k, opts \\ []) do
+    Yen.k_shortest_paths(graph, source, target, k, opts)
+  end
 
   # =============================================================================
   # A*
