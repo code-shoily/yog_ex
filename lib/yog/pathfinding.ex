@@ -735,6 +735,7 @@ defmodule Yog.Pathfinding do
   @spec suurballe(Yog.graph(), Yog.node_id(), Yog.node_id(), keyword()) ::
           {:ok, [Yog.Pathfinding.Path.t()]} | :error
   def suurballe(graph, from, to, opts \\ []) do
+    Yog.Utils.validate_opts!(opts, [], [:zero, :add, :compare, :subtract, :weight])
     zero = opts[:zero] || 0
     add = opts[:add] || (&Kernel.+/2)
     compare = opts[:compare] || (&Yog.Utils.compare/2)

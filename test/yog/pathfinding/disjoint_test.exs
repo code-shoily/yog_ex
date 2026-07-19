@@ -351,4 +351,19 @@ defmodule Yog.Pathfinding.DisjointTest do
     assert :error =
              Disjoint.suurballe(graph, 1, 3, 0, &Kernel.+/2, &Yog.Utils.compare/2, &Kernel.-/2)
   end
+
+  test "suurballe options validation - unknown option keys" do
+    graph = Yog.directed() |> Yog.add_node(1) |> Yog.add_node(3)
+
+    assert_raise ArgumentError, ~r/unknown option :invalid_key/, fn ->
+      Yog.Pathfinding.suurballe(graph, 1, 3, invalid_key: true)
+    end
+  end
+
+  test "early error on missing nodes in graph" do
+    graph = Yog.directed() |> Yog.add_node(1)
+
+    assert :error = Yog.Pathfinding.suurballe(graph, 1, 3)
+    assert :error = Yog.Pathfinding.suurballe(graph, 3, 1)
+  end
 end
