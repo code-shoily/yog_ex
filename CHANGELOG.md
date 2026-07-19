@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`Yog.Pathfinding.Brandes` Options & Node Validation** — Hardened Brandes' single-source dependency accumulation with early node existence checks, and added dedicated unit tests for discovery and dependency accumulation functions.
 - **`Yog.Pathfinding.LCA` Audit** — Audited Lowest Common Ancestor tree processor for root/node existence, cycles, disconnected components, and single-node trees.
 - **`Yog.Pathfinding.Matrix` Options & Node Validation** — Hardened distance matrix solver by validating keyword list options (raising `KeyError` for missing required options and `ArgumentError` for unknown options) and filtering out points of interest that are not in the graph.
 - **`Yog.Pathfinding.Path` Audit** — Audited path helper utilities and added unit tests for `empty?/1`, `length/1`, `start/1`, `finish/1`, `reverse/1`, `contains?/2`, and `at/2` for comprehensive test coverage.

@@ -41,16 +41,20 @@ defmodule Yog.Pathfinding.Brandes do
         add \\ &Kernel.+/2,
         compare \\ &Yog.Utils.compare/2
       ) do
-    # Use a priority queue for weighted graphs
-    pq = PQ.new(fn {d1, _}, {d2, _} -> compare.(d1, d2) != :gt end)
-    queue = PQ.push(pq, {zero, source})
+    if Yog.Model.has_node?(graph, source) do
+      # Use a priority queue for weighted graphs
+      pq = PQ.new(fn {d1, _}, {d2, _} -> compare.(d1, d2) != :gt end)
+      queue = PQ.push(pq, {zero, source})
 
-    dist = %{source => zero}
-    sigma = %{source => 1}
-    preds = %{}
-    stack = []
+      dist = %{source => zero}
+      sigma = %{source => 1}
+      preds = %{}
+      stack = []
 
-    do_brandes_loop(graph, queue, dist, sigma, preds, stack, add, compare)
+      do_brandes_loop(graph, queue, dist, sigma, preds, stack, add, compare)
+    else
+      {[], %{}, %{}}
+    end
   end
 
   defp do_brandes_loop(graph, pq, dist, sigma, preds, stack, add, compare) do
