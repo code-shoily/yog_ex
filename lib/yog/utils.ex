@@ -462,4 +462,33 @@ defmodule Yog.Utils do
       String.pad_leading(Integer.to_string(g, 16), 2, "0") <>
       String.pad_leading(Integer.to_string(b, 16), 2, "0")
   end
+
+  @doc """
+  Validates that `opts` is a keyword list containing all `required` keys, and
+  does not contain any keys other than `required` or `optional` keys.
+  """
+  @spec validate_opts!(keyword(), [atom()], [atom()]) :: :ok
+  def validate_opts!(opts, required, optional) do
+    if not Keyword.keyword?(opts) do
+      raise ArgumentError, "expected a keyword list of options, got: #{inspect(opts)}"
+    end
+
+    # check that all required are present
+    Enum.each(required, fn key ->
+      if not Keyword.has_key?(opts, key) do
+        raise KeyError, key: key, term: opts
+      end
+    end)
+
+    # check that no unknown keys are present
+    allowed = MapSet.new(required ++ optional)
+
+    Enum.each(opts, fn {key, _value} ->
+      if not MapSet.member?(allowed, key) do
+        raise ArgumentError, "unknown option #{inspect(key)}"
+      end
+    end)
+
+    :ok
+  end
 end

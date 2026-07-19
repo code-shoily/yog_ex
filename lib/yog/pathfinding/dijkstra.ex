@@ -103,7 +103,7 @@ defmodule Yog.Pathfinding.Dijkstra do
   """
   @spec shortest_path(keyword()) :: path_result()
   def shortest_path(opts) do
-    validate_opts!(opts, [:in, :from, :to], [:zero, :add, :compare])
+    Yog.Utils.validate_opts!(opts, [:in, :from, :to], [:zero, :add, :compare])
     graph = Keyword.fetch!(opts, :in)
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
@@ -137,7 +137,7 @@ defmodule Yog.Pathfinding.Dijkstra do
   """
   @spec single_source_distances(keyword()) :: %{Yog.node_id() => any()}
   def single_source_distances(opts) do
-    validate_opts!(opts, [:in, :from], [:zero, :add, :compare])
+    Yog.Utils.validate_opts!(opts, [:in, :from], [:zero, :add, :compare])
     graph = Keyword.fetch!(opts, :in)
     from = Keyword.fetch!(opts, :from)
     zero = opts[:zero] || 0
@@ -172,7 +172,12 @@ defmodule Yog.Pathfinding.Dijkstra do
   """
   @spec implicit_dijkstra(keyword()) :: {:ok, any()} | :error
   def implicit_dijkstra(opts) do
-    validate_opts!(opts, [:from, :successors_with_cost, :is_goal], [:zero, :add, :compare])
+    Yog.Utils.validate_opts!(opts, [:from, :successors_with_cost, :is_goal], [
+      :zero,
+      :add,
+      :compare
+    ])
+
     from = Keyword.fetch!(opts, :from)
     successors = Keyword.fetch!(opts, :successors_with_cost)
     is_goal = Keyword.fetch!(opts, :is_goal)
@@ -198,7 +203,7 @@ defmodule Yog.Pathfinding.Dijkstra do
   """
   @spec implicit_dijkstra_by(keyword()) :: {:ok, any()} | :error
   def implicit_dijkstra_by(opts) do
-    validate_opts!(opts, [:from, :successors_with_cost, :visited_by, :is_goal], [
+    Yog.Utils.validate_opts!(opts, [:from, :successors_with_cost, :visited_by, :is_goal], [
       :zero,
       :add,
       :compare
@@ -623,27 +628,5 @@ defmodule Yog.Pathfinding.Dijkstra do
       {:ok, path} -> {:ok, %{path | algorithm: :widest_path}}
       :error -> :error
     end
-  end
-
-  defp validate_opts!(opts, required, optional) do
-    if not Keyword.keyword?(opts) do
-      raise ArgumentError, "expected a keyword list of options, got: #{inspect(opts)}"
-    end
-
-    # check that all required are present
-    Enum.each(required, fn key ->
-      if not Keyword.has_key?(opts, key) do
-        raise KeyError, key: key, term: opts
-      end
-    end)
-
-    # check that no unknown keys are present
-    allowed = MapSet.new(required ++ optional)
-
-    Enum.each(opts, fn {key, _value} ->
-      if not MapSet.member?(allowed, key) do
-        raise ArgumentError, "unknown option #{inspect(key)}"
-      end
-    end)
   end
 end

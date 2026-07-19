@@ -101,7 +101,7 @@ defmodule Yog.Pathfinding.AStar do
   """
   @spec a_star(keyword()) :: path_result()
   def a_star(opts) do
-    validate_opts!(opts, [:in, :from, :to, :heuristic], [:zero, :add, :compare])
+    Yog.Utils.validate_opts!(opts, [:in, :from, :to, :heuristic], [:zero, :add, :compare])
     graph = Keyword.fetch!(opts, :in)
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
@@ -140,7 +140,7 @@ defmodule Yog.Pathfinding.AStar do
   """
   @spec implicit_a_star(keyword()) :: {:ok, any()} | :error
   def implicit_a_star(opts) do
-    validate_opts!(opts, [:from, :successors_with_cost, :is_goal, :heuristic], [
+    Yog.Utils.validate_opts!(opts, [:from, :successors_with_cost, :is_goal, :heuristic], [
       :zero,
       :add,
       :compare
@@ -193,11 +193,15 @@ defmodule Yog.Pathfinding.AStar do
   """
   @spec implicit_a_star_by(keyword()) :: {:ok, any()} | :error
   def implicit_a_star_by(opts) do
-    validate_opts!(opts, [:from, :successors_with_cost, :visited_by, :is_goal, :heuristic], [
-      :zero,
-      :add,
-      :compare
-    ])
+    Yog.Utils.validate_opts!(
+      opts,
+      [:from, :successors_with_cost, :visited_by, :is_goal, :heuristic],
+      [
+        :zero,
+        :add,
+        :compare
+      ]
+    )
 
     from = Keyword.fetch!(opts, :from)
     successors = Keyword.fetch!(opts, :successors_with_cost)
@@ -658,27 +662,5 @@ defmodule Yog.Pathfinding.AStar do
     else
       {q, gs}
     end
-  end
-
-  defp validate_opts!(opts, required, optional) do
-    if not Keyword.keyword?(opts) do
-      raise ArgumentError, "expected a keyword list of options, got: #{inspect(opts)}"
-    end
-
-    # check that all required are present
-    Enum.each(required, fn key ->
-      if not Keyword.has_key?(opts, key) do
-        raise KeyError, key: key, term: opts
-      end
-    end)
-
-    # check that no unknown keys are present
-    allowed = MapSet.new(required ++ optional)
-
-    Enum.each(opts, fn {key, _value} ->
-      if not MapSet.member?(allowed, key) do
-        raise ArgumentError, "unknown option #{inspect(key)}"
-      end
-    end)
   end
 end

@@ -117,6 +117,7 @@ defmodule Yog.Pathfinding.BellmanFord do
   """
   @spec bellman_ford(keyword()) :: result()
   def bellman_ford(opts) do
+    Yog.Utils.validate_opts!(opts, [:in, :from, :to], [:zero, :add, :compare])
     graph = Keyword.fetch!(opts, :in)
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
@@ -153,6 +154,13 @@ defmodule Yog.Pathfinding.BellmanFord do
   """
   @spec implicit_bellman_ford(keyword()) :: implicit_result(any())
   def implicit_bellman_ford(opts) do
+    Yog.Utils.validate_opts!(opts, [:from, :successors_with_cost, :is_goal], [
+      :zero,
+      :add,
+      :compare,
+      :max_iterations
+    ])
+
     from = Keyword.fetch!(opts, :from)
     successors = Keyword.fetch!(opts, :successors_with_cost)
     is_goal = Keyword.fetch!(opts, :is_goal)
@@ -179,6 +187,13 @@ defmodule Yog.Pathfinding.BellmanFord do
   """
   @spec implicit_bellman_ford_by(keyword()) :: implicit_result(any())
   def implicit_bellman_ford_by(opts) do
+    Yog.Utils.validate_opts!(opts, [:from, :successors_with_cost, :visited_by, :is_goal], [
+      :zero,
+      :add,
+      :compare,
+      :max_iterations
+    ])
+
     from = Keyword.fetch!(opts, :from)
     successors = Keyword.fetch!(opts, :successors_with_cost)
     visited_by = Keyword.fetch!(opts, :visited_by)
@@ -186,8 +201,18 @@ defmodule Yog.Pathfinding.BellmanFord do
     zero = opts[:zero] || 0
     add = opts[:add] || (&Kernel.+/2)
     compare = opts[:compare] || (&Yog.Utils.compare/2)
+    max_iterations = Keyword.get(opts, :max_iterations, 1000)
 
-    implicit_bellman_ford_by(from, successors, visited_by, is_goal, zero, add, compare)
+    implicit_bellman_ford_by(
+      from,
+      successors,
+      visited_by,
+      is_goal,
+      zero,
+      add,
+      compare,
+      max_iterations
+    )
   end
 
   # ============================================================
@@ -254,41 +279,50 @@ defmodule Yog.Pathfinding.BellmanFord do
         add \\ &Kernel.+/2,
         compare \\ &Yog.Utils.compare/2
       ) do
-    nodes = Map.keys(graph.nodes)
-    node_count = length(nodes)
+    cond do
+      not Yog.Model.has_node?(graph, from) ->
+        {:error, :no_path}
 
-    initial_distances = %{from => zero}
-    initial_predecessors = %{}
+      not Yog.Model.has_node?(graph, to) ->
+        {:error, :no_path}
 
-    {distances, predecessors} =
-      if node_count <= 1 do
-        {initial_distances, initial_predecessors}
-      else
-        do_relaxation_passes(
-          graph,
-          nodes,
-          initial_distances,
-          initial_predecessors,
-          add,
-          compare,
-          node_count - 1
-        )
-      end
+      true ->
+        nodes = Map.keys(graph.nodes)
+        node_count = length(nodes)
 
-    {_final_distances, _, changed?} =
-      relax_all_edges_from_graph(graph, distances, predecessors, add, compare)
+        initial_distances = %{from => zero}
+        initial_predecessors = %{}
 
-    if changed? do
-      {:error, :negative_cycle}
-    else
-      case Map.fetch(distances, to) do
-        {:ok, weight} ->
-          path = reconstruct_path_from_predecessors(predecessors, from, to)
-          {:ok, Path.new(path, weight, :bellman_ford)}
+        {distances, predecessors} =
+          if node_count <= 1 do
+            {initial_distances, initial_predecessors}
+          else
+            do_relaxation_passes(
+              graph,
+              nodes,
+              initial_distances,
+              initial_predecessors,
+              add,
+              compare,
+              node_count - 1
+            )
+          end
 
-        :error ->
-          {:error, :no_path}
-      end
+        {_final_distances, _, changed?} =
+          relax_all_edges_from_graph(graph, distances, predecessors, add, compare)
+
+        if changed? do
+          {:error, :negative_cycle}
+        else
+          case Map.fetch(distances, to) do
+            {:ok, weight} ->
+              path = reconstruct_path_from_predecessors(predecessors, from, to)
+              {:ok, Path.new(path, weight, :bellman_ford)}
+
+            :error ->
+              {:error, :no_path}
+          end
+        end
     end
   end
 
@@ -311,24 +345,28 @@ defmodule Yog.Pathfinding.BellmanFord do
         add \\ &Kernel.+/2,
         compare \\ &Yog.Utils.compare/2
       ) do
-    nodes = Map.keys(graph.nodes)
-    node_count = length(nodes)
+    if Yog.Model.has_node?(graph, from) do
+      nodes = Map.keys(graph.nodes)
+      node_count = length(nodes)
 
-    initial_distances = %{from => zero}
-    initial_predecessors = %{}
+      initial_distances = %{from => zero}
+      initial_predecessors = %{}
 
-    {distances, _} =
-      do_relaxation_passes(
-        graph,
-        nodes,
-        initial_distances,
-        initial_predecessors,
-        add,
-        compare,
-        node_count - 1
-      )
+      {distances, _} =
+        do_relaxation_passes(
+          graph,
+          nodes,
+          initial_distances,
+          initial_predecessors,
+          add,
+          compare,
+          node_count - 1
+        )
 
-    distances
+      distances
+    else
+      %{}
+    end
   end
 
   @doc """
@@ -348,21 +386,25 @@ defmodule Yog.Pathfinding.BellmanFord do
         add \\ &Kernel.+/2,
         compare \\ &Yog.Utils.compare/2
       ) do
-    nodes = Map.keys(graph.nodes)
-    node_count = length(nodes)
+    if Yog.Model.has_node?(graph, from) do
+      nodes = Map.keys(graph.nodes)
+      node_count = length(nodes)
 
-    initial_distances = %{from => zero}
+      initial_distances = %{from => zero}
 
-    distances =
-      Enum.reduce(1..(node_count - 1), initial_distances, fn _, dist ->
-        {new_dist, _} = relax_all_edges_from_graph_no_pred(graph, dist, add, compare)
-        new_dist
-      end)
+      distances =
+        Enum.reduce(1..(node_count - 1), initial_distances, fn _, dist ->
+          {new_dist, _} = relax_all_edges_from_graph_no_pred(graph, dist, add, compare)
+          new_dist
+        end)
 
-    {final_distances, changed?} =
-      relax_all_edges_from_graph_no_pred(graph, distances, add, compare)
+      {final_distances, changed?} =
+        relax_all_edges_from_graph_no_pred(graph, distances, add, compare)
 
-    changed? or negative_cycle_detected?(nodes, distances, final_distances, compare)
+      changed? or negative_cycle_detected?(nodes, distances, final_distances, compare)
+    else
+      false
+    end
   end
 
   @doc """

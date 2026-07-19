@@ -547,4 +547,57 @@ defmodule Yog.Pathfinding.BellmanFordTest do
     path_err = BellmanFord.reconstruct_path(%{2 => 1}, 1, 3, 10)
     assert path_err.nodes == []
   end
+
+  test "bellman_ford error on missing from node" do
+    graph = Yog.directed() |> Yog.add_node(2)
+    assert BellmanFord.bellman_ford(graph, 1, 2) == {:error, :no_path}
+  end
+
+  test "bellman_ford error on missing to node" do
+    graph = Yog.directed() |> Yog.add_node(1)
+    assert BellmanFord.bellman_ford(graph, 1, 2) == {:error, :no_path}
+  end
+
+  test "bellman_ford empty graph" do
+    graph = Yog.directed()
+    assert BellmanFord.bellman_ford(graph, 1, 1) == {:error, :no_path}
+  end
+
+  test "bellman_ford single node graph same start and goal" do
+    graph = Yog.directed() |> Yog.add_node(1)
+    assert {:ok, path} = BellmanFord.bellman_ford(graph, 1, 1)
+    assert path.nodes == [1]
+    assert path.weight == 0
+  end
+
+  test "bellman_ford options validation - missing required keys" do
+    graph = Yog.directed() |> Yog.add_node(1) |> Yog.add_node(2) |> Yog.add_edge!(1, 2, 5)
+
+    assert_raise KeyError, fn ->
+      BellmanFord.bellman_ford(in: graph, from: 1)
+    end
+
+    assert_raise KeyError, fn ->
+      BellmanFord.implicit_bellman_ford(
+        successors_with_cost: fn n -> [{n + 1, 1}] end,
+        is_goal: fn n -> n == 3 end
+      )
+    end
+
+    assert_raise KeyError, fn ->
+      BellmanFord.implicit_bellman_ford_by(
+        from: 1,
+        successors_with_cost: fn n -> [{n + 1, 1}] end,
+        is_goal: fn n -> n == 3 end
+      )
+    end
+  end
+
+  test "bellman_ford options validation - unknown option keys" do
+    graph = Yog.directed() |> Yog.add_node(1) |> Yog.add_node(2) |> Yog.add_edge!(1, 2, 5)
+
+    assert_raise ArgumentError, ~r/unknown option :invalid_key/, fn ->
+      BellmanFord.bellman_ford(in: graph, from: 1, to: 2, invalid_key: true)
+    end
+  end
 end
