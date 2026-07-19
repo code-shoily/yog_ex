@@ -504,4 +504,37 @@ defmodule Yog.Pathfinding.JohnsonTest do
     assert {:ok, _} = Johnson.johnson(graph, 0, &Kernel.+/2)
     assert {:ok, _} = Johnson.johnson(graph, 0, &Kernel.+/2, &Yog.Utils.compare/2)
   end
+
+  test "johnson keyword API test" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1, "A")
+      |> Yog.add_node(2, "B")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+
+    assert {:ok, distances} =
+             Yog.Pathfinding.johnson(
+               in: graph,
+               zero: 0,
+               add: &add/2,
+               compare: &compare/2,
+               subtract: &subtract/2
+             )
+
+    assert distances[{1, 2}] == 5
+  end
+
+  test "johnson options validation - missing required keys" do
+    assert_raise KeyError, fn ->
+      Yog.Pathfinding.johnson(zero: 0)
+    end
+  end
+
+  test "johnson options validation - unknown option keys" do
+    graph = Yog.directed() |> Yog.add_node(1)
+
+    assert_raise ArgumentError, ~r/unknown option :invalid_key/, fn ->
+      Yog.Pathfinding.johnson(in: graph, invalid_key: true)
+    end
+  end
 end

@@ -126,6 +126,18 @@ defmodule Yog.Pathfinding.Johnson do
       iex> Yog.Pathfinding.Johnson.johnson(bad_graph, 0, &(&1 + &2), compare, &(&1 - &2))
       {:error, :negative_cycle}
   """
+  @spec johnson(keyword()) :: {:ok, distance_matrix()} | {:error, :negative_cycle}
+  def johnson(opts) when is_list(opts) do
+    Yog.Utils.validate_opts!(opts, [:in], [:zero, :add, :compare, :subtract])
+    graph = Keyword.fetch!(opts, :in)
+    zero = opts[:zero] || 0
+    add = opts[:add] || (&Kernel.+/2)
+    compare = opts[:compare] || (&Yog.Utils.compare/2)
+    subtract = opts[:subtract] || (&Kernel.-/2)
+
+    johnson(graph, zero, add, compare, subtract)
+  end
+
   @spec johnson(
           Yog.graph(),
           any(),

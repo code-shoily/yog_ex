@@ -314,13 +314,17 @@ defmodule Yog.Pathfinding do
   edge weights (but not negative cycles).
   """
   def johnson(
-        graph,
+        graph_or_opts,
         zero \\ 0,
         add \\ &Kernel.+/2,
         compare \\ &Yog.Utils.compare/2,
         subtract \\ &Kernel.-/2
       ) do
-    Johnson.johnson(graph, zero, add, compare, subtract)
+    if is_list(graph_or_opts) do
+      Johnson.johnson(graph_or_opts)
+    else
+      Johnson.johnson(graph_or_opts, zero, add, compare, subtract)
+    end
   end
 
   # =============================================================================
