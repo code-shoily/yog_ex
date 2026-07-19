@@ -129,6 +129,19 @@ defmodule Yog.Pathfinding.Matrix do
       iex> distances[{1, 3}]
       2
   """
+  @spec distance_matrix(keyword()) :: {:ok, distance_matrix()} | {:error, :negative_cycle}
+  def distance_matrix(opts) when is_list(opts) do
+    Yog.Utils.validate_opts!(opts, [:in, :points], [:zero, :add, :compare, :subtract])
+    graph = opts[:in]
+    points = opts[:points]
+    zero = opts[:zero] || 0
+    add = opts[:add] || (&Kernel.+/2)
+    compare = opts[:compare] || (&Yog.Utils.compare/2)
+    subtract = opts[:subtract]
+
+    distance_matrix(graph, points, zero, add, compare, subtract)
+  end
+
   @spec distance_matrix(
           Yog.graph(),
           [Yog.node_id()],
@@ -145,7 +158,8 @@ defmodule Yog.Pathfinding.Matrix do
         compare \\ &Yog.Utils.compare/2,
         subtract \\ nil
       ) do
-    poi_set = MapSet.new(points_of_interest)
+    existing_pois = Enum.filter(points_of_interest, &Yog.Model.has_node?(graph, &1))
+    poi_set = MapSet.new(existing_pois)
     node_count = map_size(graph.nodes)
     edge_count = Yog.Graph.edge_count(graph)
 
@@ -153,27 +167,27 @@ defmodule Yog.Pathfinding.Matrix do
       # Negative weight support needed: choose between Johnson's and Floyd-Warshall
       # Johnson's is better for sparse graphs (E < V²/4)
       if edge_count < div(node_count * node_count, 4) do
-        run_johnson(graph, points_of_interest, poi_set, zero, add, compare, subtract)
+        run_johnson(graph, existing_pois, poi_set, zero, add, compare, subtract)
       else
-        run_floyd_warshall(graph, points_of_interest, poi_set, zero, add, compare)
+        run_floyd_warshall(graph, existing_pois, poi_set, zero, add, compare)
       end
     else
       # Non-negative weights: choose between Dijkstra × P, Johnson's, and Floyd-Warshall
-      poi_count = length(points_of_interest)
+      poi_count = length(existing_pois)
 
       cond do
         # Few POIs: Dijkstra from each POI is most efficient
         poi_count <= div(node_count, 3) ->
-          run_dijkstra_multi(graph, points_of_interest, poi_set, zero, add, compare)
+          run_dijkstra_multi(graph, existing_pois, poi_set, zero, add, compare)
 
         # Many POIs but sparse graph: running Dijkstra from each POI is correct
         # and avoids needing a subtraction function for Johnson's reweighting.
         edge_count < div(node_count * node_count, 4) ->
-          run_dijkstra_multi(graph, points_of_interest, poi_set, zero, add, compare)
+          run_dijkstra_multi(graph, existing_pois, poi_set, zero, add, compare)
 
         # Dense graph with many POIs: Floyd-Warshall
         true ->
-          run_floyd_warshall(graph, points_of_interest, poi_set, zero, add, compare)
+          run_floyd_warshall(graph, existing_pois, poi_set, zero, add, compare)
       end
     end
   end

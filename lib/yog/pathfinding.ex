@@ -341,8 +341,29 @@ defmodule Yog.Pathfinding do
   @doc """
   Computes a distance matrix between specified points of interest.
 
-  Uses Dijkstra from each point to compute pairwise distances.
+  Supports both positional parameters and a keyword options list.
+
+  ## Options
+    * `:in` - The graph
+    * `:points` - List of point node IDs
+    * `:zero` - Zero value (default: 0)
+    * `:add` - Addition function (default: &Kernel.+/2)
+    * `:compare` - Comparison function (default: &Yog.Utils.compare/2)
+    * `:subtract` - Subtraction function for negative weight support (default: nil)
   """
+  @spec distance_matrix(keyword()) :: {:ok, map()} | {:error, :negative_cycle}
+  def distance_matrix(opts) when is_list(opts) do
+    Matrix.distance_matrix(opts)
+  end
+
+  @spec distance_matrix(
+          Yog.graph(),
+          [Yog.node_id()],
+          any(),
+          (any(), any() -> any()),
+          (any(), any() -> :lt | :eq | :gt),
+          (any(), any() -> any()) | nil
+        ) :: {:ok, map()} | {:error, :negative_cycle}
   def distance_matrix(
         graph,
         points,

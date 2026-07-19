@@ -316,4 +316,44 @@ defmodule Yog.Pathfinding.MatrixTest do
       assert distances[{1, 4}] == 4
     end
   end
+
+  describe "distance_matrix options validation and facade" do
+    test "validates keyword options list" do
+      graph = Yog.directed() |> Yog.add_node(1, nil) |> Yog.add_node(2, nil)
+
+      assert_raise ArgumentError, ~r/unknown option :invalid_key/, fn ->
+        Yog.Pathfinding.distance_matrix(in: graph, points: [1, 2], invalid_key: true)
+      end
+
+      assert_raise KeyError, ~r/key :in not found/, fn ->
+        Yog.Pathfinding.distance_matrix(points: [1, 2])
+      end
+    end
+
+    test "works via keyword options version" do
+      graph =
+        Yog.directed()
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_edge_ensure(1, 2, 5)
+
+      assert {:ok, distances} = Yog.Pathfinding.distance_matrix(in: graph, points: [1, 2])
+      assert distances[{1, 2}] == 5
+    end
+
+    test "filters out non-existent points of interest" do
+      graph =
+        Yog.directed()
+        |> Yog.add_node(1, nil)
+        |> Yog.add_node(2, nil)
+        |> Yog.add_edge_ensure(1, 2, 5)
+
+      # 99 does not exist in graph
+      assert {:ok, distances} = Yog.Pathfinding.distance_matrix(in: graph, points: [1, 2, 99])
+      assert distances[{1, 2}] == 5
+      refute Map.has_key?(distances, {1, 99})
+      refute Map.has_key?(distances, {99, 1})
+      refute Map.has_key?(distances, {99, 99})
+    end
+  end
 end
