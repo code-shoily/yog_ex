@@ -274,4 +274,97 @@ defmodule Yog.Pathfinding.AStarTest do
 
     assert {:ok, 102} = AStar.implicit_a_star(1, successors, fn n -> n == 4 end, fn _ -> 0 end)
   end
+
+  test "a_star error on missing from node" do
+    graph = Yog.directed() |> Yog.add_node(2)
+    assert AStar.a_star(graph, 1, 2, fn _, _ -> 0 end) == :error
+  end
+
+  test "a_star error on missing to node" do
+    graph = Yog.directed() |> Yog.add_node(1)
+    assert AStar.a_star(graph, 1, 2, fn _, _ -> 0 end) == :error
+  end
+
+  test "a_star empty graph" do
+    graph = Yog.directed()
+    assert AStar.a_star(graph, 1, 1, fn _, _ -> 0 end) == :error
+  end
+
+  test "a_star single node graph same start and goal" do
+    graph = Yog.directed() |> Yog.add_node(1)
+    assert {:ok, path} = AStar.a_star(graph, 1, 1, fn _, _ -> 0 end)
+    assert path.nodes == [1]
+    assert path.weight == 0
+  end
+
+  test "a_star directed vs undirected behavior" do
+    # Directed graph: path exists in one direction
+    dg =
+      Yog.directed()
+      |> Yog.add_node(1)
+      |> Yog.add_node(2)
+      |> Yog.add_edge!(1, 2, 5)
+
+    assert {:ok, path} = AStar.a_star(dg, 1, 2, fn _, _ -> 0 end)
+    assert path.weight == 5
+    assert AStar.a_star(dg, 2, 1, fn _, _ -> 0 end) == :error
+
+    # Undirected graph: path exists in both directions
+    ug =
+      Yog.undirected()
+      |> Yog.add_node(1)
+      |> Yog.add_node(2)
+      |> Yog.add_edge!(1, 2, 5)
+
+    assert {:ok, path1} = AStar.a_star(ug, 1, 2, fn _, _ -> 0 end)
+    assert path1.weight == 5
+    assert {:ok, path2} = AStar.a_star(ug, 2, 1, fn _, _ -> 0 end)
+    assert path2.weight == 5
+  end
+
+  test "a_star self-loops are ignored" do
+    graph =
+      Yog.directed()
+      |> Yog.add_node(1)
+      |> Yog.add_node(2)
+      |> Yog.add_edge!(1, 1, 2)
+      |> Yog.add_edge!(1, 2, 5)
+
+    assert {:ok, path} = AStar.a_star(graph, 1, 2, fn _, _ -> 0 end)
+    assert path.nodes == [1, 2]
+    assert path.weight == 5
+  end
+
+  test "options validation - missing required keys" do
+    graph = Yog.directed() |> Yog.add_node(1) |> Yog.add_node(2) |> Yog.add_edge!(1, 2, 5)
+
+    assert_raise KeyError, fn ->
+      AStar.a_star(in: graph, from: 1, to: 2)
+    end
+
+    assert_raise KeyError, fn ->
+      AStar.implicit_a_star(
+        successors_with_cost: fn n -> [{n + 1, 1}] end,
+        is_goal: fn n -> n == 3 end,
+        heuristic: fn n -> 3 - n end
+      )
+    end
+
+    assert_raise KeyError, fn ->
+      AStar.implicit_a_star_by(
+        from: 1,
+        successors_with_cost: fn n -> [{n + 1, 1}] end,
+        is_goal: fn n -> n == 3 end,
+        heuristic: fn n -> 3 - n end
+      )
+    end
+  end
+
+  test "options validation - unknown option keys" do
+    graph = Yog.directed() |> Yog.add_node(1) |> Yog.add_node(2) |> Yog.add_edge!(1, 2, 5)
+
+    assert_raise ArgumentError, ~r/unknown option :invalid_key/, fn ->
+      AStar.a_star(in: graph, from: 1, to: 2, heuristic: fn _, _ -> 0 end, invalid_key: true)
+    end
+  end
 end

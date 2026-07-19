@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`Yog.Pathfinding.AStar` Options & Node Validation** — Hardened A* search by validating keyword list options (raising `KeyError` for missing required options and `ArgumentError` for unknown options) and early-returning `:error` for missing source or target nodes in the graph, resolving edge cases like empty and disconnected graphs.
 - **`Yog.Functional.Model.embed/2` Direction Preservation** — Fixed `embed/2` to preserve the target functional graph's direction (`:directed` or `:undirected`) when rebuilding a graph from a matched context, and clarified the inductive graph documentation around match/embed semantics.
 - **Data Structure & Utility Audit** — Hardened `Yog.Utils.compare/2` with explicit `:infinity` sentinel handling, normalized `Yog.Utils.fisher_yates/2` seed handling, clarified shuffle documentation, and reviewed `Yog.DisjointSet` and `Yog.PairingHeap` coverage/performance for the pre-1.0 audit wave.
 
