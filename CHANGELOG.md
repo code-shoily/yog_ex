@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`Yog.Pathfinding.ChinesePostman` Audit** — Audited Route Inspection solver for Eulerian, disconnected, empty, and single-node graphs.
 - **`Yog.Pathfinding.Disjoint` Options & Node Validation** — Hardened Suurballe's disjoint path search by validating keyword list options in the pathfinding facade (raising `ArgumentError` for unknown options) and early-returning `:error` for missing source or target nodes in the graph.
 - **`Yog.Pathfinding.Yen` Options & Node Validation** — Hardened Yen's k-shortest paths by validating keyword list options (raising `KeyError` for missing required options and `ArgumentError` for unknown options) and early-returning `:error` for missing source or target nodes in the graph, resolving edge cases like empty and disconnected graphs.
 - **`Yog.Pathfinding.Bidirectional` Options & Node Validation** — Hardened bidirectional search by validating keyword list options (raising `KeyError` for missing required options and `ArgumentError` for unknown options) and early-returning `:error` for missing source or target nodes in the graph, resolving edge cases like empty and disconnected graphs.

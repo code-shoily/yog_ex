@@ -203,4 +203,9 @@ defmodule Yog.Pathfinding.ChinesePostmanTest do
       assert all_edges_covered?(graph, walk)
     end
   end
+
+  test "single node graph" do
+    graph = Yog.undirected() |> Yog.add_node(1, nil)
+    assert {:ok, [1], 0} = ChinesePostman.chinese_postman(graph)
+  end
 end
