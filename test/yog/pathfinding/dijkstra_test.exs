@@ -880,4 +880,61 @@ defmodule Yog.Pathfinding.DijkstraTest do
     assert {:ok, _} = Dijkstra.shortest_path(graph, 1, 1, 0)
     assert {:ok, _} = Dijkstra.shortest_path(graph, 1, 1, 0, &Kernel.+/2)
   end
+
+  test "shortest_path error on missing from node" do
+    graph = Yog.directed() |> Yog.add_node(2)
+    assert Dijkstra.shortest_path(graph, 1, 2) == :error
+  end
+
+  test "shortest_path error on missing to node" do
+    graph = Yog.directed() |> Yog.add_node(1)
+    assert Dijkstra.shortest_path(graph, 1, 2) == :error
+  end
+
+  test "shortest_path empty graph" do
+    graph = Yog.directed()
+    assert Dijkstra.shortest_path(graph, 1, 1) == :error
+  end
+
+  test "shortest_path single node graph same start and goal" do
+    graph = Yog.directed() |> Yog.add_node(1)
+    assert {:ok, path} = Dijkstra.shortest_path(graph, 1, 1)
+    assert path.nodes == [1]
+    assert path.weight == 0
+  end
+
+  test "options validation - missing required keys" do
+    graph = Yog.directed() |> Yog.add_node(1) |> Yog.add_node(2) |> Yog.add_edge!(1, 2, 5)
+
+    assert_raise KeyError, fn ->
+      Dijkstra.shortest_path(in: graph, from: 1)
+    end
+
+    assert_raise KeyError, fn ->
+      Dijkstra.single_source_distances(in: graph)
+    end
+
+    assert_raise KeyError, fn ->
+      Dijkstra.implicit_dijkstra(
+        successors_with_cost: fn n -> [{n + 1, 1}] end,
+        is_goal: fn n -> n == 3 end
+      )
+    end
+
+    assert_raise KeyError, fn ->
+      Dijkstra.implicit_dijkstra_by(
+        from: 1,
+        successors_with_cost: fn n -> [{n + 1, 1}] end,
+        is_goal: fn n -> n == 3 end
+      )
+    end
+  end
+
+  test "options validation - unknown option keys" do
+    graph = Yog.directed() |> Yog.add_node(1) |> Yog.add_node(2) |> Yog.add_edge!(1, 2, 5)
+
+    assert_raise ArgumentError, ~r/unknown option :invalid_key/, fn ->
+      Dijkstra.shortest_path(in: graph, from: 1, to: 2, invalid_key: true)
+    end
+  end
 end
