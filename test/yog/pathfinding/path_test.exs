@@ -37,4 +37,49 @@ defmodule Yog.Pathfinding.PathTest do
       assert Path.hydrate_path(graph, path) == [{1, 2, 1}, {2, 3, 2}, {3, 4, 3}]
     end
   end
+
+  describe "path helper utilities" do
+    test "empty?" do
+      p1 = Path.new([], 0)
+      p2 = Path.new([1], 0)
+      assert Path.empty?(p1)
+      refute Path.empty?(p2)
+    end
+
+    test "length" do
+      assert Path.length(Path.new([], 0)) == 0
+      assert Path.length(Path.new([1], 0)) == 0
+      assert Path.length(Path.new([1, 2, 3], 10)) == 2
+    end
+
+    test "start and finish" do
+      assert Path.start(Path.new([], 0)) == nil
+      assert Path.finish(Path.new([], 0)) == nil
+      p = Path.new([1, 2, 3], 10)
+      assert Path.start(p) == 1
+      assert Path.finish(p) == 3
+    end
+
+    test "reverse" do
+      p = Path.new([1, 2, 3], 10, :dijkstra, %{visited: 5})
+      rev = Path.reverse(p)
+      assert rev.nodes == [3, 2, 1]
+      assert rev.weight == 10
+      assert rev.algorithm == :dijkstra
+      assert rev.metadata == %{visited: 5}
+    end
+
+    test "contains?" do
+      p = Path.new([1, 2, 3], 10)
+      assert Path.contains?(p, 2)
+      refute Path.contains?(p, 4)
+    end
+
+    test "at" do
+      p = Path.new([1, 2, 3], 10)
+      assert Path.at(p, 0) == 1
+      assert Path.at(p, 2) == 3
+      assert Path.at(p, 3) == nil
+    end
+  end
 end
