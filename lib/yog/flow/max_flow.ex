@@ -148,10 +148,20 @@ defmodule Yog.Flow.MaxFlow do
 
   ## Parameters
 
-  - `graph` - The flow network with edge capacities
-  - `source` - Source node ID where flow originates
-  - `sink` - Sink node ID where flow terminates
-  - `algorithm` - Algorithm to use: `:edmonds_karp` (default), `:dinic`, or `:push_relabel`
+  - `graph` - The flow network (`Yog.Graph.t()`) with edge capacities.
+  - `source` - Source node ID where flow originates.
+  - `sink` - Sink node ID where flow terminates.
+  - `algorithm` - Algorithm to use: `:edmonds_karp` (default), `:dinic`, or `:push_relabel`.
+
+  ## Returns
+
+  - A `%Yog.Flow.MaxFlowResult{}` containing the maximum flow and residual graph.
+
+  ## Errors
+
+  - Raises `ArgumentError` if the graph is not a `Yog.Graph` struct.
+  - Raises `ArgumentError` if either `source` or `sink` is not present in the graph.
+  - Raises `ArgumentError` if `algorithm` is invalid.
 
   ## Examples
 
@@ -170,7 +180,7 @@ defmodule Yog.Flow.MaxFlow do
       :edmonds_karp -> edmonds_karp(graph, source, sink)
       :dinic -> dinic(graph, source, sink)
       :push_relabel -> push_relabel(graph, source, sink)
-      _ -> edmonds_karp(graph, source, sink)
+      invalid -> raise ArgumentError, "invalid algorithm: #{inspect(invalid)}"
     end
   end
 
@@ -179,6 +189,21 @@ defmodule Yog.Flow.MaxFlow do
 
   This is a convenience wrapper around `edmonds_karp/8` that uses default
   integer arithmetic operations.
+
+  ## Parameters
+
+  - `graph` - The flow network (`Yog.Graph.t()`) with edge capacities.
+  - `source` - Source node ID where flow originates.
+  - `sink` - Sink node ID where flow terminates.
+
+  ## Returns
+
+  - A `%Yog.Flow.MaxFlowResult{}` containing the maximum flow and residual graph.
+
+  ## Errors
+
+  - Raises `ArgumentError` if the graph is not a `Yog.Graph` struct.
+  - Raises `ArgumentError` if either `source` or `sink` is not present in the graph.
   """
   @spec calculate(Yog.graph(), Yog.node_id(), Yog.node_id()) :: max_flow_result()
   def calculate(graph, source, sink) do
@@ -194,14 +219,24 @@ defmodule Yog.Flow.MaxFlow do
 
   ## Parameters
 
-  - `graph` - The flow network with edge capacities
-  - `source` - Source node ID where flow originates
-  - `sink` - Sink node ID where flow terminates
-  - `zero` - Zero value for the capacity type
-  - `add` - Addition function for capacities
-  - `subtract` - Subtraction function for capacities
-  - `compare` - Comparison function for capacities
-  - `min` - Minimum function for capacities
+  - `graph` - The flow network (`Yog.Graph.t()`) with edge capacities.
+  - `source` - Source node ID where flow originates.
+  - `sink` - Sink node ID where flow terminates.
+  - `zero` - Zero value for the capacity type (default: `0`).
+  - `add` - Addition function for capacities (default: `&Kernel.+/2`).
+  - `compare` - Comparison function for capacities (default: `&Yog.Utils.compare/2`).
+  - `subtract` - Subtraction function for capacities (default: `&Kernel.-/2`).
+  - `min_fn` - Minimum function for capacities (default: `&min/2`).
+
+  ## Returns
+
+  - A `%Yog.Flow.MaxFlowResult{}` containing the maximum flow and residual graph.
+
+  ## Errors
+
+  - Raises `ArgumentError` if the graph is not a `Yog.Graph` struct.
+  - Raises `ArgumentError` if either `source` or `sink` is not present in the graph.
+  - Raises `ArgumentError` if any of `add`, `compare`, `subtract`, or `min_fn` are not functions of arity 2.
 
   ## Examples
 
@@ -236,6 +271,9 @@ defmodule Yog.Flow.MaxFlow do
         subtract \\ &Kernel.-/2,
         min_fn \\ &min/2
       ) do
+    validate_nodes!(graph, source, sink)
+    validate_numeric_ops!(add, compare, subtract, min_fn)
+
     if source == sink do
       zero_flow_result(graph, source, sink, zero, compare, :edmonds_karp)
     else
@@ -267,14 +305,24 @@ defmodule Yog.Flow.MaxFlow do
 
   ## Parameters
 
-  - `graph` - The flow network with edge capacities
-  - `source` - Source node ID where flow originates
-  - `sink` - Sink node ID where flow terminates
-  - `zero` - Zero value for the capacity type
-  - `add` - Addition function for capacities
-  - `subtract` - Subtraction function for capacities
-  - `compare` - Comparison function for capacities
-  - `min` - Minimum function for capacities
+  - `graph` - The flow network (`Yog.Graph.t()`) with edge capacities.
+  - `source` - Source node ID where flow originates.
+  - `sink` - Sink node ID where flow terminates.
+  - `zero` - Zero value for the capacity type (default: `0`).
+  - `add` - Addition function for capacities (default: `&Kernel.+/2`).
+  - `compare` - Comparison function for capacities (default: `&Yog.Utils.compare/2`).
+  - `subtract` - Subtraction function for capacities (default: `&Kernel.-/2`).
+  - `min_fn` - Minimum function for capacities (default: `&min/2`).
+
+  ## Returns
+
+  - A `%Yog.Flow.MaxFlowResult{}` containing the maximum flow and residual graph.
+
+  ## Errors
+
+  - Raises `ArgumentError` if the graph is not a `Yog.Graph` struct.
+  - Raises `ArgumentError` if either `source` or `sink` is not present in the graph.
+  - Raises `ArgumentError` if any of `add`, `compare`, `subtract`, or `min_fn` are not functions of arity 2.
 
   ## Examples
 
@@ -309,6 +357,9 @@ defmodule Yog.Flow.MaxFlow do
         subtract \\ &Kernel.-/2,
         min_fn \\ &min/2
       ) do
+    validate_nodes!(graph, source, sink)
+    validate_numeric_ops!(add, compare, subtract, min_fn)
+
     if source == sink do
       zero_flow_result(graph, source, sink, zero, compare, :dinic)
     else
@@ -742,14 +793,24 @@ defmodule Yog.Flow.MaxFlow do
 
   ## Parameters
 
-  - `graph` - The flow network with edge capacities
-  - `source` - Source node ID where flow originates
-  - `sink` - Sink node ID where flow terminates
-  - `zero` - Zero value for the capacity type
-  - `add` - Addition function for capacities
-  - `subtract` - Subtraction function for capacities
-  - `compare` - Comparison function for capacities
-  - `min_fn` - Minimum function for capacities
+  - `graph` - The flow network (`Yog.Graph.t()`) with edge capacities.
+  - `source` - Source node ID where flow originates.
+  - `sink` - Sink node ID where flow terminates.
+  - `zero` - Zero value for the capacity type (default: `0`).
+  - `add` - Addition function for capacities (default: `&Kernel.+/2`).
+  - `compare` - Comparison function for capacities (default: `&Yog.Utils.compare/2`).
+  - `subtract` - Subtraction function for capacities (default: `&Kernel.-/2`).
+  - `_min_fn` - Minimum function for capacities (default: `&min/2`).
+
+  ## Returns
+
+  - A `%Yog.Flow.MaxFlowResult{}` containing the maximum flow and residual graph.
+
+  ## Errors
+
+  - Raises `ArgumentError` if the graph is not a `Yog.Graph` struct.
+  - Raises `ArgumentError` if either `source` or `sink` is not present in the graph.
+  - Raises `ArgumentError` if any of `add`, `compare`, `subtract`, or `_min_fn` are not functions of arity 2.
 
   ## Examples
 
@@ -780,8 +841,11 @@ defmodule Yog.Flow.MaxFlow do
         add \\ &Kernel.+/2,
         compare \\ &Yog.Utils.compare/2,
         subtract \\ &Kernel.-/2,
-        _min_fn \\ &min/2
+        min_fn \\ &min/2
       ) do
+    validate_nodes!(graph, source, sink)
+    validate_numeric_ops!(add, compare, subtract, min_fn)
+
     if source == sink do
       zero_flow_result(graph, source, sink, zero, compare, :push_relabel)
     else
@@ -1213,8 +1277,17 @@ defmodule Yog.Flow.MaxFlow do
   Given a max flow result, this function finds the minimum cut by identifying
   all nodes reachable from the source in the residual graph.
 
-  Returns a map with `source_side` (nodes reachable from source) and
-  `sink_side` (all other nodes).
+  ## Parameters
+
+  - `result` - A `%Yog.Flow.MaxFlowResult{}` representing the result of a max flow computation.
+
+  ## Returns
+
+  - A `%Yog.Flow.MinCutResult{}` representing the minimum cut.
+
+  ## Errors
+
+  - Raises `ArgumentError` if `result` is not a `%Yog.Flow.MaxFlowResult{}` struct.
 
   ## Examples
 
@@ -1235,6 +1308,10 @@ defmodule Yog.Flow.MaxFlow do
     min_cut(result, result.zero, result.compare)
   end
 
+  def extract_min_cut(other) do
+    raise ArgumentError, "expected a Yog.Flow.MaxFlowResult struct, got: #{inspect(other)}"
+  end
+
   @doc """
   Extracts the minimum cut from a max flow result with custom numeric type.
 
@@ -1243,9 +1320,18 @@ defmodule Yog.Flow.MaxFlow do
 
   ## Parameters
 
-  - `result` - The max flow result from `edmonds_karp/8` or `dinic/8`
-  - `zero` - Zero value for the capacity type
-  - `compare` - Comparison function for capacities (returns `:lt`, `:eq`, or `:gt`)
+  - `result` - The max flow result from `edmonds_karp/8` or `dinic/8`.
+  - `zero` - Zero value for the capacity type (default: `0`).
+  - `compare` - Comparison function for capacities (returns `:lt`, `:eq`, or `:gt`, default: `&Yog.Utils.compare/2`).
+
+  ## Returns
+
+  - A `%Yog.Flow.MinCutResult{}` representing the minimum cut.
+
+  ## Errors
+
+  - Raises `ArgumentError` if `result` is not a `%Yog.Flow.MaxFlowResult{}` struct.
+  - Raises `ArgumentError` if `compare` is not a function of arity 2.
 
   ## Examples
 
@@ -1260,6 +1346,8 @@ defmodule Yog.Flow.MaxFlow do
       5
   """
   @spec min_cut(max_flow_result(), any(), (any(), any() -> :lt | :eq | :gt)) :: min_cut()
+  def min_cut(result, zero \\ 0, compare \\ &Yog.Utils.compare/2)
+
   def min_cut(
         %MaxFlowResult{
           residual_graph: residual,
@@ -1267,9 +1355,13 @@ defmodule Yog.Flow.MaxFlow do
           max_flow: max_flow,
           algorithm: algorithm
         },
-        zero \\ 0,
-        compare \\ &Yog.Utils.compare/2
+        zero,
+        compare
       ) do
+    if not is_function(compare, 2) do
+      raise ArgumentError, "compare must be a function of arity 2, got: #{inspect(compare)}"
+    end
+
     nodes = Map.keys(residual.nodes) |> MapSet.new()
     source_side = bfs_reachable_with_compare(residual, source, nodes, zero, compare)
     sink_side = MapSet.difference(nodes, source_side)
@@ -1282,6 +1374,10 @@ defmodule Yog.Flow.MaxFlow do
       sink_side: sink_side,
       algorithm: algorithm
     }
+  end
+
+  def min_cut(result, _zero, _compare) do
+    raise ArgumentError, "expected a Yog.Flow.MaxFlowResult struct, got: #{inspect(result)}"
   end
 
   # BFS to find all nodes reachable from source in residual graph
@@ -1322,6 +1418,38 @@ defmodule Yog.Flow.MaxFlow do
           end)
 
         do_reachable_bfs(next_q, out_edges, zero, compare, next_visited)
+    end
+  end
+
+  defp validate_nodes!(graph, source, sink) do
+    if not is_struct(graph, Yog.Graph) do
+      raise ArgumentError, "expected a Yog.Graph, got: #{inspect(graph)}"
+    end
+
+    if not Map.has_key?(graph.nodes, source) do
+      raise ArgumentError, "source node #{inspect(source)} is not in the graph"
+    end
+
+    if not Map.has_key?(graph.nodes, sink) do
+      raise ArgumentError, "sink node #{inspect(sink)} is not in the graph"
+    end
+  end
+
+  defp validate_numeric_ops!(add, compare, subtract, min_fn) do
+    if not is_function(add, 2) do
+      raise ArgumentError, "add must be a function of arity 2, got: #{inspect(add)}"
+    end
+
+    if not is_function(compare, 2) do
+      raise ArgumentError, "compare must be a function of arity 2, got: #{inspect(compare)}"
+    end
+
+    if not is_function(subtract, 2) do
+      raise ArgumentError, "subtract must be a function of arity 2, got: #{inspect(subtract)}"
+    end
+
+    if not is_function(min_fn, 2) do
+      raise ArgumentError, "min_fn must be a function of arity 2, got: #{inspect(min_fn)}"
     end
   end
 end

@@ -152,9 +152,9 @@ defmodule Yog.PBT.FlowTest do
         # Disjoint union (no edges between g1 and g2)
         graph = Yog.Operation.disjoint_union(g1, g2)
 
-        # Pick s from g1 and t from g2
-        s = hd(nodes1)
-        t = hd(g2_nodes)
+        # Pick s from g1 and t from g2 and apply disjoint_union tags
+        s = {0, hd(nodes1)}
+        t = {1, hd(g2_nodes)}
 
         ek_result = Yog.Flow.MaxFlow.edmonds_karp(graph, s, t)
         dinic_result = Yog.Flow.MaxFlow.dinic(graph, s, t)

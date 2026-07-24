@@ -718,11 +718,13 @@ defmodule Yog.Flow.MinCutTest do
       assert result.cut_value == 0
     end
 
-    test "s_t_min_cut/4 fallbacks to edmonds_karp for unknown algorithm" do
+    test "s_t_min_cut/4 raises ArgumentError for unknown algorithm" do
       graph = Yog.directed() |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
-      result = MinCut.s_t_min_cut(graph, 1, 2, :non_existent_algo)
-      assert result.cut_value == 10
-      assert result.algorithm == :edmonds_karp
+      invalid_algo = :non_existent_algo
+
+      assert_raise ArgumentError, ~r/invalid algorithm/, fn ->
+        MinCut.s_t_min_cut(graph, 1, 2, invalid_algo)
+      end
     end
 
     test "undirected-only algorithms raise ArgumentError for directed graphs" do

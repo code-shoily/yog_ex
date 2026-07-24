@@ -30,6 +30,7 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 |-----------|--------|---------|-----------------|------------------|
 | Edmonds-Karp | `Yog.Flow.MaxFlow` | Maximum flow (BFS augmenting paths) | O(VE²) | O(V+E) |
 | Dinic's | `Yog.Flow.MaxFlow` | Maximum flow (blocking flow) | O(V²E) | O(V+E) |
+| Push-Relabel | `Yog.Flow.MaxFlow` | Maximum flow (preflow-push) | O(V²√E) | O(V+E) |
 | Successive Shortest Path | `Yog.Flow.SuccessiveShortestPath` | Min-cost max-flow | O(F · E log V) | O(V+E) |
 | Network Simplex | `Yog.Flow.NetworkSimplex` | Minimum cost flow (large instances) | Empirically near-polynomial; worst-case exponential | O(V+E) |
 | Stoer-Wagner | `Yog.Flow.MinCut` | Global minimum cut | O(V³) | O(V²) |
@@ -416,7 +417,7 @@ flowchart TD
     B1 -->|Negative weights| BF[Bellman-Ford]
 
     C --> C1[Which flow problem?]
-    C1 -->|Max flow| Dinic[Dinic's / Edmonds-Karp]
+    C1 -->|Max flow| Dinic[Dinic's / Edmonds-Karp / Push-Relabel]
     C1 -->|Min-cost flow| C2[Instance size?]
     C2 -->|Small / medium| SSP[Successive Shortest Path]
     C2 -->|Large| NS[Network Simplex]
@@ -485,7 +486,7 @@ flowchart TD
 
 | Scenario | Algorithm |
 |----------|-----------|
-| Max flow, general case | Dinic's or Edmonds-Karp |
+| Max flow, general case | Dinic's, Edmonds-Karp, or Push-Relabel |
 | Min-cost max-flow | Successive Shortest Path |
 | Large min-cost flow instances | Network Simplex |
 | Global min cut | Stoer-Wagner |

@@ -1244,12 +1244,130 @@ defmodule Yog.Flow.MaxFlowTest do
     end
   end
 
-  describe "max_flow/4" do
-    test "fallbacks to edmonds_karp for unknown algorithm" do
+  describe "max_flow/4 validation and error cases" do
+    test "raises ArgumentError for unknown algorithm" do
       graph = Yog.directed() |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
-      result = MaxFlow.max_flow(graph, 1, 2, :non_existent_algo)
-      assert result.max_flow == 10
-      assert result.algorithm == :edmonds_karp
+      invalid_algo = :non_existent_algo
+
+      assert_raise ArgumentError, ~r/invalid algorithm/, fn ->
+        MaxFlow.max_flow(graph, 1, 2, invalid_algo)
+      end
+    end
+
+    test "raises ArgumentError when source or sink node is missing" do
+      graph = Yog.directed() |> Yog.add_node(1, "s") |> Yog.add_node(2, "a")
+
+      assert_raise ArgumentError, ~r/source node 3 is not in the graph/, fn ->
+        MaxFlow.edmonds_karp(graph, 3, 2)
+      end
+
+      assert_raise ArgumentError, ~r/sink node 3 is not in the graph/, fn ->
+        MaxFlow.edmonds_karp(graph, 1, 3)
+      end
+
+      # Also verify other algorithms raise it
+      assert_raise ArgumentError, ~r/source node 3 is not in the graph/, fn ->
+        MaxFlow.dinic(graph, 3, 2)
+      end
+
+      assert_raise ArgumentError, ~r/sink node 3 is not in the graph/, fn ->
+        MaxFlow.push_relabel(graph, 1, 3)
+      end
+    end
+
+    test "raises ArgumentError when non-function numeric operations are passed" do
+      graph =
+        Yog.directed()
+        |> Yog.add_node(1, "s")
+        |> Yog.add_node(2, "t")
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+
+      invalid_fn = :not_a_fn
+
+      assert_raise ArgumentError, ~r/add must be a function of arity 2/, fn ->
+        MaxFlow.edmonds_karp(graph, 1, 2, 0, invalid_fn)
+      end
+
+      assert_raise ArgumentError, ~r/compare must be a function of arity 2/, fn ->
+        MaxFlow.dinic(graph, 1, 2, 0, &Kernel.+/2, invalid_fn)
+      end
+
+      assert_raise ArgumentError, ~r/subtract must be a function of arity 2/, fn ->
+        MaxFlow.push_relabel(graph, 1, 2, 0, &Kernel.+/2, &Yog.Utils.compare/2, invalid_fn)
+      end
+    end
+
+    test "empty graph raises ArgumentError since source/sink are missing" do
+      graph = Yog.directed()
+
+      assert_raise ArgumentError, ~r/source node 1 is not in the graph/, fn ->
+        MaxFlow.max_flow(graph, 1, 2)
+      end
+    end
+
+    test "single-node graph returns 0 flow if source equals sink" do
+      graph = Yog.directed() |> Yog.add_node(1, "s")
+      result = MaxFlow.max_flow(graph, 1, 1)
+      assert result.max_flow == 0
+    end
+  end
+
+  describe "undirected graph and other edge cases" do
+    test "undirected graph handles flow correctly in both directions" do
+      # In an undirected graph, capacity is shared.
+      {:ok, graph} =
+        Yog.undirected()
+        |> Yog.add_node(1, "s")
+        |> Yog.add_node(2, "a")
+        |> Yog.add_node(3, "t")
+        |> Yog.add_edges([
+          {1, 2, 10},
+          {2, 3, 5}
+        ])
+
+      result_ek = MaxFlow.edmonds_karp(graph, 1, 3)
+      result_dn = MaxFlow.dinic(graph, 1, 3)
+      result_pr = MaxFlow.push_relabel(graph, 1, 3)
+
+      assert result_ek.max_flow == 5
+      assert result_dn.max_flow == 5
+      assert result_pr.max_flow == 5
+    end
+
+    test "self-loops on source, sink, and intermediate nodes are ignored" do
+      {:ok, graph} =
+        Yog.directed()
+        |> Yog.add_node(1, "s")
+        |> Yog.add_node(2, "a")
+        |> Yog.add_node(3, "t")
+        |> Yog.add_edges([
+          # source self-loop
+          {1, 1, 100},
+          {1, 2, 10},
+          # intermediate self-loop
+          {2, 2, 50},
+          {2, 3, 5},
+          # sink self-loop
+          {3, 3, 200}
+        ])
+
+      result_ek = MaxFlow.edmonds_karp(graph, 1, 3)
+      result_dn = MaxFlow.dinic(graph, 1, 3)
+      result_pr = MaxFlow.push_relabel(graph, 1, 3)
+
+      assert result_ek.max_flow == 5
+      assert result_dn.max_flow == 5
+      assert result_pr.max_flow == 5
+    end
+
+    test "min_cut raises ArgumentError on invalid result struct" do
+      assert_raise ArgumentError, ~r/expected a Yog.Flow.MaxFlowResult struct/, fn ->
+        MaxFlow.extract_min_cut(:not_a_result)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Flow.MaxFlowResult struct/, fn ->
+        MaxFlow.min_cut(:not_a_result)
+      end
     end
   end
 end
