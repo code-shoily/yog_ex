@@ -85,8 +85,29 @@ defmodule Yog.IO.Libgraph do
     """
     @spec from_libgraph(Graph.t(), keyword()) ::
             {:ok, YogGraph.t() | Yog.Multi.Graph.t() | Yog.DAG.t()} | {:error, atom()}
-    def from_libgraph(libgraph, opts \\ []) when is_struct(libgraph, Graph) do
-      force_type = opts[:force_type]
+    def from_libgraph(libgraph, opts \\ []) do
+      if not is_struct(libgraph, Graph) do
+        raise ArgumentError, "expected a Graph struct, got: #{inspect(libgraph)}"
+      end
+
+      if not Keyword.keyword?(opts) do
+        raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
+      end
+
+      allowed_keys = [:force_type]
+
+      Enum.each(Keyword.keys(opts), fn key ->
+        if key not in allowed_keys do
+          raise ArgumentError, "unknown option: #{inspect(key)}"
+        end
+      end)
+
+      force_type = Keyword.get(opts, :force_type)
+
+      if force_type && force_type not in [:simple, :multi, :dag] do
+        raise ArgumentError,
+              "expected :force_type to be one of :simple, :multi, or :dag, got: #{inspect(force_type)}"
+      end
 
       vertices = Graph.vertices(libgraph)
       edges = Graph.edges(libgraph)
@@ -138,13 +159,43 @@ defmodule Yog.IO.Libgraph do
         :undirected
     """
     @spec to_libgraph(YogGraph.t() | Yog.Multi.Graph.t() | Yog.DAG.t(), keyword()) :: Graph.t()
-    def to_libgraph(graph, opts \\ [])
+    def to_libgraph(graph, opts \\ []) do
+      if not (is_struct(graph, YogGraph) or is_struct(graph, Yog.Multi.Graph) or
+                is_struct(graph, Yog.DAG)) do
+        raise ArgumentError,
+              "expected a Yog.Graph, Yog.Multi.Graph, or Yog.DAG, got: #{inspect(graph)}"
+      end
 
-    def to_libgraph(%YogGraph{kind: kind, nodes: nodes, out_edges: out_edges}, opts) do
+      if not Keyword.keyword?(opts) do
+        raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
+      end
+
+      allowed_keys = [:weight_fn]
+
+      Enum.each(Keyword.keys(opts), fn key ->
+        if key not in allowed_keys do
+          raise ArgumentError, "unknown option: #{inspect(key)}"
+        end
+      end)
+
+      weight_fn = Keyword.get(opts, :weight_fn, &default_weight_extractor/1)
+
+      if not is_function(weight_fn, 1) do
+        raise ArgumentError,
+              "expected :weight_fn to be an arity-1 function, got: #{inspect(weight_fn)}"
+      end
+
+      do_to_libgraph(graph, opts, weight_fn)
+    end
+
+    defp do_to_libgraph(
+           %YogGraph{kind: kind, nodes: nodes, out_edges: out_edges},
+           _opts,
+           weight_fn
+         ) do
       type = kind
 
       base_graph = Graph.new(type: type)
-      weight_fn = Keyword.get(opts, :weight_fn, &default_weight_extractor/1)
 
       graph_with_nodes =
         Enum.reduce(nodes, base_graph, fn {id, data}, acc ->
@@ -158,11 +209,10 @@ defmodule Yog.IO.Libgraph do
       end)
     end
 
-    def to_libgraph(%Yog.Multi.Graph{} = multi, opts) do
+    defp do_to_libgraph(%Yog.Multi.Graph{} = multi, _opts, weight_fn) do
       type = multi.kind
 
       base_graph = Graph.new(type: type)
-      weight_fn = Keyword.get(opts, :weight_fn, &default_weight_extractor/1)
 
       graph_with_nodes =
         Enum.reduce(multi.nodes, base_graph, fn {id, data}, acc ->
@@ -174,8 +224,8 @@ defmodule Yog.IO.Libgraph do
       end)
     end
 
-    def to_libgraph(%Yog.DAG{graph: graph}, opts) do
-      to_libgraph(graph, opts)
+    defp do_to_libgraph(%Yog.DAG{graph: graph}, opts, weight_fn) do
+      do_to_libgraph(graph, opts, weight_fn)
     end
 
     # ============================================================================
@@ -273,7 +323,7 @@ defmodule Yog.IO.Libgraph do
       raise "libgraph is not installed. Add {:libgraph, \"~> 0.16\"} to your deps to use this function."
     end
 
-    def to_libgraph(_yog_graph) do
+    def to_libgraph(_yog_graph, _opts \\ []) do
       raise "libgraph is not installed. Add {:libgraph, \"~> 0.16\"} to your deps to use this function."
     end
   end

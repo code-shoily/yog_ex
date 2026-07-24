@@ -178,4 +178,52 @@ defmodule Yog.IO.LibgraphTest do
     assert edge.weight == 1
     assert edge.label == :some_atom
   end
+
+  describe "input and options validation" do
+    test "from_libgraph validation raises ArgumentError" do
+      invalid_graph = :not_a_graph
+      invalid_opts = :invalid
+
+      assert_raise ArgumentError, ~r/expected a Graph struct/, fn ->
+        apply(Libgraph, :from_libgraph, [invalid_graph])
+      end
+
+      libgraph = Graph.new()
+
+      assert_raise ArgumentError, ~r/expected opts to be a keyword list/, fn ->
+        apply(Libgraph, :from_libgraph, [libgraph, invalid_opts])
+      end
+
+      assert_raise ArgumentError, ~r/unknown option/, fn ->
+        Libgraph.from_libgraph(libgraph, unknown_opt: true)
+      end
+
+      assert_raise ArgumentError, ~r/expected :force_type to be one of/, fn ->
+        Libgraph.from_libgraph(libgraph, force_type: :invalid_type)
+      end
+    end
+
+    test "to_libgraph validation raises ArgumentError" do
+      invalid_graph = :not_a_graph
+      invalid_opts = :invalid
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph, Yog.Multi.Graph, or Yog.DAG/, fn ->
+        apply(Libgraph, :to_libgraph, [invalid_graph])
+      end
+
+      graph = Yog.directed()
+
+      assert_raise ArgumentError, ~r/expected opts to be a keyword list/, fn ->
+        apply(Libgraph, :to_libgraph, [graph, invalid_opts])
+      end
+
+      assert_raise ArgumentError, ~r/unknown option/, fn ->
+        Libgraph.to_libgraph(graph, unknown_opt: true)
+      end
+
+      assert_raise ArgumentError, ~r/expected :weight_fn to be an arity-1 function/, fn ->
+        apply(Libgraph, :to_libgraph, [graph, [weight_fn: :not_a_function]])
+      end
+    end
+  end
 end

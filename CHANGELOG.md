@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`Yog.IO.Libgraph` Audit & Hardening** — Hardened Libgraph interoperability module (`from_libgraph/2`, `to_libgraph/2`) with graph struct verification, keyword options validation (e.g. `:force_type` and `:weight_fn`), detailed exception behavior documentation, and new validation test suites.
 - **`Yog.Flow.MinCut` Audit & Hardening** — Hardened minimum cut algorithms (`global_min_cut/2`, `karger_stein/2`, `gomory_hu_tree/1`, `min_cut_query/3`, `s_t_min_cut/4`) with early node existence checks, graph validation, keyword option validation, detailed return/error documentation, and comprehensive edge-case handling.
 - **`Yog.Flow.MaxFlow` Audit & Hardening** — Hardened maximum flow algorithms (`edmonds_karp/8`, `dinic/8`, `push_relabel/8`) with early node existence checks, parameter validation, keyword option validation, detailed return/error documentation, and comprehensive edge-case handling (empty/single-node/undirected graphs).
 - **`Yog.Pathfinding` Audit & Hardening** — Hardened all pathfinding modules with early node existence checks, keyword option validation, comprehensive edge-case handling (empty/disconnected graphs), and expanded unit test coverage.
