@@ -730,16 +730,101 @@ defmodule Yog.Flow.MinCutTest do
     test "undirected-only algorithms raise ArgumentError for directed graphs" do
       graph = Yog.directed() |> Yog.add_node(1) |> Yog.add_node(2)
 
-      assert_raise ArgumentError, ~r/requires an undirected graph/, fn ->
+      assert_raise ArgumentError, ~r/expected an undirected graph/, fn ->
         MinCut.global_min_cut(graph)
       end
 
-      assert_raise ArgumentError, ~r/requires an undirected graph/, fn ->
+      assert_raise ArgumentError, ~r/expected an undirected graph/, fn ->
         MinCut.gomory_hu_tree(graph)
       end
 
-      assert_raise ArgumentError, ~r/requires an undirected graph/, fn ->
+      assert_raise ArgumentError, ~r/expected an undirected graph/, fn ->
         MinCut.karger_stein(graph)
+      end
+    end
+
+    test "invalid graph structs raise ArgumentError" do
+      invalid_graph = :not_a_graph
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph/, fn ->
+        apply(MinCut, :global_min_cut, [invalid_graph])
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph/, fn ->
+        apply(MinCut, :gomory_hu_tree, [invalid_graph])
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph/, fn ->
+        apply(MinCut, :karger_stein, [invalid_graph])
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph/, fn ->
+        apply(MinCut, :min_cut_query, [invalid_graph, 1, 2])
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph/, fn ->
+        apply(MinCut, :s_t_min_cut, [invalid_graph, 1, 2])
+      end
+    end
+
+    test "invalid options raise ArgumentError" do
+      graph = Yog.undirected() |> Yog.add_node(1) |> Yog.add_node(2)
+      invalid_opts = :invalid
+
+      # Non-keyword list options
+      assert_raise ArgumentError, ~r/expected opts to be a keyword list/, fn ->
+        apply(MinCut, :global_min_cut, [graph, invalid_opts])
+      end
+
+      assert_raise ArgumentError, ~r/expected opts to be a keyword list/, fn ->
+        apply(MinCut, :karger_stein, [graph, invalid_opts])
+      end
+
+      # Unknown option keys
+      assert_raise ArgumentError, ~r/unknown option/, fn ->
+        MinCut.global_min_cut(graph, unknown_opt: true)
+      end
+
+      assert_raise ArgumentError, ~r/unknown option/, fn ->
+        MinCut.karger_stein(graph, unknown_opt: true)
+      end
+
+      # Invalid option values
+      invalid_bool = :not_a_bool
+
+      assert_raise ArgumentError, ~r/expected :track_partitions to be a boolean/, fn ->
+        MinCut.global_min_cut(graph, track_partitions: invalid_bool)
+      end
+
+      invalid_int = :not_an_int
+
+      assert_raise ArgumentError, ~r/expected :iterations to be a positive integer/, fn ->
+        MinCut.karger_stein(graph, iterations: invalid_int)
+      end
+
+      assert_raise ArgumentError, ~r/expected :iterations to be a positive integer/, fn ->
+        MinCut.karger_stein(graph, iterations: 0)
+      end
+    end
+
+    test "missing nodes in query and s_t_min_cut raise ArgumentError" do
+      graph = Yog.undirected() |> Yog.add_node(1) |> Yog.add_node(2)
+      tree = MinCut.gomory_hu_tree(graph)
+
+      assert_raise ArgumentError, ~r/node_a node 3 is not in the graph/, fn ->
+        MinCut.min_cut_query(tree, 3, 2)
+      end
+
+      assert_raise ArgumentError, ~r/node_b node 3 is not in the graph/, fn ->
+        MinCut.min_cut_query(tree, 1, 3)
+      end
+
+      assert_raise ArgumentError, ~r/source node 3 is not in the graph/, fn ->
+        MinCut.s_t_min_cut(graph, 3, 2)
+      end
+
+      assert_raise ArgumentError, ~r/sink node 3 is not in the graph/, fn ->
+        MinCut.s_t_min_cut(graph, 1, 3)
       end
     end
   end

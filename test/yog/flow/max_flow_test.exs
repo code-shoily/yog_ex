@@ -1250,7 +1250,7 @@ defmodule Yog.Flow.MaxFlowTest do
       invalid_algo = :non_existent_algo
 
       assert_raise ArgumentError, ~r/invalid algorithm/, fn ->
-        MaxFlow.max_flow(graph, 1, 2, invalid_algo)
+        apply(MaxFlow, :max_flow, [graph, 1, 2, invalid_algo])
       end
     end
 
@@ -1285,15 +1285,23 @@ defmodule Yog.Flow.MaxFlowTest do
       invalid_fn = :not_a_fn
 
       assert_raise ArgumentError, ~r/add must be a function of arity 2/, fn ->
-        MaxFlow.edmonds_karp(graph, 1, 2, 0, invalid_fn)
+        apply(MaxFlow, :edmonds_karp, [graph, 1, 2, 0, invalid_fn])
       end
 
       assert_raise ArgumentError, ~r/compare must be a function of arity 2/, fn ->
-        MaxFlow.dinic(graph, 1, 2, 0, &Kernel.+/2, invalid_fn)
+        apply(MaxFlow, :dinic, [graph, 1, 2, 0, &Kernel.+/2, invalid_fn])
       end
 
       assert_raise ArgumentError, ~r/subtract must be a function of arity 2/, fn ->
-        MaxFlow.push_relabel(graph, 1, 2, 0, &Kernel.+/2, &Yog.Utils.compare/2, invalid_fn)
+        apply(MaxFlow, :push_relabel, [
+          graph,
+          1,
+          2,
+          0,
+          &Kernel.+/2,
+          &Yog.Utils.compare/2,
+          invalid_fn
+        ])
       end
     end
 

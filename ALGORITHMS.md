@@ -34,6 +34,8 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | Successive Shortest Path | `Yog.Flow.SuccessiveShortestPath` | Min-cost max-flow | O(F · E log V) | O(V+E) |
 | Network Simplex | `Yog.Flow.NetworkSimplex` | Minimum cost flow (large instances) | Empirically near-polynomial; worst-case exponential | O(V+E) |
 | Stoer-Wagner | `Yog.Flow.MinCut` | Global minimum cut | O(V³) | O(V²) |
+| Karger-Stein | `Yog.Flow.MinCut` | Randomized global minimum cut | O(V² log³ V) | O(V+E) |
+| Gomory-Hu Tree | `Yog.Flow.MinCut` | All-pairs minimum cuts | O(V · MaxFlow) | O(V+E) |
 
 ## Spanning Tree
 

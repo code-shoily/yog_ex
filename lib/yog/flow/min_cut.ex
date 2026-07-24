@@ -130,12 +130,29 @@ defmodule Yog.Flow.MinCut do
   def global_min_cut(graph, opts \\ [])
 
   @spec global_min_cut(Yog.graph(), keyword()) :: MinCutResult.t()
-  def global_min_cut(%Yog.Graph{kind: :directed}, _opts) do
-    raise ArgumentError, "global_min_cut/2 requires an undirected graph"
-  end
-
   def global_min_cut(graph, opts) do
+    validate_graph!(graph, :undirected)
+
+    if not Keyword.keyword?(opts) do
+      raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
+    end
+
+    # Validate option keys
+    allowed_keys = [:track_partitions]
+
+    Enum.each(Keyword.keys(opts), fn key ->
+      if key not in allowed_keys do
+        raise ArgumentError, "unknown option: #{inspect(key)}"
+      end
+    end)
+
     track_partitions = Keyword.get(opts, :track_partitions, false)
+
+    if not is_boolean(track_partitions) do
+      raise ArgumentError,
+            "expected :track_partitions to be a boolean, got: #{inspect(track_partitions)}"
+    end
+
     nodes = Map.keys(graph.nodes)
 
     case length(nodes) do
@@ -238,6 +255,10 @@ defmodule Yog.Flow.MinCut do
   """
   @spec s_t_min_cut(Yog.graph(), Yog.node_id(), Yog.node_id(), atom()) :: MinCutResult.t()
   def s_t_min_cut(graph, source, sink, algorithm \\ :edmonds_karp) do
+    validate_graph!(graph)
+    validate_node_exists!(graph, source, "source")
+    validate_node_exists!(graph, sink, "sink")
+
     graph
     |> MaxFlow.max_flow(source, sink, algorithm)
     |> MaxFlow.extract_min_cut()
@@ -259,11 +280,8 @@ defmodule Yog.Flow.MinCut do
       3
   """
   @spec gomory_hu_tree(Yog.graph()) :: Yog.graph()
-  def gomory_hu_tree(%Yog.Graph{kind: :directed}) do
-    raise ArgumentError, "gomory_hu_tree/1 requires an undirected graph"
-  end
-
   def gomory_hu_tree(graph) do
+    validate_graph!(graph, :undirected)
     nodes = Model.all_nodes(graph) |> Enum.sort()
 
     case nodes do
@@ -334,6 +352,10 @@ defmodule Yog.Flow.MinCut do
   @spec min_cut_query(Yog.graph(), Yog.node_id(), Yog.node_id()) ::
           {number(), MapSet.t(Yog.node_id()), MapSet.t(Yog.node_id())}
   def min_cut_query(tree, node_a, node_b) do
+    validate_graph!(tree, :undirected)
+    validate_node_exists!(tree, node_a, "node_a")
+    validate_node_exists!(tree, node_b, "node_b")
+
     nodes = Model.all_nodes(tree)
 
     if node_a == node_b do
@@ -449,13 +471,32 @@ defmodule Yog.Flow.MinCut do
   def karger_stein(graph, opts \\ [])
 
   @spec karger_stein(Yog.graph(), keyword()) :: MinCutResult.t()
-  def karger_stein(%Yog.Graph{kind: :directed}, _opts) do
-    raise ArgumentError, "karger_stein/2 requires an undirected graph"
-  end
-
   def karger_stein(graph, opts) do
+    validate_graph!(graph, :undirected)
+
+    if not Keyword.keyword?(opts) do
+      raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
+    end
+
+    # Validate option keys
+    allowed_keys = [:iterations]
+
+    Enum.each(Keyword.keys(opts), fn key ->
+      if key not in allowed_keys do
+        raise ArgumentError, "unknown option: #{inspect(key)}"
+      end
+    end)
+
     nodes = Map.keys(graph.nodes)
     n = length(nodes)
+
+    default_iterations = max(1, trunc(n * :math.log2(n + 1)))
+    iterations = Keyword.get(opts, :iterations, default_iterations)
+
+    if not (is_integer(iterations) and iterations >= 1) do
+      raise ArgumentError,
+            "expected :iterations to be a positive integer, got: #{inspect(iterations)}"
+    end
 
     if n <= 1 do
       side = MapSet.new(nodes)
@@ -463,9 +504,6 @@ defmodule Yog.Flow.MinCut do
     else
       # Flat list of edges
       edges = Yog.Model.all_edges(graph)
-
-      default_iterations = max(1, trunc(n * :math.log2(n + 1)))
-      iterations = Keyword.get(opts, :iterations, default_iterations)
 
       {best_cut, {best_a, best_b}} =
         Enum.reduce(1..iterations, {nil, nil}, fn _, {best_val, best_part} ->
@@ -747,6 +785,22 @@ defmodule Yog.Flow.MinCut do
       :error ->
         [node | _] = MapSet.to_list(remaining)
         {node, queue}
+    end
+  end
+
+  defp validate_graph!(graph, expected_kind \\ nil) do
+    if not is_struct(graph, Yog.Graph) do
+      raise ArgumentError, "expected a Yog.Graph, got: #{inspect(graph)}"
+    end
+
+    if expected_kind && graph.kind != expected_kind do
+      raise ArgumentError, "expected an #{expected_kind} graph, got a #{graph.kind} graph"
+    end
+  end
+
+  defp validate_node_exists!(graph, node, name) do
+    if not Map.has_key?(graph.nodes, node) do
+      raise ArgumentError, "#{name} node #{inspect(node)} is not in the graph"
     end
   end
 end
