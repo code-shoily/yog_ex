@@ -8,66 +8,32 @@ defmodule Yog.Operation do
 
   ## Set-Theoretic Operations
 
-  | Function | Description | Use Case |
-  |----------|-------------|----------|
-  | `union/2` | All nodes and edges from both graphs | Combine graph data |
-  | `intersection/2` | Only nodes and edges common to both | Find common structure |
-  | `difference/2` | Nodes/edges in first but not second | Find unique structure |
-  | `symmetric_difference/2` | Edges in exactly one graph | Find differing structure |
+  | Function | Complexity | Description | Use Case |
+  |----------|------------|-------------|----------|
+  | `union/2` | $\\mathcal{O}(V_1 + V_2 + E_1 + E_2)$ | All nodes and edges from both graphs | Combine graph data |
+  | `intersection/2` | $\\mathcal{O}(V + E)$ | Only nodes and edges common to both | Find common structure |
+  | `difference/2` | $\\mathcal{O}(V + E)$ | Nodes/edges in first but not second | Find unique structure |
+  | `symmetric_difference/2` | $\\mathcal{O}(V_1 + V_2 + E_1 + E_2)$ | Edges in exactly one graph | Find differing structure |
 
   ## Composition & Joins
 
-  | Function | Description | Use Case |
-  |----------|-------------|----------|
-  | `disjoint_union/2` | Combine with automatic ID re-indexing | Safe graph combination |
-  | `cartesian_product/4` | Multiply graphs (grids, hypercubes) | Generate complex structures |
-  | `compose/2` | Merge overlapping graphs with combined edges | Layered systems |
-  | `power/2` | k-th power (connect nodes within distance k) | Reachability analysis |
+  | Function | Complexity | Description | Use Case |
+  |----------|------------|-------------|----------|
+  | `disjoint_union/2` | $\\mathcal{O}(V_1 + V_2 + E_1 + E_2)$ | Combine with automatic ID re-indexing | Safe graph combination |
+  | `cartesian_product/4` | $\\mathcal{O}(V_1 V_2 + E_1 V_2 + E_2 V_1)$ | Multiply graphs (grids, hypercubes) | Generate complex structures |
+  | `tensor_product/2` | $\\mathcal{O}(V_1 V_2 + E_1 E_2)$ | Kronecker direct product | Product graphs |
+  | `strong_product/4` | $\\mathcal{O}(V_1 V_2 + E_1 V_2 + E_2 V_1 + E_1 E_2)$ | Strong product (grid + diagonals) | Spatial topologies |
+  | `lexicographic_product/4` | $\\mathcal{O}(V_1 V_2 + E_1 V_2^2 + V_1 E_2)$ | Graph composition | Hierarchical substitution |
+  | `compose/2` | $\\mathcal{O}(V_1 + V_2 + E_1 + E_2)$ | Merge overlapping graphs | Layered systems |
+  | `line_graph/2` | $\\mathcal{O}(E^2)$ | Convert edges to nodes | Edge-centric analysis |
+  | `power/3` | $\\mathcal{O}(V \\cdot (V + E))$ | $k$-th power (distance $\\le k$) | Reachability analysis |
 
   ## Structural Comparison
 
-  | Function | Description | Use Case |
-  |----------|-------------|----------|
-  | `subgraph?/2` | Check if first is subset of second | Validation, pattern matching |
-  | `isomorphic?/2` | Check if graphs are structurally identical | Graph comparison |
-
-  ## Examples
-
-      # Two triangle graphs with overlapping IDs
-      iex> triangle1 = Yog.undirected()
-      ...> |> Yog.add_node(0, nil)
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
-      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge_ensure(from: 2, to: 0, with: 1)
-      iex> triangle2 = Yog.undirected()
-      ...> |> Yog.add_node(0, nil)
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
-      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge_ensure(from: 2, to: 0, with: 1)
-      iex> # disjoint_union re-indexes the second graph automatically
-      ...> combined = Yog.Operation.disjoint_union(triangle1, triangle2)
-      iex> # Result: 6 nodes (0-5), two separate triangles
-      ...> Yog.Model.order(combined)
-      6
-
-      # Finding common structure
-      iex> graph_a = Yog.undirected()
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
-      iex> graph_b = Yog.undirected()
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
-      iex> common = Yog.Operation.intersection(graph_a, graph_b)
-      iex> Yog.Model.order(common)
-      2
-
-
+  | Function | Complexity | Description | Use Case |
+  |----------|------------|-------------|----------|
+  | `subgraph?/2` | $\\mathcal{O}(V_p + E_p)$ | Check if first is subset of second | Validation, pattern matching |
+  | `isomorphic?/2` | Exponential worst-case | Check if graphs are structurally identical | Structural equivalence |
   """
 
   alias Yog.Graph
@@ -81,57 +47,34 @@ defmodule Yog.Operation do
   Returns a graph containing all nodes and edges from both input graphs.
 
   Node data and edge weights from `other` take precedence on conflicts.
-  Both graphs must have the same kind (`:directed` or `:undirected`);
-  the result inherits the kind from `base`.
+  Both graphs must be `%Yog.Graph{}` structs.
 
-  **Time Complexity:** O(V₁ + V₂ + E₁ + E₂)
-
-  ## Examples
-
-      iex> g1 = Yog.undirected()
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
-      iex> g2 = Yog.undirected()
-      ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
-      iex> union = Yog.Operation.union(g1, g2)
-      iex> Yog.Model.order(union)
-      3
+  **Time Complexity:** $\\mathcal{O}(V_1 + V_2 + E_1 + E_2)$
   """
   @spec union(Graph.t(), Graph.t()) :: Graph.t()
   def union(base, other) do
+    validate_graph!(base)
+    validate_graph!(other)
     Yog.Transform.merge(base, other)
   end
 
   @doc """
   Returns a graph containing only nodes and edges that exist in both input graphs.
 
-  For directed graphs, a directed edge must exist in both graphs to be kept.
-  For undirected graphs, an undirected edge must exist in both graphs.
+  Both graphs must have the same kind (`:directed` or `:undirected`).
 
-  **Time Complexity:** O(V + E)
+  **Time Complexity:** $\\mathcal{O}(V + E)$
 
-  ## Examples
+  ## Errors
 
-      iex> g1 = Yog.undirected()
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
-      iex> g2 = Yog.undirected()
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
-      iex> intersection = Yog.Operation.intersection(g1, g2)
-      iex> Yog.Model.order(intersection)
-      3
+  - Raises `ArgumentError` if input graphs have different kinds.
   """
   @spec intersection(Graph.t(), Graph.t()) :: Graph.t()
   def intersection(first, second) do
+    validate_graph!(first)
+    validate_graph!(second)
+    validate_same_kind!(first, second)
+
     common_nodes =
       MapSet.intersection(
         MapSet.new(Map.keys(first.nodes)),
@@ -149,28 +92,20 @@ defmodule Yog.Operation do
   Returns a graph containing nodes and edges that exist in the first graph
   but not in the second.
 
-  Any node that appears in `second` is removed from the result, along with
-  all its incident edges. Of the remaining nodes, only edges that do not
-  appear in `second` are kept.
+  Both graphs must have the same kind (`:directed` or `:undirected`).
 
-  **Time Complexity:** O(V + E)
+  **Time Complexity:** $\\mathcal{O}(V + E)$
 
-  ## Examples
+  ## Errors
 
-      iex> g1 = Yog.undirected()
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
-      iex> g2 = Yog.undirected()
-      ...> |> Yog.add_node(3, nil)
-      iex> diff = Yog.Operation.difference(g1, g2)
-      iex> Yog.Model.order(diff)
-      2
-      iex> Yog.Model.has_edge?(diff, 1, 2)
-      true
+  - Raises `ArgumentError` if input graphs have different kinds.
   """
   @spec difference(Graph.t(), Graph.t()) :: Graph.t()
   def difference(first, second) do
+    validate_graph!(first)
+    validate_graph!(second)
+    validate_same_kind!(first, second)
+
     second_node_set = MapSet.new(Map.keys(second.nodes))
 
     nodes_v1_minus_v2 =
@@ -187,31 +122,20 @@ defmodule Yog.Operation do
   @doc """
   Returns a graph containing edges that exist in exactly one of the input graphs.
 
-  The result is the union of `difference(first, second)` and
-  `difference(second, first)`. Nodes that have no incident unique edges
-  will not appear in the result.
+  Both graphs must have the same kind (`:directed` or `:undirected`).
 
-  **Time Complexity:** O(V₁ + V₂ + E₁ + E₂)
+  **Time Complexity:** $\\mathcal{O}(V_1 + V_2 + E_1 + E_2)$
 
-  ## Examples
+  ## Errors
 
-      iex> g1 = Yog.undirected()
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
-      iex> g2 = Yog.undirected()
-      ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
-      iex> sym_diff = Yog.Operation.symmetric_difference(g1, g2)
-      iex> Yog.Model.order(sym_diff)
-      1
-      iex> Yog.Model.edge_count(sym_diff)
-      0
+  - Raises `ArgumentError` if input graphs have different kinds.
   """
   @spec symmetric_difference(Graph.t(), Graph.t()) :: Graph.t()
-  def symmetric_difference(%Graph{} = first, second) do
+  def symmetric_difference(%Graph{} = first, %Graph{} = second) do
+    validate_graph!(first)
+    validate_graph!(second)
+    validate_same_kind!(first, second)
+
     set1 = MapSet.new(Map.keys(first.nodes))
     set2 = MapSet.new(Map.keys(second.nodes))
 
@@ -224,7 +148,7 @@ defmodule Yog.Operation do
         Map.take(second.nodes, MapSet.to_list(v2_minus_v1))
       )
 
-    base_graph = %Yog.Graph{first | nodes: merged_nodes, out_edges: %{}, in_edges: %{}}
+    base_graph = %Graph{first | nodes: merged_nodes, out_edges: %{}, in_edges: %{}}
     is_directed = first.kind == :directed
 
     edges1 =
@@ -261,28 +185,17 @@ defmodule Yog.Operation do
   @doc """
   Computes the disjoint union of two graphs.
 
-  Unlike a simple join, this function guarantees that nodes from Graph A
-  and Graph B remain distinct by tagging their IDs as `{0, id}` and `{1, id}`,
-  even if they share the same original ID.
+  Guarantees that nodes from Graph A and Graph B remain distinct by tagging their
+  IDs as `{0, id}` and `{1, id}`.
 
-  The resulting graph uses the kind (`:directed` or `:undirected`) from
-  `graph_a`. Combining graphs of different kinds may lead to unexpected
-  edge behavior.
-
-  **Time Complexity:** O(V₁ + V₂ + E₁ + E₂)
-
-  ## Example
-      iex> g1 = Yog.directed() |> Yog.add_node("root", "Data A")
-      iex> g2 = Yog.directed() |> Yog.add_node("root", "Data B")
-      iex> union = Yog.Operation.disjoint_union(g1, g2)
-      iex> Yog.Model.node_count(union)
-      2
-      iex> Yog.Model.node(union, {0, "root"})
-      "Data A"
+  **Time Complexity:** $\\mathcal{O}(V_1 + V_2 + E_1 + E_2)$
   """
   @spec disjoint_union(Graph.t(), Graph.t()) :: Graph.t()
   def disjoint_union(graph_a, graph_b) do
-    Yog.Graph.new(graph_a.kind)
+    validate_graph!(graph_a)
+    validate_graph!(graph_b)
+
+    Graph.new(graph_a.kind)
     |> add_tagged_component(graph_a, 0)
     |> add_tagged_component(graph_b, 1)
   end
@@ -291,41 +204,15 @@ defmodule Yog.Operation do
   Returns the Cartesian product of two graphs.
 
   Creates a new graph where each node represents a pair of nodes from the
-  input graphs. Useful for generating grids, hypercubes, and other
-  complex structures.
+  input graphs.
 
-  > [!WARNING]
-  > **Performance Warning:** The size of the resulting Cartesian product graph grows
-  > quadratically. The output graph contains $V_1 \times V_2$ nodes and
-  > $E_1 \times V_2 + E_2 \times V_1$ edges. For larger graphs (e.g., $V_1, V_2 > 1,000$),
-  > this operation can consume substantial CPU time and memory.
-
-  **Time Complexity:** O(V₁ × V₂ + E₁ × V₂ + E₂ × V₁)
-
-  ## Parameters
-
-  - `first` - First input graph
-  - `second` - Second input graph
-  - `default_first` - Default edge data for edges derived from `first`
-  - `default_second` - Default edge data for edges derived from `second`
-
-  ## Examples
-
-      iex> g1 = Yog.undirected()
-      ...> |> Yog.add_node(0, nil)
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
-      iex> g2 = Yog.undirected()
-      ...> |> Yog.add_node(0, nil)
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
-      iex> product = Yog.Operation.cartesian_product(g1, g2, 0, 0)
-      iex> # 2x2 grid structure: 4 nodes
-      ...> Yog.Model.order(product)
-      4
+  **Time Complexity:** $\\mathcal{O}(V_1 V_2 + E_1 V_2 + E_2 V_1)$
   """
   @spec cartesian_product(Graph.t(), Graph.t(), any(), any()) :: Graph.t()
   def cartesian_product(first, second, default_first, default_second) do
+    validate_graph!(first)
+    validate_graph!(second)
+
     first_nodes = Map.keys(first.nodes)
     second_nodes = Map.keys(second.nodes)
     second_order = map_size(second.nodes)
@@ -333,47 +220,22 @@ defmodule Yog.Operation do
     u_map = Enum.with_index(first_nodes) |> Enum.into(%{})
     v_map = Enum.with_index(second_nodes) |> Enum.into(%{})
 
-    Yog.Graph.new(first.kind)
+    Graph.new(first.kind)
     |> add_product_nodes(first, second, u_map, v_map, second_order)
     |> add_product_vertical_edges(first, second, u_map, v_map, second_order, default_second)
     |> add_product_horizontal_edges(first, second, u_map, v_map, second_order, default_first)
   end
 
   @doc """
-  Returns the Tensor product (also known as Kronecker or direct product) of two graphs.
+  Returns the Tensor product (Kronecker product) of two graphs.
 
-  The Tensor product $G_1 \\times G_2$ is a graph where the node set is the Cartesian product
-  $V(G_1) \\times V(G_2)$, and an edge exists between $(u_1, u_2)$ and $(v_1, v_2)$ if and only if
-  $u_1 \\to v_1$ is an edge in $G_1$ and $u_2 \\to v_2$ is an edge in $G_2$.
-
-  Edge weights in the resulting graph are tuples of `{weight_first, weight_second}`.
-
-  > [!WARNING]
-  > **Performance Warning:** The size of the resulting Tensor product graph grows
-  > quadratically. The output graph contains $V_1 \\times V_2$ nodes and $E_1 \\times E_2$ edges
-  > (or $2 \\times E_1 \\times E_2$ for undirected graphs). For larger or dense graphs,
-  > this operation can consume substantial CPU time and memory.
-
-  **Time Complexity:** O(V₁ × V₂ + E₁ × E₂)
-
-  ## Examples
-
-      iex> g1 = Yog.undirected()
-      ...> |> Yog.add_node(0, nil)
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_edge_ensure(from: 0, to: 1, with: 10)
-      iex> g2 = Yog.undirected()
-      ...> |> Yog.add_node(0, nil)
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_edge_ensure(from: 0, to: 1, with: 20)
-      iex> product = Yog.Operation.tensor_product(g1, g2)
-      iex> Yog.Model.order(product)
-      4
-      iex> Yog.Model.edge_count(product)
-      2
+  **Time Complexity:** $\\mathcal{O}(V_1 V_2 + E_1 E_2)$
   """
   @spec tensor_product(Graph.t(), Graph.t()) :: Graph.t()
   def tensor_product(first, second) do
+    validate_graph!(first)
+    validate_graph!(second)
+
     first_nodes = Map.keys(first.nodes)
     second_nodes = Map.keys(second.nodes)
     second_order = map_size(second.nodes)
@@ -381,7 +243,7 @@ defmodule Yog.Operation do
     u_map = Enum.with_index(first_nodes) |> Enum.into(%{})
     v_map = Enum.with_index(second_nodes) |> Enum.into(%{})
 
-    Yog.Graph.new(first.kind)
+    Graph.new(first.kind)
     |> add_product_nodes(first, second, u_map, v_map, second_order)
     |> add_tensor_edges(first, second, u_map, v_map, second_order)
   end
@@ -389,42 +251,13 @@ defmodule Yog.Operation do
   @doc """
   Returns the Strong product of two graphs.
 
-  The Strong product $G_1 \\boxtimes G_2$ is a graph where the node set is the Cartesian product
-  $V(G_1) \\times V(G_2)$. An edge exists between $(u_1, u_2)$ and $(v_1, v_2)$ if and only if:
-  - $u_1 = v_1$ and $u_2 \\to v_2$ in $G_2$ (vertical Cartesian edge)
-  - $u_2 = v_2$ and $u_1 \\to v_1$ in $G_1$ (horizontal Cartesian edge)
-  - $u_1 \\to v_1$ in $G_1$ and $u_2 \\to v_2$ in $G_2$ (Tensor edge)
-
-  Edge weights are tuples:
-  - `{default_second, weight_second}` for vertical edges
-  - `{weight_first, default_first}` for horizontal edges
-  - `{weight_first, weight_second}` for tensor edges
-
-  > [!WARNING]
-  > **Performance Warning:** The size of the resulting Strong product graph grows
-  > quadratically. For larger or dense graphs, this operation can consume substantial CPU
-  > time and memory.
-
-  **Time Complexity:** O(V₁ × V₂ + E₁ × V₂ + E₂ × V₁ + E₁ × E₂)
-
-  ## Examples
-
-      iex> g1 = Yog.undirected()
-      ...> |> Yog.add_node(0, nil)
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_edge_ensure(from: 0, to: 1, with: 10)
-      iex> g2 = Yog.undirected()
-      ...> |> Yog.add_node(0, nil)
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_edge_ensure(from: 0, to: 1, with: 20)
-      iex> product = Yog.Operation.strong_product(g1, g2, 0, 0)
-      iex> Yog.Model.order(product)
-      4
-      iex> Yog.Model.edge_count(product)
-      6
+  **Time Complexity:** $\\mathcal{O}(V_1 V_2 + E_1 V_2 + E_2 V_1 + E_1 E_2)$
   """
   @spec strong_product(Graph.t(), Graph.t(), any(), any()) :: Graph.t()
   def strong_product(first, second, default_first, default_second) do
+    validate_graph!(first)
+    validate_graph!(second)
+
     first_nodes = Map.keys(first.nodes)
     second_nodes = Map.keys(second.nodes)
     second_order = map_size(second.nodes)
@@ -432,7 +265,7 @@ defmodule Yog.Operation do
     u_map = Enum.with_index(first_nodes) |> Enum.into(%{})
     v_map = Enum.with_index(second_nodes) |> Enum.into(%{})
 
-    Yog.Graph.new(first.kind)
+    Graph.new(first.kind)
     |> add_product_nodes(first, second, u_map, v_map, second_order)
     |> add_product_vertical_edges(first, second, u_map, v_map, second_order, default_second)
     |> add_product_horizontal_edges(first, second, u_map, v_map, second_order, default_first)
@@ -442,40 +275,13 @@ defmodule Yog.Operation do
   @doc """
   Returns the Lexicographic product (composition) of two graphs.
 
-  The Lexicographic product $G_1[G_2]$ is a graph where the node set is the Cartesian product
-  $V(G_1) \\times V(G_2)$. An edge exists between $(u_1, u_2)$ and $(v_1, v_2)$ if and only if:
-  - $u_1 \\to v_1$ in $G_1$ (for all $u_2, v_2 \\in V(G_2)$)
-  - $u_1 = v_1$ and $u_2 \\to v_2$ in $G_2$
-
-  Edge weights are tuples:
-  - `{weight_first, default_first}` for edges derived from $G_1$
-  - `{default_second, weight_second}` for edges derived from $G_2$
-
-  > [!WARNING]
-  > **Performance Warning:** The size of the resulting Lexicographic product graph grows
-  > quadratically. The output graph contains $V_1 \\times V_2$ nodes and $V_1 \\times E_2 + E_1 \\times V_2^2$
-  > edges. For larger or dense graphs, this operation can consume substantial CPU time and memory.
-
-  **Time Complexity:** O(V₁ × V₂ + E₁ × V₂² + V₁ × E₂)
-
-  ## Examples
-
-      iex> g1 = Yog.undirected()
-      ...> |> Yog.add_node(0, nil)
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_edge_ensure(from: 0, to: 1, with: 10)
-      iex> g2 = Yog.undirected()
-      ...> |> Yog.add_node(0, nil)
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_edge_ensure(from: 0, to: 1, with: 20)
-      iex> product = Yog.Operation.lexicographic_product(g1, g2, 0, 0)
-      iex> Yog.Model.order(product)
-      4
-      iex> Yog.Model.edge_count(product)
-      6
+  **Time Complexity:** $\\mathcal{O}(V_1 V_2 + E_1 V_2^2 + V_1 E_2)$
   """
   @spec lexicographic_product(Graph.t(), Graph.t(), any(), any()) :: Graph.t()
   def lexicographic_product(first, second, default_first, default_second) do
+    validate_graph!(first)
+    validate_graph!(second)
+
     first_nodes = Map.keys(first.nodes)
     second_nodes = Map.keys(second.nodes)
     second_order = map_size(second.nodes)
@@ -483,7 +289,7 @@ defmodule Yog.Operation do
     u_map = Enum.with_index(first_nodes) |> Enum.into(%{})
     v_map = Enum.with_index(second_nodes) |> Enum.into(%{})
 
-    Yog.Graph.new(first.kind)
+    Graph.new(first.kind)
     |> add_product_nodes(first, second, u_map, v_map, second_order)
     |> add_product_vertical_edges(first, second, u_map, v_map, second_order, default_second)
     |> add_lexicographic_horizontal_edges(
@@ -499,78 +305,23 @@ defmodule Yog.Operation do
   @doc """
   Composes two graphs by merging overlapping nodes and combining their edges.
 
-  This is equivalent to `union/2` - both graphs are merged together with
-  `other`'s data taking precedence on conflicts.
-
-  **Time Complexity:** O(V₁ + V₂ + E₁ + E₂)
-
-  ## Examples
-
-      iex> g1 = Yog.undirected()
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
-      iex> g2 = Yog.undirected()
-      ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
-      iex> composed = Yog.Operation.compose(g1, g2)
-      iex> Yog.Model.order(composed)
-      3
+  **Time Complexity:** $\\mathcal{O}(V_1 + V_2 + E_1 + E_2)$
   """
   @spec compose(Graph.t(), Graph.t()) :: Graph.t()
   def compose(first, second) do
+    validate_graph!(first)
+    validate_graph!(second)
     union(first, second)
   end
 
   @doc """
   Returns the line graph of a graph.
 
-  The line graph L(G) is a graph where each node represents an edge of G,
-  and two nodes are adjacent if and only if their corresponding edges share
-  a common endpoint in G.
-
-  For **directed graphs**, two edges `(u, v)` and `(x, y)` are adjacent in the
-  line graph if and only if `v == x` (the head of the first edge matches the
-  tail of the second edge). This is the standard line digraph definition.
-
-  For **undirected graphs**, two edges `{u, v}` and `{x, y}` are adjacent if
-  and only if they share at least one endpoint.
-
-  Line graph nodes are represented as `{u, v}` tuples. For undirected graphs,
-  the tuple follows the same ordering convention as `Yog.Model.all_edges/1`
-  (`u <= v` using Erlang term ordering).
-
-  > [!WARNING]
-  > **Performance Warning:** Since each edge in the original graph becomes a node
-  > in the line graph, the line graph can grow extremely large. Specifically, it
-  > will have $E$ nodes and can have up to $O(E^2)$ edges in dense graphs.
-  > This operation has $O(E^2)$ time complexity and is not recommended for very dense or large graphs.
-
-  **Time Complexity:** O(E²) where E is the number of edges in the original graph
-
-  ## Parameters
-
-  - `graph` - The input graph
-  - `default_weight` - Weight for edges in the line graph (default: 1)
-
-  ## Examples
-
-      iex> path = Yog.undirected()
-      ...> |> Yog.add_node(0, nil)
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_edge_ensure(from: 0, to: 1, with: 10)
-      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 20)
-      iex> lg = Yog.Operation.line_graph(path, 1)
-      iex> # Line graph of a path has 2 nodes ({0,1} and {1,2}) and 1 edge
-      iex> Yog.Model.order(lg)
-      2
-      iex> Yog.Model.has_edge?(lg, {0, 1}, {1, 2})
-      true
+  **Time Complexity:** $\\mathcal{O}(E^2)$
   """
   @spec line_graph(Graph.t(), term()) :: Graph.t()
   def line_graph(%Graph{kind: kind} = graph, default_weight \\ 1) do
+    validate_graph!(graph)
     edges = extract_edges_for_line_graph(graph)
 
     init_lg =
@@ -582,55 +333,31 @@ defmodule Yog.Operation do
   end
 
   @doc """
-  Returns the k-th power of a graph.
+  Returns the $k$-th power of a graph (connecting nodes at distance $\\le k$).
 
-  The k-th power of a graph G, denoted G^k, is a graph where two nodes are
-  adjacent if and only if their distance in G is at most k.
+  **Time Complexity:** $\\mathcal{O}(V \\cdot (V + E))$
 
-  Self-loops are never added.
+  ## Errors
 
-  > [!WARNING]
-  > **Performance Warning:** Computing the $k$-th power of a graph requires running BFS
-  > from every node. For larger $k$ or dense graphs, the resulting graph can approach
-  > a complete graph ($O(V^2)$ edges), causing high CPU and memory utilization.
-
-  **Time Complexity:** O(V × (V + E)) in the worst case
-
-  ## Parameters
-
-  - `graph` - The input graph
-  - `k` - The power (distance threshold)
-  - `default_weight` - Weight for newly created edges
-
-  ## Examples
-
-      iex> path = Yog.undirected()
-      ...> |> Yog.add_node(0, nil)
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
-      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
-      iex> # G^2 connects nodes at distance <= 2
-      ...> power = Yog.Operation.power(path, 2, 1)
-      iex> # Node 0 and 2 should now be connected (distance 2 in original)
-      ...> Yog.Model.has_edge?(power, 0, 2)
-      true
+  - Raises `ArgumentError` if `k` is not a positive integer ($\ge 1$).
   """
   @spec power(Graph.t(), integer(), any()) :: Graph.t()
   def power(graph, k, default_weight) do
-    if k <= 1 do
-      graph
-    else
-      nodes = Map.keys(graph.nodes)
+    validate_graph!(graph)
 
-      List.foldl(nodes, graph, fn src, acc_graph ->
-        reachable = nodes_within_distance(acc_graph, src, k)
-
-        List.foldl(reachable, acc_graph, fn dst, g ->
-          maybe_add_power_edge(g, src, dst, default_weight)
-        end)
-      end)
+    unless is_integer(k) and k >= 0 do
+      raise ArgumentError, "expected k to be a non-negative integer, got: #{inspect(k)}"
     end
+
+    nodes = Map.keys(graph.nodes)
+
+    List.foldl(nodes, graph, fn src, acc_graph ->
+      reachable = nodes_within_distance(acc_graph, src, k)
+
+      List.foldl(reachable, acc_graph, fn dst, g ->
+        maybe_add_power_edge(g, src, dst, default_weight)
+      end)
+    end)
   end
 
   # =============================================================================
@@ -640,33 +367,20 @@ defmodule Yog.Operation do
   @doc """
   Checks if the first graph is a subgraph of the second graph.
 
-  Returns `true` if all nodes and edges in the first graph exist in the second.
+  Both graphs must have the same kind (`:directed` or `:undirected`).
 
-  **Time Complexity:** O(Vₚ + Eₚ) where Vₚ and Eₚ are the nodes and edges of the potential subgraph
+  **Time Complexity:** $\\mathcal{O}(V_p + E_p)$
 
-  ## Examples
+  ## Errors
 
-      iex> container = Yog.undirected()
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_node(3, nil)
-      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge_ensure(from: 2, to: 3, with: 1)
-      iex> potential = Yog.undirected()
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
-      iex> Yog.Operation.subgraph?(potential, container)
-      true
-      iex> not_subgraph = Yog.undirected()
-      ...> |> Yog.add_node(4, nil)
-      ...> |> Yog.add_node(5, nil)
-      ...> |> Yog.add_edge_ensure(from: 4, to: 5, with: 1)
-      iex> Yog.Operation.subgraph?(not_subgraph, container)
-      false
+  - Raises `ArgumentError` if input graphs have different kinds.
   """
   @spec subgraph?(Graph.t(), Graph.t()) :: boolean()
   def subgraph?(potential, container) do
+    validate_graph!(potential)
+    validate_graph!(container)
+    validate_same_kind!(potential, container)
+
     potential_nodes = Map.keys(potential.nodes)
     container_nodes = MapSet.new(Map.keys(container.nodes))
 
@@ -685,59 +399,28 @@ defmodule Yog.Operation do
   @doc """
   Checks if two graphs are isomorphic (structurally identical).
 
-  Two graphs are isomorphic if there exists a bijection between their node sets
-  that preserves adjacency. This implementation uses degree sequence comparison
-  and backtracking to test for isomorphism.
+  Both graphs must have the same kind (`:directed` or `:undirected`).
 
-  > [!WARNING]
-  > **Performance Warning:** Graph isomorphism is a computationally hard problem.
-  > While this function includes fast heuristics (degree sequence matching), the worst-case
-  > backtracking complexity is exponential. It should not be used on graphs with more
-  > than a few dozen nodes, especially highly symmetric graphs (like strongly regular graphs)
-  > where degree heuristics fail.
+  **Time Complexity:** Exponential in worst case due to backtracking.
 
-  **Time Complexity:** O(V log V + E) for the fast checks; exponential in the
-  worst case due to backtracking (not recommended for large graphs).
+  ## Errors
 
-  ## Examples
-
-      # Two identical triangles are isomorphic
-      iex> g1 = Yog.undirected()
-      ...> |> Yog.add_node(0, nil)
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
-      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
-      ...> |> Yog.add_edge_ensure(from: 2, to: 0, with: 1)
-      iex> g2 = Yog.undirected()
-      ...> |> Yog.add_node(10, nil)
-      ...> |> Yog.add_node(20, nil)
-      ...> |> Yog.add_node(30, nil)
-      ...> |> Yog.add_edge_ensure(from: 10, to: 20, with: 1)
-      ...> |> Yog.add_edge_ensure(from: 20, to: 30, with: 1)
-      ...> |> Yog.add_edge_ensure(from: 30, to: 10, with: 1)
-      iex> Yog.Operation.isomorphic?(g1, g2)
-      true
-      iex> # Triangle is not isomorphic to a path
-      iex> path = Yog.undirected()
-      ...> |> Yog.add_node(0, nil)
-      ...> |> Yog.add_node(1, nil)
-      ...> |> Yog.add_node(2, nil)
-      ...> |> Yog.add_edge_ensure(from: 0, to: 1, with: 1)
-      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
-      iex> Yog.Operation.isomorphic?(g1, path)
-      false
+  - Raises `ArgumentError` if input graphs have different kinds.
   """
   @spec isomorphic?(Graph.t(), Graph.t()) :: boolean()
   def isomorphic?(first, second) do
+    validate_graph!(first)
+    validate_graph!(second)
+    validate_same_kind!(first, second)
+
     first_order = map_size(first.nodes)
     second_order = map_size(second.nodes)
 
     if first_order != second_order do
       false
     else
-      first_edges = Yog.Graph.edge_count(first)
-      second_edges = Yog.Graph.edge_count(second)
+      first_edges = Graph.edge_count(first)
+      second_edges = Graph.edge_count(second)
 
       if first_edges != second_edges do
         false
@@ -758,6 +441,19 @@ defmodule Yog.Operation do
   # Private Helper Functions
   # =============================================================================
 
+  defp validate_graph!(%Graph{}), do: :ok
+
+  defp validate_graph!(other) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
+  end
+
+  defp validate_same_kind!(g1, g2) do
+    if g1.kind != g2.kind do
+      raise ArgumentError,
+            "Cannot perform operation on graphs of different kinds: #{g1.kind} and #{g2.kind}"
+    end
+  end
+
   defp has_edge?(graph, u, v) do
     graph.out_edges |> Map.get(u, %{}) |> Map.has_key?(v)
   end
@@ -774,15 +470,12 @@ defmodule Yog.Operation do
     graph.out_edges |> Map.get(node, %{}) |> Map.to_list()
   end
 
-  # Reindex edges with a tag to avoid ID collisions
   defp add_tagged_component(target_graph, source_graph, tag) do
-    # First pass: add all nodes
     target_graph =
       Utils.map_fold(source_graph.nodes, target_graph, fn node_id, data, acc ->
         Yog.add_node(acc, {tag, node_id}, data)
       end)
 
-    # Second pass: add all edges
     is_directed = source_graph.kind == :directed
 
     Utils.map_fold(source_graph.out_edges, target_graph, fn u, dests, acc_outer ->
@@ -1007,7 +700,6 @@ defmodule Yog.Operation do
     end
   end
 
-  # Finds all nodes within distance k from a source node using BFS
   defp nodes_within_distance(graph, src, max_dist) do
     Yog.Traversal.fold_walk(
       over: graph,
@@ -1024,14 +716,12 @@ defmodule Yog.Operation do
     )
   end
 
-  # Computes the degree sequence of a graph as {in_degree, out_degree} pairs
   defp degree_sequence(graph) do
     Enum.map(Map.keys(graph.nodes), fn node ->
       {in_degree(graph, node), out_degree(graph, node)}
     end)
   end
 
-  # Attempts to find an isomorphism between two graphs using backtracking
   defp attempt_isomorphism(first, second) do
     first_nodes =
       Map.keys(first.nodes)
@@ -1063,7 +753,6 @@ defmodule Yog.Operation do
     end)
   end
 
-  # Checks if mapping src -> candidate is consistent with current mapping
   defp mapping_valid?(first, second, src, candidate, mapping) do
     src_succs = Map.get(first.out_edges, src, %{})
     cand_succs = Map.get(second.out_edges, candidate, %{})

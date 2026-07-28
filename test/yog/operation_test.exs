@@ -1,5 +1,6 @@
 defmodule Yog.OperationTest do
   use ExUnit.Case
+  use ExUnitProperties
 
   alias Yog.Operation
 
@@ -707,6 +708,119 @@ defmodule Yog.OperationTest do
       assert Yog.Model.order(result) == 4
       # 2 vertical + 4 horizontal = 6 edges
       assert Yog.Model.edge_count(result) == 6
+    end
+  end
+
+  # ============= Validation & Struct Verification Tests =============
+
+  describe "input validation and struct verification" do
+    test "functions raise ArgumentError on non-graph inputs" do
+      g = Yog.directed() |> Yog.add_node(1, "A")
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph struct/, fn ->
+        apply(Operation, :union, [:not_a_graph, g])
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph struct/, fn ->
+        apply(Operation, :intersection, [g, :not_a_graph])
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph struct/, fn ->
+        apply(Operation, :difference, [:not_a_graph, g])
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph struct/, fn ->
+        apply(Operation, :subgraph?, [g, :not_a_graph])
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph struct/, fn ->
+        apply(Operation, :isomorphic?, [:not_a_graph, g])
+      end
+    end
+
+    test "set operations raise ArgumentError on graph kind mismatch" do
+      directed_g = Yog.directed() |> Yog.add_node(1, "A")
+      undirected_g = Yog.undirected() |> Yog.add_node(1, "A")
+
+      assert_raise ArgumentError, ~r/Cannot perform operation on graphs of different kinds/, fn ->
+        apply(Operation, :intersection, [directed_g, undirected_g])
+      end
+
+      assert_raise ArgumentError, ~r/Cannot perform operation on graphs of different kinds/, fn ->
+        apply(Operation, :difference, [directed_g, undirected_g])
+      end
+
+      assert_raise ArgumentError, ~r/Cannot perform operation on graphs of different kinds/, fn ->
+        apply(Operation, :symmetric_difference, [directed_g, undirected_g])
+      end
+
+      assert_raise ArgumentError, ~r/Cannot perform operation on graphs of different kinds/, fn ->
+        apply(Operation, :subgraph?, [directed_g, undirected_g])
+      end
+
+      assert_raise ArgumentError, ~r/Cannot perform operation on graphs of different kinds/, fn ->
+        apply(Operation, :isomorphic?, [directed_g, undirected_g])
+      end
+    end
+
+    test "power/3 raises ArgumentError on invalid k" do
+      g = Yog.directed() |> Yog.add_node(1, "A")
+
+      assert_raise ArgumentError, ~r/expected k to be a non-negative integer/, fn ->
+        apply(Operation, :power, [g, -1, 1])
+      end
+
+      assert_raise ArgumentError, ~r/expected k to be a non-negative integer/, fn ->
+        apply(Operation, :power, [g, -2, 1])
+      end
+    end
+  end
+
+  # ============= Property-Based Tests =============
+
+  describe "property-based operation invariants" do
+    property "set operation idempotency and difference identity" do
+      check all(
+              kind <- StreamData.member_of([:directed, :undirected]),
+              nodes <-
+                StreamData.list_of(StreamData.integer(1..20), min_length: 1, max_length: 10),
+              edges <-
+                StreamData.list_of(
+                  StreamData.tuple({
+                    StreamData.integer(1..20),
+                    StreamData.integer(1..20),
+                    StreamData.integer(1..100)
+                  }),
+                  min_length: 0,
+                  max_length: 15
+                )
+            ) do
+        graph =
+          Enum.reduce(nodes, Yog.Model.new(kind), fn u, g ->
+            Yog.Model.add_node(g, u, "data_#{u}")
+          end)
+
+        graph =
+          Enum.reduce(edges, graph, fn {u, v, w}, g ->
+            Yog.Model.add_edge_ensure(g, u, v, w)
+          end)
+
+        # Union with self is self
+        assert Operation.union(graph, graph) == graph
+
+        # Intersection with self is self
+        assert Operation.intersection(graph, graph) == graph
+
+        # Difference with self has 0 edges
+        diff_self = Operation.difference(graph, graph)
+        assert Yog.Model.edge_count(diff_self) == 0
+
+        # Graph is isomorphic to itself
+        assert Operation.isomorphic?(graph, graph) == true
+
+        # Graph is a subgraph of itself
+        assert Operation.subgraph?(graph, graph) == true
+      end
     end
   end
 end
