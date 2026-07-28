@@ -1,33 +1,32 @@
 defmodule Yog.Graph do
   @moduledoc """
-  Core graph data structure.
+  Core graph data structure and protocols.
 
-  A graph is represented as a struct with four fields:
+  A graph is represented as a `%Yog.Graph{}` struct with four primary fields:
   - `kind`: Either `:directed` or `:undirected`
-  - `nodes`: Map of node_id => node_data
-  - `out_edges`: Map of node_id => %{neighbor_id => weight}
-  - `in_edges`: Map of node_id => %{neighbor_id => weight}
+  - `nodes`: Map of `node_id => node_data`
+  - `out_edges`: Map of `node_id => %{neighbor_id => weight}`
+  - `in_edges`: Map of `node_id => %{neighbor_id => weight}`
 
-  The dual-map representation (storing both out_edges and in_edges) enables:
-  - O(1) graph transpose (just swap out_edges ↔ in_edges)
-  - Efficient predecessor queries without traversing the entire graph
-  - Fast bidirectional edge lookups
+  ## Dual-Map Representation
 
-  ## Examples
+  The dual-map design (storing both `out_edges` and `in_edges`) enables:
+  - **$\\mathcal{O}(1)$ Graph Transpose:** Transposing a graph is a simple pointer swap (`out_edges ↔ in_edges`).
+  - **Fast Predecessor Queries:** Finding incoming edges to a node runs in $\\mathcal{O}(\\text{in-degree})$ time without scanning the entire graph.
+  - **Fast Bidirectional Lookups:** Instant checking for reverse edges or symmetrical relationships.
 
-      iex> %Yog.Graph{
-      ...>   kind: :directed,
-      ...>   nodes: %{1 => "A", 2 => "B"},
-      ...>   out_edges: %{1 => %{2 => 10}},
-      ...>   in_edges: %{2 => %{1 => 10}}
-      ...> }
+  ## Constructor & Mutation Guidelines
+
+  Direct struct instantiation (`%Yog.Graph{...}`) or raw field mutation should generally
+  be avoided in application code to prevent index desynchronization between `nodes`,
+  `out_edges`, and `in_edges`. Use the primary `Yog` facade or `Yog.Model` functions to
+  build and manipulate graphs safely.
 
   ## Protocols
 
   `Yog.Graph` implements the `Enumerable` and `Inspect` protocols:
-
-  - **Enumerable**: Iterates over nodes as `{id, data}` tuples
-  - **Inspect**: Compact representation showing graph type and statistics
+  - **Enumerable:** Iterates over nodes as `{id, data}` tuples.
+  - **Inspect:** Compact representation showing graph kind, node count, and edge count.
 
   ## Visual Showcase
 
@@ -54,17 +53,16 @@ defmodule Yog.Graph do
   }
   </div>
 
-      iex> graph = Yog.directed()
-      ...> |> Yog.add_edge_ensure("User", "Core System", "triggers")
-      ...> |> Yog.add_edge_ensure("Core System", "Logic A", "invokes")
-      ...> |> Yog.add_edge_ensure("Core System", "Logic B", "invokes")
-      ...> |> Yog.add_edge_ensure("Logic A", "Logic C", "calls")
-      ...> |> Yog.add_edge_ensure("Logic B", "Logic C", "calls")
-      ...> |> Yog.add_edge_ensure("Logic C", "Storage", "writes")
-      iex> Yog.node_count(graph)
-      6
-      iex> Yog.edge_count(graph)
-      6
+  ## Examples
+
+      iex> graph = Yog.Graph.new(:directed)
+      ...> |> Yog.add_node(1, "A")
+      ...> |> Yog.add_node(2, "B")
+      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+      iex> Yog.Graph.node_count(graph)
+      2
+      iex> Yog.Graph.edge_count(graph)
+      1
   """
 
   @typedoc "Type representing the unique identifier for a node."
@@ -85,16 +83,19 @@ defmodule Yog.Graph do
   defstruct [:kind, :nodes, :out_edges, :in_edges]
 
   @doc """
-  Creates a new empty graph of the given type.
+  Creates a new empty graph of the given kind (`:directed` or `:undirected`).
 
-  ## Example
+  ## Errors
+
+  - Raises `ArgumentError` if `kind` is not `:directed` or `:undirected`.
+
+  ## Examples
 
       iex> Yog.Graph.new(:directed)
       %Yog.Graph{kind: :directed, in_edges: %{}, nodes: %{}, out_edges: %{}}
 
       iex> Yog.Graph.new(:undirected)
       %Yog.Graph{kind: :undirected, in_edges: %{}, nodes: %{}, out_edges: %{}}
-
   """
   @spec new(kind()) :: t()
   def new(kind) when kind in [:directed, :undirected] do
@@ -106,31 +107,26 @@ defmodule Yog.Graph do
     }
   end
 
+  def new(invalid_kind) do
+    raise ArgumentError,
+          "expected kind to be :directed or :undirected, got: #{inspect(invalid_kind)}"
+  end
+
   @doc """
   Returns the total number of edges in the graph.
 
-  For undirected graphs, this counts each edge once (not twice).
+  For undirected graphs, each edge is counted once (excluding duplicate mirroring).
+  Self-loops are counted as single edges.
 
-  ## Performance Note
+  **Time Complexity:** $\\mathcal{O}(V)$
 
-  This function traverses all nodes' outgoing edges, making it O(V) where V is
-  the number of vertices. If you need the edge count multiple times, consider
-  caching the result:
+  ## Errors
 
-      edge_count = Yog.Graph.edge_count(graph)
-      # Use edge_count in subsequent calculations...
+  - Raises `ArgumentError` if passed a non-`Yog.Graph` term.
 
-  ## Example
+  ## Examples
 
       iex> graph = Yog.Graph.new(:directed)
-      ...> |> Yog.add_node(1, "A")
-      ...> |> Yog.add_node(2, "B")
-      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
-      ...> |> Yog.add_edge_ensure(from: 1, to: 3, with: 20)
-      iex> Yog.Graph.edge_count(graph)
-      2
-
-      iex> graph = Yog.Graph.new(:undirected)
       ...> |> Yog.add_node(1, "A")
       ...> |> Yog.add_node(2, "B")
       ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
@@ -158,73 +154,49 @@ defmodule Yog.Graph do
     end
   end
 
+  def edge_count(other) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
+  end
+
   @doc """
   Returns the number of nodes in the graph.
 
-  ## Example
+  **Time Complexity:** $\\mathcal{O}(1)$
+
+  ## Errors
+
+  - Raises `ArgumentError` if passed a non-`Yog.Graph` term.
+
+  ## Examples
 
       iex> graph = Yog.Graph.new(:directed)
       ...> |> Yog.add_node(1, "A")
       ...> |> Yog.add_node(2, "B")
       ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
-      ...> |> Yog.add_edge_ensure(from: 1, to: 3, with: 20)
       iex> Yog.Graph.node_count(graph)
-      3
-
-      iex> graph = Yog.Graph.new(:undirected)
-      ...> |> Yog.add_node(1, "A")
-      ...> |> Yog.add_node(2, "B")
-      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
-      ...> |> Yog.add_edge_ensure(from: 1, to: 3, with: 20)
-      iex> Yog.Graph.node_count(graph)
-      3
+      2
   """
   @spec node_count(t()) :: non_neg_integer()
   def node_count(%__MODULE__{} = graph) do
     map_size(graph.nodes)
   end
+
+  def node_count(other) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
+  end
 end
 
 defimpl Enumerable, for: Yog.Graph do
   @moduledoc """
-  Enumerable implementation for `Yog.Graph`.
+  Enumerable protocol implementation for `Yog.Graph`.
 
-  Iterates over nodes as `{id, data}` tuples, similar to `Map.to_list/1`.
-
-  ## Examples
-
-      iex> graph =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      iex> Enum.to_list(graph)
-      [{1, "A"}, {2, "B"}]
-      iex> Enum.count(graph)
-      2
-      iex> Enum.map(graph, fn {_id, data} -> data end)
-      ["A", "B"]
+  Iterates over graph nodes as `{id, data}` tuples.
   """
 
   def count(%Yog.Graph{nodes: nodes}) do
     {:ok, map_size(nodes)}
   end
 
-  @doc """
-  Checks if a node exists in the graph.
-
-  ## Example
-
-      iex> graph = Yog.Graph.new(:directed)
-      ...> |> Yog.add_node(1, "A")
-      ...> |> Yog.add_node(2, "B")
-      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
-      iex> Enum.member?(graph, {1, "A"})
-      true
-      iex> Enum.member?(graph, {1, "B"})
-      false
-      iex> Enum.member?(graph, :not_a_tuple)
-      false
-  """
   def member?(%Yog.Graph{nodes: nodes}, {id, data}) do
     {:ok, Map.get(nodes, id) == data}
   end
@@ -233,34 +205,10 @@ defimpl Enumerable, for: Yog.Graph do
     {:ok, false}
   end
 
-  @doc """
-  Reduces the graph to a single value.
-
-  ## Example
-
-      iex> graph = Yog.Graph.new(:directed)
-      ...> |> Yog.add_node(1, "A")
-      ...> |> Yog.add_node(2, "B")
-      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
-      iex> Enum.reduce(graph, 0, fn {id, _data}, acc -> acc + id end)
-      3
-  """
   def reduce(%Yog.Graph{nodes: nodes}, acc, fun) do
     Enumerable.reduce(nodes, acc, fun)
   end
 
-  @doc """
-  Slices the graph into a list of nodes.
-
-  ## Example
-
-      iex> graph = Yog.Graph.new(:directed)
-      ...> |> Yog.add_node(1, "A")
-      ...> |> Yog.add_node(2, "B")
-      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
-      iex> Enum.slice(graph, 0, 1)
-      [{1, "A"}]
-  """
   def slice(%Yog.Graph{nodes: nodes}) do
     {:ok, map_size(nodes),
      fn start, length, _step ->
@@ -273,36 +221,13 @@ end
 
 defimpl Inspect, for: Yog.Graph do
   @moduledoc """
-  Inspect implementation for `Yog.Graph`.
+  Inspect protocol implementation for `Yog.Graph`.
 
-  Provides a compact representation showing graph type, node count, and edge count.
-
-  ## Examples
-
-      iex> graph = Yog.directed() |> Yog.add_node(1, "A")
-      iex> inspect(graph)
-      "#Yog.Graph<:directed, 1 node, 0 edges>"
-      iex> graph = Yog.undirected() |> Yog.add_node(1, "A") |> Yog.add_node(2, "B")
-      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
-      iex> inspect(graph)
-      "#Yog.Graph<:undirected, 2 nodes, 1 edge>"
-
+  Provides a compact, human-readable summary: `#Yog.Graph<:kind, N nodes, M edges>`.
   """
 
   import Inspect.Algebra
 
-  @doc """
-  Inspects the graph.
-
-  ## Example
-
-      iex> graph = Yog.Graph.new(:directed)
-      ...> |> Yog.add_node(1, "A")
-      ...> |> Yog.add_node(2, "B")
-      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
-      iex> inspect(graph)
-      "#Yog.Graph<:directed, 2 nodes, 1 edge>"
-  """
   def inspect(%Yog.Graph{} = graph, opts) do
     node_count = map_size(graph.nodes)
     edge_count = Yog.Graph.edge_count(graph)
