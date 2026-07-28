@@ -59,6 +59,11 @@ defmodule Yog.IO.List do
   - Algorithm competition input format
   - Adjacency matrix conversion
 
+  ## Complexity
+
+  - `from_list/2` and `from_string/3`: $\\mathcal{O}(V + E)$ time and space complexity.
+  - `to_list/1` and `to_string/2`: $\\mathcal{O}(V \\log V + E \\log E)$ time due to sorting nodes and neighbors, and $\\mathcal{O}(V + E)$ space complexity.
+
   ## See Also
 
   - `Yog.IO.Matrix` - Dense adjacency matrix format
@@ -77,7 +82,7 @@ defmodule Yog.IO.List do
 
   - `type` - `:directed` or `:undirected`
   - `entries` - List of `{node_id, neighbors}` tuples where neighbors is a list
-    of `{neighbor_id, weight}` tuples. For unweighted graphs, use weight 1.
+    of `{neighbor_id, weight}` or `neighbor_id` elements. For unweighted graphs, weight defaults to 1.
 
   ## Examples
 
@@ -103,39 +108,64 @@ defmodule Yog.IO.List do
       iex> Yog.Model.edge_count(digraph)
       3
 
+  ## Errors
+
+  - Raises `ArgumentError` if `type` is not `:directed` or `:undirected`.
+  - Raises `ArgumentError` if `entries` is not a list or contains malformed entries.
+
   ## Notes
 
-  - For undirected graphs, edges are added in both directions automatically
-  - Nodes with empty neighbor lists are still added to the graph
-  - Duplicate edges are handled by the underlying graph structure
+  - For undirected graphs, edges are added in both directions automatically.
+  - Nodes with empty neighbor lists are still added to the graph.
+  - Nodes mentioned only as neighbors are automatically created.
   """
   @spec from_list(:directed | :undirected, [adjacency_entry()]) :: Yog.graph()
-  def from_list(type, entries) when is_list(entries) do
+  def from_list(type, entries) do
     unless type in [:directed, :undirected] do
       raise ArgumentError,
             "Invalid graph type: #{inspect(type)}. Expected :directed or :undirected"
     end
 
+    if not is_list(entries) do
+      raise ArgumentError, "expected entries to be a list, got: #{inspect(entries)}"
+    end
+
     base = Yog.new(type)
 
-    # First pass: add all nodes
+    # First pass: add all specified nodes
     graph_with_nodes =
-      Enum.reduce(entries, base, fn {node_id, _neighbors}, g ->
-        Model.add_node(g, node_id, nil)
+      Enum.reduce(entries, base, fn
+        {node_id, _neighbors}, g ->
+          Model.add_node(g, node_id, nil)
+
+        other, _g ->
+          raise ArgumentError,
+                "expected entry to be a tuple {node_id, neighbors_list}, got: #{inspect(other)}"
       end)
 
-    # Second pass: add all edges
+    # Second pass: add all edges and missing neighbor nodes
     Enum.reduce(entries, graph_with_nodes, fn {node_id, neighbors}, g ->
-      Enum.reduce(neighbors, g, fn {neighbor_id, weight}, acc ->
-        # Ensure neighbor node exists
-        acc =
-          if Model.has_node?(acc, neighbor_id) do
-            acc
-          else
-            Model.add_node(acc, neighbor_id, nil)
-          end
+      if not is_list(neighbors) do
+        raise ArgumentError,
+              "expected neighbors for node #{inspect(node_id)} to be a list, got: #{inspect(neighbors)}"
+      end
 
-        Model.add_edge!(acc, node_id, neighbor_id, weight)
+      Enum.reduce(neighbors, g, fn
+        {neighbor_id, weight}, acc ->
+          acc = ensure_node_exists(acc, neighbor_id)
+          Model.add_edge!(acc, node_id, neighbor_id, weight)
+
+        {neighbor_id}, acc ->
+          acc = ensure_node_exists(acc, neighbor_id)
+          Model.add_edge!(acc, node_id, neighbor_id, 1)
+
+        neighbor_id, acc when not is_tuple(neighbor_id) ->
+          acc = ensure_node_exists(acc, neighbor_id)
+          Model.add_edge!(acc, node_id, neighbor_id, 1)
+
+        other, _acc ->
+          raise ArgumentError,
+                "expected neighbor to be a node ID or {node_id, weight} tuple, got: #{inspect(other)}"
       end)
     end)
   end
@@ -154,8 +184,8 @@ defmodule Yog.IO.List do
   - `type` - `:directed` or `:undirected`
   - `string` - Multiline string with adjacency list format
   - `opts` - Options:
-    - `:weighted` - `true` to parse weighted edges (format: "neighbor,weight")
-    - `:delimiter` - Delimiter between node and neighbors (default: ":")
+    - `:weighted` - `true` to parse weighted edges (format: "neighbor,weight") (default: `false`)
+    - `:delimiter` - Delimiter string between node ID and neighbors (default: `":"`)
 
   ## Examples
 
@@ -176,6 +206,13 @@ defmodule Yog.IO.List do
       iex> graph = Yog.IO.List.from_string(:directed, weighted_text, weighted: true)
       iex> Yog.Model.edge_count(graph)
       3
+
+  ## Errors
+
+  - Raises `ArgumentError` if `type` is not `:directed` or `:undirected`.
+  - Raises `ArgumentError` if `string` is not a binary.
+  - Raises `ArgumentError` if `opts` is not a keyword list or contains unknown options.
+  - Raises `ArgumentError` if node IDs or numerical weights are invalid.
   """
   @spec from_string(:directed | :undirected, String.t(), keyword()) :: Yog.graph()
   def from_string(type, string, opts \\ []) do
@@ -184,8 +221,33 @@ defmodule Yog.IO.List do
             "Invalid graph type: #{inspect(type)}. Expected :directed or :undirected"
     end
 
+    if not is_binary(string) do
+      raise ArgumentError, "expected string to be a binary, got: #{inspect(string)}"
+    end
+
+    if not Keyword.keyword?(opts) do
+      raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
+    end
+
+    allowed_keys = [:weighted, :delimiter]
+
+    Enum.each(Keyword.keys(opts), fn key ->
+      if key not in allowed_keys do
+        raise ArgumentError, "unknown option: #{inspect(key)}"
+      end
+    end)
+
     weighted = Keyword.get(opts, :weighted, false)
     delimiter = Keyword.get(opts, :delimiter, ":")
+
+    if not is_boolean(weighted) do
+      raise ArgumentError, "expected :weighted to be a boolean, got: #{inspect(weighted)}"
+    end
+
+    if not is_binary(delimiter) or delimiter == "" do
+      raise ArgumentError,
+            "expected :delimiter to be a non-empty string, got: #{inspect(delimiter)}"
+    end
 
     entries =
       string
@@ -205,6 +267,10 @@ defmodule Yog.IO.List do
   Returns a list of `{node_id, neighbors}` tuples where neighbors is a list
   of `{neighbor_id, weight}` tuples.
 
+  ## Parameters
+
+  - `graph` - A `Yog.Graph` or `Yog.DAG` struct.
+
   ## Examples
 
       iex> graph = Yog.undirected()
@@ -217,19 +283,24 @@ defmodule Yog.IO.List do
       iex> entries
       [{1, [{2, 5}]}, {2, [{1, 5}, {3, 7}]}, {3, [{2, 7}]}]
 
+  ## Errors
+
+  - Raises `ArgumentError` if `graph` is not a valid Yog graph struct.
+
   ## Notes
 
-  - Node order is deterministic (sorted by node ID)
-  - For undirected graphs, each edge appears twice (once for each direction)
-  - Isolated nodes have empty neighbor lists
+  - Node order is deterministic (sorted by node ID).
+  - For undirected graphs, each edge appears twice (once for each direction).
+  - Isolated nodes have empty neighbor lists.
   """
-  @spec to_list(Yog.graph()) :: [adjacency_entry()]
+  @spec to_list(Yog.graph() | Yog.DAG.t()) :: [adjacency_entry()]
   def to_list(graph) do
-    nodes = Model.all_nodes(graph) |> Enum.sort()
+    target_graph = unwrap_graph!(graph)
+    nodes = Model.all_nodes(target_graph) |> Enum.sort()
 
     Enum.map(nodes, fn node_id ->
       neighbors =
-        graph
+        target_graph
         |> Model.successors(node_id)
         |> Enum.sort_by(&elem(&1, 0))
 
@@ -240,12 +311,14 @@ defmodule Yog.IO.List do
   @doc """
   Exports a graph to a string representation of an adjacency list.
 
-  ## Options
+  ## Parameters
 
-  - `weighted` - `true` to include weights (format: "neighbor,weight")
-  - `delimiter` - Delimiter between node and neighbors (default: ":")
-  - `node_formatter` - Function to convert node IDs to strings (default: `&Kernel.to_string/1`)
-  - `weight_formatter` - Function to convert edge weights to strings (default: `&Yog.Utils.to_weight_label/1`)
+  - `graph` - A `Yog.Graph` or `Yog.DAG` struct.
+  - `opts` - Options:
+    - `:weighted` - `true` to include weights (format: "neighbor,weight") (default: `false`)
+    - `:delimiter` - Delimiter string between node ID and neighbors (default: `":"`)
+    - `:node_formatter` - Function converting node ID to string (default: `&Yog.Utils.safe_string/1`)
+    - `:weight_formatter` - Function converting weight to string (default: `&Yog.Utils.to_weight_label/1`)
 
   ## Examples
 
@@ -264,13 +337,49 @@ defmodule Yog.IO.List do
       ...>   weighted: true
       ...> )
       "1_2: 3_4,w10\\n3_4: 1_2,w10"
+
+  ## Errors
+
+  - Raises `ArgumentError` if `graph` is not a valid Yog graph struct.
+  - Raises `ArgumentError` if `opts` is not a keyword list or contains unknown options.
+  - Raises `ArgumentError` if `:node_formatter` or `:weight_formatter` are not arity-1 functions.
   """
-  @spec to_string(Yog.graph(), keyword()) :: String.t()
+  @spec to_string(Yog.graph() | Yog.DAG.t(), keyword()) :: String.t()
   def to_string(graph, opts \\ []) do
+    if not Keyword.keyword?(opts) do
+      raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
+    end
+
+    allowed_keys = [:weighted, :delimiter, :node_formatter, :weight_formatter]
+
+    Enum.each(Keyword.keys(opts), fn key ->
+      if key not in allowed_keys do
+        raise ArgumentError, "unknown option: #{inspect(key)}"
+      end
+    end)
+
     weighted = Keyword.get(opts, :weighted, false)
     delimiter = Keyword.get(opts, :delimiter, ":")
     node_fmt = Keyword.get(opts, :node_formatter, &Yog.Utils.safe_string/1)
     weight_fmt = Keyword.get(opts, :weight_formatter, &Yog.Utils.to_weight_label/1)
+
+    if not is_boolean(weighted) do
+      raise ArgumentError, "expected :weighted to be a boolean, got: #{inspect(weighted)}"
+    end
+
+    if not is_binary(delimiter) do
+      raise ArgumentError, "expected :delimiter to be a string, got: #{inspect(delimiter)}"
+    end
+
+    if not is_function(node_fmt, 1) do
+      raise ArgumentError,
+            "expected :node_formatter to be an arity-1 function, got: #{inspect(node_fmt)}"
+    end
+
+    if not is_function(weight_fmt, 1) do
+      raise ArgumentError,
+            "expected :weight_formatter to be an arity-1 function, got: #{inspect(weight_fmt)}"
+    end
 
     entries = to_list(graph)
 
@@ -293,6 +402,22 @@ defmodule Yog.IO.List do
       end)
 
     Enum.join(lines, "\n")
+  end
+
+  defp unwrap_graph!(%Yog.Graph{} = g), do: g
+  defp unwrap_graph!(%Yog.DAG{graph: g}), do: g
+
+  defp unwrap_graph!(other) do
+    raise ArgumentError,
+          "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
+  end
+
+  defp ensure_node_exists(graph, node_id) do
+    if Model.has_node?(graph, node_id) do
+      graph
+    else
+      Model.add_node(graph, node_id, nil)
+    end
   end
 
   # Private helper to parse a single line of adjacency list
@@ -342,8 +467,17 @@ defmodule Yog.IO.List do
     str = String.trim(str)
 
     case Integer.parse(str) do
-      {int, ""} -> int
-      _ -> String.to_float(str)
+      {int, ""} ->
+        int
+
+      _ ->
+        case Float.parse(str) do
+          {float, ""} ->
+            float
+
+          _ ->
+            raise ArgumentError, "invalid numerical weight: #{inspect(str)}"
+        end
     end
   end
 end
