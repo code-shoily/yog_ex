@@ -3,7 +3,7 @@ defmodule Yog.IO.TGF do
   Trivial Graph Format (TGF) serialization support.
 
   Provides functions to serialize and deserialize graphs in TGF format,
-  a very simple text-based format suitable for quick graph exchange and debugging.
+  a simple text-based format suitable for quick graph exchange and debugging.
 
   ## Format Overview
 
@@ -33,6 +33,11 @@ defmodule Yog.IO.TGF do
   - **Empty labels**: Nodes without labels default to using their ID as the label.
   - **Malformed lines**: Lines that cannot be parsed are skipped and collected
     as warnings in the `TgfResult`.
+
+  ## Complexity
+
+  - `serialize/1` and `serialize_with/2`: $\\mathcal{O}(V \\log V + E)$ time complexity due to node ID sorting, and $\\mathcal{O}(V + E)$ space complexity.
+  - `parse/2` and `parse_with/4`: $\\mathcal{O}(V + E)$ time and space complexity.
   """
 
   alias Yog.Model
@@ -43,8 +48,8 @@ defmodule Yog.IO.TGF do
   Default behavior:
   - Node labels: Convert data to string using `to_string/1`
   - Edge labels: No labels (returns `:none`)
-  - Node formatter: `Kernel.to_string/1`
-  - Edge formatter: `Kernel.to_string/1`
+  - Node formatter: `Yog.Utils.safe_string/1`
+  - Edge formatter: `Yog.Utils.safe_string/1`
 
   ## Example
 
@@ -60,18 +65,22 @@ defmodule Yog.IO.TGF do
   @doc """
   Creates TGF options with custom node and edge label functions.
 
-  **Time Complexity:** O(1)
-
   ## Parameters
 
-  - `node_label` - Function to convert node data to string label
-    `(node_data) -> string`
-  - `edge_label` - Function to convert edge data to optional label
-    `(edge_data) -> :none | {:some, string}`
+  - `node_label` - Function to convert node data to string label `(node_data) -> string`
+  - `edge_label` - Function to convert edge data to optional label `(edge_data) -> :none | {:some, string}`
+  - `opts` - Keyword list options:
+    - `:node_formatter` - Function converting node ID to string (default: `&Yog.Utils.safe_string/1`)
+    - `:edge_formatter` - Function converting edge label to string (default: `&Yog.Utils.safe_string/1`)
 
   ## Returns
 
   TGF options tuple for use with `serialize_with/2`
+
+  ## Errors
+
+  - Raises `ArgumentError` if `node_label` or `edge_label` are not arity-1 functions.
+  - Raises `ArgumentError` if `opts` is not a keyword list or contains unknown options.
 
   ## Example
 
@@ -84,8 +93,41 @@ defmodule Yog.IO.TGF do
       :ok
   """
   def options_with(node_label, edge_label, opts \\ []) do
+    if not is_function(node_label, 1) do
+      raise ArgumentError,
+            "expected node_label to be an arity-1 function, got: #{inspect(node_label)}"
+    end
+
+    if not is_function(edge_label, 1) do
+      raise ArgumentError,
+            "expected edge_label to be an arity-1 function, got: #{inspect(edge_label)}"
+    end
+
+    if not Keyword.keyword?(opts) do
+      raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
+    end
+
+    allowed_keys = [:node_formatter, :edge_formatter]
+
+    Enum.each(Keyword.keys(opts), fn key ->
+      if key not in allowed_keys do
+        raise ArgumentError, "unknown option: #{inspect(key)}"
+      end
+    end)
+
     node_fmt = Keyword.get(opts, :node_formatter, &Yog.Utils.safe_string/1)
     edge_fmt = Keyword.get(opts, :edge_formatter, &Yog.Utils.safe_string/1)
+
+    if not is_function(node_fmt, 1) do
+      raise ArgumentError,
+            "expected :node_formatter to be an arity-1 function, got: #{inspect(node_fmt)}"
+    end
+
+    if not is_function(edge_fmt, 1) do
+      raise ArgumentError,
+            "expected :edge_formatter to be an arity-1 function, got: #{inspect(edge_fmt)}"
+    end
+
     {:tgf_options, node_label, edge_label, node_fmt, edge_fmt}
   end
 
@@ -94,16 +136,19 @@ defmodule Yog.IO.TGF do
 
   Allows full control over how node and edge data are converted to TGF labels.
 
-  **Time Complexity:** O(V + E) where V is nodes and E is edges
-
   ## Parameters
 
   - `options` - TGF options tuple (see `options_with/2`)
-  - `graph` - The graph to serialize
+  - `graph` - The `Yog.Graph` or `Yog.DAG` to serialize
 
   ## Returns
 
   TGF format string
+
+  ## Errors
+
+  - Raises `ArgumentError` if `graph` is not a valid Yog graph struct.
+  - Raises `ArgumentError` if `options` is not a valid options tuple.
 
   ## Example
 
@@ -120,20 +165,27 @@ defmodule Yog.IO.TGF do
       true
   """
   def serialize_with(options, graph) do
+    target_graph = unwrap_graph!(graph)
+
     {node_label_fn, edge_label_fn, node_fmt, edge_fmt} =
       case options do
-        {:tgf_options, n_lbl, e_lbl, n_fmt, e_fmt} ->
+        {:tgf_options, n_lbl, e_lbl, n_fmt, e_fmt}
+        when is_function(n_lbl, 1) and is_function(e_lbl, 1) and is_function(n_fmt, 1) and
+               is_function(e_fmt, 1) ->
           {n_lbl, e_lbl, n_fmt, e_fmt}
 
-        {:tgf_options, n_lbl, e_lbl} ->
+        {:tgf_options, n_lbl, e_lbl}
+        when is_function(n_lbl, 1) and is_function(e_lbl, 1) ->
           {n_lbl, e_lbl, &Yog.Utils.safe_string/1, &Yog.Utils.safe_string/1}
-      end
 
-    %Yog.Graph{nodes: nodes_map} = graph
+        other ->
+          raise ArgumentError,
+                "expected valid options tuple from default_options/0 or options_with/2, got: #{inspect(other)}"
+      end
 
     # Serialize nodes
     node_lines =
-      nodes_map
+      target_graph.nodes
       |> Enum.sort()
       |> Enum.map(fn {id, data} ->
         label = node_label_fn.(data)
@@ -141,7 +193,7 @@ defmodule Yog.IO.TGF do
       end)
 
     # Serialize edges
-    edges = Model.all_edges(graph)
+    edges = Model.all_edges(target_graph)
 
     edge_lines =
       edges
@@ -162,7 +214,9 @@ defmodule Yog.IO.TGF do
 
   Node data is converted to strings, edge labels are omitted.
 
-  **Time Complexity:** O(V + E)
+  ## Errors
+
+  - Raises `ArgumentError` if `graph` is not a valid Yog graph struct.
 
   ## Example
 
@@ -181,8 +235,6 @@ defmodule Yog.IO.TGF do
   @doc """
   Writes a graph to a TGF file using default label conversion.
 
-  **Time Complexity:** O(V + E) + file I/O
-
   ## Parameters
 
   - `path` - File path to write to
@@ -192,6 +244,11 @@ defmodule Yog.IO.TGF do
 
   - `:ok` on success
   - `{:error, reason}` on file write failure
+
+  ## Errors
+
+  - Raises `ArgumentError` if `path` is not a binary.
+  - Raises `ArgumentError` if `graph` is not a valid Yog graph struct.
 
   ## Example
 
@@ -204,14 +261,16 @@ defmodule Yog.IO.TGF do
       # => :ok
   """
   def write(path, graph) do
+    if not is_binary(path) do
+      raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
+    end
+
     content = serialize(graph)
     File.write(path, content)
   end
 
   @doc """
   Writes a graph to a TGF file with custom label functions.
-
-  **Time Complexity:** O(V + E) + file I/O
 
   ## Parameters
 
@@ -224,6 +283,11 @@ defmodule Yog.IO.TGF do
   - `:ok` on success
   - `{:error, reason}` on file write failure
 
+  ## Errors
+
+  - Raises `ArgumentError` if `path` is not a binary.
+  - Raises `ArgumentError` if `options` or `graph` are invalid.
+
   ## Example
 
       graph = Yog.directed() |> Yog.add_node(1, %{name: "Alice"})
@@ -232,6 +296,10 @@ defmodule Yog.IO.TGF do
       Yog.IO.TGF.write_with("network.tgf", options, graph)
   """
   def write_with(path, options, graph) do
+    if not is_binary(path) do
+      raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
+    end
+
     content = serialize_with(options, graph)
     File.write(path, content)
   end
@@ -242,21 +310,23 @@ defmodule Yog.IO.TGF do
   This function allows you to transform TGF labels into custom Elixir data
   structures as the graph is built.
 
-  **Time Complexity:** O(V + E)
-
   ## Parameters
 
   - `input` - TGF format string
   - `graph_type` - `:directed` or `:undirected`
-  - `node_parser` - Function to transform node label to node data
-    `(string) -> node_data`
-  - `edge_parser` - Function to transform edge label to edge data
-    `(string | nil) -> edge_data`
+  - `node_parser` - Function transforming node label to node data `(label) -> node_data` or `(id, label) -> node_data`
+  - `edge_parser` - Function transforming edge label to edge data `(string | nil) -> edge_data`
 
   ## Returns
 
   - `{:ok, {:tgf_result, graph, warnings}}` on success
   - `{:error, reason}` on parsing failure
+
+  ## Errors
+
+  - Raises `ArgumentError` if `graph_type` is not `:directed` or `:undirected`.
+  - Raises `ArgumentError` if `input` is not a binary.
+  - Raises `ArgumentError` if `node_parser` or `edge_parser` are invalid functions.
 
   ## Example
 
@@ -274,6 +344,25 @@ defmodule Yog.IO.TGF do
         Yog.IO.TGF.parse_with(tgf, :directed, node_parser, edge_parser)
   """
   def parse_with(input, graph_type, node_parser, edge_parser) do
+    unless graph_type in [:directed, :undirected] do
+      raise ArgumentError,
+            "Invalid graph type: #{inspect(graph_type)}. Expected :directed or :undirected"
+    end
+
+    if not is_binary(input) do
+      raise ArgumentError, "expected input to be a binary string, got: #{inspect(input)}"
+    end
+
+    if not (is_function(node_parser, 1) or is_function(node_parser, 2)) do
+      raise ArgumentError,
+            "expected node_parser to be an arity-1 or arity-2 function, got: #{inspect(node_parser)}"
+    end
+
+    if not is_function(edge_parser, 1) do
+      raise ArgumentError,
+            "expected edge_parser to be an arity-1 function, got: #{inspect(edge_parser)}"
+    end
+
     lines = String.split(input, "\n", trim: false)
 
     case parse_lines(lines, graph_type, node_parser, edge_parser) do
@@ -288,8 +377,6 @@ defmodule Yog.IO.TGF do
   Node and edge labels are stored as strings. For custom data structures,
   use `parse_with/4`.
 
-  **Time Complexity:** O(V + E)
-
   ## Parameters
 
   - `input` - TGF format string
@@ -301,6 +388,11 @@ defmodule Yog.IO.TGF do
   - `{:error, reason}` on parsing failure
 
   The warnings list contains any malformed lines that were skipped.
+
+  ## Errors
+
+  - Raises `ArgumentError` if `gtype` is not `:directed` or `:undirected`.
+  - Raises `ArgumentError` if `input` is not a binary.
 
   ## Example
 
@@ -321,8 +413,6 @@ defmodule Yog.IO.TGF do
   @doc """
   Reads a graph from a TGF file using String labels.
 
-  **Time Complexity:** O(V + E) + file I/O
-
   ## Parameters
 
   - `path` - File path to read from
@@ -332,6 +422,10 @@ defmodule Yog.IO.TGF do
 
   - `{:ok, {:tgf_result, graph, warnings}}` on success
   - `{:error, reason}` on file read or parse failure
+
+  ## Errors
+
+  - Raises `ArgumentError` if `path` is not a binary string.
 
   ## Example
 
@@ -343,6 +437,10 @@ defmodule Yog.IO.TGF do
       end
   """
   def read(path, gtype) do
+    if not is_binary(path) do
+      raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
+    end
+
     case File.read(path) do
       {:ok, content} -> parse(content, gtype)
       {:error, _} = error -> error
@@ -351,8 +449,16 @@ defmodule Yog.IO.TGF do
 
   @doc """
   Reads a graph from a TGF file with custom parsers.
+
+  ## Errors
+
+  - Raises `ArgumentError` if `path` is not a binary string.
   """
   def read_with(path, gtype, node_parser, edge_parser) do
+    if not is_binary(path) do
+      raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
+    end
+
     case File.read(path) do
       {:ok, content} -> parse_with(content, gtype, node_parser, edge_parser)
       {:error, _} = error -> error
@@ -361,16 +467,18 @@ defmodule Yog.IO.TGF do
 
   # Private functions
 
+  defp unwrap_graph!(%Yog.Graph{} = g), do: g
+  defp unwrap_graph!(%Yog.DAG{graph: g}), do: g
+
+  defp unwrap_graph!(other) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
+  end
+
   defp parse_lines(lines, graph_type, node_parser, edge_parser) do
     # Find separator
     case Enum.find_index(lines, &(&1 == "#" || String.trim(&1) == "#")) do
       nil ->
-        # No separator found
-        if Enum.all?(lines, &(String.trim(&1) == "")) do
-          {:error, {:missing_separator, "Input must contain '#' separator"}}
-        else
-          {:error, {:missing_separator, "Input must contain '#' separator"}}
-        end
+        {:error, {:missing_separator, "Input must contain '#' separator"}}
 
       separator_index ->
         node_lines = Enum.take(lines, separator_index)
@@ -431,18 +539,25 @@ defmodule Yog.IO.TGF do
       [id_str] ->
         # No label, use ID as label
         {:ok, id} = parse_int(id_str)
-        data = node_parser.(id, Kernel.to_string(id))
+        data = apply_node_parser(node_parser, id, Kernel.to_string(id))
         {:ok, id, data}
 
       [id_str, label] ->
         {:ok, id} = parse_int(id_str)
-        # Normalize whitespace: trim and collapse multiple spaces to single space
         normalized_label = label |> String.split() |> Enum.join(" ")
-        data = node_parser.(id, normalized_label)
+        data = apply_node_parser(node_parser, id, normalized_label)
         {:ok, id, data}
 
       [] ->
         {:warning, {:empty_line, line_num}}
+    end
+  end
+
+  defp apply_node_parser(node_parser, id, label) do
+    if is_function(node_parser, 2) do
+      node_parser.(id, label)
+    else
+      node_parser.(label)
     end
   end
 

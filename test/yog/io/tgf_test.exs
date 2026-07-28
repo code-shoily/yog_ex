@@ -1,7 +1,9 @@
 defmodule Yog.IO.TGFTest do
   use ExUnit.Case
+  use ExUnitProperties
 
   alias Yog.IO.TGF
+  import Yog.Generators
 
   doctest Yog.IO.TGF
 
@@ -50,7 +52,6 @@ defmodule Yog.IO.TGFTest do
 
     result = TGF.serialize(graph)
 
-    # Default uses node data as label
     assert String.contains?(result, "1 Alice")
     assert String.contains?(result, "2 Bob")
   end
@@ -70,6 +71,21 @@ defmodule Yog.IO.TGFTest do
     assert String.contains?(result, "2 B")
     assert String.contains?(result, "3 C")
     assert String.contains?(result, "#")
+  end
+
+  test "serialize Yog.DAG struct" do
+    g =
+      Yog.directed()
+      |> Yog.add_node(1, "Alice")
+      |> Yog.add_node(2, "Bob")
+      |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+
+    {:ok, dag} = Yog.DAG.from_graph(g)
+
+    tgf = TGF.serialize(dag)
+    assert String.contains?(tgf, "1 Alice")
+    assert String.contains?(tgf, "2 Bob")
+    assert String.contains?(tgf, "1 2")
   end
 
   # =============================================================================
@@ -235,15 +251,56 @@ defmodule Yog.IO.TGFTest do
         edge_formatter: &inspect/1
       )
 
-    # Should not crash on tuples/maps
     result = TGF.serialize_with(options, graph)
     assert String.contains?(result, "{\"Alice\", :admin}")
     assert String.contains?(result, "{10, :kg}")
   end
 
   # =============================================================================
-  # ERROR HANDLING TESTS
+  # ERROR HANDLING & VALIDATION TESTS
   # =============================================================================
+
+  test "input and option validation errors" do
+    assert_raise ArgumentError, ~r/expected node_label to be an arity-1 function/, fn ->
+      apply(TGF, :options_with, [:invalid, fn _ -> :none end])
+    end
+
+    assert_raise ArgumentError, ~r/expected edge_label to be an arity-1 function/, fn ->
+      apply(TGF, :options_with, [fn d -> d end, :invalid])
+    end
+
+    assert_raise ArgumentError, ~r/expected opts to be a keyword list/, fn ->
+      apply(TGF, :options_with, [fn d -> d end, fn _ -> :none end, :invalid_opts])
+    end
+
+    assert_raise ArgumentError, ~r/unknown option/, fn ->
+      TGF.options_with(fn d -> d end, fn _ -> :none end, unknown: true)
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      apply(TGF, :serialize, [:not_a_graph])
+    end
+
+    assert_raise ArgumentError, ~r/expected valid options tuple/, fn ->
+      apply(TGF, :serialize_with, [:invalid_options, Yog.directed()])
+    end
+
+    assert_raise ArgumentError, ~r/Invalid graph type/, fn ->
+      apply(TGF, :parse, ["1 Alice\n#\n", :invalid_type])
+    end
+
+    assert_raise ArgumentError, ~r/expected input to be a binary string/, fn ->
+      apply(TGF, :parse, [123, :directed])
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      apply(TGF, :read, [123, :directed])
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      apply(TGF, :write, [123, Yog.directed()])
+    end
+  end
 
   test "parse alphanumeric node id" do
     input = """
@@ -253,7 +310,6 @@ defmodule Yog.IO.TGFTest do
 
     {:ok, {:tgf_result, graph, _}} = TGF.parse(input, :directed)
 
-    # Alphanumeric IDs are now supported!
     assert Yog.all_nodes(graph) == ["abc"]
     assert Yog.Model.node(graph, "abc") == "Alice"
   end
@@ -277,9 +333,6 @@ defmodule Yog.IO.TGFTest do
   end
 
   test "parse with error adding edge" do
-    # This is tricky because add_edge rarely fails if nodes exist.
-    # We can simulate by using a graph type that rejects certain edges if it existed.
-    # But for TGF, we just check warnings.
     input = """
     1 A
     2 B
@@ -356,20 +409,16 @@ defmodule Yog.IO.TGFTest do
 
     {:ok, {:tgf_result, graph, warnings}} = TGF.read(fixture_path, :directed)
 
-    # Verify no warnings
     assert warnings == []
 
-    # Verify graph structure
     assert Yog.Model.node_count(graph) == 3
     assert Yog.Model.edge_count(graph) == 3
     assert Yog.Model.type(graph) == :directed
 
-    # Verify node data
     assert Yog.Model.node(graph, 1) == "Alice"
     assert Yog.Model.node(graph, 2) == "Bob"
     assert Yog.Model.node(graph, 3) == "Charlie"
 
-    # Verify edges exist
     assert length(Yog.successors(graph, 1)) == 2
     assert length(Yog.successors(graph, 2)) == 1
   end
@@ -406,7 +455,6 @@ defmodule Yog.IO.TGFTest do
   end
 
   test "serialize with legacy 3-tuple options" do
-    # Verify backward compatibility
     graph = Yog.directed() |> Yog.add_node(1, "A")
     options = {:tgf_options, fn d -> d end, fn _ -> :none end}
     result = TGF.serialize_with(options, graph)
@@ -427,14 +475,10 @@ defmodule Yog.IO.TGFTest do
     {:ok, {:tgf_result, graph, warnings}} = TGF.parse(input, :directed)
     assert Yog.Model.node_count(graph) == 2
     assert Yog.Model.edge_count(graph) == 1
-    # One malformed line
     assert length(warnings) == 1
   end
 
   test "parse edge with invalid endpoint warning" do
-    # Since parse_int now supports strings, we need a way to fail add_edge.
-    # Actually, add_edge might fail if we reach a limit or something,
-    # but for now let's just trigger the malformed edge warning.
     input = """
     1 A
     #
@@ -444,5 +488,28 @@ defmodule Yog.IO.TGFTest do
     {:ok, {:tgf_result, _, warnings}} = TGF.parse(input, :directed)
     assert length(warnings) == 1
     assert elem(hd(warnings), 0) == :malformed_edge
+  end
+
+  describe "property tests" do
+    property "roundtrip serialize and parse preserves graph node and edge counts" do
+      check all(
+              kind <- StreamData.member_of([:directed, :undirected]),
+              graph <-
+                if(kind == :directed, do: directed_graph_gen(), else: undirected_graph_gen())
+            ) do
+        options =
+          TGF.options_with(fn data -> Yog.Utils.safe_string(data) end, fn w ->
+            {:some, Yog.Utils.safe_string(w)}
+          end)
+
+        tgf = TGF.serialize_with(options, graph)
+
+        assert {:ok, {:tgf_result, parsed, _warnings}} =
+                 TGF.parse_with(tgf, kind, fn _id, label -> label end, fn label -> label end)
+
+        assert Yog.Model.node_count(parsed) == Yog.Model.node_count(graph)
+        assert Yog.Model.edge_count(parsed) == Yog.Model.edge_count(graph)
+      end
+    end
   end
 end

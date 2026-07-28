@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`Yog.IO.TGF` Audit & Hardening** — Hardened Trivial Graph Format module (`serialize/1`, `serialize_with/2`, `write/2`, `write_with/3`, `parse/2`, `parse_with/4`, `read/2`, `read_with/4`) with graph struct verification (`Yog.Graph`, `Yog.DAG`), options and argument validation, support for arity-1 and arity-2 node parsers, detailed error documentation, and property-based test suites.
 - **`Yog.IO.List` Audit & Hardening** — Hardened adjacency list import/export module (`from_list/2`, `from_string/3`, `to_list/1`, `to_string/2`) with graph struct verification (`Yog.Graph`, `Yog.DAG`), strict input and keyword option validation (`:weighted`, `:delimiter`, `:node_formatter`, `:weight_formatter`), flexible neighbor format support, detailed error documentation, and expanded unit & property-based test suites.
 - **`Yog.IO.Libgraph` Audit & Hardening** — Hardened Libgraph interoperability module (`from_libgraph/2`, `to_libgraph/2`) with graph struct verification, keyword options validation (e.g. `:force_type` and `:weight_fn`), detailed exception behavior documentation, and new validation test suites.
 - **`Yog.Flow.MinCut` Audit & Hardening** — Hardened minimum cut algorithms (`global_min_cut/2`, `karger_stein/2`, `gomory_hu_tree/1`, `min_cut_query/3`, `s_t_min_cut/4`) with early node existence checks, graph validation, keyword option validation, detailed return/error documentation, and comprehensive edge-case handling.
