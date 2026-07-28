@@ -2,54 +2,52 @@ defmodule Yog.Transform do
   @moduledoc """
   Graph transformations and mappings - functor operations on graphs.
 
-  This module provides operations that transform graphs while preserving their structure.
-  These are useful for adapting graph data types, creating derived graphs, and
-  preparing graphs for specific algorithms.
+  This module provides operations that transform graphs while preserving or reshaping
+  their structure. These are useful for adapting graph data types, creating derived graphs,
+  and preparing graphs for specific algorithms.
 
   ## Available Transformations
 
   | Transformation | Function | Complexity | Use Case |
   |----------------|----------|------------|----------|
-  | Transpose | `transpose/1` | O(1) | Reverse edge directions |
-  | Map Nodes | `map_nodes/2` | O(V) | Transform node data |
-  | Map Nodes Async | `map_nodes_async/2` | O(V/cores) | Parallel node transforms |
-  | Map Edges | `map_edges/2` | O(E) | Transform edge weights |
-  | Map Edges Async | `map_edges_async/2` | O(E/cores) | Parallel edge transforms |
-  | Filter Nodes | `filter_nodes/2` | O(V) | Subgraph extraction |
-  | Filter Edges | `filter_edges/2` | O(E) | Remove unwanted edges |
-  | Ego Graph | `ego_graph/4` | O(V + E) | Extract k-hop neighborhood |
-
-  ## Parallel Transformations
-
-  The `_async` variants use `Task.async_stream/3` for parallel processing on multi-core
-  systems. They're beneficial for:
-  - Large graphs (10K+ nodes, 100K+ edges)
-  - Expensive transformation functions (I/O, complex computations)
-  - Multi-core environments where parallelism outweighs overhead
-
-  For small graphs or trivial transforms, use the sequential versions to avoid task overhead.
+  | Transpose | `transpose/1` | $\\mathcal{O}(1)$ | Reverse edge directions |
+  | Add Self-Loops | `add_self_loops/2` | $\\mathcal{O}(V)$ | Add reflexivity to nodes |
+  | Remove Self-Loops | `remove_self_loops/1` | $\\mathcal{O}(E)$ | Remove reflexive edges |
+  | To Directed | `to_directed/1` | $\\mathcal{O}(1)$ | Convert undirected to directed |
+  | To Undirected | `to_undirected/2` | $\\mathcal{O}(E)$ | Mirror directed edges symmetrically |
+  | Map Nodes | `map_nodes/2` | $\\mathcal{O}(V)$ | Transform node data |
+  | Map Nodes Indexed | `map_nodes_indexed/2` | $\\mathcal{O}(V)$ | Transform node data with node ID |
+  | Map Nodes Async | `map_nodes_async/3` | $\\mathcal{O}(V / \\text{cores})$ | Parallel node transforms |
+  | Relabel Nodes | `relabel_nodes/2` | $\\mathcal{O}(V + E)$ | Rename node IDs |
+  | Normalize Node IDs | `normalize_node_ids/1` | $\\mathcal{O}(V \\log V + E)$ | Reindex node IDs to `0..n-1` |
+  | Update Node | `update_node/4` | $\\mathcal{O}(1)$ | Update specific node payload |
+  | Filter Nodes | `filter_nodes/2` | $\\mathcal{O}(V + E)$ | Subgraph node predicate filtering |
+  | Filter Nodes Indexed | `filter_nodes_indexed/2` | $\\mathcal{O}(V + E)$ | Subgraph node/ID predicate filtering |
+  | Map Edges | `map_edges/2` | $\\mathcal{O}(E)$ | Transform edge weights |
+  | Map Edges Indexed | `map_edges_indexed/2` | $\\mathcal{O}(E)$ | Transform edge weights with endpoints |
+  | Map Edges Async | `map_edges_async/3` | $\\mathcal{O}(E / \\text{cores})$ | Parallel edge weight transforms |
+  | Update Edge | `update_edge/5` | $\\mathcal{O}(1)$ | Update specific edge weight |
+  | Filter Edges | `filter_edges/2` | $\\mathcal{O}(E)$ | Remove edges by predicate |
+  | Merge | `merge/2` | $\\mathcal{O}(V + E)$ | Union two graphs |
+  | Complement | `complement/2` | $\\mathcal{O}(V^2 + E)$ | Inverse graph edges |
+  | Subgraph | `subgraph/2` | $\\mathcal{O}(V + E)$ | Extract subset of nodes |
+  | Ego Graph | `ego_graph/4` | $\\mathcal{O}(V + E)$ | Extract k-hop neighborhood |
+  | Contract | `contract/4` | $\\mathcal{O}(\\text{deg}(a) + \\text{deg}(b))$ | Merge node pair |
+  | Quotient Graph | `quotient_graph/4` | $\\mathcal{O}(V + E)$ | Condense partition blocks |
+  | Transitive Closure | `transitive_closure/1` | $\\mathcal{O}(V \\cdot (V + E))$ | Compute all reachable pairs |
+  | Transitive Reduction | `transitive_reduction/1` | $\\mathcal{O}(V \\cdot (V + E))$ | Compute minimal reachability DAG |
 
   ## The O(1) Transpose Operation
 
-  Due to yog's dual-map representation (storing both outgoing and incoming edges),
-  transposing a graph is a single pointer swap - dramatically faster than O(E)
+  Due to Yog's dual-map representation (storing both outgoing and incoming edges),
+  transposing a graph is a single pointer swap - dramatically faster than $\\mathcal{O}(E)$
   implementations in traditional adjacency list libraries.
 
   ## Functor Laws
 
-  The mapping operations satisfy functor laws:
+  The mapping operations satisfy standard functor laws:
   - Identity: `map_nodes(g, fn x -> x end) == g`
   - Composition: `map_nodes(map_nodes(g, f), h) == map_nodes(g, fn x -> h.(f.(x)) end)`
-
-  ## Use Cases
-
-  - **Kosaraju's Algorithm**: Requires transposed graph for SCC finding
-  - **Type Conversion**: Changing node/edge data types for algorithm requirements
-  - **Subgraph Extraction**: Working with portions of large graphs
-  - **Weight Normalization**: Preprocessing edge weights
-  - **Parallel Processing**: Large-scale data transformations on multi-core systems
-
-  Async variants added in v0.60.1.
   """
 
   alias Yog.Graph
@@ -80,18 +78,12 @@ defmodule Yog.Transform do
       ...>   |> Yog.add_node(3, "C")
       ...>   |> Yog.add_edges([{1, 2, 10}, {2, 3, 20}])
       iex> reversed = Yog.Transform.transpose(graph)
-      iex> # Now has edges: 2->1 and 3->2
       iex> Yog.successors(reversed, 2)
       [{1, 10}]
-
-  ## Use Cases
-
-  - Computing strongly connected components (Kosaraju's algorithm)
-  - Finding all nodes that can reach a target node
-  - Reversing dependencies in a DAG
   """
   @spec transpose(Graph.t()) :: Graph.t()
-  def transpose(%Graph{} = graph) do
+  def transpose(graph) do
+    validate_graph!(graph)
     %{graph | out_edges: graph.in_edges, in_edges: graph.out_edges}
   end
 
@@ -102,18 +94,11 @@ defmodule Yog.Transform do
   supplied `default_weight`.
 
   **Time Complexity:** O(V)
-
-  ## Examples
-
-      iex> graph = Yog.directed() |> Yog.add_node(1, nil) |> Yog.add_node(2, nil)
-      iex> graph = Yog.Transform.add_self_loops(graph, 1)
-      iex> Yog.successors(graph, 1)
-      [{1, 1}]
-      iex> Yog.successors(graph, 2)
-      [{2, 1}]
   """
   @spec add_self_loops(Graph.t(), term()) :: Graph.t()
-  def add_self_loops(%Graph{} = graph, default_weight \\ 1) do
+  def add_self_loops(graph, default_weight \\ 1) do
+    validate_graph!(graph)
+
     Utils.map_fold(graph.nodes, graph, fn node_id, _data, g_acc ->
       if Model.has_edge?(g_acc, node_id, node_id) do
         g_acc
@@ -127,109 +112,71 @@ defmodule Yog.Transform do
   Removes all self-loops (edges from a node to itself) from the graph.
 
   **Time Complexity:** O(E)
-
-  ## Examples
-
-      iex> graph = Yog.directed() |> Yog.add_node(1, nil) |> Yog.add_edge_ensure(1, 1, 5)
-      iex> no_loops = Yog.Transform.remove_self_loops(graph)
-      iex> Yog.Model.has_edge?(no_loops, 1, 1)
-      false
   """
   @spec remove_self_loops(Graph.t()) :: Graph.t()
-  def remove_self_loops(%Graph{} = graph) do
+  def remove_self_loops(graph) do
+    validate_graph!(graph)
     filter_edges(graph, fn u, v, _w -> u != v end)
   end
 
   @doc """
   Converts an undirected graph to a directed graph.
 
-  Since yog internally stores undirected edges as bidirectional directed edges,
-  this is essentially free — it just changes the `kind` flag. The resulting
-  directed graph has two directed edges (A→B and B→A) for each original
-  undirected edge.
+  Since Yog internally stores undirected edges as bidirectional directed edges,
+  this is essentially free — it just changes the `kind` flag.
 
   If the graph is already directed, it is returned unchanged.
 
   **Time Complexity:** O(1)
-
-  ## Example
-
-      iex> undirected =
-      ...>   Yog.undirected()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
-      iex> directed = Yog.Transform.to_directed(undirected)
-      iex> # Has edges: 1->2 and 2->1 (both with weight 10)
-      iex> directed.kind
-      :directed
   """
   @spec to_directed(Graph.t()) :: Graph.t()
-  def to_directed(%Graph{} = graph) do
+  def to_directed(graph) do
+    validate_graph!(graph)
     %{graph | kind: :directed}
   end
 
   @doc """
-  Converts a directed graph to an undirected graph.
-
-  For each directed edge A→B, ensures B→A also exists. If both A→B and B→A
-  already exist with different weights, the `resolve` function decides which
-  weight to keep.
+  Converts a directed graph to an undirected graph using `resolve` for weight conflicts.
 
   If the graph is already undirected, it is returned unchanged.
 
-  **Time Complexity:** O(E) where E is the number of edges
+  **Time Complexity:** O(E)
 
-  ## Examples
+  ## Errors
 
-  ### When both directions exist, keep the smaller weight
-
-      iex> directed =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_edges!([{1, 2, 10}, {2, 1, 20}])
-      iex> undirected = Yog.Transform.to_undirected(directed, &min/2)
-      iex> # Edge 1-2 has weight 10 (min of 10 and 20)
-      iex> Yog.successors(undirected, 1)
-      [{2, 10}]
-
-  ### One-directional edges get mirrored automatically
-
-      iex> directed =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
-      iex> undirected = Yog.Transform.to_undirected(directed, &min/2)
-      iex> # Edge exists in both directions with weight 5
-      iex> Enum.sort(Yog.successors(undirected, 1))
-      [{2, 5}]
+  - Raises `ArgumentError` if `resolve` is not an arity-2 function.
   """
   @spec to_undirected(Graph.t(), (term(), term() -> term())) :: Graph.t()
-  def to_undirected(%Graph{kind: :undirected} = graph, _resolve) do
-    graph
-  end
+  def to_undirected(graph, resolve) do
+    validate_graph!(graph)
 
-  def to_undirected(%Graph{kind: :directed} = graph, resolve) do
-    out_edges = graph.out_edges
+    unless is_function(resolve, 2) do
+      raise ArgumentError,
+            "expected resolve to be an arity-2 function, got: #{inspect(resolve)}"
+    end
 
-    symmetric_out =
-      Utils.map_fold(out_edges, out_edges, fn src, inner, acc_outer ->
-        Utils.map_fold(inner, acc_outer, fn dst, weight, acc ->
-          dst_inner = Map.get(acc, dst, %{})
+    if graph.kind == :undirected do
+      graph
+    else
+      out_edges = graph.out_edges
 
-          updated_inner =
-            case Map.fetch(dst_inner, src) do
-              {:ok, existing} -> Map.put(dst_inner, src, resolve.(existing, weight))
-              :error -> Map.put(dst_inner, src, weight)
-            end
+      symmetric_out =
+        Utils.map_fold(out_edges, out_edges, fn src, inner, acc_outer ->
+          Utils.map_fold(inner, acc_outer, fn dst, weight, acc ->
+            dst_inner = Map.get(acc, dst, %{})
 
-          Map.put(acc, dst, updated_inner)
+            updated_inner =
+              case Map.fetch(dst_inner, src) do
+                {:ok, existing} -> Map.put(dst_inner, src, resolve.(existing, weight))
+                :error -> Map.put(dst_inner, src, weight)
+              end
+
+            Map.put(acc, dst, updated_inner)
+          end)
         end)
-      end)
 
-    %{graph | kind: :undirected, out_edges: symmetric_out, in_edges: symmetric_out}
+      %{graph | kind: :undirected, out_edges: symmetric_out, in_edges: symmetric_out}
+    end
   end
 
   # =============================================================================
@@ -239,39 +186,20 @@ defmodule Yog.Transform do
   @doc """
   Transforms node data using a function, preserving graph structure.
 
-  This is a functor operation - it applies a function to every node's data
-  while keeping all edges and the graph structure unchanged.
+  **Time Complexity:** O(V)
 
-  **Time Complexity:** O(V) where V is the number of nodes
+  ## Errors
 
-  **Functor Law:** `map_nodes(map_nodes(g, f), h) == map_nodes(g, fn x -> h.(f.(x)) end)`
-
-  ## Example
-
-      iex> graph =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "alice")
-      ...>   |> Yog.add_node(2, "bob")
-      iex> uppercased = Yog.Transform.map_nodes(graph, &String.upcase/1)
-      iex> # Nodes now contain "ALICE" and "BOB"
-      iex> uppercased.nodes[1]
-      "ALICE"
-
-  ## Type Changes
-
-  Can change the node data type:
-
-      iex> # Convert string node data to integers
-      iex> graph =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "5")
-      ...>   |> Yog.add_node(2, "10")
-      iex> int_graph = Yog.Transform.map_nodes(graph, fn s -> String.to_integer(s) end)
-      iex> int_graph.nodes[1]
-      5
+  - Raises `ArgumentError` if `fun` is not an arity-1 function.
   """
   @spec map_nodes(Graph.t(), (term() -> term())) :: Graph.t()
-  def map_nodes(%Graph{} = graph, fun) do
+  def map_nodes(graph, fun) do
+    validate_graph!(graph)
+
+    unless is_function(fun, 1) do
+      raise ArgumentError, "expected fun to be an arity-1 function, got: #{inspect(fun)}"
+    end
+
     new_nodes = Map.new(graph.nodes, fn {id, data} -> {id, fun.(data)} end)
     %{graph | nodes: new_nodes}
   end
@@ -279,18 +207,20 @@ defmodule Yog.Transform do
   @doc """
   Transforms node data using a function that also takes the node ID.
 
-  ## Example
+  **Time Complexity:** O(V)
 
-      iex> graph =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      iex> mapped = Yog.Transform.map_nodes_indexed(graph, fn id, data -> "\#{id}:\#{data}" end)
-      iex> mapped.nodes[1]
-      "1:A"
+  ## Errors
+
+  - Raises `ArgumentError` if `fun` is not an arity-2 function.
   """
   @spec map_nodes_indexed(Graph.t(), (Yog.node_id(), term() -> term())) :: Graph.t()
-  def map_nodes_indexed(%Graph{} = graph, fun) do
+  def map_nodes_indexed(graph, fun) do
+    validate_graph!(graph)
+
+    unless is_function(fun, 2) do
+      raise ArgumentError, "expected fun to be an arity-2 function, got: #{inspect(fun)}"
+    end
+
     new_nodes = Map.new(graph.nodes, fn {id, data} -> {id, fun.(id, data)} end)
     %{graph | nodes: new_nodes}
   end
@@ -298,53 +228,27 @@ defmodule Yog.Transform do
   @doc """
   Relabels all node IDs in the graph using a mapping function.
 
-  This operation replaces every node ID `u` with `fun.(u)`. It updates all
-  node identifiers and all edge references (source and destination) to
-  maintain graph consistency.
-
-  **Warning:** If the function is not injective (i.e., different IDs map to the
-  same new ID), nodes will be merged. In such cases, the data of the last node
-  processed will be kept, and edges will be combined (last edge weight wins).
-
   **Time Complexity:** O(V + E)
 
-  ## Parameters
+  ## Errors
 
-  - `graph` - The graph to relabel
-  - `fun` - Function `(node_id) -> new_node_id` (default: `:erlang.phash2/1`)
-
-  ## Examples
-
-  ### String to Integer relabeling
-
-      iex> graph = Yog.directed() |> Yog.add_node("A", 1) |> Yog.add_node("B", 2)
-      iex> relabeled = Yog.Transform.relabel_nodes(graph, fn
-      ...>   "A" -> 1
-      ...>   "B" -> 2
-      ...> end)
-      iex> Yog.Model.has_node?(relabeled, 1)
-      true
-
-  ### Default: hashing IDs to integers
-
-      iex> graph = Yog.directed() |> Yog.add_node("user_123", nil)
-      iex> hashed = Yog.Transform.relabel_nodes(graph)
-      iex> id = Map.keys(hashed.nodes) |> List.first()
-      iex> is_integer(id)
-      true
+  - Raises `ArgumentError` if `fun` is not an arity-1 function.
   """
   @spec relabel_nodes(Graph.t(), (Yog.node_id() -> Yog.node_id())) :: Graph.t()
-  def relabel_nodes(%Graph{} = graph, fun \\ &:erlang.phash2/1) do
-    # Rebuild the graph to ensure consistency and handle potential merges
+  def relabel_nodes(graph, fun \\ &:erlang.phash2/1) do
+    validate_graph!(graph)
+
+    unless is_function(fun, 1) do
+      raise ArgumentError, "expected fun to be an arity-1 function, got: #{inspect(fun)}"
+    end
+
     base = Model.new(graph.kind)
 
-    # First pass: add all relabeled nodes
     graph_with_nodes =
       Utils.map_fold(graph.nodes, base, fn id, data, acc ->
         Model.add_node(acc, fun.(id), data)
       end)
 
-    # Second pass: add all relabeled edges
     is_directed = graph.kind == :directed
 
     Utils.map_fold(graph.out_edges, graph_with_nodes, fn u, dests, acc_outer ->
@@ -361,21 +265,12 @@ defmodule Yog.Transform do
   @doc """
   Normalizes all node IDs to a continuous range of integers `0..n-1`.
 
-  The mapping is deterministic, based on the sorted order of existing node IDs.
-  This is useful for preparing graphs for formats like Graph6 or Sparse6,
-  or for optimizing algorithms that benefit from integer indexing.
-
   **Time Complexity:** O(V log V + E)
-
-  ## Example
-
-      iex> graph = Yog.undirected() |> Yog.add_node("B", nil) |> Yog.add_node("A", nil)
-      iex> normalized = Yog.Transform.normalize_node_ids(graph)
-      iex> Map.keys(normalized.nodes) |> Enum.sort()
-      [0, 1]
   """
   @spec normalize_node_ids(Graph.t()) :: Graph.t()
-  def normalize_node_ids(%Graph{} = graph) do
+  def normalize_node_ids(graph) do
+    validate_graph!(graph)
+
     mapping =
       graph.nodes
       |> Map.keys()
@@ -387,58 +282,28 @@ defmodule Yog.Transform do
   end
 
   @doc """
-  Transforms node data using a function in parallel, preserving graph structure.
+  Transforms node data using a function in parallel.
 
-  This is the async version of `map_nodes/2` that uses `Task.async_stream/3` to
-  process node transformations concurrently. For large graphs with expensive
-  transformation functions, this can provide significant speedups on multi-core systems.
-
-  **Time Complexity:** O(V/cores) amortized, where V is the number of nodes
-
-  **When to use:**
-  - Large graphs (10,000+ nodes)
-  - Expensive transformation functions (I/O, complex computations)
-  - Multi-core systems where parallelism benefits outweigh overhead
-
-  **When NOT to use:**
-  - Small graphs (< 1,000 nodes) - overhead dominates
-  - Trivial transformations - spawning tasks costs more than the work
-  - Already in a parallel context - avoid nested parallelism
+  **Time Complexity:** O(V/cores)
 
   ## Options
 
   - `:max_concurrency` - Maximum concurrent tasks (default: `System.schedulers_online()`)
   - `:timeout` - Task timeout in milliseconds (default: 5000)
-  - `:ordered` - Preserve order (default: false, faster unordered)
-
-  ## Example
-
-      iex> graph =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "alice")
-      ...>   |> Yog.add_node(2, "bob")
-      iex> uppercased = Yog.Transform.map_nodes_async(graph, &String.upcase/1)
-      iex> uppercased.nodes[1]
-      "ALICE"
-
-  ## Custom Options
-
-      iex> graph = Yog.directed() |> Yog.add_node(1, "test")
-      iex> opts = [max_concurrency: 4, timeout: 10_000]
-      iex> result = Yog.Transform.map_nodes_async(graph, &String.upcase/1, opts)
-      iex> result.nodes[1]
-      "TEST"
-
-  ## Performance Example
-
-      # Sequential map_nodes on 1M nodes with moderate computation: ~6 seconds
-      graph |> Yog.Transform.map_nodes(fn x -> expensive_function(x) end)
-
-      # Parallel map_nodes_async on 8-core system: ~1 second
-      graph |> Yog.Transform.map_nodes_async(fn x -> expensive_function(x) end)
+  - `:ordered` - Preserve order (default: false)
   """
   @spec map_nodes_async(Graph.t(), (term() -> term()), keyword()) :: Graph.t()
-  def map_nodes_async(%Graph{} = graph, fun, opts \\ []) do
+  def map_nodes_async(graph, fun, opts \\ []) do
+    validate_graph!(graph)
+
+    unless is_function(fun, 1) do
+      raise ArgumentError, "expected fun to be an arity-1 function, got: #{inspect(fun)}"
+    end
+
+    unless Keyword.keyword?(opts) do
+      raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
+    end
+
     default_opts = [
       max_concurrency: System.schedulers_online(),
       timeout: 5000,
@@ -463,60 +328,33 @@ defmodule Yog.Transform do
   @doc """
   Updates a specific node's data using an updater function.
 
-  Similar to `Map.update/4`, it takes an initial value if the node doesn't exist,
-  but since this is a graph transformation, it is typically used on existing nodes.
-
-  ## Example
-
-      iex> graph = Yog.directed() |> Yog.add_node(1, 100)
-      iex> updated = Yog.Transform.update_node(graph, 1, 0, fn x -> x + 50 end)
-      iex> Yog.Model.node(updated, 1)
-      150
-
-      iex> graph = Yog.directed()
-      iex> updated = Yog.Transform.update_node(graph, 1, 5, fn x -> x + 5 end)
-      iex> Yog.Model.node(updated, 1)
-      5
+  **Time Complexity:** O(1)
   """
   @spec update_node(Graph.t(), Yog.node_id(), term(), (term() -> term())) :: Graph.t()
-  def update_node(%Graph{} = graph, id, default, fun) do
+  def update_node(graph, id, default, fun) do
+    validate_graph!(graph)
+
+    unless is_function(fun, 1) do
+      raise ArgumentError, "expected fun to be an arity-1 function, got: #{inspect(fun)}"
+    end
+
     %{graph | nodes: Map.update(graph.nodes, id, default, fun)}
   end
 
   @doc """
   Filters nodes by a predicate, automatically pruning connected edges.
 
-  Returns a new graph containing only nodes whose data satisfies the predicate.
-  All edges connected to removed nodes (both incoming and outgoing) are
-  automatically removed to maintain graph consistency.
-
-  **Time Complexity:** O(V + E) where V is nodes and E is edges
-
-  ## Example
-
-      iex> graph =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "apple")
-      ...>   |> Yog.add_node(2, "banana")
-      ...>   |> Yog.add_node(3, "apricot")
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
-      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 2)
-      iex> # Keep only nodes starting with 'a'
-      iex> filtered = Yog.Transform.filter_nodes(graph, fn s ->
-      ...>   String.starts_with?(s, "a")
-      ...> end)
-      iex> # Result has nodes 1 and 3, edge 1->2 is removed (node 2 gone)
-      iex> map_size(filtered.nodes)
-      2
-
-  ## Use Cases
-
-  - Extract subgraphs based on node properties
-  - Remove inactive/disabled nodes from a network
-  - Filter by node importance/centrality
+  **Time Complexity:** O(V + E)
   """
   @spec filter_nodes(Graph.t(), (term() -> boolean())) :: Graph.t()
-  def filter_nodes(%Graph{} = graph, predicate) do
+  def filter_nodes(graph, predicate) do
+    validate_graph!(graph)
+
+    unless is_function(predicate, 1) do
+      raise ArgumentError,
+            "expected predicate to be an arity-1 function, got: #{inspect(predicate)}"
+    end
+
     kept_nodes = Map.filter(graph.nodes, fn {_id, data} -> predicate.(data) end)
 
     %{
@@ -528,27 +366,19 @@ defmodule Yog.Transform do
   end
 
   @doc """
-  Filters nodes by a predicate that also receives the node ID.
+  Filters nodes by a predicate that receives `(node_id, node_data)`.
 
-  Returns a new graph containing only nodes for which the predicate returns true.
-  Connected edges are automatically pruned.
-
-  ## Example
-
-      iex> graph =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "apple")
-      ...>   |> Yog.add_node(2, "apple")
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
-      iex> # Keep only even numbered nodes
-      iex> filtered = Yog.Transform.filter_nodes_indexed(graph, fn id, _data -> rem(id, 2) == 0 end)
-      iex> map_size(filtered.nodes)
-      1
-      iex> Map.has_key?(filtered.nodes, 2)
-      true
+  **Time Complexity:** O(V + E)
   """
   @spec filter_nodes_indexed(Graph.t(), (Yog.node_id(), term() -> boolean())) :: Graph.t()
-  def filter_nodes_indexed(%Graph{} = graph, predicate) do
+  def filter_nodes_indexed(graph, predicate) do
+    validate_graph!(graph)
+
+    unless is_function(predicate, 2) do
+      raise ArgumentError,
+            "expected predicate to be an arity-2 function, got: #{inspect(predicate)}"
+    end
+
     kept_nodes = Map.filter(graph.nodes, fn {id, data} -> predicate.(id, data) end)
 
     %{
@@ -566,55 +396,16 @@ defmodule Yog.Transform do
   @doc """
   Transforms edge weights using a function, preserving graph structure.
 
-  This is a functor operation - it applies a function to every edge's weight/data
-  while keeping all nodes and the graph topology unchanged.
-
-  **Time Complexity:** O(E) where E is the number of edges
-
-  **Functor Law:** `map_edges(map_edges(g, f), h) == map_edges(g, fn x -> h.(f.(x)) end)`
-
-  ## Example
-
-      iex> {:ok, graph} =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edges([{1, 2, 10}, {2, 3, 20}])
-      iex> # Double all weights
-      iex> doubled = Yog.Transform.map_edges(graph, fn w -> w * 2 end)
-      iex> # Edges now have weights 20 and 40
-      iex> Yog.successors(doubled, 1)
-      [{2, 20}]
-
-  ## Type Changes
-
-  Can change the edge weight type:
-
-      iex> # Convert integer weights to floats
-      iex> {:ok, graph} =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_edge(1, 2, 10)
-      iex> float_graph = Yog.Transform.map_edges(graph, fn w -> w * 1.0 end)
-      iex> Yog.successors(float_graph, 1)
-      [{2, 10.0}]
-
-      iex> # Convert weights to labels
-      iex> {:ok, graph} =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_edge(1, 2, 5)
-      iex> labeled = Yog.Transform.map_edges(graph, fn w ->
-      ...>   if w < 10, do: "short", else: "long"
-      ...> end)
-      iex> Yog.successors(labeled, 1)
-      [{2, "short"}]
+  **Time Complexity:** O(E)
   """
   @spec map_edges(Graph.t(), (term() -> term())) :: Graph.t()
-  def map_edges(%Graph{} = graph, fun) do
+  def map_edges(graph, fun) do
+    validate_graph!(graph)
+
+    unless is_function(fun, 1) do
+      raise ArgumentError, "expected fun to be an arity-1 function, got: #{inspect(fun)}"
+    end
+
     transform_inner = fn inner_map ->
       Map.new(inner_map, fn {dst, weight} -> {dst, fun.(weight)} end)
     end
@@ -631,66 +422,22 @@ defmodule Yog.Transform do
   end
 
   @doc """
-  Transforms edge weights using a function in parallel, preserving graph structure.
+  Transforms edge weights using a function in parallel.
 
-  This is the async version of `map_edges/2` that uses `Task.async_stream/3` to
-  process edge transformations concurrently. For large graphs with expensive
-  transformation functions, this can provide significant speedups on multi-core systems.
-
-  The parallelization strategy processes nodes (and their outgoing edges) in parallel,
-  transforming all edges from each node concurrently.
-
-  **Time Complexity:** O(E/cores) amortized, where E is the number of edges
-
-  **When to use:**
-  - Large graphs (100,000+ edges)
-  - Expensive transformation functions (I/O, database lookups, complex calculations)
-  - Multi-core systems where parallelism benefits outweigh overhead
-
-  **When NOT to use:**
-  - Small graphs (< 10,000 edges) - overhead dominates
-  - Trivial transformations (arithmetic) - spawning tasks costs more
-  - Already in a parallel context - avoid nested parallelism
-
-  ## Options
-
-  - `:max_concurrency` - Maximum concurrent tasks (default: `System.schedulers_online()`)
-  - `:timeout` - Task timeout in milliseconds (default: 5000)
-  - `:ordered` - Preserve order (default: false, faster unordered)
-
-  ## Example
-
-      iex> {:ok, graph} =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_edge(1, 2, 10)
-      iex> doubled = Yog.Transform.map_edges_async(graph, fn w -> w * 2 end)
-      iex> Yog.successors(doubled, 1)
-      [{2, 20}]
-
-  ## Custom Options
-
-      iex> {:ok, graph} =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_edge(1, 2, 5)
-      iex> opts = [max_concurrency: 8, timeout: 10_000]
-      iex> result = Yog.Transform.map_edges_async(graph, fn w -> w * 3 end, opts)
-      iex> Yog.successors(result, 1)
-      [{2, 15}]
-
-  ## Performance Example
-
-      # Sequential map_edges on 1M edges with moderate computation: ~6 seconds
-      graph |> Yog.Transform.map_edges(fn w -> expensive_transform(w) end)
-
-      # Parallel map_edges_async on 8-core system: ~1 second
-      graph |> Yog.Transform.map_edges_async(fn w -> expensive_transform(w) end)
+  **Time Complexity:** O(E/cores)
   """
   @spec map_edges_async(Graph.t(), (term() -> term()), keyword()) :: Graph.t()
-  def map_edges_async(%Graph{} = graph, fun, opts \\ []) do
+  def map_edges_async(graph, fun, opts \\ []) do
+    validate_graph!(graph)
+
+    unless is_function(fun, 1) do
+      raise ArgumentError, "expected fun to be an arity-1 function, got: #{inspect(fun)}"
+    end
+
+    unless Keyword.keyword?(opts) do
+      raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
+    end
+
     default_opts = [
       max_concurrency: System.schedulers_online(),
       timeout: 5000,
@@ -699,8 +446,6 @@ defmodule Yog.Transform do
 
     stream_opts = Keyword.merge(default_opts, opts)
 
-    # Flatten edges and chunk them to avoid data skew on high-degree nodes
-    # Process chunks in parallel for better load balancing
     all_out_edges =
       for {src, inner} <- graph.out_edges,
           {dst, weight} <- inner,
@@ -713,7 +458,6 @@ defmodule Yog.Transform do
 
     all_edges = all_out_edges ++ all_in_edges
 
-    # Process edges in parallel and collect results
     processed_edges =
       all_edges
       |> Task.async_stream(
@@ -745,20 +489,19 @@ defmodule Yog.Transform do
   end
 
   @doc """
-  Transforms edge weights using a function that also takes the source and destination IDs.
+  Transforms edge weights using a function that receives `(src, dst, weight)`.
 
-  ## Example
-
-      iex> {:ok, graph} = Yog.directed()
-      ...>   |> Yog.add_node(1, "A") |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_edge(1, 2, 10)
-      iex> result = Yog.Transform.map_edges_indexed(graph, fn u, v, w -> u + v + w end)
-      iex> Yog.successors(result, 1)
-      [{2, 13}] # 1 + 2 + 10
+  **Time Complexity:** O(E)
   """
   @spec map_edges_indexed(Graph.t(), (Yog.node_id(), Yog.node_id(), term() -> term())) ::
           Graph.t()
-  def map_edges_indexed(%Graph{} = graph, fun) do
+  def map_edges_indexed(graph, fun) do
+    validate_graph!(graph)
+
+    unless is_function(fun, 3) do
+      raise ArgumentError, "expected fun to be an arity-3 function, got: #{inspect(fun)}"
+    end
+
     new_out =
       Map.new(graph.out_edges, fn {src, inner} ->
         {src, Map.new(inner, fn {dst, weight} -> {dst, fun.(src, dst, weight)} end)}
@@ -773,36 +516,19 @@ defmodule Yog.Transform do
   end
 
   @doc """
-  Updates a specific edge's weight/metadata.
+  Updates a specific edge's weight using an updater function.
 
-  This is the "safe" way to perform the update, ensuring that
-  both `in_edges` and `out_edges` stay in sync. It also handles undirected graphs
-  properly.
-
-  If either node `u` or `v` does not exist in the graph, the original graph
-  is returned unchanged.
-
-  ## Example
-
-      iex> {:ok, graph} = Yog.directed()
-      ...>   |> Yog.add_node(1, "A") |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_edge(1, 2, 10)
-      iex> updated = Yog.Transform.update_edge(graph, 1, 2, 0, fn w -> w + 5 end)
-      iex> Yog.successors(updated, 1)
-      [{2, 15}]
-
-      iex> {:ok, graph} = Yog.undirected()
-      ...>   |> Yog.add_node(1, "A") |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_edge(1, 2, 10)
-      iex> updated = Yog.Transform.update_edge(graph, 1, 2, 0, fn w -> w * 2 end)
-      iex> Yog.successors(updated, 1)
-      [{2, 20}]
-      iex> Yog.successors(updated, 2)
-      [{1, 20}]
+  **Time Complexity:** O(1)
   """
   @spec update_edge(Graph.t(), Yog.node_id(), Yog.node_id(), term(), (term() -> term())) ::
           Graph.t()
-  def update_edge(%Graph{} = graph, u, v, default, fun) do
+  def update_edge(graph, u, v, default, fun) do
+    validate_graph!(graph)
+
+    unless is_function(fun, 1) do
+      raise ArgumentError, "expected fun to be an arity-1 function, got: #{inspect(fun)}"
+    end
+
     if Map.has_key?(graph.nodes, u) and Map.has_key?(graph.nodes, v) do
       update_directed = fn g, src, dst ->
         update_map = fn map, start, finish ->
@@ -837,36 +563,20 @@ defmodule Yog.Transform do
   end
 
   @doc """
-  Filters edges by a predicate, preserving all nodes.
+  Filters edges by a predicate receiving `(src, dst, weight)`.
 
-  Returns a new graph with the same nodes but only the edges where the
-  predicate returns `true`. The predicate receives `(src, dst, weight)`.
-
-  **Time Complexity:** O(E) where E is the number of edges
-
-  ## Example
-
-      iex> {:ok, graph} =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edges([{1, 2, 5}, {1, 3, 15}, {2, 3, 3}])
-      iex> # Keep only edges with weight >= 10
-      iex> heavy = Yog.Transform.filter_edges(graph, fn _src, _dst, w -> w >= 10 end)
-      iex> # Result: edges [1->3 (15)], edges 1->2 and 2->3 removed
-      iex> Yog.successors(heavy, 1)
-      [{3, 15}]
-
-  ## Use Cases
-
-  - Pruning low-weight edges in weighted networks
-  - Removing self-loops: `filter_edges(g, fn(s, d, _) -> s != d end)`
-  - Threshold-based graph sparsification
+  **Time Complexity:** O(E)
   """
   @spec filter_edges(Graph.t(), (Yog.node_id(), Yog.node_id(), term() -> boolean())) ::
           Graph.t()
-  def filter_edges(%Graph{} = graph, predicate) do
+  def filter_edges(graph, predicate) do
+    validate_graph!(graph)
+
+    unless is_function(predicate, 3) do
+      raise ArgumentError,
+            "expected predicate to be an arity-3 function, got: #{inspect(predicate)}"
+    end
+
     new_out =
       for {src, inner_map} <- graph.out_edges, reduce: %{} do
         acc ->
@@ -903,44 +613,13 @@ defmodule Yog.Transform do
   @doc """
   Combines two graphs, with the second graph's data taking precedence on conflicts.
 
-  Merges nodes, out_edges, and in_edges from both graphs. When a node exists in
-  both graphs, the node data from `other` overwrites `base`. When the same edge
-  exists in both graphs, the edge weight from `other` overwrites `base`.
-
-  Importantly, edges from different nodes are combined - if `base` has edges
-  1->2 and 1->3, and `other` has edges 1->4 and 1->5, the result will have
-  all four edges from node 1.
-
-  The resulting graph uses the `kind` (Directed/Undirected) from the base graph.
-
-  **Time Complexity:** O(V + E) for both graphs combined
-
-  ## Example
-
-      iex> base =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "Original")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
-      iex> other =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "Updated")
-      ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 3, with: 20)
-      iex> merged = Yog.Transform.merge(base, other)
-      iex> # Node 1 has "Updated" (from other)
-      iex> # Node 1 has edges to: 2 and 3 (all edges combined)
-      iex> length(Yog.successors(merged, 1))
-      2
-
-  ## Use Cases
-
-  - Combining disjoint subgraphs
-  - Applying updates/patches to a graph
-  - Building graphs incrementally from multiple sources
+  **Time Complexity:** O(V + E)
   """
   @spec merge(Graph.t(), Graph.t()) :: Graph.t()
-  def merge(%Graph{} = graph1, %Graph{} = graph2) do
+  def merge(graph1, graph2) do
+    validate_graph!(graph1)
+    validate_graph!(graph2)
+
     merge_inner = fn m1, m2 -> Map.merge(m1, m2) end
 
     merge_outer = fn outer1, outer2 ->
@@ -960,43 +639,12 @@ defmodule Yog.Transform do
   @doc """
   Returns the complement of a graph.
 
-  The complement graph has the exact same nodes as the original graph.
-  An edge exists in the complement graph if and only if it does not exist
-  in the original graph.
-
-  Each new edge gets the supplied `default_weight`. Self-loops are never
-  added in the complement.
-
-  > [!WARNING]
-  > **Performance Warning:** Since a complement graph can contain up to
-  > $O(V^2)$ edges, this operation has a time and memory complexity of
-  > $O(V^2 + E)$. For very large graphs (e.g., $V > 10,000$), this can consume
-  > significant memory and CPU time. Use with caution on large datasets.
-
   **Time Complexity:** O(V² + E)
-
-  ## Example
-
-      iex> graph =
-      ...>   Yog.undirected()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 1)
-      iex> comp = Yog.Transform.complement(graph, 100)
-      iex> # Original: 1-2 connected, 1-3 and 2-3 not
-      iex> # Complement: 1-3 and 2-3 connected, 1-2 not
-      iex> {1, 100} in Yog.successors(comp, 3)
-      true
-
-  ## Use Cases
-
-  - Finding independent sets (cliques in the complement)
-  - Graph coloring via complement analysis
-  - Testing graph density (sparse ↔ dense complement)
   """
   @spec complement(Graph.t(), term()) :: Graph.t()
-  def complement(%Graph{kind: kind} = graph, default_weight) do
+  def complement(graph, default_weight) do
+    validate_graph!(graph)
+
     node_ids = Map.keys(graph.nodes)
 
     out_edges =
@@ -1020,7 +668,7 @@ defmodule Yog.Transform do
       end)
 
     in_edges =
-      if kind == :directed do
+      if graph.kind == :directed do
         Utils.map_fold(out_edges, %{}, fn src, inners, acc_in ->
           Utils.map_fold(inners, acc_in, fn dst, weight, acc_in_inner ->
             inner = Map.get(acc_in_inner, dst, %{}) |> Map.put(src, weight)
@@ -1037,43 +685,16 @@ defmodule Yog.Transform do
   @doc """
   Extracts a subgraph containing only the specified nodes and their connecting edges.
 
-  Returns a new graph with only the nodes whose IDs are in the provided list,
-  along with any edges that connect nodes within this subset. Nodes not in the
-  list are removed, and all edges touching removed nodes are pruned.
-
-  **Time Complexity:** O(V + E) where V is nodes and E is edges
-
-  ## Example
-
-      iex> {:ok, graph} =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_node(4, "D")
-      ...>   |> Yog.add_edges([{1, 2, 10}, {2, 3, 20}, {3, 4, 30}])
-      iex> # Extract only nodes 2 and 3
-      iex> sub = Yog.Transform.subgraph(graph, [2, 3])
-      iex> # Result has nodes 2, 3 and edge 2->3
-      iex> # Edges 1->2 and 3->4 are removed (endpoints outside subgraph)
-      iex> Yog.successors(sub, 2)
-      [{3, 20}]
-
-  ## Use Cases
-
-  - Extracting connected components found by algorithms
-  - Analyzing k-hop neighborhoods around specific nodes
-  - Working with strongly connected components (extract each SCC)
-  - Removing nodes found by some criteria (keep the inverse set)
-  - Visualizing specific portions of large graphs
-
-  ## Comparison with `filter_nodes/2`
-
-  - `filter_nodes/2` - Filters by predicate on node data (e.g., "keep active users")
-  - `subgraph/2` - Filters by explicit node IDs (e.g., "keep nodes [1, 5, 7]")
+  **Time Complexity:** O(V + E)
   """
   @spec subgraph(Graph.t(), [Yog.node_id()]) :: Graph.t()
-  def subgraph(%Graph{} = graph, ids) do
+  def subgraph(graph, ids) do
+    validate_graph!(graph)
+
+    unless is_list(ids) or is_struct(ids, MapSet) do
+      raise ArgumentError, "expected ids to be a list or MapSet, got: #{inspect(ids)}"
+    end
+
     id_set = MapSet.new(ids)
 
     filtered_nodes = Map.filter(graph.nodes, fn {id, _} -> MapSet.member?(id_set, id) end)
@@ -1087,75 +708,30 @@ defmodule Yog.Transform do
   end
 
   @doc """
-  Returns the ego graph of a node: the subgraph induced by the node
-  and all nodes within `radius` hops.
+  Returns the ego graph of a node within `radius` hops.
 
-  For undirected graphs, neighbors are traversed in both directions.
-  For directed graphs, the behavior is controlled by the `:mode` option:
-
-  - `:successors` (default) - Follow outgoing edges only. This aligns with
-    the English notion of "ego" (who the node points to / influences).
-  - `:neighbors` - Follow both outgoing and incoming edges (the union of
-    successors and predecessors).
-
-  ## Options
-
-    * `:mode` - `:successors` or `:neighbors`. Only affects directed graphs.
-
-  ## Examples
-
-  ### Radius 1 (default) on an undirected graph
-
-      iex> graph =
-      ...>   Yog.undirected()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
-      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 20)
-      iex> ego = Yog.Transform.ego_graph(graph, 2)
-      iex> Enum.sort(Yog.all_nodes(ego))
-      [1, 2, 3]
-
-  ### Directed graph with :successors mode (default)
-
-      iex> graph =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
-      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 20)
-      iex> ego = Yog.Transform.ego_graph(graph, 2)
-      iex> Enum.sort(Yog.all_nodes(ego))
-      [2, 3]
-
-  ### Directed graph with :neighbors mode
-
-      iex> graph =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
-      ...>   |> Yog.add_edge_ensure(from: 3, to: 2, with: 20)
-      iex> ego = Yog.Transform.ego_graph(graph, 2, 1, mode: :neighbors)
-      iex> Enum.sort(Yog.all_nodes(ego))
-      [1, 2, 3]
-
-  ### Radius 2
-
-      iex> graph =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_nodes_from([{1, nil}, {2, nil}, {3, nil}, {4, nil}])
-      ...>   |> Yog.add_edges!([{1, 2, 1}, {2, 3, 1}, {3, 4, 1}])
-      iex> ego = Yog.Transform.ego_graph(graph, 1, 2)
-      iex> Enum.sort(Yog.all_nodes(ego))
-      [1, 2, 3]
+  **Time Complexity:** O(V + E)
   """
   @spec ego_graph(Graph.t(), Yog.node_id(), non_neg_integer(), keyword()) :: Graph.t()
-  def ego_graph(%Graph{} = graph, node, radius \\ 1, opts \\ []) when radius >= 0 do
+  def ego_graph(graph, node, radius \\ 1, opts \\ []) do
+    validate_graph!(graph)
+
+    unless is_integer(radius) and radius >= 0 do
+      raise ArgumentError,
+            "expected radius to be a non-negative integer, got: #{inspect(radius)}"
+    end
+
+    unless Keyword.keyword?(opts) do
+      raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
+    end
+
     mode = Keyword.get(opts, :mode, :successors)
+
+    unless mode in [:successors, :neighbors] do
+      raise ArgumentError,
+            "expected :mode option to be :successors or :neighbors, got: #{inspect(mode)}"
+    end
+
     id_set = ego_bfs(graph, node, radius, mode)
     subgraph(graph, MapSet.to_list(id_set))
   end
@@ -1194,59 +770,7 @@ defmodule Yog.Transform do
   @doc """
   Contracts an edge by merging node `b` into node `a`.
 
-  Node `b` is removed from the graph, and all edges connected to `b` are
-  redirected to `a`. If both `a` and `b` had edges to the same neighbor,
-  their weights are combined using `with_combine`.
-
-  Self-loops (edges from a node to itself) are removed during contraction.
-
-  **Important for undirected graphs:** Since undirected edges are stored
-  bidirectionally, each logical edge is processed twice during contraction,
-  causing weights to be combined twice. For example, if edge weights represent
-  capacities, this effectively doubles them. Consider dividing weights by 2
-  or using a custom combine function if this behavior is undesired.
-
-  **Time Complexity:** O(deg(a) + deg(b)) - proportional to the combined
-  degree of both nodes.
-
-  ## Example
-
-      iex> graph =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
-      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 20)
-      iex> contracted = Yog.Transform.contract(graph, 1, 2, fn w1, w2 -> w1 + w2 end)
-      iex> # Result: nodes [1, 3], edge 1->3 with weight 20
-      iex> # Node 2 is merged into node 1
-      iex> Yog.successors(contracted, 1)
-      [{3, 20}]
-
-  ## Combining Weights
-
-  When both `a` and `b` have edges to the same neighbor `c`:
-
-      iex> # Before: a->c (5), b->c (10)
-      iex> graph =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_edge_ensure(from: 1, to: 3, with: 5)
-      ...>   |> Yog.add_edge_ensure(from: 2, to: 3, with: 10)
-      iex> contracted = Yog.Transform.contract(graph, 1, 2, fn w1, w2 -> w1 + w2 end)
-      iex> # After: a->c (15) (5 + 10)
-      iex> Yog.successors(contracted, 1)
-      [{3, 15}]
-
-  ## Use Cases
-
-  - **Stoer-Wagner algorithm** for minimum cut
-  - **Graph simplification** by merging strongly connected nodes
-  - **Community detection** by contracting nodes in the same community
-  - **Karger's algorithm** for minimum cut (randomized)
+  **Time Complexity:** O(deg(a) + deg(b))
   """
   @spec contract(
           Graph.t(),
@@ -1254,65 +778,44 @@ defmodule Yog.Transform do
           Yog.node_id(),
           (term(), term() -> term())
         ) :: Graph.t()
-  def contract(%Graph{out_edges: out_edges, in_edges: in_edges} = graph, a, b, combine_weight) do
-    b_in = Map.get(in_edges, b, %{})
-    b_out = Map.get(out_edges, b, %{})
+  def contract(graph, a, b, combine_weight) do
+    validate_graph!(graph)
 
-    a_out = merge_adjacent(Map.get(out_edges, a, %{}), b_out, combine_weight, a, b)
+    unless is_function(combine_weight, 2) do
+      raise ArgumentError,
+            "expected combine_weight to be an arity-2 function, got: #{inspect(combine_weight)}"
+    end
 
-    out_edges =
-      graph.out_edges
-      |> redirect_neighbors(b_in, a, b, combine_weight)
-      |> Map.put(a, a_out)
-      |> Map.delete(b)
+    if Map.has_key?(graph.nodes, a) and Map.has_key?(graph.nodes, b) and a != b do
+      b_in = Map.get(graph.in_edges, b, %{})
+      b_out = Map.get(graph.out_edges, b, %{})
 
-    if graph.kind == :undirected do
-      %{graph | nodes: Map.delete(graph.nodes, b), out_edges: out_edges, in_edges: out_edges}
+      a_out = merge_adjacent(Map.get(graph.out_edges, a, %{}), b_out, combine_weight, a, b)
+
+      out_edges =
+        graph.out_edges
+        |> redirect_neighbors(b_in, a, b, combine_weight)
+        |> Map.put(a, a_out)
+        |> Map.delete(b)
+
+      if graph.kind == :undirected do
+        %{graph | nodes: Map.delete(graph.nodes, b), out_edges: out_edges, in_edges: out_edges}
+      else
+        a_in = merge_adjacent(Map.get(graph.in_edges, a, %{}), b_in, combine_weight, a, b)
+        in_edges = redirect_neighbors(graph.in_edges, b_out, a, b, combine_weight)
+        in_edges = in_edges |> Map.put(a, a_in) |> Map.delete(b)
+
+        %{graph | nodes: Map.delete(graph.nodes, b), out_edges: out_edges, in_edges: in_edges}
+      end
     else
-      a_in = merge_adjacent(Map.get(in_edges, a, %{}), b_in, combine_weight, a, b)
-      in_edges = redirect_neighbors(in_edges, b_out, a, b, combine_weight)
-      in_edges = in_edges |> Map.put(a, a_in) |> Map.delete(b)
-
-      %{graph | nodes: Map.delete(graph.nodes, b), out_edges: out_edges, in_edges: in_edges}
+      graph
     end
   end
 
   @doc """
   Contracts nodes according to a partition map, producing a quotient graph.
 
-  Each block in the partition becomes a single super-node. All edges between
-  nodes in different blocks become edges between the corresponding super-nodes,
-  with weights combined using `combine_weight`. Edges within the same block
-  (self-loops) are dropped.
-
-  Nodes not present in `partition` are treated as singleton blocks (their block
-  ID is the node itself).
-
   **Time Complexity:** O(V + E)
-
-  ## Example
-
-      iex> graph =
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(1, "A")
-      ...>   |> Yog.add_node(2, "B")
-      ...>   |> Yog.add_node(3, "C")
-      ...>   |> Yog.add_node(4, "D")
-      ...>   |> Yog.add_edge_ensure(1, 3, 1)
-      ...>   |> Yog.add_edge_ensure(2, 3, 1)
-      ...>   |> Yog.add_edge_ensure(3, 4, 1)
-      iex> partition = %{1 => :ab, 2 => :ab, 3 => :cd, 4 => :cd}
-      iex> q = Yog.Transform.quotient_graph(graph, partition, &Kernel.+/2)
-      iex> Yog.Model.node_count(q)
-      2
-      iex> Yog.successors(q, :ab)
-      [{:cd, 2}]
-
-  ## Use Cases
-
-  - **Multilevel community detection**: contract communities and re-run algorithms
-  - **Hierarchical aggregation**: summarize large graphs by role or cluster
-  - **SCC condensation**: collapse strongly connected components
   """
   @spec quotient_graph(
           Graph.t(),
@@ -1321,11 +824,27 @@ defmodule Yog.Transform do
           (term(), term() -> term())
         ) :: Graph.t()
   def quotient_graph(
-        %Graph{} = graph,
+        graph,
         partition,
         combine_weight \\ &Kernel.+/2,
         combine_data \\ fn exist, _new -> exist end
       ) do
+    validate_graph!(graph)
+
+    unless is_map(partition) do
+      raise ArgumentError, "expected partition to be a map, got: #{inspect(partition)}"
+    end
+
+    unless is_function(combine_weight, 2) do
+      raise ArgumentError,
+            "expected combine_weight to be an arity-2 function, got: #{inspect(combine_weight)}"
+    end
+
+    unless is_function(combine_data, 2) do
+      raise ArgumentError,
+            "expected combine_data to be an arity-2 function, got: #{inspect(combine_data)}"
+    end
+
     block_for = fn node -> Map.get(partition, node, node) end
 
     block_nodes =
@@ -1362,23 +881,12 @@ defmodule Yog.Transform do
   @doc """
   Computes the transitive closure of the graph.
 
-  The transitive closure adds an edge from node A to node C whenever there is
-  a path from A to C. For a DAG, this uses a topological sorting optimization.
-  For graphs with cycles, it uses a general path-reaching approach.
-
   **Time Complexity:** O(V × (V + E))
-
-  ## Examples
-
-      iex> graph = Yog.directed()
-      ...> |> Yog.add_edge_ensure(1, 2, 1, nil)
-      ...> |> Yog.add_edge_ensure(2, 3, 1, nil)
-      iex> closure = Yog.Transform.transitive_closure(graph)
-      iex> Yog.Model.has_edge?(closure, 1, 3)
-      true
   """
   @spec transitive_closure(Graph.t()) :: Graph.t()
-  def transitive_closure(%Graph{} = graph) do
+  def transitive_closure(graph) do
+    validate_graph!(graph)
+
     case Yog.Traversal.topological_sort(graph) do
       {:ok, sorted} ->
         reachability_map = solve_transitive_reachability(graph, Enum.reverse(sorted))
@@ -1407,28 +915,12 @@ defmodule Yog.Transform do
   @doc """
   Computes the transitive reduction of a DAG.
 
-  Transitive reduction removes redundant edges that are implied by transitivity.
-  For Directed Acyclic Graphs (DAGs), the result is unique and minimal.
-
-  If the graph contains cycles, this returns an error as transitive reduction
-  is not uniquely defined for general graphs with cycles.
-
   **Time Complexity:** O(V × (V + E))
-
-  ## Examples
-
-      iex> graph = Yog.directed()
-      ...> |> Yog.add_edge_ensure(:a, :b, 1, nil)
-      ...> |> Yog.add_edge_ensure(:b, :c, 1, nil)
-      ...> |> Yog.add_edge_ensure(:a, :c, 1, nil)
-      iex> reduction = Yog.Transform.transitive_reduction(graph)
-      iex> {:ok, red} = reduction
-      iex> # Edge a->c is redundant because a->b->c exists
-      iex> Yog.Model.has_edge?(red, :a, :c)
-      false
   """
   @spec transitive_reduction(Graph.t()) :: {:ok, Graph.t()} | {:error, :contains_cycle}
-  def transitive_reduction(%Graph{} = graph) do
+  def transitive_reduction(graph) do
+    validate_graph!(graph)
+
     case Yog.Traversal.topological_sort(graph) do
       {:ok, sorted} ->
         reachability = compute_reachability_dp(graph, sorted)
@@ -1478,8 +970,12 @@ defmodule Yog.Transform do
   # Private Helper Functions
   # =============================================================================
 
-  # Prunes an edges map (out_edges or in_edges) so that only nodes present in
-  # `allowed` (a map or MapSet) are kept, both in the outer and inner maps.
+  defp validate_graph!(%Graph{}), do: :ok
+
+  defp validate_graph!(other) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
+  end
+
   defp prune_edges(outer_map, allowed) do
     outer_map
     |> Map.filter(fn {src, _} -> contains?(allowed, src) end)
@@ -1491,7 +987,6 @@ defmodule Yog.Transform do
   defp contains?(%MapSet{} = set, key), do: MapSet.member?(set, key)
   defp contains?(map, key) when is_map(map), do: Map.has_key?(map, key)
 
-  # Merges b's edges into a's adjacency map and removes self-loops
   defp merge_adjacent(a_edges, b_edges, combine_weight, a, b) do
     Map.merge(a_edges, b_edges, fn _k, v1, v2 -> combine_weight.(v1, v2) end)
     |> Map.delete(a)
@@ -1548,9 +1043,6 @@ defmodule Yog.Transform do
     end)
   end
 
-  # Computes reachability using dynamic programming in reverse topological order.
-  # Returns a map of node => MapSet of reachable nodes.
-  # Time Complexity: O(V * (V+E)) - much faster than O(E * (V+E)) for dense graphs
   defp compute_reachability_dp(graph, sorted_nodes) do
     out_edges = graph.out_edges
 

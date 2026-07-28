@@ -1,5 +1,6 @@
 defmodule Yog.TransformTest do
   use ExUnit.Case
+  use ExUnitProperties
 
   doctest Yog.Transform
 
@@ -1561,5 +1562,141 @@ defmodule Yog.TransformTest do
 
     assert Yog.successors(graph_no_loops, 1) == [{2, 10}]
     assert Yog.successors(graph_no_loops, 2) == []
+  end
+
+  # ============= Validation & Struct Verification Tests =============
+
+  describe "input validation and struct verification" do
+    test "functions raise ArgumentError on non-graph inputs" do
+      assert_raise ArgumentError, ~r/expected a Yog.Graph struct/, fn ->
+        apply(Yog.Transform, :transpose, [:not_a_graph])
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph struct/, fn ->
+        apply(Yog.Transform, :map_nodes, [:not_a_graph, fn x -> x end])
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph struct/, fn ->
+        apply(Yog.Transform, :map_edges, [:not_a_graph, fn x -> x end])
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph struct/, fn ->
+        apply(Yog.Transform, :filter_nodes, [:not_a_graph, fn _ -> true end])
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph struct/, fn ->
+        apply(Yog.Transform, :filter_edges, [:not_a_graph, fn _, _, _ -> true end])
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph struct/, fn ->
+        apply(Yog.Transform, :subgraph, [:not_a_graph, [1]])
+      end
+    end
+
+    test "functions raise ArgumentError on invalid function arities or parameters" do
+      graph = Yog.directed() |> Yog.add_node(1, "A")
+
+      assert_raise ArgumentError, ~r/expected fun to be an arity-1 function/, fn ->
+        apply(Yog.Transform, :map_nodes, [graph, :invalid])
+      end
+
+      assert_raise ArgumentError, ~r/expected fun to be an arity-1 function/, fn ->
+        apply(Yog.Transform, :map_edges, [graph, :invalid])
+      end
+
+      assert_raise ArgumentError, ~r/expected predicate to be an arity-1 function/, fn ->
+        apply(Yog.Transform, :filter_nodes, [graph, :invalid])
+      end
+
+      assert_raise ArgumentError, ~r/expected radius to be a non-negative integer/, fn ->
+        apply(Yog.Transform, :ego_graph, [graph, 1, -1])
+      end
+
+      assert_raise ArgumentError, ~r/expected :mode option to be :successors or :neighbors/, fn ->
+        apply(Yog.Transform, :ego_graph, [graph, 1, 1, [mode: :invalid]])
+      end
+    end
+  end
+
+  # ============= Property-Based Tests =============
+
+  describe "property-based transformation invariants" do
+    property "transpose is an involution: transpose(transpose(G)) == G" do
+      check all(
+              kind <- StreamData.member_of([:directed, :undirected]),
+              nodes <-
+                StreamData.list_of(StreamData.integer(1..20), min_length: 0, max_length: 10),
+              edges <-
+                StreamData.list_of(
+                  StreamData.tuple({
+                    StreamData.integer(1..20),
+                    StreamData.integer(1..20),
+                    StreamData.integer(1..100)
+                  }),
+                  min_length: 0,
+                  max_length: 20
+                )
+            ) do
+        graph =
+          Enum.reduce(nodes, Yog.Model.new(kind), fn u, g ->
+            Yog.Model.add_node(g, u, "data_#{u}")
+          end)
+
+        graph =
+          Enum.reduce(edges, graph, fn {u, v, w}, g ->
+            Yog.Model.add_edge_ensure(g, u, v, w)
+          end)
+
+        double_transposed =
+          graph
+          |> Yog.Transform.transpose()
+          |> Yog.Transform.transpose()
+
+        assert double_transposed == graph
+      end
+    end
+
+    property "map_nodes functor laws: identity and composition" do
+      check all(
+              nodes <-
+                StreamData.list_of(StreamData.integer(1..50), min_length: 1, max_length: 20)
+            ) do
+        graph =
+          Enum.reduce(nodes, Yog.directed(), fn u, g ->
+            Yog.add_node(g, u, u)
+          end)
+
+        # Identity law
+        assert Yog.Transform.map_nodes(graph, fn x -> x end) == graph
+
+        # Composition law
+        f = fn x -> x * 2 end
+        h = fn x -> x + 5 end
+
+        comp1 = graph |> Yog.Transform.map_nodes(f) |> Yog.Transform.map_nodes(h)
+        comp2 = Yog.Transform.map_nodes(graph, fn x -> h.(f.(x)) end)
+
+        assert comp1.nodes == comp2.nodes
+      end
+    end
+
+    property "subgraph node containment" do
+      check all(
+              nodes <-
+                StreamData.list_of(StreamData.integer(1..20), min_length: 1, max_length: 20),
+              subset <-
+                StreamData.list_of(StreamData.integer(1..20), min_length: 0, max_length: 20)
+            ) do
+        graph =
+          Enum.reduce(nodes, Yog.directed(), fn u, g ->
+            Yog.add_node(g, u, "node_#{u}")
+          end)
+
+        sub = Yog.Transform.subgraph(graph, subset)
+        expected_nodes = Enum.filter(Yog.all_nodes(graph), &(&1 in subset))
+
+        assert Enum.sort(Yog.all_nodes(sub)) == Enum.sort(expected_nodes)
+      end
+    end
   end
 end
