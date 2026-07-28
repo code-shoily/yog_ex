@@ -9,23 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`Yog.Multi` & `Yog.Multi.Model` Lookup Helpers** — Added query and lookup helpers (`has_node?/2`, `fetch_node/2`, `node_data/2`, `node_count/1`, `edge_count/1`, `all_edges/1`, `fetch_edge/2`, `edge/2`, `edge_data/2`, `has_edge?/2`, `has_edge_between?/3`) to `Yog.Multi.Model` and delegated them in `Yog.Multi`.
+
 ### Fixed
 
-- **`Yog.Graph` Audit & Hardening** — Hardened core graph struct module with constructor validation (`new/1`), struct verification on `node_count/1` and `edge_count/1`, `@moduledoc` guidance clarifying `Yog.Graph` role versus `Yog.Model` and `Yog` public facade, and property-based tests verifying dual-map index symmetry.
-- **`Yog.Operation` Audit & Hardening** — Hardened graph set-theoretic operations, composition, and structural comparison module with graph struct verification (`Yog.Graph`), graph kind compatibility checks (`:directed` vs `:undirected`), parameter validation (`power/3` $k \ge 0$), expanded complexity documentation, and property-based tests covering set operation idempotency, difference identity, and isomorphism reflexivity.
-- **`Yog.Transform` Audit & Hardening** — Hardened graph transformation and functor mapping module with graph struct verification (`Yog.Graph`), parameter & function arity validation, option checks for async variants and `ego_graph/4`, expanded complexity documentation, and property-based test suites testing functor laws, involution properties, and subgraph containment.
-- **`Yog.Multi` Facade Audit & Hardening** — Hardened multigraph public facade module with expanded documentation explaining edge ID semantics and simple graph collapse options, delegates for all query/lookup functions (`has_node?/2`, `fetch_node/2`, `fetch_edge/2`, `all_edges/1`, `has_edge_between?/3`), typespecs, and property-based tests verifying node set preservation under graph collapse.
-- **`Yog.Multi.Model` Audit & Hardening** — Hardened multigraph core model with graph struct verification, automatic endpoint node insertion on `add_edge/4`, new lookup/query functions (`has_node?/2`, `node/2`, `fetch_node/2`, `node_data/2`, `node_count/1`, `edge_count/1`, `all_edges/1`, `fetch_edge/2`, `edge/2`, `edge_data/2`, `has_edge?/2`, `has_edge_between?/3`), updated `Yog.Multi` facade delegates, detailed complexity annotations, and property-based index consistency tests.
-- **`Yog.IO.TGF` Audit & Hardening** — Hardened Trivial Graph Format module (`serialize/1`, `serialize_with/2`, `write/2`, `write_with/3`, `parse/2`, `parse_with/4`, `read/2`, `read_with/4`) with graph struct verification (`Yog.Graph`, `Yog.DAG`), options and argument validation, support for arity-1 and arity-2 node parsers, detailed error documentation, and property-based test suites.
-- **`Yog.IO.List` Audit & Hardening** — Hardened adjacency list import/export module (`from_list/2`, `from_string/3`, `to_list/1`, `to_string/2`) with graph struct verification (`Yog.Graph`, `Yog.DAG`), strict input and keyword option validation (`:weighted`, `:delimiter`, `:node_formatter`, `:weight_formatter`), flexible neighbor format support, detailed error documentation, and expanded unit & property-based test suites.
-- **`Yog.IO.Libgraph` Audit & Hardening** — Hardened Libgraph interoperability module (`from_libgraph/2`, `to_libgraph/2`) with graph struct verification, keyword options validation (e.g. `:force_type` and `:weight_fn`), detailed exception behavior documentation, and new validation test suites.
-- **`Yog.Flow.MinCut` Audit & Hardening** — Hardened minimum cut algorithms (`global_min_cut/2`, `karger_stein/2`, `gomory_hu_tree/1`, `min_cut_query/3`, `s_t_min_cut/4`) with early node existence checks, graph validation, keyword option validation, detailed return/error documentation, and comprehensive edge-case handling.
-- **`Yog.Flow.MaxFlow` Audit & Hardening** — Hardened maximum flow algorithms (`edmonds_karp/8`, `dinic/8`, `push_relabel/8`) with early node existence checks, parameter validation, keyword option validation, detailed return/error documentation, and comprehensive edge-case handling (empty/single-node/undirected graphs).
-- **`Yog.Pathfinding` Audit & Hardening** — Hardened all pathfinding modules with early node existence checks, keyword option validation, comprehensive edge-case handling (empty/disconnected graphs), and expanded unit test coverage.
-- **`Yog.Functional.Model.embed/2` Direction Preservation** — Fixed `embed/2` to preserve the target functional graph's direction (`:directed` or `:undirected`) when rebuilding a graph from a matched context, and clarified the inductive graph documentation around match/embed semantics.
-- **Data Structure & Utility Audit** — Hardened `Yog.Utils.compare/2` with explicit `:infinity` sentinel handling, normalized `Yog.Utils.fisher_yates/2` seed handling, clarified shuffle documentation, and reviewed `Yog.DisjointSet` and `Yog.PairingHeap` coverage/performance for the pre-1.0 audit wave.
+- **`Yog.Multi.Model.add_edge/4` Endpoint Creation** — Automatically inserts missing `from`/`to` endpoint nodes on `add_edge/4` to maintain multigraph index consistency across `nodes`, `edges`, `out_edge_ids`, and `in_edge_ids`.
+- **`Yog.Functional.Model.embed/2` Direction Preservation** — Fixed `embed/2` to preserve the target graph's direction (`:directed` or `:undirected`) when rebuilding a graph from a matched context.
+- **Set Operations & Graph Kind Matching** — Added graph kind compatibility checks (`:directed` vs `:undirected`) across `Yog.Operation` set operations (`intersection`, `difference`, `symmetric_difference`, `subgraph?`, `isomorphic?`), and enforced $k \ge 0$ parameter validation in `power/3`.
+- **`Yog.Graph` Constructor Validation** — Added validation to `Yog.Graph.new/1` to enforce valid kinds (`:directed` or `:undirected`).
+- **Input & Option Validation Across Modules** — Standardized `%Yog.Graph{}` struct verification, parameter arity checks, and option validations across `Yog.Transform`, `Yog.IO` (`List`, `TGF`, `Libgraph`), `Yog.Flow` (`MinCut`, `MaxFlow`), and `Yog.Pathfinding`.
+- **Data Structure Utilities** — Hardened `Yog.Utils.compare/2` with `:infinity` sentinel handling and normalized `FisherYates` shuffle seed handling.
 
 ### Changed
+
+- **Pre-1.0 Module Audit & Hardening** — Completed stabilizing audit pass across core, IO, flow, transform, operation, pathfinding, and multigraph modules. Standardized error handling, updated complexity math documentation ($\mathcal{O}(\dots)$), and significantly expanded unit and property-based test coverage.
 
 
 ## [0.99.1] - 2026-07-10
