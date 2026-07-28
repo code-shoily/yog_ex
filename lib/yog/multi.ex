@@ -22,6 +22,12 @@ defmodule Yog.Multi do
   @doc "Creates a new empty undirected multigraph."
   defdelegate undirected(), to: Model
 
+  @doc "Returns the type of the multigraph (:directed or :undirected)."
+  defdelegate type(graph), to: Model
+
+  @doc "Synonym for type/1."
+  defdelegate kind(graph), to: Model
+
   # ============= Modification =============
 
   @doc "Adds a node to the multigraph."
@@ -38,17 +44,38 @@ defmodule Yog.Multi do
 
   # ============= Query =============
 
+  @doc "Checks if a node ID exists in the multigraph."
+  defdelegate has_node?(graph, id), to: Model
+
+  @doc "Returns data associated with a node, or nil."
+  defdelegate node(graph, id), to: Model
+
+  @doc "Fetches node data for a given node ID."
+  defdelegate fetch_node(graph, id), to: Model
+
+  @doc "Returns data associated with a node, or nil."
+  defdelegate node_data(graph, id), to: Model
+
   @doc "Returns all node IDs in the multigraph."
   defdelegate all_nodes(graph), to: Model
 
   @doc "Returns the number of nodes."
   defdelegate order(graph), to: Model
 
+  @doc "Synonym for order/1."
+  defdelegate node_count(graph), to: Model
+
   @doc "Returns all edge IDs in the graph."
   defdelegate all_edge_ids(graph), to: Model
 
+  @doc "Returns all edges as [{edge_id, from, to, data}] sorted by edge_id."
+  defdelegate all_edges(graph), to: Model
+
   @doc "Returns the total number of edges."
   defdelegate size(graph), to: Model
+
+  @doc "Synonym for size/1."
+  defdelegate edge_count(graph), to: Model
 
   @doc "Returns the out-degree of a node."
   defdelegate out_degree(graph, id), to: Model
@@ -56,11 +83,29 @@ defmodule Yog.Multi do
   @doc "Returns the in-degree of a node."
   defdelegate in_degree(graph, id), to: Model
 
-  @doc "Returns the total degree of a node (in-degree + out-degree for directed, out-degree for undirected)."
+  @doc "Returns the total degree of a node."
   defdelegate degree(graph, id), to: Model
 
   @doc "Checks if a specific edge_id exists in the multigraph."
   defdelegate has_edge(graph, edge_id), to: Model
+
+  @doc "Predicate synonym for has_edge/2."
+  defdelegate has_edge?(graph, edge_id), to: Model
+
+  @doc "Fetches details for an edge_id as {:ok, {from, to, data}} or :error."
+  defdelegate fetch_edge(graph, edge_id), to: Model
+
+  @doc "Returns {from, to, data} for an edge_id, or nil."
+  defdelegate edge(graph, edge_id), to: Model
+
+  @doc "Returns edge data for an edge_id, or nil."
+  defdelegate edge_data(graph, edge_id), to: Model
+
+  @doc "Checks if at least one edge exists between from and to."
+  defdelegate has_edge_between?(graph, from, to), to: Model
+
+  @doc "Synonym for has_edge_between?/3."
+  defdelegate has_edge_between(graph, from, to), to: Model
 
   @doc "Returns the number of parallel edges between from and to."
   defdelegate edge_count(graph, from, to), to: Model

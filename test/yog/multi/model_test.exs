@@ -7,10 +7,75 @@ defmodule Yog.Multi.ModelTest do
   """
 
   use ExUnit.Case
+  use ExUnitProperties
 
   doctest Yog.Multi.Model
 
   alias Yog.Multi.Model
+
+  # Helper function to assert internal index consistency for a multigraph
+  defp assert_index_consistency(graph) do
+    # 1. Size match
+    assert Model.size(graph) == map_size(graph.edges)
+    assert Model.order(graph) == map_size(graph.nodes)
+
+    # 2. Every edge in edges has endpoints in nodes and is indexed in out_edge_ids and in_edge_ids
+    Enum.each(graph.edges, fn {eid, {src, dst, _data}} ->
+      assert Map.has_key?(graph.nodes, src), "Source node #{inspect(src)} missing from nodes"
+      assert Map.has_key?(graph.nodes, dst), "Target node #{inspect(dst)} missing from nodes"
+
+      out_set = Map.get(graph.out_edge_ids, src, MapSet.new())
+
+      assert MapSet.member?(out_set, eid),
+             "Edge #{eid} missing from out_edge_ids of #{inspect(src)}"
+
+      in_set = Map.get(graph.in_edge_ids, dst, MapSet.new())
+
+      assert MapSet.member?(in_set, eid),
+             "Edge #{eid} missing from in_edge_ids of #{inspect(dst)}"
+
+      if graph.kind == :undirected do
+        rev_out = Map.get(graph.out_edge_ids, dst, MapSet.new())
+
+        assert MapSet.member?(rev_out, eid),
+               "Edge #{eid} missing from out_edge_ids of #{inspect(dst)} in undirected graph"
+
+        rev_in = Map.get(graph.in_edge_ids, src, MapSet.new())
+
+        assert MapSet.member?(rev_in, eid),
+               "Edge #{eid} missing from in_edge_ids of #{inspect(src)} in undirected graph"
+      end
+    end)
+
+    # 3. Every edge ID in out_edge_ids exists in edges
+    Enum.each(graph.out_edge_ids, fn {node_id, set} ->
+      assert Map.has_key?(graph.nodes, node_id)
+
+      Enum.each(set, fn eid ->
+        assert Map.has_key?(graph.edges, eid)
+      end)
+    end)
+
+    # 4. Every edge ID in in_edge_ids exists in edges
+    Enum.each(graph.in_edge_ids, fn {node_id, set} ->
+      assert Map.has_key?(graph.nodes, node_id)
+
+      Enum.each(set, fn eid ->
+        assert Map.has_key?(graph.edges, eid)
+      end)
+    end)
+
+    # 5. Handshake lemma for undirected graph
+    if graph.kind == :undirected do
+      sum_degrees =
+        graph
+        |> Model.all_nodes()
+        |> Enum.map(&Model.degree(graph, &1))
+        |> Enum.sum()
+
+      assert sum_degrees == 2 * Model.size(graph)
+    end
+  end
 
   # ============================================================
   # Construction Tests
@@ -20,6 +85,8 @@ defmodule Yog.Multi.ModelTest do
     test "new/1 creates directed multigraph" do
       graph = Model.new(:directed)
       assert graph.kind == :directed
+      assert Model.type(graph) == :directed
+      assert Model.kind(graph) == :directed
       assert graph.nodes == %{}
       assert graph.edges == %{}
       assert graph.next_edge_id == 0
@@ -28,8 +95,15 @@ defmodule Yog.Multi.ModelTest do
     test "new/1 creates undirected multigraph" do
       graph = Model.new(:undirected)
       assert graph.kind == :undirected
+      assert Model.type(graph) == :undirected
       assert graph.nodes == %{}
       assert graph.edges == %{}
+    end
+
+    test "new/1 raises on invalid graph type" do
+      assert_raise ArgumentError, ~r/Invalid graph type/, fn ->
+        apply(Model, :new, [:invalid])
+      end
     end
 
     test "directed/0 convenience constructor" do
@@ -55,6 +129,14 @@ defmodule Yog.Multi.ModelTest do
         |> Model.add_node(2, "B")
 
       assert graph.nodes == %{1 => "A", 2 => "B"}
+      assert Model.has_node?(graph, 1)
+      assert Model.has_node?(graph, 2)
+      refute Model.has_node?(graph, 3)
+
+      assert Model.node(graph, 1) == "A"
+      assert Model.node_data(graph, 1) == "A"
+      assert Model.fetch_node(graph, 1) == {:ok, "A"}
+      assert Model.fetch_node(graph, 99) == :error
     end
 
     test "add_node/3 replaces existing node data" do
@@ -75,8 +157,8 @@ defmodule Yog.Multi.ModelTest do
 
       graph = Model.add_node(graph, 1, "Updated")
 
-      # Edges should still exist
       assert Model.edges_between(graph, 1, 2) != []
+      assert_index_consistency(graph)
     end
 
     test "all_nodes/1 returns all node IDs" do
@@ -93,13 +175,14 @@ defmodule Yog.Multi.ModelTest do
       assert 3 in nodes
     end
 
-    test "order/1 returns node count" do
+    test "order/1 and node_count/1 return node count" do
       graph =
         Model.directed()
         |> Model.add_node(1, "A")
         |> Model.add_node(2, "B")
 
       assert Model.order(graph) == 2
+      assert Model.node_count(graph) == 2
     end
 
     test "order/1 returns 0 for empty graph" do
@@ -114,10 +197,10 @@ defmodule Yog.Multi.ModelTest do
         |> Model.remove_node(1)
 
       assert Model.all_nodes(graph) == [2]
+      assert_index_consistency(graph)
     end
 
-    test "remove_node/2 removes all connected edges" do
-      # Build graph and track all edge IDs properly
+    test "remove_node/2 removes all connected edges and maintains index consistency" do
       {graph, e1} =
         Model.directed()
         |> Model.add_node(1, "A")
@@ -126,39 +209,53 @@ defmodule Yog.Multi.ModelTest do
         |> Model.add_edge(1, 2, 10)
 
       {graph, e2} = Model.add_edge(graph, 2, 3, 20)
-      {graph, _e3} = Model.add_edge(graph, 1, 3, 30)
+      {graph, e3} = Model.add_edge(graph, 1, 3, 30)
 
-      # All edges exist
       assert Model.has_edge(graph, e1)
       assert Model.has_edge(graph, e2)
+      assert Model.has_edge(graph, e3)
 
       graph = Model.remove_node(graph, 2)
 
-      # Node 2 removed
       nodes = Model.all_nodes(graph)
       assert length(nodes) == 2
       refute 2 in nodes
 
-      # Edges involving node 2 should be gone
       refute Model.has_edge(graph, e1)
       refute Model.has_edge(graph, e2)
+      assert Model.has_edge(graph, e3)
+
+      assert_index_consistency(graph)
+    end
+
+    test "remove_node/2 with non-existent node returns unchanged graph" do
+      graph = Model.directed() |> Model.add_node(1, "A")
+      updated = Model.remove_node(graph, 999)
+      assert updated == graph
     end
   end
 
   # ============================================================
-  # Edge Operations Tests (Parallel Edges)
+  # Edge Operations Tests
   # ============================================================
 
   describe "edge operations" do
-    test "add_edge/4 creates single edge" do
+    test "add_edge/4 creates single edge and auto-creates missing nodes" do
       {graph, edge_id} =
         Model.directed()
-        |> Model.add_node(1, "A")
-        |> Model.add_node(2, "B")
         |> Model.add_edge(1, 2, 10)
 
       assert edge_id == 0
       assert graph.edges[0] == {1, 2, 10}
+      assert Model.has_node?(graph, 1)
+      assert Model.has_node?(graph, 2)
+      assert Model.edge(graph, 0) == {1, 2, 10}
+      assert Model.edge_data(graph, 0) == 10
+      assert Model.fetch_edge(graph, 0) == {:ok, {1, 2, 10}}
+      assert Model.fetch_edge(graph, 99) == :error
+      assert Model.has_edge?(graph, 0)
+      refute Model.has_edge?(graph, 99)
+      assert_index_consistency(graph)
     end
 
     test "add_edge/4 assigns incrementing edge IDs" do
@@ -183,9 +280,14 @@ defmodule Yog.Multi.ModelTest do
         |> Model.add_node(2, "B")
         |> Model.add_edge(1, 2, "first")
 
-      {_graph, e2} = Model.add_edge(graph, 1, 2, "second")
+      {graph, e2} = Model.add_edge(graph, 1, 2, "second")
 
       assert e1 != e2
+      assert Model.edge_count(graph, 1, 2) == 2
+      assert Model.has_edge_between?(graph, 1, 2)
+      assert Model.has_edge_between(graph, 1, 2)
+      refute Model.has_edge_between?(graph, 1, 3)
+      assert_index_consistency(graph)
     end
 
     test "remove_edge/2 removes specific edge by ID" do
@@ -199,25 +301,17 @@ defmodule Yog.Multi.ModelTest do
 
       graph = Model.remove_edge(graph, e1)
 
-      # e1 should be gone
       refute Model.has_edge(graph, e1)
-
-      # e2 should remain
       assert Model.has_edge(graph, e2)
+      assert_index_consistency(graph)
     end
 
-    test "has_edge/2 checks edge existence" do
-      {graph, edge_id} =
-        Model.directed()
-        |> Model.add_node(1, "A")
-        |> Model.add_node(2, "B")
-        |> Model.add_edge(1, 2, 10)
-
-      assert Model.has_edge(graph, edge_id)
-      refute Model.has_edge(graph, 999)
+    test "remove_edge/2 on non-existent edge ID returns graph unchanged" do
+      graph = Model.directed() |> Model.add_node(1, "A")
+      assert Model.remove_edge(graph, 999) == graph
     end
 
-    test "all_edge_ids/1 returns all edge IDs" do
+    test "all_edge_ids/1 and all_edges/1" do
       {graph, e1} =
         Model.directed()
         |> Model.add_node(1, "A")
@@ -232,9 +326,12 @@ defmodule Yog.Multi.ModelTest do
       assert e1 in edge_ids
       assert e2 in edge_ids
       assert e3 in edge_ids
+
+      edges = Model.all_edges(graph)
+      assert edges == [{0, 1, 2, 10}, {1, 1, 2, 20}, {2, 2, 1, 30}]
     end
 
-    test "size/1 returns edge count" do
+    test "size/1 and edge_count/1 return edge count" do
       {graph, _e1} =
         Model.directed()
         |> Model.add_node(1, "A")
@@ -244,6 +341,7 @@ defmodule Yog.Multi.ModelTest do
       {graph, _e2} = Model.add_edge(graph, 1, 2, 20)
 
       assert Model.size(graph) == 2
+      assert Model.edge_count(graph) == 2
     end
 
     test "edges_between/3 returns parallel edges" do
@@ -283,14 +381,12 @@ defmodule Yog.Multi.ModelTest do
         |> Model.add_node(2, "B")
         |> Model.add_edge(1, 2, 10)
 
-      # Both directions should be indexed
       out_edges = Map.get(graph.out_edge_ids, 1, [])
-
-      # For undirected, successors of 1 should include 2
       assert edge_id in out_edges
-
-      # And 2 should also have this edge in its outgoing
       assert edge_id in Map.get(graph.out_edge_ids, 2, [])
+      assert Model.has_edge_between?(graph, 1, 2)
+      assert Model.has_edge_between?(graph, 2, 1)
+      assert_index_consistency(graph)
     end
 
     test "remove_edge/2 removes both directions for undirected" do
@@ -303,6 +399,7 @@ defmodule Yog.Multi.ModelTest do
       graph = Model.remove_edge(graph, edge_id)
 
       refute Model.has_edge(graph, edge_id)
+      assert_index_consistency(graph)
     end
   end
 
@@ -388,9 +485,16 @@ defmodule Yog.Multi.ModelTest do
 
       simple = Model.to_simple_graph(multi, &min/2)
 
-      # Verify the result is a valid graph structure
       assert simple.__struct__ == Yog.Graph
       assert simple.kind == :directed
+    end
+
+    test "to_simple_graph/2 raises on invalid combine_fn" do
+      multi = Model.directed() |> Model.add_node(1, "A")
+
+      assert_raise ArgumentError, ~r/expected combine_fn to be an arity-2 function/, fn ->
+        apply(Model, :to_simple_graph, [multi, :invalid])
+      end
     end
 
     test "to_simple_graph_min_edges/1 returns a valid graph" do
@@ -457,12 +561,39 @@ defmodule Yog.Multi.ModelTest do
   end
 
   # ============================================================
+  # Struct Verification Errors
+  # ============================================================
+
+  describe "struct verification" do
+    test "functions raise ArgumentError when given non-multigraph struct" do
+      assert_raise ArgumentError, ~r/expected a Yog.Multi.Graph struct/, fn ->
+        apply(Model, :type, [:not_a_graph])
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Multi.Graph struct/, fn ->
+        apply(Model, :add_node, [:not_a_graph, 1, "A"])
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Multi.Graph struct/, fn ->
+        apply(Model, :remove_node, [:not_a_graph, 1])
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Multi.Graph struct/, fn ->
+        apply(Model, :add_edge, [:not_a_graph, 1, 2, "w"])
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Multi.Graph struct/, fn ->
+        apply(Model, :remove_edge, [:not_a_graph, 0])
+      end
+    end
+  end
+
+  # ============================================================
   # Complex Scenarios
   # ============================================================
 
   describe "complex scenarios" do
     test "parallel edges with different weights" do
-      # Build multigraph with multiple edges between same nodes
       {multi, e1} =
         Model.directed()
         |> Model.add_node(:a, "A")
@@ -480,11 +611,11 @@ defmodule Yog.Multi.ModelTest do
       assert 200 in weights
       assert 50 in weights
 
-      # Verify all edge IDs are unique
       edge_ids = Enum.map(edges, &elem(&1, 0))
       assert e1 in edge_ids
       assert e2 in edge_ids
       assert e3 in edge_ids
+      assert_index_consistency(multi)
     end
 
     test "remove_node/2 handles self-loops correctly" do
@@ -496,6 +627,7 @@ defmodule Yog.Multi.ModelTest do
       multi = Yog.Multi.Model.remove_node(multi, 1)
       refute Yog.Multi.Model.has_edge(multi, e1)
       assert Yog.Multi.Model.all_nodes(multi) == []
+      assert_index_consistency(multi)
     end
 
     test "map conversion (from_map/to_map)" do
@@ -510,6 +642,7 @@ defmodule Yog.Multi.ModelTest do
       assert multi2.kind == :directed
       assert multi2.nodes[1] == "A"
       assert Yog.Multi.Model.size(multi2) == 1
+      assert_index_consistency(multi2)
     end
 
     test "mixed parallel and single edges" do
@@ -523,10 +656,10 @@ defmodule Yog.Multi.ModelTest do
       {multi, _e2} = Model.add_edge(multi, :a, :b, 2)
       {multi, _e3} = Model.add_edge(multi, :b, :c, 3)
 
-      # a->b has 2 edges, b->c has 1 edge
       assert length(Model.edges_between(multi, :a, :b)) == 2
       assert length(Model.edges_between(multi, :b, :c)) == 1
       assert Model.edges_between(multi, :a, :c) == []
+      assert_index_consistency(multi)
     end
   end
 
@@ -544,6 +677,7 @@ defmodule Yog.Multi.ModelTest do
       assert Model.degree(multi, :u) == 2
       assert Model.out_degree(multi, :u) == 2
       assert Model.in_degree(multi, :u) == 2
+      assert_index_consistency(multi)
     end
 
     test "undirected self-loop plus regular edge" do
@@ -557,6 +691,7 @@ defmodule Yog.Multi.ModelTest do
 
       assert Model.degree(multi, :u) == 3
       assert Model.degree(multi, :v) == 1
+      assert_index_consistency(multi)
     end
 
     test "multiple undirected self-loops" do
@@ -568,6 +703,7 @@ defmodule Yog.Multi.ModelTest do
       {multi, _} = Model.add_edge(multi, :u, :u, "loop2")
 
       assert Model.degree(multi, :u) == 4
+      assert_index_consistency(multi)
     end
 
     test "directed self-loop contributes 1 to in-degree and 1 to out-degree" do
@@ -579,6 +715,7 @@ defmodule Yog.Multi.ModelTest do
       assert Model.out_degree(multi, :u) == 1
       assert Model.in_degree(multi, :u) == 1
       assert Model.degree(multi, :u) == 2
+      assert_index_consistency(multi)
     end
 
     test "handshake lemma holds for undirected multigraph with self-loops" do
@@ -602,6 +739,50 @@ defmodule Yog.Multi.ModelTest do
         |> Enum.sum()
 
       assert sum_deg == 2 * Model.size(multi)
+      assert_index_consistency(multi)
+    end
+  end
+
+  # ============================================================
+  # Property-Based Index Consistency Tests
+  # ============================================================
+
+  describe "property-based index consistency" do
+    property "random sequence of multigraph operations maintains strict index consistency" do
+      check all(
+              kind <- StreamData.member_of([:directed, :undirected]),
+              ops <-
+                StreamData.list_of(
+                  StreamData.tuple({
+                    StreamData.member_of([:add_node, :add_edge, :remove_edge, :remove_node]),
+                    StreamData.integer(1..10),
+                    StreamData.integer(1..10)
+                  }),
+                  min_length: 5,
+                  max_length: 50
+                )
+            ) do
+        graph =
+          Enum.reduce(ops, Model.new(kind), fn
+            {:add_node, u, _}, g ->
+              Model.add_node(g, u, "data_#{u}")
+
+            {:add_edge, u, v}, g ->
+              {updated, _eid} = Model.add_edge(g, u, v, "edge_#{u}_#{v}")
+              updated
+
+            {:remove_edge, _u, _v}, g ->
+              case Model.all_edge_ids(g) do
+                [] -> g
+                eids -> Model.remove_edge(g, hd(eids))
+              end
+
+            {:remove_node, u, _v}, g ->
+              Model.remove_node(g, u)
+          end)
+
+        assert_index_consistency(graph)
+      end
     end
   end
 end
