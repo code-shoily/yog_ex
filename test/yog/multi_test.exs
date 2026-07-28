@@ -6,11 +6,10 @@ defmodule Yog.MultiTest do
   - Yog.Multi.Model for construction, modification, and query operations
   - Yog.Multi.Traversal for BFS, DFS, and fold_walk operations
   - Yog.Multi.Eulerian for Eulerian path/circuit detection and finding
-
-  Coverage target: 80%+ for facade delegation verification.
   """
 
   use ExUnit.Case
+  use ExUnitProperties
 
   doctest Yog.Multi
 
@@ -25,6 +24,8 @@ defmodule Yog.MultiTest do
       graph = Multi.new(:directed)
 
       assert graph.kind == :directed
+      assert Multi.type(graph) == :directed
+      assert Multi.kind(graph) == :directed
       assert Multi.order(graph) == 0
       assert Multi.size(graph) == 0
     end
@@ -33,7 +34,14 @@ defmodule Yog.MultiTest do
       graph = Multi.new(:undirected)
 
       assert graph.kind == :undirected
+      assert Multi.type(graph) == :undirected
       assert Multi.order(graph) == 0
+    end
+
+    test "raises ArgumentError when passed invalid graph type" do
+      assert_raise ArgumentError, ~r/Invalid graph type/, fn ->
+        apply(Multi, :new, [:invalid])
+      end
     end
   end
 
@@ -41,11 +49,13 @@ defmodule Yog.MultiTest do
     test "directed/0 creates directed multigraph" do
       graph = Multi.directed()
       assert graph.kind == :directed
+      assert Multi.type(graph) == :directed
     end
 
     test "undirected/0 creates undirected multigraph" do
       graph = Multi.undirected()
       assert graph.kind == :undirected
+      assert Multi.type(graph) == :undirected
     end
   end
 
@@ -61,6 +71,16 @@ defmodule Yog.MultiTest do
         |> Multi.add_node(2, "B")
 
       assert Multi.order(graph) == 2
+      assert Multi.node_count(graph) == 2
+      assert Multi.has_node?(graph, 1)
+      assert Multi.has_node?(graph, 2)
+      refute Multi.has_node?(graph, 3)
+
+      assert Multi.node(graph, 1) == "A"
+      assert Multi.node_data(graph, 1) == "A"
+      assert Multi.fetch_node(graph, 1) == {:ok, "A"}
+      assert Multi.fetch_node(graph, 99) == :error
+
       assert 1 in Multi.all_nodes(graph)
       assert 2 in Multi.all_nodes(graph)
     end
@@ -71,7 +91,6 @@ defmodule Yog.MultiTest do
         |> Multi.add_node(:user1, %{name: "Alice", age: 30})
         |> Multi.add_node(:user2, %{name: "Bob", age: 25})
 
-      # Verify through to_simple_graph conversion
       simple = Multi.to_simple_graph(graph, fn a, _b -> a end)
       assert Yog.node(simple, :user1) == %{name: "Alice", age: 30}
     end
@@ -101,6 +120,7 @@ defmodule Yog.MultiTest do
       graph = Multi.remove_node(graph, 1)
 
       assert Multi.size(graph) == 0
+      assert Multi.edge_count(graph) == 0
     end
   end
 
@@ -119,15 +139,18 @@ defmodule Yog.MultiTest do
       assert Enum.sort(nodes) == [1, 2, 3]
     end
 
-    test "order/1 delegates to Model.order/1" do
+    test "order/1 and node_count/1 delegate to Model" do
       graph = Multi.directed()
       assert Multi.order(graph) == 0
+      assert Multi.node_count(graph) == 0
 
       graph = Multi.add_node(graph, 1, "A")
       assert Multi.order(graph) == 1
+      assert Multi.node_count(graph) == 1
 
       graph = Multi.add_node(graph, 2, "B")
       assert Multi.order(graph) == 2
+      assert Multi.node_count(graph) == 2
     end
   end
 
@@ -145,6 +168,12 @@ defmodule Yog.MultiTest do
 
       assert is_integer(edge_id)
       assert Multi.size(graph) == 1
+      assert Multi.edge_count(graph) == 1
+      assert Multi.has_edge(graph, edge_id)
+      assert Multi.has_edge?(graph, edge_id)
+      assert Multi.fetch_edge(graph, edge_id) == {:ok, {1, 2, 10}}
+      assert Multi.edge(graph, edge_id) == {1, 2, 10}
+      assert Multi.edge_data(graph, edge_id) == 10
     end
 
     test "parallel edges supported via facade" do
@@ -163,6 +192,8 @@ defmodule Yog.MultiTest do
 
       edges = Multi.edges_between(graph, 1, 2)
       assert length(edges) == 3
+      assert Multi.has_edge_between?(graph, 1, 2)
+      assert Multi.has_edge_between(graph, 1, 2)
     end
 
     test "undirected edges via facade" do
@@ -172,7 +203,6 @@ defmodule Yog.MultiTest do
         |> Multi.add_node(2, "B")
         |> Multi.add_edge(1, 2, 10)
 
-      # In undirected, edge appears in both directions
       assert Multi.size(graph) == 1
 
       successors = Multi.successors(graph, 1)
@@ -208,15 +238,14 @@ defmodule Yog.MultiTest do
 
       graph = Multi.remove_edge(graph, eid1)
 
-      # Second edge should remain
       assert Multi.size(graph) == 1
       edges = Multi.edges_between(graph, 1, 2)
       assert [{^eid2, 20}] = edges
     end
   end
 
-  describe "all_edge_ids/1 and size/1 delegation" do
-    test "all_edge_ids/1 delegates to Model.all_edge_ids/1" do
+  describe "all_edge_ids/1, all_edges/1 and size/1 delegation" do
+    test "all_edge_ids/1 and all_edges/1 delegate to Model" do
       {graph, eid1} =
         Multi.directed()
         |> Multi.add_node(1, "A")
@@ -226,22 +255,27 @@ defmodule Yog.MultiTest do
       {graph, eid2} = Multi.add_edge(graph, 2, 1, 20)
 
       edge_ids = Multi.all_edge_ids(graph)
-
       assert is_list(edge_ids)
       assert length(edge_ids) == 2
       assert eid1 in edge_ids
       assert eid2 in edge_ids
+
+      all_e = Multi.all_edges(graph)
+      assert all_e == [{0, 1, 2, 10}, {1, 2, 1, 20}]
     end
 
-    test "size/1 delegates to Model.size/1" do
+    test "size/1 and edge_count/1 delegate to Model" do
       graph = Multi.directed() |> Multi.add_node(1, "A") |> Multi.add_node(2, "B")
       assert Multi.size(graph) == 0
+      assert Multi.edge_count(graph) == 0
 
       {graph, _} = Multi.add_edge(graph, 1, 2, 10)
       assert Multi.size(graph) == 1
+      assert Multi.edge_count(graph) == 1
 
       {graph, _} = Multi.add_edge(graph, 1, 2, 20)
       assert Multi.size(graph) == 2
+      assert Multi.edge_count(graph) == 2
     end
   end
 
@@ -358,6 +392,7 @@ defmodule Yog.MultiTest do
         |> Multi.add_edge(1, 2, 10)
 
       assert Multi.has_edge(graph, eid)
+      assert Multi.has_edge?(graph, eid)
     end
 
     test "returns false for non-existent edge_id" do
@@ -367,6 +402,7 @@ defmodule Yog.MultiTest do
         |> Multi.add_node(2, "B")
 
       refute Multi.has_edge(graph, 999)
+      refute Multi.has_edge?(graph, 999)
     end
   end
 
@@ -397,7 +433,6 @@ defmodule Yog.MultiTest do
         |> Multi.add_edge(1, 2, 10)
 
       {graph, _} = Multi.add_edge(graph, 1, 3, 20)
-      # Parallel edge
       {graph, _} = Multi.add_edge(graph, 1, 2, 30)
 
       assert Multi.out_degree(graph, 1) == 3
@@ -413,7 +448,6 @@ defmodule Yog.MultiTest do
         |> Multi.add_edge(1, 2, 10)
 
       {graph, _} = Multi.add_edge(graph, 3, 2, 20)
-      # Parallel edge
       {graph, _} = Multi.add_edge(graph, 1, 2, 30)
 
       assert Multi.in_degree(graph, 2) == 3
@@ -454,7 +488,6 @@ defmodule Yog.MultiTest do
         |> Multi.add_node(:b, nil)
         |> Multi.add_edge(:a, :b, 1)
 
-      # Parallel
       {graph, _} = Multi.add_edge(graph, :a, :b, 2)
 
       result = Multi.bfs(graph, :a)
@@ -524,7 +557,6 @@ defmodule Yog.MultiTest do
           end
         end)
 
-      # Should halt before reaching c
       assert :a in result
       refute :c in result
     end
@@ -587,7 +619,6 @@ defmodule Yog.MultiTest do
     end
 
     test "undirected Eulerian circuit detection" do
-      # Square with diagonal (all even degrees)
       {graph, _} =
         Multi.undirected()
         |> Multi.add_node(1, nil)
@@ -807,7 +838,6 @@ defmodule Yog.MultiTest do
       assert :a in order
       assert :d in order
 
-      # Verify ordering constraints
       assert Enum.find_index(order, &(&1 == :a)) < Enum.find_index(order, &(&1 == :b))
       assert Enum.find_index(order, &(&1 == :a)) < Enum.find_index(order, &(&1 == :c))
       assert Enum.find_index(order, &(&1 == :b)) < Enum.find_index(order, &(&1 == :d))
@@ -875,7 +905,6 @@ defmodule Yog.MultiTest do
         |> Multi.add_node(2, "B")
         |> Multi.add_edge(1, 2, 10)
 
-      # Parallel
       {graph, _} = Multi.add_edge(graph, 1, 2, 20)
 
       simple = Multi.to_simple_graph(graph, fn a, b -> min(a, b) end)
@@ -883,7 +912,6 @@ defmodule Yog.MultiTest do
       assert is_struct(simple, Yog.Graph)
       assert simple.kind == :directed
       assert Yog.Model.has_edge?(simple, 1, 2)
-      # min(10, 20) = 10
       assert Yog.Model.edge_data(simple, 1, 2) == 10
     end
 
@@ -899,7 +927,6 @@ defmodule Yog.MultiTest do
 
       simple = Multi.to_simple_graph(graph, fn a, b -> a + b end)
 
-      # 10 + 20 + 30 = 60
       assert Yog.Model.edge_data(simple, 1, 2) == 60
     end
 
@@ -1006,71 +1033,41 @@ defmodule Yog.MultiTest do
   end
 
   # =============================================================================
-  # Integration Tests
+  # Property-Based Facade Invariants
   # =============================================================================
 
-  describe "integration tests" do
-    test "full multigraph lifecycle via facade" do
-      # Create multigraph
-      graph = Multi.undirected()
+  describe "property-based facade invariants" do
+    property "collapsing multigraph to simple graph preserves exact node set" do
+      check all(
+              kind <- StreamData.member_of([:directed, :undirected]),
+              nodes <-
+                StreamData.list_of(StreamData.integer(1..20), min_length: 1, max_length: 20),
+              edges <-
+                StreamData.list_of(
+                  StreamData.tuple({
+                    StreamData.integer(1..20),
+                    StreamData.integer(1..20),
+                    StreamData.integer(1..100)
+                  }),
+                  min_length: 0,
+                  max_length: 30
+                )
+            ) do
+        graph =
+          Enum.reduce(nodes, Multi.new(kind), fn u, g ->
+            Multi.add_node(g, u, "node_#{u}")
+          end)
 
-      # Add nodes
-      graph =
-        graph
-        |> Multi.add_node(:station_a, %{name: "Central"})
-        |> Multi.add_node(:station_b, %{name: "North"})
-        |> Multi.add_node(:station_c, %{name: "South"})
+        graph =
+          Enum.reduce(edges, graph, fn {u, v, w}, g ->
+            {updated, _} = Multi.add_edge(g, u, v, w)
+            updated
+          end)
 
-      assert Multi.order(graph) == 3
+        simple = Multi.to_simple_graph(graph)
 
-      # Add parallel edges (multiple routes)
-      {graph, route1} = Multi.add_edge(graph, :station_a, :station_b, %{distance: 10, time: 20})
-      {graph, _route2} = Multi.add_edge(graph, :station_a, :station_b, %{distance: 15, time: 15})
-      {graph, _route3} = Multi.add_edge(graph, :station_b, :station_c, %{distance: 8, time: 12})
-
-      assert Multi.size(graph) == 3
-
-      # Query parallel edges
-      routes = Multi.edges_between(graph, :station_a, :station_b)
-      assert length(routes) == 2
-
-      # Traverse
-      visited = Multi.bfs(graph, :station_a)
-      assert :station_a in visited
-      assert :station_b in visited
-      assert :station_c in visited
-
-      # Remove specific route
-      graph = Multi.remove_edge(graph, route1)
-      assert Multi.size(graph) == 2
-
-      # Convert to simple graph (keep fastest route)
-      simple =
-        Multi.to_simple_graph(graph, fn a, b ->
-          if a.time <= b.time, do: a, else: b
-        end)
-
-      assert Yog.Model.has_edge?(simple, :station_a, :station_b)
-    end
-
-    test "Eulerian circuit in multigraph via facade" do
-      # Create a multigraph with Eulerian circuit
-      {graph, _} =
-        Multi.undirected()
-        |> Multi.add_node(1, nil)
-        |> Multi.add_node(2, nil)
-        |> Multi.add_node(3, nil)
-        |> Multi.add_node(4, nil)
-        |> Multi.add_edge(1, 2, 1)
-
-      {graph, _} = Multi.add_edge(graph, 2, 3, 1)
-      {graph, _} = Multi.add_edge(graph, 3, 4, 1)
-      {graph, _} = Multi.add_edge(graph, 4, 1, 1)
-
-      assert Multi.has_eulerian_circuit?(graph)
-
-      {:ok, circuit} = Multi.find_eulerian_circuit(graph)
-      assert length(circuit) == 4
+        assert Enum.sort(Yog.all_nodes(simple)) == Enum.sort(Multi.all_nodes(graph))
+      end
     end
   end
 end
