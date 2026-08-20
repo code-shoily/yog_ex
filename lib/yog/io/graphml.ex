@@ -27,10 +27,6 @@ defmodule Yog.IO.GraphML do
   - **Without saxy:** Uses Erlang's `:xmerl` (DOM parser, slower for large files)
   - **With saxy:** Uses streaming parser (up to 3-4x faster for large files)
 
-  For example, loading a 60MB GraphML file with ~500k edges:
-  - xmerl: ~20 seconds
-  - saxy: ~6 seconds
-
   ## Examples
 
   ### Basic Serialization and Deserialization
@@ -70,89 +66,63 @@ defmodule Yog.IO.GraphML do
 
       # Write with default string conversion
       Yog.IO.GraphML.write("output.graphml", graph)
-
-  ## Output Format
-
-  ```xml
-  <?xml version="1.0" encoding="UTF-8"?>
-  <graphml xmlns="http://graphml.graphdrawing.org/xmlns">
-    <key id="label" for="node" attr.name="label" attr.type="string"/>
-    <key id="weight" for="edge" attr.name="weight" attr.type="string"/>
-    <graph id="G" edgedefault="directed">
-      <node id="1">
-        <data key="label">Alice</data>
-      </node>
-      <node id="2">
-        <data key="label">Bob</data>
-      </node>
-      <edge source="1" target="2">
-        <data key="weight">friend</data>
-      </edge>
-    </graph>
-  </graphml>
-  ```
-
-  ## References
-
-  - [GraphML Specification](http://graphml.graphdrawing.org/)
-  - [GraphML Primer](http://graphml.graphdrawing.org/primer/graphml-primer.html)
-  - [Gephi GraphML Support](https://gephi.org/users/supported-graph-formats/graphml-format/)
   """
 
   alias Yog.IO.GraphML.Xmerl
+  alias Yog.IO.XMLUtils
   alias Yog.Model
 
   @doc """
   Returns default GraphML serialization options.
 
-  The options control XML formatting:
-  - **indent:** Number of spaces for indentation (default: 2)
-  - **include_xml_declaration:** Whether to include XML declaration (default: true)
-
-  ## Example
-
-      iex> {:graphml_options, indent, include_xml_declaration, _, _} = Yog.IO.GraphML.default_options()
-      iex> indent
-      2
-      iex> include_xml_declaration
-      true
+  Time complexity: $\\mathcal{O}(1)$
   """
+  @spec default_options() :: tuple()
   def default_options do
     {:graphml_options, 2, true, &Yog.Utils.safe_string/1, &Yog.Utils.safe_string/1}
   end
 
   @doc """
+  Creates GraphML options with custom formatting.
+
+  Raises `ArgumentError` if parameters are invalid.
+
+  Time complexity: $\\mathcal{O}(1)$
+  """
+  @spec options_with(non_neg_integer(), boolean(), keyword()) :: tuple()
+  def options_with(indent, include_declaration, opts \\ [])
+
+  def options_with(indent, include_declaration, opts)
+      when is_integer(indent) and indent >= 0 and is_boolean(include_declaration) and
+             is_list(opts) do
+    node_fmt = Keyword.get(opts, :node_formatter, &Yog.Utils.safe_string/1)
+    edge_fmt = Keyword.get(opts, :edge_formatter, &Yog.Utils.safe_string/1)
+
+    if not is_function(node_fmt, 1) do
+      raise ArgumentError, "expected :node_formatter to be an arity-1 function"
+    end
+
+    if not is_function(edge_fmt, 1) do
+      raise ArgumentError, "expected :edge_formatter to be an arity-1 function"
+    end
+
+    {:graphml_options, indent, include_declaration, node_fmt, edge_fmt}
+  end
+
+  def options_with(indent, include_declaration, _opts) do
+    raise ArgumentError,
+          "expected non-negative integer indent and boolean include_declaration, got: #{inspect({indent, include_declaration})}"
+  end
+
+  @doc """
   Serializes a graph to GraphML string with custom attribute mappers.
 
-  This is the main serialization function allowing you to control how node and
-  edge data are converted to GraphML attributes.
+  Raises `ArgumentError` if mappers or graph are invalid.
 
-  **Time Complexity:** O(V + E) where V is the number of nodes and E is edges
-
-  ## Parameters
-
-  - `node_attr` - Function that converts node data to a map of attributes
-    `(node_data) -> %{string => string}`
-  - `edge_attr` - Function that converts edge data to a map of attributes
-    `(edge_data) -> %{string => string}`
-  - `graph` - The graph to serialize
-
-  ## Example
-
-      iex> graph = Yog.directed()
-      ...> |> Yog.add_node(1, %{name: "Alice", role: "admin"})
-      ...> |> Yog.add_node(2, %{name: "Bob", role: "user"})
-      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: %{since: "2024"})
-      iex> node_attr = fn data ->
-      ...>   %{"label" => data.name, "role" => data.role}
-      ...> end
-      iex> edge_attr = fn data ->
-      ...>   %{"since" => data.since}
-      ...> end
-      iex> xml = Yog.IO.GraphML.serialize_with(node_attr, edge_attr, graph)
-      iex> String.contains?(xml, "Alice") and String.contains?(xml, "admin")
-      true
+  Time complexity: $\\mathcal{O}(V + E)$
   """
+  @spec serialize_with((any() -> map()), (any() -> map()), Yog.graph() | Yog.DAG.t()) ::
+          String.t()
   def serialize_with(node_attr, edge_attr, graph) do
     serialize_with_options(node_attr, edge_attr, default_options(), graph)
   end
@@ -160,22 +130,12 @@ defmodule Yog.IO.GraphML do
   @doc """
   Serializes a graph to GraphML with typed attributes for Gephi compatibility.
 
-  Identical to `serialize_with/3` but explicitly intended for tools like Gephi
-  that benefit from type information in the key definitions.
+  Raises `ArgumentError` if mappers or graph are invalid.
 
-  **Time Complexity:** O(V + E)
-
-  ## Example
-
-      iex> graph = Yog.directed()
-      ...> |> Yog.add_node(1, "Node1")
-      ...> |> Yog.add_node(2, "Node2")
-      iex> node_attr = fn data -> %{"label" => data} end
-      iex> edge_attr = fn _ -> %{} end
-      iex> xml = Yog.IO.GraphML.serialize_with_types(node_attr, edge_attr, graph)
-      iex> String.contains?(xml, ~s(attr.type="string"))
-      true
+  Time complexity: $\\mathcal{O}(V + E)$
   """
+  @spec serialize_with_types((any() -> map()), (any() -> map()), Yog.graph() | Yog.DAG.t()) ::
+          String.t()
   def serialize_with_types(node_attr, edge_attr, graph) do
     serialize_with_options(node_attr, edge_attr, default_options(), graph)
   end
@@ -183,64 +143,74 @@ defmodule Yog.IO.GraphML do
   @doc """
   Serializes a graph to GraphML with typed attributes and custom options.
 
-  Provides full control over both attribute mapping and output formatting.
+  Raises `ArgumentError` if arguments or options are invalid.
 
-  **Time Complexity:** O(V + E)
-
-  ## Parameters
-
-  - `node_attr` - Function to convert node data to attributes
-  - `edge_attr` - Function to convert edge data to attributes
-  - `options` - GraphML options tuple (see `default_options/0`)
-  - `graph` - The graph to serialize
-
-  ## Example
-
-      iex> graph = Yog.directed() |> Yog.add_node(1, "A")
-      iex> node_attr = fn data -> %{"label" => data} end
-      iex> edge_attr = fn _ -> %{} end
-      iex> options = {:graphml_options, 4, false, &Yog.Utils.safe_string/1, &Yog.Utils.safe_string/1}  # 4-space indent, no XML declaration
-      iex> xml = Yog.IO.GraphML.serialize_with_types_and_options(node_attr, edge_attr, options, graph)
-      iex> String.contains?(xml, "<?xml")
-      false
+  Time complexity: $\\mathcal{O}(V + E)$
   """
+  @spec serialize_with_types_and_options(
+          (any() -> map()),
+          (any() -> map()),
+          tuple(),
+          Yog.graph() | Yog.DAG.t()
+        ) :: String.t()
   def serialize_with_types_and_options(node_attr, edge_attr, options, graph) do
     serialize_with_options(node_attr, edge_attr, options, graph)
   end
 
   @doc """
-  Creates GraphML options with custom formatting.
-  """
-  def options_with(indent, include_declaration, opts \\ []) do
-    node_fmt = Keyword.get(opts, :node_formatter, &Yog.Utils.safe_string/1)
-    edge_fmt = Keyword.get(opts, :edge_formatter, &Yog.Utils.safe_string/1)
-    {:graphml_options, indent, include_declaration, node_fmt, edge_fmt}
-  end
-
-  @doc """
   Serializes a graph to a GraphML string with custom options.
+
+  Raises `ArgumentError` if arguments or options are invalid.
+
+  Time complexity: $\\mathcal{O}(V + E)$
   """
+  @spec serialize_with_options(
+          (any() -> map()),
+          (any() -> map()),
+          tuple(),
+          Yog.graph() | Yog.DAG.t()
+        ) :: String.t()
   def serialize_with_options(node_attr, edge_attr, options, graph) do
-    {indent, include_xml_declaration, node_fmt, edge_fmt} =
-      case options do
-        {:graphml_options, i, d, nf, ef} -> {i, d, nf, ef}
-        {:graphml_options, i, d} -> {i, d, &Kernel.to_string/1, &Kernel.to_string/1}
+    if not is_function(node_attr, 1) do
+      raise ArgumentError, "expected node_attr to be an arity-1 function"
+    end
+
+    if not is_function(edge_attr, 1) do
+      raise ArgumentError, "expected edge_attr to be an arity-1 function"
+    end
+
+    target_graph =
+      case graph do
+        %Yog.Graph{} ->
+          graph
+
+        %Yog.DAG{graph: inner} ->
+          inner
+
+        _ ->
+          raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(graph)}"
       end
 
-    %Yog.Graph{kind: type, nodes: nodes_map} = graph
+    {indent, include_xml_declaration, node_fmt, edge_fmt} =
+      case options do
+        {:graphml_options, i, d, nf, ef}
+        when is_integer(i) and i >= 0 and is_boolean(d) and is_function(nf, 1) and
+               is_function(ef, 1) ->
+          {i, d, nf, ef}
 
-    # Collect all node and edge attributes
-    node_attrs_list =
-      nodes_map
-      |> Enum.map(fn {_id, data} -> node_attr.(data) end)
+        {:graphml_options, i, d} when is_integer(i) and i >= 0 and is_boolean(d) ->
+          {i, d, &Kernel.to_string/1, &Kernel.to_string/1}
 
-    edges = Model.all_edges(graph)
+        _ ->
+          raise ArgumentError, "expected valid graphml_options tuple, got: #{inspect(options)}"
+      end
 
-    edge_attrs_list =
-      edges
-      |> Enum.map(fn {_from, _to, weight} -> edge_attr.(weight) end)
+    %Yog.Graph{kind: type, nodes: nodes_map} = target_graph
 
-    # Extract unique keys
+    node_attrs_list = Enum.map(nodes_map, fn {_id, data} -> node_attr.(data) end)
+    edges = Model.all_edges(target_graph)
+    edge_attrs_list = Enum.map(edges, fn {_from, _to, weight} -> edge_attr.(weight) end)
+
     node_keys =
       node_attrs_list
       |> Enum.flat_map(&Map.keys/1)
@@ -253,7 +223,6 @@ defmodule Yog.IO.GraphML do
       |> Enum.uniq()
       |> Enum.sort()
 
-    # Build XML
     indent_str = String.duplicate(" ", indent)
 
     xml_declaration =
@@ -265,7 +234,6 @@ defmodule Yog.IO.GraphML do
 
     graphml_open = "<graphml xmlns=\"http://graphml.graphdrawing.org/xmlns\">\n"
 
-    # Key definitions
     key_defs =
       (Enum.map(node_keys, fn key ->
          indent_str <>
@@ -279,11 +247,9 @@ defmodule Yog.IO.GraphML do
 
     key_defs_section = if key_defs != "", do: key_defs <> "\n", else: ""
 
-    # Graph
     edge_default = if type == :directed, do: "directed", else: "undirected"
     graph_open = indent_str <> "<graph id=\"G\" edgedefault=\"#{edge_default}\">\n"
 
-    # Nodes
     nodes_xml =
       nodes_map
       |> Enum.sort()
@@ -310,7 +276,6 @@ defmodule Yog.IO.GraphML do
 
     nodes_section = if nodes_xml != "", do: nodes_xml <> "\n", else: ""
 
-    # Edges
     edges_xml =
       edges
       |> Enum.map_join("\n", fn {from, to, weight} ->
@@ -349,21 +314,11 @@ defmodule Yog.IO.GraphML do
   @doc """
   Serializes a graph to GraphML string using default attribute conversion.
 
-  Node and edge data are converted to strings and stored as "label" and "weight"
-  attributes respectively. For custom attribute mapping, use `serialize_with/3`.
+  Raises `ArgumentError` if graph is invalid.
 
-  **Time Complexity:** O(V + E)
-
-  ## Example
-
-      iex> graph = Yog.directed()
-      ...> |> Yog.add_node(1, "Alice")
-      ...> |> Yog.add_node(2, "Bob")
-      ...> |> Yog.add_edge_ensure(from: 1, to: 2, with: "friend")
-      iex> xml = Yog.IO.GraphML.serialize(graph)
-      iex> String.contains?(xml, ~s(<node id="1">)) and String.contains?(xml, "Alice")
-      true
+  Time complexity: $\\mathcal{O}(V + E)$
   """
+  @spec serialize(Yog.graph() | Yog.DAG.t()) :: String.t()
   def serialize(graph) do
     node_attr = fn data -> %{"label" => Yog.Utils.to_label("", data)} end
     edge_attr = fn data -> %{"weight" => Yog.Utils.to_weight_label(data)} end
@@ -373,31 +328,12 @@ defmodule Yog.IO.GraphML do
   @doc """
   Writes a graph to a GraphML file using default attribute conversion.
 
-  This is a convenience function that combines `serialize/1` with `File.write/2`.
+  Raises `ArgumentError` if path is not a binary string or graph is invalid.
 
-  **Time Complexity:** O(V + E) + file I/O
-
-  ## Parameters
-
-  - `path` - File path to write to
-  - `graph` - The graph to serialize
-
-  ## Returns
-
-  - `{:ok, nil}` on success
-  - `{:error, reason}` on file write failure
-
-  ## Example
-
-      graph = Yog.directed()
-      |> Yog.add_node(1, "Alice")
-      |> Yog.add_node(2, "Bob")
-      |> Yog.add_edge_ensure(from: 1, to: 2, with: "friend")
-
-      Yog.IO.GraphML.write("network.graphml", graph)
-      # => {:ok, nil}
+  Time complexity: $\\mathcal{O}(V + E)$ + file I/O
   """
-  def write(path, graph) do
+  @spec write(String.t(), Yog.graph() | Yog.DAG.t()) :: {:ok, nil} | {:error, atom()}
+  def write(path, graph) when is_binary(path) do
     content = serialize(graph)
 
     case File.write(path, content) do
@@ -406,43 +342,20 @@ defmodule Yog.IO.GraphML do
     end
   end
 
+  def write(path, _graph) do
+    raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
+  end
+
   @doc """
   Writes a graph to a GraphML file with custom attribute mappers.
 
-  Use this when you need control over how node and edge data are converted
-  to GraphML attributes.
+  Raises `ArgumentError` if path is not a binary string or graph/mappers are invalid.
 
-  **Time Complexity:** O(V + E) + file I/O
-
-  ## Parameters
-
-  - `path` - File path to write to
-  - `node_attr` - Function to convert node data to attributes
-  - `edge_attr` - Function to convert edge data to attributes
-  - `graph` - The graph to serialize
-
-  ## Returns
-
-  - `{:ok, nil}` on success
-  - `{:error, reason}` on file write failure
-
-  ## Example
-
-      graph = Yog.directed()
-      |> Yog.add_node(1, %{name: "Alice", score: 95})
-      |> Yog.add_node(2, %{name: "Bob", score: 87})
-
-      node_attr = fn data ->
-        %{
-          "label" => data.name,
-          "score" => Integer.to_string(data.score)
-        }
-      end
-      edge_attr = fn _ -> %{} end
-
-      Yog.IO.GraphML.write_with("network.graphml", node_attr, edge_attr, graph)
+  Time complexity: $\\mathcal{O}(V + E)$ + file I/O
   """
-  def write_with(path, node_attr, edge_attr, graph) do
+  @spec write_with(String.t(), (any() -> map()), (any() -> map()), Yog.graph() | Yog.DAG.t()) ::
+          {:ok, nil} | {:error, atom()}
+  def write_with(path, node_attr, edge_attr, graph) when is_binary(path) do
     content = serialize_with(node_attr, edge_attr, graph)
 
     case File.write(path, content) do
@@ -451,24 +364,24 @@ defmodule Yog.IO.GraphML do
     end
   end
 
+  def write_with(path, _node_attr, _edge_attr, _graph) do
+    raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
+  end
+
   @doc """
   Writes a graph to a GraphML file with typed attributes for Gephi compatibility.
 
-  Identical to `write_with/4` but explicitly intended for tools that require
-  type annotations.
+  Raises `ArgumentError` if path is not a binary string or graph/mappers are invalid.
 
-  **Time Complexity:** O(V + E) + file I/O
-
-  ## Example
-
-      graph = Yog.directed() |> Yog.add_node(1, "Node1")
-
-      node_attr = fn data -> %{"label" => data} end
-      edge_attr = fn _ -> %{} end
-
-      Yog.IO.GraphML.write_with_types("network.graphml", node_attr, edge_attr, graph)
+  Time complexity: $\\mathcal{O}(V + E)$ + file I/O
   """
-  def write_with_types(path, node_attr, edge_attr, graph) do
+  @spec write_with_types(
+          String.t(),
+          (any() -> map()),
+          (any() -> map()),
+          Yog.graph() | Yog.DAG.t()
+        ) :: {:ok, nil} | {:error, atom()}
+  def write_with_types(path, node_attr, edge_attr, graph) when is_binary(path) do
     content = serialize_with_types(node_attr, edge_attr, graph)
 
     case File.write(path, content) do
@@ -477,177 +390,88 @@ defmodule Yog.IO.GraphML do
     end
   end
 
+  def write_with_types(path, _node_attr, _edge_attr, _graph) do
+    raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
+  end
+
   @doc """
   Deserializes a GraphML string into a graph with custom data mappers.
 
-  This function allows you to transform the raw GraphML attributes into
-  custom Elixir data structures as the graph is built.
+  Raises `ArgumentError` if xml or data mappers are invalid.
 
-  **Time Complexity:** O(V + E) where V is nodes and E is edges
-
-  ## Parameters
-
-  - `node_folder` - Function to transform node attributes to node data
-    `(attrs :: map) -> node_data`
-  - `edge_folder` - Function to transform edge attributes to edge data
-    `(attrs :: map) -> edge_data`
-  - `xml` - The GraphML XML string to parse
-
-  ## Returns
-
-  - `{:ok, graph}` on success
-  - `{:error, {:parse_error, reason}}` on parsing failure
-
-  ## Example
-
-      iex> xml = \"\"\"
-      ...> <?xml version="1.0" encoding="UTF-8"?>
-      ...> <graphml xmlns="http://graphml.graphdrawing.org/xmlns">
-      ...>   <graph id="G" edgedefault="directed">
-      ...>     <node id="1">
-      ...>       <data key="name">Alice</data>
-      ...>       <data key="age">30</data>
-      ...>     </node>
-      ...>     <node id="2">
-      ...>       <data key="name">Bob</data>
-      ...>       <data key="age">25</data>
-      ...>     </node>
-      ...>     <edge source="1" target="2">
-      ...>       <data key="weight">5</data>
-      ...>     </edge>
-      ...>   </graph>
-      ...> </graphml>
-      ...> \"\"\"
-      iex> node_folder = fn attrs ->
-      ...>   %{name: Map.get(attrs, "name"), age: String.to_integer(Map.get(attrs, "age", "0"))}
-      ...> end
-      iex> edge_folder = fn attrs ->
-      ...>   String.to_integer(Map.get(attrs, "weight", "1"))
-      ...> end
-      iex> {:ok, graph} = Yog.IO.GraphML.deserialize_with(node_folder, edge_folder, xml)
-      iex> Yog.Model.node_count(graph)
-      2
+  Time complexity: $\\mathcal{O}(V + E)$
   """
-  def deserialize_with(node_folder, edge_folder, xml) do
+  @spec deserialize_with((map() -> any()), (map() -> any()), String.t()) ::
+          {:ok, Yog.graph()} | {:error, term()}
+  def deserialize_with(node_folder, edge_folder, xml) when is_binary(xml) do
+    if not is_function(node_folder, 1) do
+      raise ArgumentError, "expected node_folder to be an arity-1 function"
+    end
+
+    if not is_function(edge_folder, 1) do
+      raise ArgumentError, "expected edge_folder to be an arity-1 function"
+    end
+
     parse_graphml(xml, node_folder, edge_folder)
+  end
+
+  def deserialize_with(_node_folder, _edge_folder, xml) do
+    raise ArgumentError, "expected xml to be a binary string, got: #{inspect(xml)}"
   end
 
   @doc """
   Deserializes a GraphML string to a graph using default conversion.
 
-  Node and edge attributes are stored as-is in maps. For custom data structures,
-  use `deserialize_with/3`.
+  Raises `ArgumentError` if xml is not a binary string.
 
-  **Time Complexity:** O(V + E) where V is nodes and E is edges
-
-  ## Returns
-
-  - `{:ok, graph}` on success
-  - `{:error, {:parse_error, reason}}` on parsing failure
-
-  ## Example
-
-      iex> xml = \"\"\"
-      ...> <?xml version="1.0" encoding="UTF-8"?>
-      ...> <graphml xmlns="http://graphml.graphdrawing.org/xmlns">
-      ...>   <graph id="G" edgedefault="directed">
-      ...>     <node id="1"><data key="label">Alice</data></node>
-      ...>     <node id="2"><data key="label">Bob</data></node>
-      ...>   </graph>
-      ...> </graphml>
-      ...> \"\"\"
-      iex> {:ok, graph} = Yog.IO.GraphML.deserialize(xml)
-      iex> Yog.Model.node_count(graph)
-      2
-
-  ## Performance Note
-
-  For large files, parsing automatically uses the fast `saxy` parser when available,
-  falling back to `:xmerl` otherwise. See module documentation for performance details.
+  Time complexity: $\\mathcal{O}(V + E)$
   """
-  def deserialize(xml) do
+  @spec deserialize(String.t()) :: {:ok, Yog.graph()} | {:error, term()}
+  def deserialize(xml) when is_binary(xml) do
     parse_graphml(xml, fn attrs -> attrs end, fn attrs -> attrs end)
+  end
+
+  def deserialize(xml) do
+    raise ArgumentError, "expected xml to be a binary string, got: #{inspect(xml)}"
   end
 
   @doc """
   Reads a graph from a GraphML file using default conversion.
 
-  This is a convenience function that combines `File.read/1` with `deserialize/1`.
+  Raises `ArgumentError` if path is not a binary string.
 
-  **Time Complexity:** O(V + E) + file I/O
-
-  ## Parameters
-
-  - `path` - File path to read from
-
-  ## Returns
-
-  - `{:ok, graph}` on success
-  - `{:error, reason}` on file read or parse failure
-
-  ## Example
-
-      # Read a GraphML file exported from Gephi or NetworkX
-      {:ok, graph} = Yog.IO.GraphML.read("social_network.graphml")
-
-      # Check what we loaded
-      IO.puts("Nodes: \#{Yog.Model.node_count(graph)}")
-      IO.puts("Edges: \#{Yog.Model.edge_count(graph)}")
+  Time complexity: $\\mathcal{O}(V + E)$ + file I/O
   """
-  def read(path) do
+  @spec read(String.t()) :: {:ok, Yog.graph()} | {:error, term()}
+  def read(path) when is_binary(path) do
     case File.read(path) do
       {:ok, content} -> deserialize(content)
       {:error, _} = error -> error
     end
   end
 
+  def read(path) do
+    raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
+  end
+
   @doc """
   Reads a graph from a GraphML file with custom data mappers.
 
-  Use this when you want to transform GraphML attributes into custom
-  Elixir data structures during loading.
+  Raises `ArgumentError` if path is not a binary string or mappers are invalid.
 
-  **Time Complexity:** O(V + E) + file I/O
-
-  ## Parameters
-
-  - `path` - File path to read from
-  - `node_folder` - Function to transform node attributes to node data
-  - `edge_folder` - Function to transform edge attributes to edge data
-
-  ## Returns
-
-  - `{:ok, graph}` on success
-  - `{:error, reason}` on file read or parse failure
-
-  ## Example
-
-      # Transform GraphML data to custom structs
-      node_folder = fn attrs ->
-        %Person{
-          name: Map.get(attrs, "name", "Unknown"),
-          score: String.to_integer(Map.get(attrs, "score", "0"))
-        }
-      end
-
-      edge_folder = fn attrs ->
-        %Relationship{
-          type: Map.get(attrs, "type", "knows"),
-          strength: String.to_float(Map.get(attrs, "strength", "0.5"))
-        }
-      end
-
-      {:ok, graph} = Yog.IO.GraphML.read_with(
-        "network.graphml",
-        node_folder,
-        edge_folder
-      )
+  Time complexity: $\\mathcal{O}(V + E)$ + file I/O
   """
-  def read_with(path, node_folder, edge_folder) do
+  @spec read_with(String.t(), (map() -> any()), (map() -> any())) ::
+          {:ok, Yog.graph()} | {:error, term()}
+  def read_with(path, node_folder, edge_folder) when is_binary(path) do
     case File.read(path) do
       {:ok, content} -> deserialize_with(node_folder, edge_folder, content)
       {:error, _} = error -> error
     end
+  end
+
+  def read_with(path, _node_folder, _edge_folder) do
+    raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
   end
 
   # Private functions
@@ -655,15 +479,10 @@ defmodule Yog.IO.GraphML do
   defp escape_xml(value, formatter) do
     value
     |> formatter.()
-    |> String.replace("&", "&amp;")
-    |> String.replace("<", "&lt;")
-    |> String.replace(">", "&gt;")
-    |> String.replace("\"", "&quot;")
-    |> String.replace("'", "&apos;")
+    |> XMLUtils.escape_xml()
   end
 
   defp parse_graphml(xml, node_folder, edge_folder) do
-    # Use fast SAX parser if available, otherwise fall back to xmerl
     if Code.ensure_loaded?(Saxy) do
       parse_graphml_saxy(xml, node_folder, edge_folder)
     else
@@ -679,7 +498,6 @@ defmodule Yog.IO.GraphML do
 
     case Saxy.parse_string(xml, Yog.IO.GraphML.SaxyHandler, initial_state) do
       {:ok, state} ->
-        # Build graph from collected data
         graph = Yog.Model.new(state.graph_type)
 
         graph =
@@ -703,6 +521,8 @@ defmodule Yog.IO.GraphML do
   end
 
   @doc false
+  @spec parse_graphml_xmerl(String.t(), (map() -> any()), (map() -> any())) ::
+          {:ok, Yog.graph()} | {:error, term()}
   def parse_graphml_xmerl(xml, node_folder, edge_folder) do
     Xmerl.parse_graphml_xmerl(xml, node_folder, edge_folder)
   end

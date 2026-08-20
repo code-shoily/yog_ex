@@ -1,5 +1,6 @@
 defmodule Yog.IO.GraphMLTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
+  use ExUnitProperties
 
   alias Yog.IO.GraphML
 
@@ -777,6 +778,119 @@ defmodule Yog.IO.GraphMLTest do
     test "xmerl parsing with completely invalid xml" do
       assert {:error, {:parse_error, _}} =
                GraphML.parse_graphml_xmerl("<graphml>invalid xml", fn x -> x end, fn x -> x end)
+    end
+  end
+
+  test "serialize DAG" do
+    dag =
+      Yog.DAG.new()
+      |> Yog.DAG.add_node(1, "Node1")
+      |> Yog.DAG.add_node(2, "Node2")
+
+    {:ok, dag} = Yog.DAG.add_edge(dag, 1, 2, "link")
+
+    xml = GraphML.serialize(dag)
+
+    assert String.contains?(xml, "<node id=\"1\">")
+    assert String.contains?(xml, "<node id=\"2\">")
+    assert String.contains?(xml, "source=\"1\"")
+    assert String.contains?(xml, "target=\"2\"")
+  end
+
+  test "input and options validation" do
+    assert_raise ArgumentError, ~r/expected non-negative integer indent/, fn ->
+      GraphML.options_with(-1, true)
+    end
+
+    assert_raise ArgumentError, ~r/expected :node_formatter to be an arity-1 function/, fn ->
+      GraphML.options_with(2, true, node_formatter: :invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected :edge_formatter to be an arity-1 function/, fn ->
+      GraphML.options_with(2, true, edge_formatter: :invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected node_attr to be an arity-1 function/, fn ->
+      GraphML.serialize_with_options(:invalid, & &1, GraphML.default_options(), Yog.directed())
+    end
+
+    assert_raise ArgumentError, ~r/expected edge_attr to be an arity-1 function/, fn ->
+      GraphML.serialize_with_options(& &1, :invalid, GraphML.default_options(), Yog.directed())
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      GraphML.serialize_with_options(& &1, & &1, GraphML.default_options(), :not_a_graph)
+    end
+
+    assert_raise ArgumentError, ~r/expected valid graphml_options tuple/, fn ->
+      GraphML.serialize_with_options(
+        & &1,
+        & &1,
+        :invalid_options,
+        Yog.directed()
+      )
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      GraphML.write(123, Yog.directed())
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      GraphML.write_with(123, & &1, & &1, Yog.directed())
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      GraphML.write_with_types(123, & &1, & &1, Yog.directed())
+    end
+
+    assert_raise ArgumentError, ~r/expected xml to be a binary string/, fn ->
+      GraphML.deserialize(123)
+    end
+
+    assert_raise ArgumentError, ~r/expected node_folder to be an arity-1 function/, fn ->
+      GraphML.deserialize_with(:invalid, & &1, "<graphml></graphml>")
+    end
+
+    assert_raise ArgumentError, ~r/expected edge_folder to be an arity-1 function/, fn ->
+      GraphML.deserialize_with(& &1, :invalid, "<graphml></graphml>")
+    end
+
+    assert_raise ArgumentError, ~r/expected xml to be a binary string/, fn ->
+      GraphML.deserialize_with(& &1, & &1, 123)
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      GraphML.read(123)
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      GraphML.read_with(123, & &1, & &1)
+    end
+  end
+
+  describe "property tests" do
+    property "roundtrip serialize and deserialize preserves node and edge counts" do
+      check all(
+              kind <- StreamData.member_of([:directed, :undirected]),
+              n <- StreamData.integer(1..15),
+              raw_edges <-
+                StreamData.list_of(
+                  StreamData.tuple({StreamData.integer(1..n), StreamData.integer(1..n)})
+                )
+            ) do
+        graph =
+          Enum.reduce(1..n, Yog.Model.new(kind), &Yog.add_node(&2, &1, "Node#{&1}"))
+
+        graph =
+          Enum.reduce(raw_edges, graph, fn {u, v}, acc ->
+            Yog.add_edge_ensure(acc, u, v, "Edge")
+          end)
+
+        xml = GraphML.serialize(graph)
+        assert {:ok, parsed} = GraphML.deserialize(xml)
+        assert Yog.Model.node_count(parsed) == Yog.Model.node_count(graph)
+        assert Yog.Model.edge_count(parsed) == Yog.Model.edge_count(graph)
+      end
     end
   end
 end
