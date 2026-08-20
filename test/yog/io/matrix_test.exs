@@ -1,5 +1,6 @@
 defmodule Yog.IO.MatrixTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
+  use ExUnitProperties
 
   alias Yog.IO.Matrix
 
@@ -24,13 +25,11 @@ defmodule Yog.IO.MatrixTest do
       assert Yog.Model.order(graph) == 4
       assert Yog.Model.edge_count(graph) == 4
 
-      # Check specific edges exist
       assert Yog.Model.has_edge?(graph, 0, 1)
       assert Yog.Model.has_edge?(graph, 0, 2)
       assert Yog.Model.has_edge?(graph, 1, 3)
       assert Yog.Model.has_edge?(graph, 2, 3)
 
-      # Undirected - check reverse edges
       assert Yog.Model.has_edge?(graph, 1, 0)
       assert Yog.Model.has_edge?(graph, 2, 0)
     end
@@ -47,13 +46,11 @@ defmodule Yog.IO.MatrixTest do
       assert Yog.Model.order(graph) == 4
       assert Yog.Model.edge_count(graph) == 4
 
-      # Check specific edges exist
       assert Yog.has_edge?(graph, 0, 1)
       assert Yog.has_edge?(graph, 0, 2)
       assert Yog.has_edge?(graph, 1, 3)
       assert Yog.has_edge?(graph, 2, 3)
 
-      # Check no reverse edges (directed)
       refute Yog.has_edge?(graph, 1, 0)
     end
 
@@ -77,7 +74,6 @@ defmodule Yog.IO.MatrixTest do
 
       graph = Matrix.from_matrix(:undirected, matrix)
       assert Yog.Model.order(graph) == 3
-      # K3 has 3 edges
       assert Yog.Model.edge_count(graph) == 3
     end
 
@@ -133,8 +129,20 @@ defmodule Yog.IO.MatrixTest do
 
       {nodes, matrix} = Matrix.to_matrix(graph)
       assert nodes == [1, 2]
-      # Directed: [1,2] = 10, [2,1] = 0
       assert matrix == [[0, 10], [0, 0]]
+    end
+
+    test "exports DAG to matrix" do
+      dag =
+        Yog.DAG.new()
+        |> Yog.DAG.add_node(0, nil)
+        |> Yog.DAG.add_node(1, nil)
+
+      {:ok, dag} = Yog.DAG.add_edge(dag, 0, 1, 5)
+
+      {nodes, matrix} = Matrix.to_matrix(dag)
+      assert nodes == [0, 1]
+      assert matrix == [[0, 5], [0, 0]]
     end
 
     test "empty graph returns empty matrix" do
@@ -158,6 +166,12 @@ defmodule Yog.IO.MatrixTest do
 
       assert Yog.Model.order(restored) == Yog.Model.order(original)
       assert Yog.Model.edge_count(restored) == Yog.Model.edge_count(original)
+    end
+
+    test "raises ArgumentError when input is not a graph or DAG struct" do
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Matrix.to_matrix(:not_a_graph)
+      end
     end
   end
 
@@ -196,11 +210,28 @@ defmodule Yog.IO.MatrixTest do
 
       assert str == "0 w10\nw10 0"
     end
+
+    test "input validation for to_string/2" do
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Matrix.to_string(:not_a_graph)
+      end
+
+      assert_raise ArgumentError, ~r/expected opts to be a keyword list/, fn ->
+        Matrix.to_string(Yog.undirected(), :invalid_opts)
+      end
+
+      assert_raise ArgumentError, ~r/expected weight_formatter to be an arity-1 function/, fn ->
+        Matrix.to_string(Yog.undirected(), weight_formatter: :invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected delimiter to be a binary string/, fn ->
+        Matrix.to_string(Yog.undirected(), delimiter: 123)
+      end
+    end
   end
 
   describe "integration with House of Graphs format" do
     test "imports Petersen graph from matrix" do
-      # Petersen graph adjacency matrix (10 nodes)
       matrix = [
         [0, 1, 0, 0, 1, 1, 0, 0, 0, 0],
         [1, 0, 1, 0, 0, 0, 1, 0, 0, 0],
@@ -216,12 +247,46 @@ defmodule Yog.IO.MatrixTest do
 
       graph = Matrix.from_matrix(:undirected, matrix)
       assert Yog.Model.order(graph) == 10
-      # Petersen graph has 15 edges
       assert Yog.Model.edge_count(graph) == 15
 
-      # All nodes have degree 3 (cubic graph)
       for v <- 0..9 do
         assert length(Yog.neighbors(graph, v)) == 3
+      end
+    end
+  end
+
+  describe "property tests" do
+    property "roundtrip matrix conversion preserves structure for simple integer-indexed graphs" do
+      check all(
+              kind <- StreamData.member_of([:directed, :undirected]),
+              n <- StreamData.integer(0..15),
+              raw_edges <-
+                StreamData.list_of(
+                  StreamData.tuple(
+                    {StreamData.integer(0..max(n - 1, 0)), StreamData.integer(0..max(n - 1, 0))}
+                  )
+                )
+            ) do
+        graph =
+          if n == 0 do
+            Yog.Model.new(kind)
+          else
+            base = Enum.reduce(0..(n - 1), Yog.Model.new(kind), &Yog.add_node(&2, &1, nil))
+
+            Enum.reduce(raw_edges, base, fn {u, v}, acc ->
+              if u != v and u < n and v < n do
+                Yog.add_edge_ensure(acc, u, v, 1)
+              else
+                acc
+              end
+            end)
+          end
+
+        {_nodes, matrix} = Matrix.to_matrix(graph)
+        restored = Matrix.from_matrix(kind, matrix)
+
+        assert Yog.Model.node_count(restored) == Yog.Model.node_count(graph)
+        assert Yog.Model.edge_count(restored) == Yog.Model.edge_count(graph)
       end
     end
   end

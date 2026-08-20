@@ -55,6 +55,8 @@ defmodule Yog.IO.Matrix do
   the weight of the edge from node `i` to node `j`. A value of `0` or `nil`
   indicates no edge.
 
+  Time complexity: $\\mathcal{O}(N^2)$ where $N$ is the matrix dimension ($N \\times N$).
+
   ## Parameters
 
   - `type` - `:directed` or `:undirected`
@@ -95,7 +97,7 @@ defmodule Yog.IO.Matrix do
 
   ## Raises
 
-  - `ArgumentError` if the matrix is not square
+  - `ArgumentError` if the matrix is not square or `type` is invalid
   """
   @spec from_matrix(:directed | :undirected, [[number()]]) :: Yog.graph()
   def from_matrix(type, matrix) do
@@ -157,6 +159,10 @@ defmodule Yog.IO.Matrix do
   @doc """
   Exports a graph to an adjacency matrix representation.
 
+  Raises `ArgumentError` if `graph` is not a `Yog.Graph` or `Yog.DAG` struct.
+
+  Time complexity: $\\mathcal{O}(V^2)$ where $V$ is node count.
+
   Returns a tuple `{nodes, matrix}` where:
   - `nodes` is a list of node IDs in the order they appear in the matrix
   - `matrix` is the adjacency matrix (list of lists)
@@ -181,11 +187,23 @@ defmodule Yog.IO.Matrix do
   - For undirected graphs, the matrix is symmetric
   - Node order is deterministic (sorted by node ID)
   """
-  @spec to_matrix(Yog.graph()) :: {[Yog.node_id()], [[number()]]}
-  def to_matrix(%Yog.Graph{out_edges: out_edges} = graph) do
-    nodes = Model.all_nodes(graph) |> Enum.sort()
+  @spec to_matrix(Yog.graph() | Yog.DAG.t()) :: {[Yog.node_id()], [[term()]]}
+  def to_matrix(graph) do
+    target_graph =
+      case graph do
+        %Yog.Graph{} ->
+          graph
 
-    # Build matrix by looking up edge weights directly from out_edges
+        %Yog.DAG{graph: inner} ->
+          inner
+
+        _ ->
+          raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(graph)}"
+      end
+
+    nodes = Model.all_nodes(target_graph) |> Enum.sort()
+    out_edges = target_graph.out_edges
+
     matrix =
       for i <- nodes do
         inner_map = Map.get(out_edges, i, %{})
@@ -204,6 +222,10 @@ defmodule Yog.IO.Matrix do
 
   @doc """
   Exports a graph to a string representation of an adjacency matrix.
+
+  Raises `ArgumentError` if `graph` or `opts` are invalid.
+
+  Time complexity: $\\mathcal{O}(V^2)$ where $V$ is node count.
 
   ## Options
 
@@ -231,8 +253,24 @@ defmodule Yog.IO.Matrix do
   """
   @spec to_string(Yog.graph(), keyword()) :: String.t()
   def to_string(graph, opts \\ []) do
+    unless is_struct(graph, Yog.Graph) or is_struct(graph, Yog.DAG) do
+      raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(graph)}"
+    end
+
+    unless Keyword.keyword?(opts) do
+      raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
+    end
+
     weight_fmt = Keyword.get(opts, :weight_formatter, &Yog.Utils.safe_string/1)
     delimiter = Keyword.get(opts, :delimiter, " ")
+
+    if not is_function(weight_fmt, 1) do
+      raise ArgumentError, "expected weight_formatter to be an arity-1 function"
+    end
+
+    if not is_binary(delimiter) do
+      raise ArgumentError, "expected delimiter to be a binary string, got: #{inspect(delimiter)}"
+    end
 
     {_nodes, matrix} = to_matrix(graph)
 
