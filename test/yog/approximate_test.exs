@@ -1,5 +1,6 @@
 defmodule Yog.ApproximateTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
+  use ExUnitProperties
 
   doctest Yog.Approximate
 
@@ -401,6 +402,40 @@ defmodule Yog.ApproximateTest do
     # Maximum clique is still size 3 (either triangle)
     assert MapSet.size(clique) == 3
     assert valid_clique?(graph, clique)
+  end
+
+  test "input validation raises ArgumentError on invalid parameters" do
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Approximate.diameter(:invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected opts to be a keyword list/, fn ->
+      Approximate.betweenness(Yog.undirected(), :invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected heuristic to be :min_degree or :min_fill/, fn ->
+      Approximate.treewidth_upper_bound(Yog.undirected(), heuristic: :invalid)
+    end
+  end
+
+  describe "Approximate Property Tests" do
+    property "vertex_cover always covers every edge" do
+      check all(
+              n <- StreamData.integer(2..10),
+              raw_edges <-
+                StreamData.list_of(
+                  StreamData.tuple({StreamData.integer(1..n), StreamData.integer(1..n)})
+                )
+            ) do
+        g =
+          Enum.reduce(raw_edges, Yog.undirected(), fn {u, v}, acc ->
+            Yog.add_edge_ensure(acc, u, v, 1)
+          end)
+
+        cover = Approximate.vertex_cover(g)
+        assert valid_vertex_cover?(g, cover)
+      end
+    end
   end
 
   # Helpers

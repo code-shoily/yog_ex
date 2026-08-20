@@ -86,15 +86,18 @@ defmodule Yog.Approximate do
   O(k × (V+E)) for unweighted graphs, O(k × (E + V log V)) for weighted.
   """
   @spec diameter(Graph.t(), keyword()) :: any()
-  def diameter(%Graph{} = graph, opts \\ []) do
+  def diameter(graph, opts \\ [])
+
+  def diameter(graph, opts) when is_list(opts) do
+    target_graph = validate_graph!(graph)
     samples = Keyword.get(opts, :samples, 4)
 
     %{zero: zero, add: add, compare: compare, weight_fn: weight_fn} = parse_metric_opts(opts)
 
     reweighted_graph =
       if weight_fn != (&Function.identity/1),
-        do: Transform.map_edges(graph, weight_fn),
-        else: graph
+        do: Transform.map_edges(target_graph, weight_fn),
+        else: target_graph
 
     nodes = Model.all_nodes(reweighted_graph)
 
@@ -116,6 +119,10 @@ defmodule Yog.Approximate do
 
       best
     end
+  end
+
+  def diameter(_graph, opts) do
+    raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
   end
 
   defp farthest_node(graph, source, zero, add, compare) do
@@ -157,12 +164,15 @@ defmodule Yog.Approximate do
   O(k(V+E)) where k is the sample count.
   """
   @spec betweenness(Graph.t(), keyword()) :: %{Yog.node_id() => float()}
-  def betweenness(%Graph{} = graph, opts \\ []) do
+  def betweenness(graph, opts \\ [])
+
+  def betweenness(graph, opts) when is_list(opts) do
+    target_graph = validate_graph!(graph)
     zero = opts[:zero] || 0
     add = opts[:add] || (&Kernel.+/2)
     compare = opts[:compare] || (&Yog.Utils.compare/2)
 
-    nodes = Model.all_nodes(graph)
+    nodes = Model.all_nodes(target_graph)
     n = length(nodes)
 
     if n == 0 do
@@ -185,7 +195,7 @@ defmodule Yog.Approximate do
         sampled
         |> Task.async_stream(
           fn s ->
-            {stack, preds, sigmas} = Brandes.discovery(graph, s, zero, add, compare)
+            {stack, preds, sigmas} = Brandes.discovery(target_graph, s, zero, add, compare)
             deps = Brandes.accumulate_node_dependencies(stack, preds, sigmas)
             {s, deps}
           end,
@@ -199,8 +209,12 @@ defmodule Yog.Approximate do
       scale = n / max(n_sampled, 1) * 1.0
 
       scaled_scores = Map.new(scores, fn {id, score} -> {id, score * scale} end)
-      apply_undirected_scaling(scaled_scores, graph)
+      apply_undirected_scaling(scaled_scores, target_graph)
     end
+  end
+
+  def betweenness(_graph, opts) do
+    raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
   end
 
   defp merge_scores(acc, dependencies) do
@@ -246,14 +260,18 @@ defmodule Yog.Approximate do
   O(k × (E + V log V)) where k is the sample count.
   """
   @spec closeness(Graph.t(), keyword()) :: %{Yog.node_id() => float()}
-  def closeness(%Graph{} = graph, opts \\ []) do
+  def closeness(graph, opts \\ [])
+
+  def closeness(graph, opts) when is_list(opts) do
+    target_graph = validate_graph!(graph)
+
     %{zero: zero, add: add, compare: compare, weight_fn: weight_fn, to_float: to_float} =
       parse_metric_opts(opts)
 
     reweighted_graph =
       if Keyword.has_key?(opts, :with),
-        do: Transform.map_edges(graph, weight_fn),
-        else: graph
+        do: Transform.map_edges(target_graph, weight_fn),
+        else: target_graph
 
     nodes = Model.all_nodes(reweighted_graph)
     n = length(nodes)
@@ -311,6 +329,10 @@ defmodule Yog.Approximate do
     end
   end
 
+  def closeness(_graph, opts) do
+    raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
+  end
+
   # =============================================================================
   # Harmonic Centrality Approximation
   # =============================================================================
@@ -342,14 +364,18 @@ defmodule Yog.Approximate do
   O(k × (E + V log V)) where k is the sample count.
   """
   @spec harmonic(Graph.t(), keyword()) :: %{Yog.node_id() => float()}
-  def harmonic(%Graph{} = graph, opts \\ []) do
+  def harmonic(graph, opts \\ [])
+
+  def harmonic(graph, opts) when is_list(opts) do
+    target_graph = validate_graph!(graph)
+
     %{zero: zero, add: add, compare: compare, weight_fn: weight_fn, to_float: to_float} =
       parse_metric_opts(opts)
 
     reweighted_graph =
       if Keyword.has_key?(opts, :with),
-        do: Transform.map_edges(graph, weight_fn),
-        else: graph
+        do: Transform.map_edges(target_graph, weight_fn),
+        else: target_graph
 
     nodes = Model.all_nodes(reweighted_graph)
     n = length(nodes)
@@ -362,8 +388,6 @@ defmodule Yog.Approximate do
       sampled = sample_nodes(nodes, min(samples, n), seed)
       k = length(sampled)
 
-      # Transpose the graph so Dijkstra from pivot p on the transposed graph
-      # yields the distance from all nodes v to p in the original graph.
       transposed = Transform.transpose(reweighted_graph)
 
       parallel_opts = [
@@ -407,6 +431,10 @@ defmodule Yog.Approximate do
     end
   end
 
+  def harmonic(_graph, opts) do
+    raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
+  end
+
   # =============================================================================
   # Average Shortest Path Length Approximation
   # =============================================================================
@@ -438,14 +466,18 @@ defmodule Yog.Approximate do
   O(k × (E + V log V)) where k is the sample count.
   """
   @spec average_path_length(Graph.t(), keyword()) :: float() | nil
-  def average_path_length(%Graph{} = graph, opts \\ []) do
+  def average_path_length(graph, opts \\ [])
+
+  def average_path_length(graph, opts) when is_list(opts) do
+    target_graph = validate_graph!(graph)
+
     %{zero: zero, add: add, compare: compare, weight_fn: weight_fn, to_float: to_float} =
       parse_metric_opts(opts)
 
     reweighted_graph =
       if Keyword.has_key?(opts, :with),
-        do: Transform.map_edges(graph, weight_fn),
-        else: graph
+        do: Transform.map_edges(target_graph, weight_fn),
+        else: target_graph
 
     nodes = Model.all_nodes(reweighted_graph)
     n = length(nodes)
@@ -490,6 +522,10 @@ defmodule Yog.Approximate do
     end
   end
 
+  def average_path_length(_graph, opts) do
+    raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
+  end
+
   # =============================================================================
   # Global Efficiency Approximation
   # =============================================================================
@@ -516,14 +552,18 @@ defmodule Yog.Approximate do
   O(k × (E + V log V)) where k is the sample count.
   """
   @spec global_efficiency(Graph.t(), keyword()) :: float()
-  def global_efficiency(%Graph{} = graph, opts \\ []) do
+  def global_efficiency(graph, opts \\ [])
+
+  def global_efficiency(graph, opts) when is_list(opts) do
+    target_graph = validate_graph!(graph)
+
     %{zero: zero, add: add, compare: compare, weight_fn: weight_fn, to_float: to_float} =
       parse_metric_opts(opts)
 
     reweighted_graph =
       if Keyword.has_key?(opts, :with),
-        do: Transform.map_edges(graph, weight_fn),
-        else: graph
+        do: Transform.map_edges(target_graph, weight_fn),
+        else: target_graph
 
     nodes = Model.all_nodes(reweighted_graph)
     n = length(nodes)
@@ -557,9 +597,12 @@ defmodule Yog.Approximate do
         )
         |> Enum.reduce(0.0, fn {:ok, source_sum}, acc -> acc + source_sum end)
 
-      # Scale from sample average to population average
       total * (n / max(length(sampled), 1)) / (n * (n - 1) * 1.0)
     end
+  end
+
+  def global_efficiency(_graph, opts) do
+    raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
   end
 
   defp safe_inverse(dist, to_float) do
@@ -597,25 +640,26 @@ defmodule Yog.Approximate do
   O(k) where k is the number of sampled wedges.
   """
   @spec transitivity(Graph.t(), keyword()) :: float()
-  def transitivity(%Graph{nodes: nodes} = graph, opts \\ []) do
-    node_list = Map.keys(nodes)
+  def transitivity(graph, opts \\ [])
+
+  def transitivity(graph, opts) when is_list(opts) do
+    target_graph = validate_graph!(graph)
+    node_list = Model.all_nodes(target_graph)
     n = length(node_list)
 
     if n < 3 do
       0.0
     else
-      # Build adjacency sets for fast O(1) lookups
       adj =
         Map.new(node_list, fn u ->
           neighbors =
-            graph
+            target_graph
             |> Model.neighbor_ids(u)
             |> MapSet.new()
 
           {u, neighbors}
         end)
 
-      # Compute degree of each node and total wedge count
       degrees = Map.new(node_list, fn u -> {u, MapSet.size(Map.fetch!(adj, u))} end)
 
       total_wedges =
@@ -633,6 +677,10 @@ defmodule Yog.Approximate do
         closed / samples * 1.0
       end
     end
+  end
+
+  def transitivity(_graph, opts) do
+    raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
   end
 
   defp sample_wedges(nodes, adj, _degrees, samples, seed) do
@@ -733,8 +781,9 @@ defmodule Yog.Approximate do
   O(V + E)
   """
   @spec vertex_cover(Graph.t()) :: MapSet.t(Yog.node_id())
-  def vertex_cover(%Graph{} = graph) do
-    edges = Model.all_edges(graph)
+  def vertex_cover(graph) do
+    target_graph = validate_graph!(graph)
+    edges = Model.all_edges(target_graph)
     do_vertex_cover(edges, MapSet.new())
   end
 
@@ -779,18 +828,18 @@ defmodule Yog.Approximate do
   O(V²)
   """
   @spec max_clique(Graph.t()) :: MapSet.t(Yog.node_id())
-  def max_clique(%Graph{} = graph) do
-    nodes = Model.all_nodes(graph)
+  def max_clique(graph) do
+    target_graph = validate_graph!(graph)
+    nodes = Model.all_nodes(target_graph)
 
     if nodes == [] do
       MapSet.new()
     else
       adj =
         Map.new(nodes, fn u ->
-          {u, Model.neighbor_ids(graph, u) |> MapSet.new()}
+          {u, Model.neighbor_ids(target_graph, u) |> MapSet.new()}
         end)
 
-      # Try starting from each node, keep the best clique found
       sorted = Enum.sort_by(nodes, fn u -> MapSet.size(Map.fetch!(adj, u)) end, :desc)
 
       Enum.reduce(sorted, MapSet.new(), fn start_node, best ->
@@ -805,39 +854,31 @@ defmodule Yog.Approximate do
     end
   end
 
-  # =============================================================================
-  # Treewidth Approximation
-  # =============================================================================
-
-  @doc """
-  Returns an upper bound on the treewidth using heuristic elimination ordering.
-
-  ## Options
-
-  - `:heuristic` - `:min_degree` (default) or `:min_fill`
-
-  ## Examples
-
-      iex> graph = Yog.Generator.Classic.cycle(5)
-      iex> Yog.Approximate.treewidth_upper_bound(graph) <= 2
-      true
-
-      iex> graph = Yog.Generator.Classic.complete(4)
-      iex> Yog.Approximate.treewidth_upper_bound(graph) == 3
-      true
-  """
   @spec treewidth_upper_bound(Graph.t(), keyword()) :: non_neg_integer()
-  def treewidth_upper_bound(%Graph{} = graph, opts \\ []) do
+  def treewidth_upper_bound(graph, opts \\ [])
+
+  def treewidth_upper_bound(graph, opts) when is_list(opts) do
+    target_graph = validate_graph!(graph)
     heuristic = Keyword.get(opts, :heuristic, :min_degree)
-    nodes = Model.all_nodes(graph)
+
+    if heuristic not in [:min_degree, :min_fill] do
+      raise ArgumentError,
+            "expected heuristic to be :min_degree or :min_fill, got: #{inspect(heuristic)}"
+    end
+
+    nodes = Model.all_nodes(target_graph)
 
     if nodes == [] do
       0
     else
-      {full_adj, components} = weak_components(graph, nodes)
+      {full_adj, components} = weak_components(target_graph, nodes)
       {tw, _bag_info} = eliminate_components(components, full_adj, heuristic)
       tw
     end
+  end
+
+  def treewidth_upper_bound(_graph, opts) do
+    raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
   end
 
   @doc """
@@ -858,15 +899,24 @@ defmodule Yog.Approximate do
   """
   @spec tree_decomposition(Graph.t(), keyword()) ::
           {:ok, TreeDecomposition.t()} | :error
-  def tree_decomposition(%Graph{} = graph, opts \\ []) do
+  def tree_decomposition(graph, opts \\ [])
+
+  def tree_decomposition(graph, opts) when is_list(opts) do
+    target_graph = validate_graph!(graph)
     heuristic = Keyword.get(opts, :heuristic, :min_degree)
-    nodes = Model.all_nodes(graph)
+
+    if heuristic not in [:min_degree, :min_fill] do
+      raise ArgumentError,
+            "expected heuristic to be :min_degree or :min_fill, got: #{inspect(heuristic)}"
+    end
+
+    nodes = Model.all_nodes(target_graph)
 
     if nodes == [] do
       tree = Yog.undirected()
       {:ok, %TreeDecomposition{bags: %{}, tree: tree, width: 0}}
     else
-      {full_adj, components} = weak_components(graph, nodes)
+      {full_adj, components} = weak_components(target_graph, nodes)
       {tw, bag_info} = eliminate_components(components, full_adj, heuristic)
       tree = build_bag_tree(bag_info)
 
@@ -882,6 +932,17 @@ defmodule Yog.Approximate do
          width: tw
        }}
     end
+  end
+
+  def tree_decomposition(_graph, opts) do
+    raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
+  end
+
+  defp validate_graph!(%Graph{} = g), do: g
+  defp validate_graph!(%Yog.DAG{graph: g}), do: g
+
+  defp validate_graph!(other) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
   end
 
   # Build undirected adjacency and find weakly connected components

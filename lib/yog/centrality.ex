@@ -117,13 +117,16 @@ defmodule Yog.Centrality do
       0.5
   """
   @spec degree(Yog.graph(), degree_mode()) :: centrality_scores()
-  def degree(graph, mode \\ :total_degree) do
-    n = map_size(graph.nodes)
-    nodes = Map.keys(graph.nodes)
+  def degree(graph, mode \\ :total_degree)
+
+  def degree(graph, mode) when mode in [:in_degree, :out_degree, :total_degree] do
+    target_graph = validate_graph!(graph)
+    n = map_size(target_graph.nodes)
+    nodes = Map.keys(target_graph.nodes)
 
     factor = if n > 1, do: (n - 1) * 1.0, else: 1.0
 
-    %Yog.Graph{kind: kind, out_edges: out_edges, in_edges: in_edges} = graph
+    %Yog.Graph{kind: kind, out_edges: out_edges, in_edges: in_edges} = target_graph
 
     List.foldl(nodes, %{}, fn id, acc ->
       count =
@@ -147,6 +150,11 @@ defmodule Yog.Centrality do
 
       Map.put(acc, id, count / factor)
     end)
+  end
+
+  def degree(_graph, mode) do
+    raise ArgumentError,
+          "expected mode to be :in_degree, :out_degree, or :total_degree, got: #{inspect(mode)}"
   end
 
   # =============================================================================
@@ -213,15 +221,18 @@ defmodule Yog.Centrality do
       1.0
   """
   @spec closeness(Yog.graph(), keyword()) :: centrality_scores()
-  def closeness(graph, opts \\ []) do
+  def closeness(graph, opts \\ [])
+
+  def closeness(graph, opts) when is_list(opts) do
+    target_graph = validate_graph!(graph)
     zero = opts[:zero] || 0
     add = opts[:add] || (&Kernel.+/2)
     compare = opts[:compare] || (&Yog.Utils.compare/2)
     to_float = opts[:to_float] || fn x -> x * 1.0 end
     wf_improved = Keyword.get(opts, :wf_improved, false)
 
-    nodes = Map.keys(graph.nodes)
-    n = map_size(graph.nodes)
+    nodes = Map.keys(target_graph.nodes)
+    n = map_size(target_graph.nodes)
 
     if n <= 1 do
       List.foldl(nodes, %{}, fn id, acc ->
@@ -230,7 +241,7 @@ defmodule Yog.Centrality do
     else
       # Computation function per source node
       compute = fn source ->
-        distances = dijkstra_single_source(graph, source, zero, add, compare)
+        distances = dijkstra_single_source(target_graph, source, zero, add, compare)
         reachable = map_size(distances)
 
         total_distance =
@@ -282,6 +293,10 @@ defmodule Yog.Centrality do
         end)
       end
     end
+  end
+
+  def closeness(_graph, opts) do
+    raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
   end
 
   # =============================================================================
@@ -338,14 +353,17 @@ defmodule Yog.Centrality do
       1.0
   """
   @spec harmonic(Yog.graph(), keyword()) :: centrality_scores()
-  def harmonic(graph, opts \\ []) do
+  def harmonic(graph, opts \\ [])
+
+  def harmonic(graph, opts) when is_list(opts) do
+    target_graph = validate_graph!(graph)
     zero = opts[:zero] || 0
     add = opts[:add] || (&Kernel.+/2)
     compare = opts[:compare] || (&Yog.Utils.compare/2)
     to_float = opts[:to_float] || fn x -> x * 1.0 end
 
-    nodes = Map.keys(graph.nodes)
-    n = map_size(graph.nodes)
+    nodes = Map.keys(target_graph.nodes)
+    n = map_size(target_graph.nodes)
 
     if n <= 1 do
       List.foldl(nodes, %{}, fn id, acc ->
@@ -355,7 +373,7 @@ defmodule Yog.Centrality do
       denominator = (n - 1) * 1.0
 
       compute = fn source ->
-        distances = dijkstra_single_source(graph, source, zero, add, compare)
+        distances = dijkstra_single_source(target_graph, source, zero, add, compare)
 
         sum_of_reciprocals =
           List.foldl(Map.to_list(distances), 0.0, fn {node, dist}, sum ->
@@ -394,6 +412,10 @@ defmodule Yog.Centrality do
         end)
       end
     end
+  end
+
+  def harmonic(_graph, opts) do
+    raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
   end
 
   # =============================================================================
@@ -447,18 +469,21 @@ defmodule Yog.Centrality do
       1.0
   """
   @spec betweenness(Yog.graph(), keyword()) :: centrality_scores()
-  def betweenness(graph, opts \\ []) do
+  def betweenness(graph, opts \\ [])
+
+  def betweenness(graph, opts) when is_list(opts) do
+    target_graph = validate_graph!(graph)
     zero = opts[:zero] || 0
     add = opts[:add] || (&Kernel.+/2)
     compare = opts[:compare] || (&Yog.Utils.compare/2)
 
-    nodes = Map.keys(graph.nodes)
+    nodes = Map.keys(target_graph.nodes)
 
     initial =
       Map.new(nodes, fn id -> {id, 0.0} end)
 
     compute = fn s ->
-      {stack, preds, sigmas} = Brandes.discovery(graph, s, zero, add, compare)
+      {stack, preds, sigmas} = Brandes.discovery(target_graph, s, zero, add, compare)
 
       dependencies =
         Brandes.accumulate_node_dependencies(stack, preds, sigmas)
@@ -486,7 +511,11 @@ defmodule Yog.Centrality do
         end)
       end
 
-    apply_undirected_scaling(scores, graph)
+    apply_undirected_scaling(scores, target_graph)
+  end
+
+  def betweenness(_graph, opts) do
+    raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
   end
 
   # =============================================================================
@@ -555,12 +584,15 @@ defmodule Yog.Centrality do
       3
   """
   @spec pagerank(Yog.graph(), keyword()) :: centrality_scores()
-  def pagerank(graph, opts \\ []) do
+  def pagerank(graph, opts \\ [])
+
+  def pagerank(graph, opts) when is_list(opts) do
+    target_graph = validate_graph!(graph)
     damping = Keyword.get(opts, :damping, 0.85)
     max_iterations = Keyword.get(opts, :max_iterations, 100)
     tolerance = Keyword.get(opts, :tolerance, 0.0001)
 
-    nodes = Map.keys(graph.nodes)
+    nodes = Map.keys(target_graph.nodes)
     n = length(nodes)
 
     cond do
@@ -571,7 +603,7 @@ defmodule Yog.Centrality do
         Map.new(nodes, fn node -> {node, 1.0} end)
 
       true ->
-        %Yog.Graph{kind: kind, out_edges: out_edges, in_edges: in_edges} = graph
+        %Yog.Graph{kind: kind, out_edges: out_edges, in_edges: in_edges} = target_graph
 
         out_degrees_map =
           List.foldl(nodes, %{}, fn id, acc ->
@@ -619,6 +651,10 @@ defmodule Yog.Centrality do
           sinks
         )
     end
+  end
+
+  def pagerank(_graph, opts) do
+    raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
   end
 
   # =============================================================================
@@ -676,7 +712,9 @@ defmodule Yog.Centrality do
           hubs: centrality_scores(),
           authorities: centrality_scores()
         }
-  def hits(graph, opts \\ []) do
+  def hits(graph, opts \\ [])
+
+  def hits(graph, opts) when is_list(opts) do
     max_iterations = Keyword.get(opts, :max_iterations, 100)
     tolerance = Keyword.get(opts, :tolerance, 1.0e-6)
 
@@ -852,14 +890,17 @@ defmodule Yog.Centrality do
       true
   """
   @spec eigenvector(Yog.graph(), keyword()) :: centrality_scores()
-  def eigenvector(graph, opts \\ []) do
+  def eigenvector(graph, opts \\ [])
+
+  def eigenvector(graph, opts) when is_list(opts) do
+    target_graph = validate_graph!(graph)
     max_iterations = Keyword.get(opts, :max_iterations, 100)
     tolerance = Keyword.get(opts, :tolerance, 0.0001)
 
-    nodes = Map.keys(graph.nodes)
-    n = map_size(graph.nodes)
+    nodes = Map.keys(target_graph.nodes)
+    n = map_size(target_graph.nodes)
 
-    %Yog.Graph{kind: kind, out_edges: out_edges, in_edges: in_edges} = graph
+    %Yog.Graph{kind: kind, out_edges: out_edges, in_edges: in_edges} = target_graph
 
     if n <= 1 do
       List.foldl(nodes, %{}, fn id, acc ->
@@ -887,6 +928,10 @@ defmodule Yog.Centrality do
         in_neighbors_map
       )
     end
+  end
+
+  def eigenvector(_graph, opts) do
+    raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
   end
 
   # =============================================================================
@@ -937,11 +982,17 @@ defmodule Yog.Centrality do
       true
   """
   @spec katz(Yog.graph(), keyword()) :: centrality_scores()
-  def katz(graph, opts \\ []) do
+  def katz(graph, opts \\ [])
+
+  def katz(graph, opts) when is_list(opts) do
     alpha = Keyword.get(opts, :alpha, 0.1)
     beta = Keyword.get(opts, :beta, 1.0)
 
     alpha(graph, Keyword.merge(opts, alpha: alpha, initial: beta))
+  end
+
+  def katz(_graph, opts) do
+    raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
   end
 
   # =============================================================================
@@ -991,12 +1042,15 @@ defmodule Yog.Centrality do
       3
   """
   @spec alpha(Yog.graph(), keyword()) :: centrality_scores()
-  def alpha(graph, opts \\ []) do
+  def alpha(graph, opts \\ [])
+
+  def alpha(graph, opts) when is_list(opts) do
+    target_graph = validate_graph!(graph)
     alpha = Keyword.get(opts, :alpha, 0.1)
     max_iter = Keyword.get(opts, :max_iterations, 100)
     tol = Keyword.get(opts, :tolerance, 1.0e-6)
 
-    nodes = Map.keys(graph.nodes)
+    nodes = Map.keys(target_graph.nodes)
 
     initial_scores =
       opts
@@ -1006,7 +1060,7 @@ defmodule Yog.Centrality do
     in_map =
       List.foldl(nodes, %{}, fn id, acc ->
         predecessors =
-          case Map.fetch(graph.in_edges, id) do
+          case Map.fetch(target_graph.in_edges, id) do
             {:ok, edges} -> Map.keys(edges)
             :error -> []
           end
@@ -1017,6 +1071,10 @@ defmodule Yog.Centrality do
     iterate_alpha(nodes, initial_scores, initial_scores, alpha, max_iter, tol, in_map)
   end
 
+  def alpha(_graph, opts) do
+    raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
+  end
+
   @doc """
   Degree centrality with default options for undirected graphs.
   Uses `:total_degree` mode.
@@ -1025,6 +1083,13 @@ defmodule Yog.Centrality do
   """
   @spec degree_total(Yog.graph()) :: centrality_scores()
   def degree_total(graph), do: degree(graph, :total_degree)
+
+  defp validate_graph!(%Yog.Graph{} = g), do: g
+  defp validate_graph!(%Yog.DAG{graph: g}), do: g
+
+  defp validate_graph!(other) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
+  end
 
   # =============================================================================
   # Internal Helper Functions

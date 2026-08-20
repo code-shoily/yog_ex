@@ -1,5 +1,6 @@
 defmodule Yog.CentralityTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
+  use ExUnitProperties
 
   doctest Yog.Centrality
 
@@ -621,6 +622,47 @@ defmodule Yog.CentralityTest do
       )
 
     assert scores_default == scores_explicit
+  end
+
+  test "input validation raises ArgumentError on invalid graph or arguments" do
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Yog.Centrality.degree(:invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected mode to be/, fn ->
+      Yog.Centrality.degree(Yog.directed(), :invalid_mode)
+    end
+
+    assert_raise ArgumentError, ~r/expected opts to be a keyword list/, fn ->
+      Yog.Centrality.closeness(Yog.directed(), :invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected opts to be a keyword list/, fn ->
+      Yog.Centrality.pagerank(Yog.directed(), :invalid)
+    end
+  end
+
+  describe "Centrality Property Tests" do
+    property "degree centrality is normalized in [0, 1] for all non-empty simple graphs without self-loops" do
+      check all(
+              n <- StreamData.integer(2..10),
+              raw_edges <-
+                StreamData.list_of(
+                  StreamData.tuple({StreamData.integer(1..n), StreamData.integer(1..n)})
+                )
+            ) do
+        g =
+          Enum.reduce(raw_edges, Yog.undirected(), fn {u, v}, acc ->
+            if u != v, do: Yog.add_edge_ensure(acc, u, v, 1), else: acc
+          end)
+
+        scores = Yog.Centrality.degree(g)
+
+        for {_node, score} <- scores do
+          assert score >= 0.0 and score <= 1.0
+        end
+      end
+    end
   end
 
   # ============= Helper Functions =============
