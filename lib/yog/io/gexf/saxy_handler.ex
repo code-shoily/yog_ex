@@ -1,8 +1,29 @@
 defmodule Yog.IO.GEXF.SaxyHandler do
-  @moduledoc false
+  @moduledoc """
+  SAXY XML SAX event handler for GEXF graph import.
+
+  Processes GEXF XML documents element-by-element during streaming or string parsing,
+  extracting graph metadata, nodes, edges, attributes, and visual extensions (`viz:*`).
+  """
+
   if Code.ensure_loaded?(Saxy) do
     @behaviour Saxy.Handler
   end
+
+  @type t :: %__MODULE__{
+          node_folder: (map() -> any()) | nil,
+          edge_folder: (map() -> any()) | nil,
+          graph_type: :directed | :undirected,
+          node_attr_map: %{String.t() => String.t()},
+          node_attr_types: %{String.t() => String.t()},
+          edge_attr_map: %{String.t() => String.t()},
+          edge_attr_types: %{String.t() => String.t()},
+          nodes: list(),
+          edges: list(),
+          current_element: atom() | {:attributes, String.t()} | nil,
+          current_attrs: map(),
+          multigraph: boolean()
+        }
 
   defstruct node_folder: nil,
             edge_folder: nil,
@@ -17,6 +38,12 @@ defmodule Yog.IO.GEXF.SaxyHandler do
             current_attrs: %{},
             multigraph: false
 
+  @doc """
+  Handles SAXY XML events for GEXF document parsing.
+
+  Time complexity: $\\mathcal{O}(1)$ per XML event.
+  """
+  @spec handle_event(atom(), any(), t()) :: {:ok, t()}
   def handle_event(:start_document, _prolog, state) do
     {:ok, state}
   end
@@ -232,7 +259,13 @@ defmodule Yog.IO.GEXF.SaxyHandler do
 
     attrs = if label != "", do: Map.put(attrs_map, "label", label), else: attrs_map
 
-    data = state.node_folder.(attrs)
+    data =
+      if is_function(state.node_folder, 1) do
+        state.node_folder.(attrs)
+      else
+        attrs
+      end
+
     nodes = [{id, data} | state.nodes]
 
     {:ok, %{state | nodes: nodes, current_element: nil, current_attrs: %{}}}
@@ -247,7 +280,12 @@ defmodule Yog.IO.GEXF.SaxyHandler do
 
     attrs_map = Map.drop(state.current_attrs, keys_to_delete)
 
-    weight = state.edge_folder.(attrs_map)
+    weight =
+      if is_function(state.edge_folder, 1) do
+        state.edge_folder.(attrs_map)
+      else
+        attrs_map
+      end
 
     edge =
       if state.multigraph do
@@ -270,10 +308,34 @@ defmodule Yog.IO.GEXF.SaxyHandler do
     {:ok, state}
   end
 
-  defp cast_value(val, "integer"), do: String.to_integer(val)
-  defp cast_value(val, "long"), do: String.to_integer(val)
-  defp cast_value(val, "double"), do: String.to_float(val)
-  defp cast_value(val, "float"), do: String.to_float(val)
+  defp cast_value(val, "integer") do
+    case Integer.parse(val) do
+      {i, ""} -> i
+      _ -> val
+    end
+  end
+
+  defp cast_value(val, "long") do
+    case Integer.parse(val) do
+      {i, ""} -> i
+      _ -> val
+    end
+  end
+
+  defp cast_value(val, "double") do
+    case Float.parse(val) do
+      {f, ""} -> f
+      _ -> val
+    end
+  end
+
+  defp cast_value(val, "float") do
+    case Float.parse(val) do
+      {f, ""} -> f
+      _ -> val
+    end
+  end
+
   defp cast_value("true", "boolean"), do: true
   defp cast_value("false", "boolean"), do: false
   defp cast_value(val, _), do: val
