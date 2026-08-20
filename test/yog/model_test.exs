@@ -1,5 +1,6 @@
 defmodule Yog.ModelTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
+  use ExUnitProperties
 
   alias Yog.Model
 
@@ -421,5 +422,122 @@ defmodule Yog.ModelTest do
     assert Model.type(graph) == :directed
     assert is_map(Model.nodes(graph))
     assert Model.node(graph, 1) == "A"
+  end
+
+  test "input validation for new, add_edge_with, combine and edge lists" do
+    assert_raise ArgumentError, ~r/expected graph_type to be :directed or :undirected/, fn ->
+      Model.new(:invalid_kind)
+    end
+
+    assert_raise ArgumentError, ~r/expected make_fn to be an arity-1 function/, fn ->
+      Model.add_edge_with(Model.new(:directed), 1, 2, 10, :invalid_fn)
+    end
+
+    graph = Model.new(:directed) |> Model.add_node(1, "A") |> Model.add_node(2, "B")
+
+    assert {:error, "expected with_combine to be an arity-2 function" <> _} =
+             Model.add_edge_with_combine(graph, 1, 2, 10, :invalid_combine)
+
+    assert {:error, "invalid edge tuple format: :bad_edge"} =
+             Model.add_edges(graph, [:bad_edge])
+
+    assert {:error, "invalid edge tuple format: :bad_edge"} =
+             Model.add_simple_edges(graph, [:bad_edge])
+
+    assert {:error, "invalid edge tuple format: :bad_edge"} =
+             Model.add_unweighted_edges(graph, [:bad_edge])
+  end
+
+  describe "property tests for Model invariants" do
+    property "directed graph in-degree sum equals out-degree sum" do
+      check all(
+              n <- StreamData.integer(1..15),
+              raw_edges <-
+                StreamData.list_of(
+                  StreamData.tuple(
+                    {StreamData.integer(1..n), StreamData.integer(1..n),
+                     StreamData.integer(1..100)}
+                  )
+                )
+            ) do
+        graph =
+          Enum.reduce(1..n, Model.new(:directed), &Model.add_node(&2, &1, "Node#{&1}"))
+
+        graph =
+          Enum.reduce(raw_edges, graph, fn {u, v, w}, acc ->
+            Model.add_edge_ensure(acc, u, v, w)
+          end)
+
+        nodes = Model.all_nodes(graph)
+
+        out_sum = Enum.sum_by(nodes, &Model.out_degree(graph, &1))
+        in_sum = Enum.sum_by(nodes, &Model.in_degree(graph, &1))
+
+        assert out_sum == in_sum
+        assert out_sum == Model.edge_count(graph)
+      end
+    end
+
+    property "undirected graph has symmetric adjacency" do
+      check all(
+              n <- StreamData.integer(1..15),
+              raw_edges <-
+                StreamData.list_of(
+                  StreamData.tuple(
+                    {StreamData.integer(1..n), StreamData.integer(1..n),
+                     StreamData.integer(1..100)}
+                  )
+                )
+            ) do
+        graph =
+          Enum.reduce(1..n, Model.new(:undirected), &Model.add_node(&2, &1, "Node#{&1}"))
+
+        graph =
+          Enum.reduce(raw_edges, graph, fn {u, v, w}, acc ->
+            Model.add_edge_ensure(acc, u, v, w)
+          end)
+
+        nodes = Model.all_nodes(graph)
+
+        for u <- nodes, v <- nodes do
+          assert Model.has_edge?(graph, u, v) == Model.has_edge?(graph, v, u)
+          assert Model.edge_data(graph, u, v) == Model.edge_data(graph, v, u)
+        end
+      end
+    end
+
+    property "node removal cleans up all incident edges" do
+      check all(
+              n <- StreamData.integer(2..15),
+              target_node <- StreamData.integer(1..n),
+              kind <- StreamData.member_of([:directed, :undirected]),
+              raw_edges <-
+                StreamData.list_of(
+                  StreamData.tuple(
+                    {StreamData.integer(1..n), StreamData.integer(1..n),
+                     StreamData.integer(1..100)}
+                  )
+                )
+            ) do
+        graph =
+          Enum.reduce(1..n, Model.new(kind), &Model.add_node(&2, &1, "Node#{&1}"))
+
+        graph =
+          Enum.reduce(raw_edges, graph, fn {u, v, w}, acc ->
+            Model.add_edge_ensure(acc, u, v, w)
+          end)
+
+        updated_graph = Model.remove_node(graph, target_node)
+
+        refute Model.has_node?(updated_graph, target_node)
+        assert Model.successors(updated_graph, target_node) == []
+        assert Model.predecessors(updated_graph, target_node) == []
+
+        for other <- Model.all_nodes(updated_graph) do
+          refute Model.has_edge?(updated_graph, other, target_node)
+          refute Model.has_edge?(updated_graph, target_node, other)
+        end
+      end
+    end
   end
 end

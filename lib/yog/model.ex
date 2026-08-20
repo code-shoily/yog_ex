@@ -34,8 +34,6 @@ defmodule Yog.Model do
   The dual-map representation enables O(1) edge existence checks and O(1) transpose
   operations, at the cost of increased memory usage and slightly more complex edge
   updates.
-
-
   """
 
   alias Yog.Graph
@@ -62,7 +60,11 @@ defmodule Yog.Model do
   # =============================================================================
 
   @doc """
-  Creates a new empty graph of the specified type.
+  Creates a new empty graph of the specified type (`:directed` or `:undirected`).
+
+  Raises `ArgumentError` if graph_type is invalid.
+
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Example
 
@@ -71,13 +73,20 @@ defmodule Yog.Model do
       0
   """
   @spec new(graph_type()) :: graph()
-  def new(graph_type) do
+  def new(graph_type) when graph_type in [:directed, :undirected] do
     Graph.new(graph_type)
+  end
+
+  def new(graph_type) do
+    raise ArgumentError,
+          "expected graph_type to be :directed or :undirected, got: #{inspect(graph_type)}"
   end
 
   @doc """
   Adds a node to the graph with the given ID and data.
   If a node with this ID already exists, its data will be replaced.
+
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Example
 
@@ -104,6 +113,8 @@ defmodule Yog.Model do
 
   Existing nodes with the same ID will have their data replaced.
 
+  Time complexity: $\\mathcal{O}(N)$ where $N$ is the number of nodes added.
+
   ## Example
 
       iex> graph =
@@ -126,8 +137,7 @@ defmodule Yog.Model do
   @doc """
   Removes a node and all its connected edges (incoming and outgoing).
 
-  **Time Complexity:** O(deg(v)) - proportional to the number of edges
-  connected to the node, not the whole graph.
+  Time complexity: $\\mathcal{O}(\\text{deg}(v))$
 
   ## Example
 
@@ -179,6 +189,8 @@ defmodule Yog.Model do
   Use `add_edge_ensure/5` to auto-create missing nodes with a default value,
   or `add_node/3` to explicitly add nodes before adding edges.
 
+  Time complexity: $\\mathcal{O}(1)$
+
   ## Example
 
       iex> {:ok, graph} =
@@ -216,6 +228,8 @@ defmodule Yog.Model do
   @doc """
   Same as `add_edge/4` but raises on error.
 
+  Time complexity: $\\mathcal{O}(1)$
+
   ## Example
 
       iex> graph =
@@ -241,6 +255,8 @@ defmodule Yog.Model do
   For undirected graphs, adds edges in both directions.
 
   Returns `{:ok, graph}` or `{:error, reason}`.
+
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Example
 
@@ -271,6 +287,8 @@ defmodule Yog.Model do
   @doc """
   Adds an edge to the graph, raising on error.
 
+  Time complexity: $\\mathcal{O}(1)$
+
   ## Example
 
       iex> graph = Yog.directed() |> Yog.add_node(1, "A") |> Yog.add_node(2, "B")
@@ -294,6 +312,8 @@ defmodule Yog.Model do
 
   Always succeeds and returns a `Graph` (never fails).
   Use this when you want to build graphs quickly without pre-creating nodes.
+
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Example
 
@@ -322,6 +342,8 @@ defmodule Yog.Model do
   is used as the default node data.
 
   Always succeeds and returns a `Graph` (never fails).
+
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Example
 
@@ -356,6 +378,8 @@ defmodule Yog.Model do
 
   Returns `{:ok, graph}` or `{:error, reason}` if either endpoint node doesn't exist.
 
+  Time complexity: $\\mathcal{O}(1)$
+
   ## Example
 
       iex> {:ok, graph} =
@@ -377,10 +401,12 @@ defmodule Yog.Model do
   Ensures both endpoint nodes exist using a callback, then adds an edge.
 
   If `src` or `dst` is not already in the graph, it is created by
-  calling the `by` function with the node ID to generate the node data.
+  calling the `make_fn` function with the node ID to generate the node data.
   Nodes that already exist are left unchanged.
 
-  Always succeeds and returns a `Graph` (never fails).
+  Raises `ArgumentError` if `make_fn` is not an arity-1 function.
+
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Example
 
@@ -401,11 +427,15 @@ defmodule Yog.Model do
       {"1", "2:new"}
   """
   @spec add_edge_with(graph(), node_id(), node_id(), term(), (node_id() -> term())) :: graph()
-  def add_edge_with(graph, src, dst, edge_data, make_fn) do
+  def add_edge_with(graph, src, dst, edge_data, make_fn) when is_function(make_fn, 1) do
     graph
     |> ensure_node_with(src, make_fn)
     |> ensure_node_with(dst, make_fn)
     |> add_edge_unchecked(src, dst, edge_data)
+  end
+
+  def add_edge_with(_graph, _src, _dst, _edge_data, make_fn) do
+    raise ArgumentError, "expected make_fn to be an arity-1 function, got: #{inspect(make_fn)}"
   end
 
   @doc """
@@ -416,6 +446,8 @@ defmodule Yog.Model do
 
   This is more ergonomic than chaining multiple `add_edge` calls
   as it only requires unwrapping a single `Result`.
+
+  Time complexity: $\\mathcal{O}(E)$
 
   ## Example
 
@@ -430,17 +462,23 @@ defmodule Yog.Model do
   """
   @spec add_edges(graph(), [{node_id(), node_id(), term()}]) ::
           {:ok, graph()} | {:error, String.t()}
-  def add_edges(graph, edges) do
-    Enum.reduce_while(edges, {:ok, graph}, fn {src, dst, edge_data}, {:ok, g} ->
-      case add_edge(g, src, dst, edge_data) do
-        {:ok, new_g} -> {:cont, {:ok, new_g}}
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
+  def add_edges(%Graph{} = graph, edges) when is_list(edges) do
+    Enum.reduce_while(edges, {:ok, graph}, fn
+      {src, dst, edge_data}, {:ok, g} ->
+        case add_edge(g, src, dst, edge_data) do
+          {:ok, new_g} -> {:cont, {:ok, new_g}}
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+
+      edge, _ ->
+        {:halt, {:error, "invalid edge tuple format: #{inspect(edge)}"}}
     end)
   end
 
   @doc """
   Adds multiple edges to the graph, raising on error.
+
+  Time complexity: $\\mathcal{O}(E)$
 
   ## Example
 
@@ -453,6 +491,7 @@ defmodule Yog.Model do
       iex> length(Yog.successors(graph, 1))
       1
   """
+  @spec add_edges!(graph(), [{node_id(), node_id(), term()}]) :: graph()
   def add_edges!(graph, edges) do
     case add_edges(graph, edges) do
       {:ok, graph} -> graph
@@ -465,6 +504,8 @@ defmodule Yog.Model do
 
   Fails fast on the first edge that references non-existent nodes.
   Convenient for unweighted graphs where all edges have weight 1.
+
+  Time complexity: $\\mathcal{O}(E)$
 
   ## Example
 
@@ -479,12 +520,16 @@ defmodule Yog.Model do
   """
   @spec add_simple_edges(graph(), [{node_id(), node_id()}]) ::
           {:ok, graph()} | {:error, String.t()}
-  def add_simple_edges(graph, edges) do
-    Enum.reduce_while(edges, {:ok, graph}, fn {src, dst}, {:ok, g} ->
-      case add_edge(g, src, dst, 1) do
-        {:ok, new_g} -> {:cont, {:ok, new_g}}
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
+  def add_simple_edges(%Graph{} = graph, edges) when is_list(edges) do
+    Enum.reduce_while(edges, {:ok, graph}, fn
+      {src, dst}, {:ok, g} ->
+        case add_edge(g, src, dst, 1) do
+          {:ok, new_g} -> {:cont, {:ok, new_g}}
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+
+      edge, _ ->
+        {:halt, {:error, "invalid edge tuple format: #{inspect(edge)}"}}
     end)
   end
 
@@ -493,6 +538,8 @@ defmodule Yog.Model do
 
   Fails fast on the first edge that references non-existent nodes.
   Convenient for graphs where edges carry no weight information.
+
+  Time complexity: $\\mathcal{O}(E)$
 
   ## Example
 
@@ -507,12 +554,16 @@ defmodule Yog.Model do
   """
   @spec add_unweighted_edges(graph(), [{node_id(), node_id()}]) ::
           {:ok, graph()} | {:error, String.t()}
-  def add_unweighted_edges(graph, edges) do
-    Enum.reduce_while(edges, {:ok, graph}, fn {src, dst}, {:ok, g} ->
-      case add_edge(g, src, dst, nil) do
-        {:ok, new_g} -> {:cont, {:ok, new_g}}
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
+  def add_unweighted_edges(%Graph{} = graph, edges) when is_list(edges) do
+    Enum.reduce_while(edges, {:ok, graph}, fn
+      {src, dst}, {:ok, g} ->
+        case add_edge(g, src, dst, nil) do
+          {:ok, new_g} -> {:cont, {:ok, new_g}}
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+
+      edge, _ ->
+        {:halt, {:error, "invalid edge tuple format: #{inspect(edge)}"}}
     end)
   end
 
@@ -523,9 +574,10 @@ defmodule Yog.Model do
   The combine function receives `(existing_weight, new_weight)` and should
   return the combined weight.
 
-  Returns `{:error, reason}` if either endpoint node doesn't exist in `graph.nodes`.
+  Returns `{:error, reason}` if either endpoint node doesn't exist in `graph.nodes`
+  or if `with_combine` is not an arity-2 function.
 
-  **Time Complexity:** O(1)
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Example
 
@@ -547,7 +599,8 @@ defmodule Yog.Model do
   """
   @spec add_edge_with_combine(graph(), node_id(), node_id(), term(), (term(), term() -> term())) ::
           {:ok, graph()} | {:error, String.t()}
-  def add_edge_with_combine(%Graph{nodes: nodes} = graph, src, dst, weight, with_combine) do
+  def add_edge_with_combine(%Graph{nodes: nodes} = graph, src, dst, weight, with_combine)
+      when is_function(with_combine, 2) do
     has_src = Map.has_key?(nodes, src)
     has_dst = Map.has_key?(nodes, dst)
 
@@ -577,8 +630,14 @@ defmodule Yog.Model do
     end
   end
 
+  def add_edge_with_combine(%Graph{}, _src, _dst, _weight, with_combine) do
+    {:error, "expected with_combine to be an arity-2 function, got: #{inspect(with_combine)}"}
+  end
+
   @doc """
   Same as `add_edge_with_combine/5` but raises on error.
+
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Example
 
@@ -607,7 +666,7 @@ defmodule Yog.Model do
   For **undirected graphs**, this removes the edges in both directions
   (from `src` to `dst` and from `dst` to `src`).
 
-  **Time Complexity:** O(1)
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Example
 
@@ -651,6 +710,8 @@ defmodule Yog.Model do
   @doc """
   Gets the type of the graph (`:directed` or `:undirected`).
 
+  Time complexity: $\\mathcal{O}(1)$
+
   ## Example
 
       iex> graph = Yog.Model.new(:directed)
@@ -665,7 +726,7 @@ defmodule Yog.Model do
   @doc """
   Returns the number of nodes in the graph (graph order).
 
-  **Time Complexity:** O(1)
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Example
 
@@ -685,7 +746,7 @@ defmodule Yog.Model do
   Returns the number of nodes in the graph.
   Equivalent to `order/1`.
 
-  **Time Complexity:** O(1)
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Example
 
@@ -707,7 +768,7 @@ defmodule Yog.Model do
   For undirected graphs, each edge is counted once (the pair {u, v}).
   For directed graphs, each directed edge (u -> v) is counted once.
 
-  **Time Complexity:** O(V)
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Example
 
@@ -718,7 +779,6 @@ defmodule Yog.Model do
       ...>   |> Yog.Model.add_edge(1, 2, 10)
       iex> Yog.Model.edge_count(graph)
       1
-
   """
   @spec edge_count(graph()) :: integer()
   def edge_count(graph) do
@@ -728,6 +788,8 @@ defmodule Yog.Model do
   @doc """
   Checks if the graph contains a node with the given ID.
 
+  Time complexity: $\\mathcal{O}(1)$
+
   ## Example
 
       iex> graph = Yog.undirected() |> Yog.add_node(1, nil)
@@ -735,8 +797,6 @@ defmodule Yog.Model do
       true
       iex> Yog.Model.has_node?(graph, 2)
       false
-
-  **Time Complexity:** O(1)
   """
   @spec has_node?(graph(), node_id()) :: boolean()
   def has_node?(%Graph{nodes: nodes}, id) do
@@ -747,6 +807,8 @@ defmodule Yog.Model do
   Checks if the graph contains an edge between `src` and `dst`.
 
   Returns `true` if an edge exists, `false` otherwise.
+
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Examples
 
@@ -761,8 +823,6 @@ defmodule Yog.Model do
       true
       iex> Yog.Model.has_edge?(graph, 2, 4)
       false
-
-  **Time Complexity:** O(1)
   """
   @spec has_edge?(graph(), node_id(), node_id()) :: boolean()
   def has_edge?(%Graph{out_edges: out}, src, dst) do
@@ -779,6 +839,8 @@ defmodule Yog.Model do
   @doc """
   Gets nodes you can travel TO from the given node (successors).
   Returns a list of tuples containing the destination node ID and edge data.
+
+  Time complexity: $\\mathcal{O}(\\text{deg}_{\\text{out}}(v))$
 
   ## Example
 
@@ -801,6 +863,8 @@ defmodule Yog.Model do
   @doc """
   Gets nodes you came FROM to reach the given node (predecessors).
   Returns a list of tuples containing the source node ID and edge data.
+
+  Time complexity: $\\mathcal{O}(\\text{deg}_{\\text{in}}(v))$
 
   ## Example
 
@@ -827,6 +891,8 @@ defmodule Yog.Model do
   For undirected graphs, this is equivalent to successors.
   For directed graphs, this combines successors and predecessors without duplicates.
 
+  Time complexity: $\\mathcal{O}(\\text{deg}(v))$
+
   ## Example
 
       iex> {:ok, graph} =
@@ -848,7 +914,6 @@ defmodule Yog.Model do
 
     case Map.fetch(graph.in_edges, id) do
       {:ok, inner} ->
-        # Extract IDs from already-fetched outgoing list to avoid redundant lookup
         out_ids = Enum.map(outgoing, fn {node_id, _} -> node_id end)
         incoming_to_add = inner |> Map.drop(out_ids) |> Map.to_list()
         outgoing ++ incoming_to_add
@@ -860,6 +925,8 @@ defmodule Yog.Model do
 
   @doc """
   Returns all neighbor node IDs (without weights).
+
+  Time complexity: $\\mathcal{O}(\\text{deg}(v))$
 
   ## Example
 
@@ -887,6 +954,8 @@ defmodule Yog.Model do
   @doc """
   Returns all successor node IDs (without weights).
 
+  Time complexity: $\\mathcal{O}(\\text{deg}_{\\text{out}}(v))$
+
   ## Example
 
       iex> {:ok, graph} =
@@ -907,6 +976,8 @@ defmodule Yog.Model do
 
   @doc """
   Returns all predecessor node IDs (without weights).
+
+  Time complexity: $\\mathcal{O}(\\text{deg}_{\\text{in}}(v))$
 
   ## Example
 
@@ -931,7 +1002,7 @@ defmodule Yog.Model do
 
   For undirected graphs, this returns the total degree (same as `in_degree/2`).
 
-  **Time Complexity:** O(1)
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Example
 
@@ -944,7 +1015,6 @@ defmodule Yog.Model do
       1
       iex> Yog.Model.out_degree(graph, 2)
       0
-
   """
   @spec out_degree(graph(), node_id()) :: non_neg_integer()
   def out_degree(%Graph{out_edges: out_edges}, id) do
@@ -959,7 +1029,7 @@ defmodule Yog.Model do
 
   For undirected graphs, this returns the total degree (same as `out_degree/2`).
 
-  **Time Complexity:** O(1)
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Example
 
@@ -972,7 +1042,6 @@ defmodule Yog.Model do
       1
       iex> Yog.Model.in_degree(graph, 1)
       0
-
   """
   @spec in_degree(graph(), node_id()) :: non_neg_integer()
   def in_degree(%Graph{in_edges: in_edges}, id) do
@@ -988,7 +1057,7 @@ defmodule Yog.Model do
   For directed graphs, this is the sum of in-degree and out-degree.
   For undirected graphs, this counts each edge once (self-loops count as 2).
 
-  **Time Complexity:** O(1) for undirected, O(1) for directed
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Example
 
@@ -999,13 +1068,11 @@ defmodule Yog.Model do
       ...>   |> Yog.Model.add_edge(1, 2, 10)
       iex> Yog.Model.degree(graph, 1)
       1
-
   """
   @spec degree(graph(), node_id()) :: non_neg_integer()
   def degree(%Graph{kind: :undirected, out_edges: out_edges}, id) do
     case Map.fetch(out_edges, id) do
       {:ok, targets} ->
-        # Self-loops count as 2 in undirected graphs
         base = map_size(targets)
         if Map.has_key?(targets, id), do: base + 1, else: base
 
@@ -1026,6 +1093,8 @@ defmodule Yog.Model do
   Returns all node IDs in the graph.
   This includes all nodes, even isolated nodes with no edges.
 
+  Time complexity: $\\mathcal{O}(V)$
+
   ## Example
 
       iex> graph =
@@ -1036,12 +1105,14 @@ defmodule Yog.Model do
       [1, 2]
   """
   @spec all_nodes(graph()) :: [node_id()]
-  def all_nodes(graph) do
-    Map.keys(graph.nodes)
+  def all_nodes(%Graph{nodes: nodes}) do
+    Map.keys(nodes)
   end
 
   @doc """
   Returns all nodes in the graph as a map.
+
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Example
 
@@ -1063,6 +1134,8 @@ defmodule Yog.Model do
 
   Returns `nil` if the node doesn't exist.
 
+  Time complexity: $\\mathcal{O}(1)$
+
   ## Example
 
       iex> graph =
@@ -1080,6 +1153,8 @@ defmodule Yog.Model do
   Gets the weight/data of an edge between two nodes.
   Returns `nil` if the edge doesn't exist.
 
+  Time complexity: $\\mathcal{O}(1)$
+
   ## Example
 
       iex> graph = Yog.directed() |> Yog.add_edge_ensure(1, 2, 10, nil)
@@ -1096,6 +1171,8 @@ defmodule Yog.Model do
 
   @doc """
   Gets the weight/data of an edge between two nodes, raising if not found.
+
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Example
 
@@ -1123,7 +1200,7 @@ defmodule Yog.Model do
   For directed graphs, returns all edges.
   For undirected graphs, returns each edge only once (where `from <= to`).
 
-  This is particularly useful for graph export formats.
+  Time complexity: $\\mathcal{O}(V + E)$
 
   ## Examples
 
@@ -1144,7 +1221,7 @@ defmodule Yog.Model do
       iex> length(edges)
       1
   """
-  @spec all_edges(graph()) :: [{node_id(), node_id(), number()}]
+  @spec all_edges(graph()) :: [{node_id(), node_id(), term()}]
   def all_edges(%Graph{kind: kind, out_edges: out_edges}) do
     if kind == :directed do
       for {from, dests} <- out_edges,
@@ -1152,10 +1229,6 @@ defmodule Yog.Model do
         {from, to, weight}
       end
     else
-      # For undirected graphs, deduplicate by only taking edges where from <= to
-      # NOTE: This relies on Erlang term ordering. For complex types (structs/maps),
-      # the ordering is valid but may be semantically arbitrary. Ensure consistent
-      # node ID types to avoid unexpected edge ordering.
       for {from, dests} <- out_edges,
           {to, weight} <- dests,
           from <= to do
@@ -1168,9 +1241,6 @@ defmodule Yog.Model do
   # Private Helper Functions
   # =============================================================================
 
-  # Adds an edge without checking if nodes exist (internal use).
-  # For directed graphs, adds a single edge from src to dst.
-  # For undirected graphs, adds edges in both directions.
   defp add_edge_unchecked(%Graph{kind: :directed} = graph, src, dst, weight) do
     new_out = do_add_directed_edge_out(graph.out_edges, src, dst, weight)
     new_in = do_add_directed_edge_in(graph.in_edges, src, dst, weight)
@@ -1178,30 +1248,25 @@ defmodule Yog.Model do
   end
 
   defp add_edge_unchecked(%Graph{kind: :undirected} = graph, src, dst, weight) do
-    # Add src -> dst
     new_out = do_add_directed_edge_out(graph.out_edges, src, dst, weight)
     new_in = do_add_directed_edge_in(graph.in_edges, src, dst, weight)
-    # Add dst -> src (for undirected)
     new_out2 = do_add_directed_edge_out(new_out, dst, src, weight)
     new_in2 = do_add_directed_edge_in(new_in, dst, src, weight)
     %{graph | out_edges: new_out2, in_edges: new_in2}
   end
 
-  # Helper to add outgoing edge
   defp do_add_directed_edge_out(out_edges, src, dst, weight) do
     Map.update(out_edges, src, %{dst => weight}, fn inner ->
       Map.put(inner, dst, weight)
     end)
   end
 
-  # Helper to add incoming edge
   defp do_add_directed_edge_in(in_edges, src, dst, weight) do
     Map.update(in_edges, dst, %{src => weight}, fn inner ->
       Map.put(inner, src, weight)
     end)
   end
 
-  # Adds a node only if it doesn't already exist.
   defp ensure_node(%Graph{} = graph, id, data) do
     if Map.has_key?(graph.nodes, id) do
       graph
@@ -1210,7 +1275,6 @@ defmodule Yog.Model do
     end
   end
 
-  # Adds a node only if it doesn't already exist, using a function to create the node data.
   defp ensure_node_with(%Graph{} = graph, id, make_fn) do
     if Map.has_key?(graph.nodes, id) do
       graph
@@ -1219,7 +1283,6 @@ defmodule Yog.Model do
     end
   end
 
-  # Removes a directed edge from src to dst (internal helper).
   defp do_remove_directed_edge(%Graph{} = graph, src, dst) do
     new_out =
       case Map.fetch(graph.out_edges, src) do
@@ -1236,9 +1299,7 @@ defmodule Yog.Model do
     %{graph | out_edges: new_out, in_edges: new_in}
   end
 
-  # Adds a directed edge with weight combination (internal helper).
   defp do_add_directed_combine(%Graph{} = graph, src, dst, weight, with_combine) do
-    # Update out_edges
     new_out =
       Map.update(graph.out_edges, src, %{dst => weight}, fn inner ->
         new_weight =
@@ -1250,7 +1311,6 @@ defmodule Yog.Model do
         Map.put(inner, dst, new_weight)
       end)
 
-    # Update in_edges
     new_in =
       Map.update(graph.in_edges, dst, %{src => weight}, fn inner ->
         new_weight =
