@@ -116,6 +116,8 @@ defmodule Yog do
 
   Auto-creates nodes with `nil` data as needed.
 
+  Time complexity: $\\mathcal{O}(E)$
+
   ## Example
 
       iex> edges = [{1, 2, 10}, {2, 3, 20}]
@@ -124,10 +126,14 @@ defmodule Yog do
       1
   """
   @spec from_edges(:directed | :undirected, [{node_id(), node_id(), any()}]) :: graph()
-  def from_edges(type, edges) do
+  def from_edges(type, edges) when is_list(edges) do
     Enum.reduce(edges, new(type), fn {src, dst, weight}, g ->
       Model.add_edge_ensure(g, src, dst, weight, nil)
     end)
+  end
+
+  def from_edges(_type, edges) do
+    raise ArgumentError, "expected edges to be a list, got: #{inspect(edges)}"
   end
 
   @doc """
@@ -137,6 +143,8 @@ defmodule Yog do
   - A list of node IDs: `[1, 2, 3]`
   - A list of `{id, data}` tuples: `[{1, "A"}, {2, "B"}]`
   - A map: `%{1 => "A", 2 => "B"}`
+
+  Time complexity: $\\mathcal{O}(V)$
 
   ## Example
 
@@ -154,6 +162,8 @@ defmodule Yog do
   @doc """
   Creates a graph from a list of unweighted edges (weight will be nil).
 
+  Time complexity: $\\mathcal{O}(E)$
+
   ## Example
 
       iex> edges = [{1, 2}, {2, 3}]
@@ -162,16 +172,22 @@ defmodule Yog do
       [{2, nil}]
   """
   @spec from_unweighted_edges(:directed | :undirected, [{node_id(), node_id()}]) :: graph()
-  def from_unweighted_edges(type, edges) do
+  def from_unweighted_edges(type, edges) when is_list(edges) do
     Enum.reduce(edges, new(type), fn {src, dst}, g ->
       Model.add_edge_ensure(g, src, dst, nil, nil)
     end)
+  end
+
+  def from_unweighted_edges(_type, edges) do
+    raise ArgumentError, "expected edges to be a list, got: #{inspect(edges)}"
   end
 
   @doc """
   Creates a graph from an adjacency matrix.
 
   Delegates to `Yog.IO.Matrix.from_matrix/2`.
+
+  Time complexity: $\\mathcal{O}(V^2)$
 
   ## Example
 
@@ -187,6 +203,8 @@ defmodule Yog do
 
   Delegates to `Yog.IO.Matrix.to_matrix/1`.
 
+  Time complexity: $\\mathcal{O}(V^2)$
+
   ## Example
 
       iex> graph = Yog.undirected() |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
@@ -201,6 +219,8 @@ defmodule Yog do
 
   Delegates to `Yog.IO.List.from_list/2`.
 
+  Time complexity: $\\mathcal{O}(V + E)$
+
   ## Example
 
       iex> entries = [{1, [{2, 1}, {3, 1}]}, {2, [{3, 1}]}, {3, []}]
@@ -214,6 +234,8 @@ defmodule Yog do
   Creates a graph from an adjacency list string.
 
   Delegates to `Yog.IO.List.from_string/3`.
+
+  Time complexity: $\\mathcal{O}(V + E)$
 
   ## Example
 
@@ -231,6 +253,8 @@ defmodule Yog do
 
   Delegates to `Yog.IO.List.to_list/1`.
 
+  Time complexity: $\\mathcal{O}(V + E)$
+
   ## Example
 
       iex> graph = Yog.undirected() |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
@@ -243,6 +267,8 @@ defmodule Yog do
   Exports a graph to an adjacency list string.
 
   Delegates to `Yog.IO.List.to_string/2`.
+
+  Time complexity: $\\mathcal{O}(V + E)$
 
   ## Example
 
@@ -258,6 +284,8 @@ defmodule Yog do
   Adds a node to the graph with the given ID and label.
   If a node with this ID already exists, its data will be replaced.
 
+  Time complexity: $\\mathcal{O}(1)$
+
   ## Example
 
       iex> graph = Yog.directed()
@@ -272,6 +300,8 @@ defmodule Yog do
   @doc """
   Adds multiple nodes to the graph from an iterable.
 
+  Time complexity: $\\mathcal{O}(V)$
+
   See `Yog.Model.add_nodes_from/2` for details.
   """
   @spec add_nodes_from(graph(), Enumerable.t()) :: graph()
@@ -284,6 +314,8 @@ defmodule Yog do
   For undirected graphs, adds edges in both directions.
 
   Returns `{:ok, graph}` or `{:error, reason}`.
+
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Example
 
@@ -309,6 +341,8 @@ defmodule Yog do
   @doc """
   Raw binding for add_edge with positional arguments.
 
+  Time complexity: $\\mathcal{O}(1)$
+
   ## Example
 
       iex> graph = Yog.directed() |> Yog.add_node(1, "A") |> Yog.add_node(2, "B")
@@ -321,6 +355,8 @@ defmodule Yog do
 
   @doc """
   Adds an edge to the graph, raising on error.
+
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Example
 
@@ -335,6 +371,8 @@ defmodule Yog do
   @doc """
   Adds an edge to the graph with positional arguments, raising on error.
 
+  Time complexity: $\\mathcal{O}(1)$
+
   ## Example
 
       iex> graph = Yog.directed() |> Yog.add_node(1, "A") |> Yog.add_node(2, "B")
@@ -342,6 +380,7 @@ defmodule Yog do
       iex> Yog.successors(graph, 1)
       [{2, 10}]
   """
+  @spec add_edge!(graph(), node_id(), node_id(), any()) :: graph()
   defdelegate add_edge!(graph, from, to, weight), to: Model
 
   @doc """
@@ -352,6 +391,8 @@ defmodule Yog do
 
   Always succeeds and returns a `Graph` (never fails).
   Use this when you want to build graphs quickly without pre-creating nodes.
+
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Example
 
@@ -368,12 +409,15 @@ defmodule Yog do
   @doc """
   Ensures both endpoint nodes exist with positional arguments, then adds an edge.
 
+  Time complexity: $\\mathcal{O}(1)$
+
   ## Example
 
       iex> graph = Yog.directed() |> Yog.add_edge_ensure(1, 2, 10, "anon")
       iex> Yog.successors(graph, 1)
       [{2, 10}]
   """
+  @spec add_edge_ensure(graph(), node_id(), node_id(), any(), any()) :: graph()
   defdelegate add_edge_ensure(graph, from, to, weight, default \\ nil), to: Model
 
   @doc """
@@ -384,6 +428,8 @@ defmodule Yog do
   Existing nodes are left unchanged.
 
   Always succeeds and returns a `Graph` (never fails).
+
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Example
 
@@ -405,6 +451,8 @@ defmodule Yog do
 
   Returns `{:ok, graph}` or `{:error, reason}` if either endpoint node doesn't exist.
 
+  Time complexity: $\\mathcal{O}(1)$
+
   ## Example
 
       iex> {:ok, graph} =
@@ -420,6 +468,8 @@ defmodule Yog do
 
   @doc """
   Adds an unweighted edge with positional arguments.
+
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Example
 
@@ -440,6 +490,8 @@ defmodule Yog do
   @doc """
   Adds an unweighted edge to the graph, raising on error.
 
+  Time complexity: $\\mathcal{O}(1)$
+
   ## Example
 
       iex> graph =
@@ -450,12 +502,14 @@ defmodule Yog do
       iex> Yog.successors(graph, 1)
       [{2, nil}]
   """
+  @spec add_unweighted_edge!(graph(), keyword()) :: graph()
   def add_unweighted_edge!(graph, opts) when is_list(opts) do
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
     Model.add_edge!(graph, from, to, nil)
   end
 
+  @spec add_unweighted_edge!(graph(), node_id(), node_id()) :: graph()
   def add_unweighted_edge!(graph, from, to) do
     Model.add_edge!(graph, from, to, nil)
   end
@@ -467,6 +521,8 @@ defmodule Yog do
   a default weight of 1 is appropriate (e.g., unweighted graphs, hop counts).
 
   Returns `{:ok, graph}` or `{:error, reason}` if either endpoint node doesn't exist.
+
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Example
 
@@ -488,6 +544,8 @@ defmodule Yog do
   @doc """
   Adds a simple edge with positional arguments (weight = 1).
 
+  Time complexity: $\\mathcal{O}(1)$
+
   ## Example
 
       iex> {:ok, graph} =
@@ -506,6 +564,8 @@ defmodule Yog do
   @doc """
   Adds a simple edge with weight 1, raising on error.
 
+  Time complexity: $\\mathcal{O}(1)$
+
   ## Example
 
       iex> graph =
@@ -516,12 +576,14 @@ defmodule Yog do
       iex> Yog.successors(graph, 1)
       [{2, 1}]
   """
+  @spec add_simple_edge!(graph(), keyword()) :: graph()
   def add_simple_edge!(graph, opts) when is_list(opts) do
     from = Keyword.fetch!(opts, :from)
     to = Keyword.fetch!(opts, :to)
     Model.add_edge!(graph, from, to, 1)
   end
 
+  @spec add_simple_edge!(graph(), node_id(), node_id()) :: graph()
   def add_simple_edge!(graph, from, to) do
     Model.add_edge!(graph, from, to, 1)
   end

@@ -1,5 +1,6 @@
 defmodule YogTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
+  use ExUnitProperties
 
   doctest Yog
 
@@ -600,6 +601,53 @@ defmodule YogTest do
 
       updated = Yog.update_edge(graph, 1, 2, 0, fn w -> w + 10 end)
       assert Yog.successors(updated, 1) == [{2, 15}]
+    end
+
+    test "input validation raises ArgumentError for invalid types and arguments" do
+      assert_raise ArgumentError, ~r/expected graph_type to be :directed or :undirected/, fn ->
+        Yog.new(:invalid_kind)
+      end
+
+      assert_raise ArgumentError, ~r/expected edges to be a list/, fn ->
+        Yog.from_edges(:directed, :not_a_list)
+      end
+
+      assert_raise ArgumentError, ~r/expected edges to be a list/, fn ->
+        Yog.from_unweighted_edges(:directed, :not_a_list)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Yog.to_adjacency_matrix(:not_a_graph)
+      end
+    end
+  end
+
+  describe "Yog Property Tests" do
+    property "graph? correctly identifies graph structs" do
+      check all(kind <- StreamData.member_of([:directed, :undirected])) do
+        g = Yog.new(kind)
+        assert Yog.graph?(g) == true
+        refute Yog.graph?(:not_a_graph)
+        refute Yog.graph?({:graph, kind})
+      end
+    end
+
+    property "from_edges constructs graphs with correct edge counts" do
+      check all(
+              kind <- StreamData.member_of([:directed, :undirected]),
+              n <- StreamData.integer(1..10),
+              raw_edges <-
+                StreamData.list_of(
+                  StreamData.tuple(
+                    {StreamData.integer(1..n), StreamData.integer(1..n),
+                     StreamData.integer(1..100)}
+                  )
+                )
+            ) do
+        g = Yog.from_edges(kind, raw_edges)
+        assert Yog.graph?(g)
+        assert Yog.node_count(g) <= n
+      end
     end
   end
 end
