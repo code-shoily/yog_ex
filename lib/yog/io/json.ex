@@ -50,7 +50,10 @@ defmodule Yog.IO.JSON do
 
   @doc """
   Creates default export options for String node and edge data.
+
+  Time complexity: $\\mathcal{O}(1)$
   """
+  @spec default_export_options() :: tuple()
   def default_export_options do
     {:json_export_options, :yog_generic, true, &default_node_serializer/1,
      &default_edge_serializer/1, false, %{}, &Yog.Utils.safe_string/1, &Yog.Utils.safe_string/1}
@@ -58,10 +61,37 @@ defmodule Yog.IO.JSON do
 
   @doc """
   Creates export options with custom serializers for generic types.
+
+  Raises `ArgumentError` if serializers or keyword options are invalid.
+
+  Time complexity: $\\mathcal{O}(1)$
   """
-  def export_options_with(node_serializer, edge_serializer, opts \\ []) do
+  @spec export_options_with((any() -> any()), (any() -> any()), keyword()) :: tuple()
+  def export_options_with(node_serializer, edge_serializer, opts \\ [])
+
+  def export_options_with(node_serializer, edge_serializer, opts) do
+    if not is_function(node_serializer, 1) do
+      raise ArgumentError, "expected node_serializer to be an arity-1 function"
+    end
+
+    if not is_function(edge_serializer, 1) do
+      raise ArgumentError, "expected edge_serializer to be an arity-1 function"
+    end
+
+    if not Keyword.keyword?(opts) do
+      raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
+    end
+
     node_fmt = Keyword.get(opts, :node_formatter, &Yog.Utils.safe_string/1)
     edge_fmt = Keyword.get(opts, :edge_formatter, &Yog.Utils.safe_string/1)
+
+    if not is_function(node_fmt, 1) do
+      raise ArgumentError, "expected node_formatter to be an arity-1 function"
+    end
+
+    if not is_function(edge_fmt, 1) do
+      raise ArgumentError, "expected edge_formatter to be an arity-1 function"
+    end
 
     {:json_export_options, :yog_generic, true, node_serializer, edge_serializer, false, %{},
      node_fmt, edge_fmt}
@@ -69,43 +99,84 @@ defmodule Yog.IO.JSON do
 
   @doc """
   Converts a graph to a JSON string according to options.
+
+  Raises `ArgumentError` if `graph` or `options` are invalid.
+
+  Time complexity: $\\mathcal{O}(V + E)$
   """
-  def to_json(graph, options \\ default_export_options()) do
+  @spec to_json(Yog.graph() | Yog.DAG.t(), tuple()) :: String.t()
+  def to_json(graph, options \\ default_export_options())
+
+  def to_json(graph, options) do
+    target_graph =
+      case graph do
+        %Yog.Graph{} ->
+          graph
+
+        %Yog.DAG{graph: inner} ->
+          inner
+
+        _ ->
+          raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(graph)}"
+      end
+
     {format, include_metadata?, node_ser, edge_ser, _pretty?, _meta, node_fmt, edge_fmt} =
       case options do
-        {:json_export_options, f, im, ns, es, p, m, nf, ef} ->
+        {:json_export_options, f, im, ns, es, p, m, nf, ef}
+        when is_boolean(im) and is_function(ns, 1) and is_function(es, 1) and is_function(nf, 1) and
+               is_function(ef, 1) ->
           {f, im, ns, es, p, m, nf, ef}
 
-        {:json_export_options, f, im, ns, es, p, m} ->
+        {:json_export_options, f, im, ns, es, p, m}
+        when is_boolean(im) and is_function(ns, 1) and is_function(es, 1) ->
           {f, im, ns, es, p, m, &Yog.Utils.safe_string/1, &Yog.Utils.safe_string/1}
+
+        _ ->
+          raise ArgumentError,
+                "expected valid json_export_options tuple, got: #{inspect(options)}"
       end
 
     case format do
       :yog_generic ->
-        to_generic_format(graph, node_ser, edge_ser, include_metadata?, node_fmt, edge_fmt)
+        to_generic_format(target_graph, node_ser, edge_ser, include_metadata?, node_fmt, edge_fmt)
 
       :network_x ->
-        to_networkx_format(graph, node_ser, edge_ser, include_metadata?, node_fmt, edge_fmt)
+        to_networkx_format(
+          target_graph,
+          node_ser,
+          edge_ser,
+          include_metadata?,
+          node_fmt,
+          edge_fmt
+        )
 
       :d3_force ->
-        to_d3_format(graph, node_ser, edge_ser, node_fmt, edge_fmt)
+        to_d3_format(target_graph, node_ser, edge_ser, node_fmt, edge_fmt)
 
       :cytoscape ->
-        to_cytoscape_format(graph, node_ser, edge_ser, node_fmt, edge_fmt)
+        to_cytoscape_format(target_graph, node_ser, edge_ser, node_fmt, edge_fmt)
 
       :visjs ->
-        to_visjs_format(graph, node_ser, edge_ser, node_fmt, edge_fmt)
+        to_visjs_format(target_graph, node_ser, edge_ser, node_fmt, edge_fmt)
 
       _ ->
-        to_generic_format(graph, node_ser, edge_ser, include_metadata?, node_fmt, edge_fmt)
+        to_generic_format(target_graph, node_ser, edge_ser, include_metadata?, node_fmt, edge_fmt)
     end
     |> Jason.encode!()
   end
 
   @doc """
   Exports a graph to a JSON file.
+
+  Raises `ArgumentError` if `path` is not a binary string or `graph`/`options` are invalid.
+
+  Time complexity: $\\mathcal{O}(V + E)$ + file I/O
   """
-  def to_json_file(graph, path, options \\ default_export_options()) do
+  @spec to_json_file(Yog.graph() | Yog.DAG.t(), String.t(), tuple()) ::
+          {:ok, nil} | {:error, atom()}
+  def to_json_file(graph, path, options \\ default_export_options())
+
+  def to_json_file(graph, path, options) when is_binary(path) do
     json_string = to_json(graph, options)
 
     case File.write(path, json_string) do
@@ -114,9 +185,18 @@ defmodule Yog.IO.JSON do
     end
   end
 
+  def to_json_file(_graph, path, _options) do
+    raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
+  end
+
   @doc """
   Quick export for D3.js force-directed graphs with default settings.
+
+  Raises `ArgumentError` if serializers or graph are invalid.
+
+  Time complexity: $\\mathcal{O}(V + E)$
   """
+  @spec to_d3_json(Yog.graph() | Yog.DAG.t(), (any() -> any()), (any() -> any())) :: String.t()
   def to_d3_json(graph, node_serializer, edge_serializer) do
     options =
       {:json_export_options, :d3_force, false, node_serializer, edge_serializer, false, %{}}
@@ -126,7 +206,13 @@ defmodule Yog.IO.JSON do
 
   @doc """
   Quick export for Cytoscape.js with default settings.
+
+  Raises `ArgumentError` if serializers or graph are invalid.
+
+  Time complexity: $\\mathcal{O}(V + E)$
   """
+  @spec to_cytoscape_json(Yog.graph() | Yog.DAG.t(), (any() -> any()), (any() -> any())) ::
+          String.t()
   def to_cytoscape_json(graph, node_serializer, edge_serializer) do
     options =
       {:json_export_options, :cytoscape, false, node_serializer, edge_serializer, false, %{}}
@@ -136,7 +222,12 @@ defmodule Yog.IO.JSON do
 
   @doc """
   Quick export for vis.js networks with default settings.
+
+  Raises `ArgumentError` if serializers or graph are invalid.
+
+  Time complexity: $\\mathcal{O}(V + E)$
   """
+  @spec to_visjs_json(Yog.graph() | Yog.DAG.t(), (any() -> any()), (any() -> any())) :: String.t()
   def to_visjs_json(graph, node_serializer, edge_serializer) do
     options = {:json_export_options, :visjs, false, node_serializer, edge_serializer, false, %{}}
     to_json(graph, options)
@@ -144,22 +235,46 @@ defmodule Yog.IO.JSON do
 
   @doc """
   Writes a graph to a JSON file using default export options.
+
+  Raises `ArgumentError` if `path` is not a binary string or `graph` is invalid.
+
+  Time complexity: $\\mathcal{O}(V + E)$ + file I/O
   """
-  def write(path, graph) do
+  @spec write(String.t(), Yog.graph() | Yog.DAG.t()) :: {:ok, nil} | {:error, atom()}
+  def write(path, graph) when is_binary(path) do
     to_json_file(graph, path, default_export_options())
+  end
+
+  def write(path, _graph) do
+    raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
   end
 
   @doc """
   Writes a graph to a JSON file with custom export options.
+
+  Raises `ArgumentError` if `path` is not a binary string or `graph`/`options` are invalid.
+
+  Time complexity: $\\mathcal{O}(V + E)$ + file I/O
   """
-  def write_with(path, options, graph) do
+  @spec write_with(String.t(), tuple(), Yog.graph() | Yog.DAG.t()) ::
+          {:ok, nil} | {:error, atom()}
+  def write_with(path, options, graph) when is_binary(path) do
     to_json_file(graph, path, options)
+  end
+
+  def write_with(path, _options, _graph) do
+    raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
   end
 
   @doc """
   Converts a multigraph to a JSON string.
+
+  Time complexity: $\\mathcal{O}(V + E)$
   """
-  def to_json_multi(graph, options \\ default_export_options()) do
+  @spec to_json_multi(any(), tuple()) :: String.t()
+  def to_json_multi(graph, options \\ default_export_options())
+
+  def to_json_multi(graph, options) do
     {_format, include_metadata?, node_ser, edge_ser, _pretty?, _meta, node_fmt, edge_fmt} =
       case options do
         {:json_export_options, f, im, ns, es, p, m, nf, ef} ->
@@ -175,15 +290,29 @@ defmodule Yog.IO.JSON do
 
   @doc """
   Exports a multigraph to a JSON file.
+
+  Raises `ArgumentError` if `path` is not a binary string.
+
+  Time complexity: $\\mathcal{O}(V + E)$ + file I/O
   """
-  def to_json_file_multi(graph, path, options \\ default_export_options()) do
+  @spec to_json_file_multi(any(), String.t(), tuple()) :: :ok | {:error, atom()}
+  def to_json_file_multi(graph, path, options \\ default_export_options())
+
+  def to_json_file_multi(graph, path, options) when is_binary(path) do
     json_string = to_json_multi(graph, options)
     File.write(path, json_string)
   end
 
+  def to_json_file_multi(_graph, path, _options) do
+    raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
+  end
+
   @doc """
   Converts a JsonError to a string.
+
+  Time complexity: $\\mathcal{O}(1)$
   """
+  @spec error_to_string(any()) :: String.t()
   def error_to_string(error) do
     inspect(error)
   end
@@ -198,18 +327,15 @@ defmodule Yog.IO.JSON do
     data
   end
 
-  # Convert Gleam JSON iolist to Elixir term
   defp gleam_json_to_term(iolist) do
     iolist
     |> IO.iodata_to_binary()
     |> Jason.decode!()
   end
 
-  # Serialize data using the provided serializer
   defp serialize_data(data, serializer, formatter) do
     result = serializer.(data)
 
-    # Check if result is a Gleam JSON iolist (starts with numbers or nested lists)
     if is_list(result) and (is_integer(List.first(result)) or is_list(List.first(result))) do
       gleam_json_to_term(result)
     else
@@ -392,12 +518,9 @@ defmodule Yog.IO.JSON do
   end
 
   defp to_generic_multi_format(graph, node_ser, edge_ser, include_metadata?, node_fmt, edge_fmt) do
-    # Note: using direct field access as this function handles both Yog.Graph and Yog.Multi.Graph
-    # This will be replaced with protocol dispatch when protocols are implemented
     graph_type = if graph.kind == :directed, do: "directed", else: "undirected"
     nodes = Map.to_list(graph.nodes)
 
-    # Collect all edges with their IDs
     edges =
       graph.edges
       |> Map.to_list()
@@ -452,7 +575,6 @@ defmodule Yog.IO.JSON do
 
   defp build_multi_metadata(graph) do
     %{
-      # Note: using direct field access as this function handles both Yog.Graph and Yog.Multi.Graph
       node_count: map_size(graph.nodes),
       edge_count: map_size(graph.edges),
       directed: graph.kind == :directed
@@ -465,6 +587,10 @@ defmodule Yog.IO.JSON do
   Detects the JSON graph format of the given input.
 
   Supports detection from both JSON strings and decoded maps.
+
+  Raises `ArgumentError` if input is neither a binary string nor a map.
+
+  Time complexity: $\\mathcal{O}(V + E)$
 
   ## Parameters
 
@@ -501,8 +627,15 @@ defmodule Yog.IO.JSON do
     {:ok, detect_format(map)}
   end
 
+  def json_type(input) do
+    raise ArgumentError,
+          "expected input to be a binary string or map, got: #{inspect(input)}"
+  end
+
   @doc """
   Detects the JSON graph format, raising on error for string input.
+
+  Time complexity: $\\mathcal{O}(V + E)$
 
   ## Examples
 
@@ -524,6 +657,10 @@ defmodule Yog.IO.JSON do
   Parses a JSON string and creates a graph.
 
   Supports the generic Yog format and common variations.
+
+  Raises `ArgumentError` if `json_string` is not a binary string.
+
+  Time complexity: $\\mathcal{O}(V + E)$
 
   ## Parameters
 
@@ -559,7 +696,7 @@ defmodule Yog.IO.JSON do
       iex> Yog.Model.order(graph)
       2
   """
-  @spec from_json(String.t()) :: {:ok, Yog.graph()} | {:error, String.t()}
+  @spec from_json(String.t()) :: {:ok, Yog.graph()} | {:error, term()}
   def from_json(json_string) when is_binary(json_string) do
     case Jason.decode(json_string) do
       {:ok, map} -> from_map(map)
@@ -567,8 +704,15 @@ defmodule Yog.IO.JSON do
     end
   end
 
+  def from_json(json_string) do
+    raise ArgumentError,
+          "expected json_string to be a binary string, got: #{inspect(json_string)}"
+  end
+
   @doc """
   Parses a JSON string and creates a graph, raising on error.
+
+  Time complexity: $\\mathcal{O}(V + E)$
 
   ## Examples
 
@@ -585,10 +729,19 @@ defmodule Yog.IO.JSON do
     end
   end
 
+  def from_json!(json_string) do
+    raise ArgumentError,
+          "expected json_string to be a binary string, got: #{inspect(json_string)}"
+  end
+
   @doc """
   Creates a graph from a map (useful for PostgreSQL JSONB).
 
   Auto-detects format based on keys present in the map.
+
+  Raises `ArgumentError` if `map` is not a map.
+
+  Time complexity: $\\mathcal{O}(V + E)$
 
   ## Parameters
 
@@ -631,6 +784,10 @@ defmodule Yog.IO.JSON do
     e -> {:error, Exception.message(e)}
   end
 
+  def from_map(map) do
+    raise ArgumentError, "expected map to be a map, got: #{inspect(map)}"
+  end
+
   defp do_from_map(map) do
     case detect_format(map) do
       :cytoscape -> parse_cytoscape_format(map)
@@ -644,28 +801,22 @@ defmodule Yog.IO.JSON do
 
   defp detect_format(map) do
     cond do
-      # Cytoscape format: elements array
       Map.has_key?(map, "elements") ->
         :cytoscape
 
-      # VisJs format: nodes and edges with from/to
       Map.has_key?(map, "nodes") and Map.has_key?(map, "edges") and
           has_visjs_edges?(map["edges"]) ->
         :visjs
 
-      # NetworkX format: directed + multigraph + links
       Map.has_key?(map, "directed") ->
         :network_x
 
-      # Yog generic format: graph_type + edges
       Map.has_key?(map, "graph_type") or Map.has_key?(map, "edges") ->
         :yog_generic
 
-      # D3 format: nodes + links (no type indicator)
       Map.has_key?(map, "nodes") and Map.has_key?(map, "links") ->
         :d3_force
 
-      # Fallback: try to interpret as simple graph
       true ->
         :simple
     end
@@ -725,7 +876,6 @@ defmodule Yog.IO.JSON do
   end
 
   defp parse_d3_format(map) do
-    # D3 format doesn't specify directed/undirected, assume undirected
     nodes = map["nodes"] || []
     links = map["links"] || []
 
@@ -749,14 +899,12 @@ defmodule Yog.IO.JSON do
   defp parse_cytoscape_format(map) do
     elements = map["elements"] || []
 
-    # Separate nodes and edges
     {nodes, edges} =
       Enum.split_with(elements, fn elem ->
         data = elem["data"] || %{}
         Map.has_key?(data, "id") and not Map.has_key?(data, "source")
       end)
 
-    # Try to detect if directed
     graph_type = :undirected
 
     base = Yog.new(graph_type)
@@ -782,7 +930,6 @@ defmodule Yog.IO.JSON do
     nodes = map["nodes"] || []
     edges = map["edges"] || []
 
-    # VisJs can be directed or undirected, assume undirected by default
     graph_type = :undirected
 
     base = Yog.new(graph_type)
@@ -803,7 +950,6 @@ defmodule Yog.IO.JSON do
   end
 
   defp parse_simple_format(map) do
-    # Most basic format - just try to extract nodes and edges
     nodes = map["nodes"] || []
     edges = map["edges"] || map["links"] || []
 

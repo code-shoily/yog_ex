@@ -1,5 +1,6 @@
 defmodule Yog.IO.JSONTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
+  use ExUnitProperties
 
   alias Yog.IO.JSON
 
@@ -52,6 +53,22 @@ defmodule Yog.IO.JSONTest do
            end)
   end
 
+  test "to_json exports DAG" do
+    dag =
+      Yog.DAG.new()
+      |> Yog.DAG.add_node(1, "Node1")
+      |> Yog.DAG.add_node(2, "Node2")
+
+    {:ok, dag} = Yog.DAG.add_edge(dag, 1, 2, "link")
+
+    json_string = JSON.to_json(dag)
+    result = Jason.decode!(json_string)
+
+    assert result["format"] == "yog-generic"
+    assert length(result["nodes"]) == 2
+    assert length(result["edges"]) == 1
+  end
+
   test "to_json exports undirected graph in generic format" do
     graph =
       Yog.undirected()
@@ -91,7 +108,6 @@ defmodule Yog.IO.JSONTest do
       |> Yog.add_node(1, "Alice")
       |> Yog.add_node(2, "Bob")
 
-    # Create options with metadata disabled
     options =
       {:json_export_options, :yog_generic, false, &Function.identity/1, &Function.identity/1,
        false, %{}, &Kernel.to_string/1, &Kernel.to_string/1}
@@ -100,6 +116,68 @@ defmodule Yog.IO.JSONTest do
     result = Jason.decode!(json_string)
 
     refute Map.has_key?(result, "metadata")
+  end
+
+  test "input and options validation" do
+    assert_raise ArgumentError, ~r/expected node_serializer to be an arity-1 function/, fn ->
+      JSON.export_options_with(:invalid, & &1)
+    end
+
+    assert_raise ArgumentError, ~r/expected edge_serializer to be an arity-1 function/, fn ->
+      JSON.export_options_with(& &1, :invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected opts to be a keyword list/, fn ->
+      JSON.export_options_with(& &1, & &1, :invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected node_formatter to be an arity-1 function/, fn ->
+      JSON.export_options_with(& &1, & &1, node_formatter: :invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected edge_formatter to be an arity-1 function/, fn ->
+      JSON.export_options_with(& &1, & &1, edge_formatter: :invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      JSON.to_json(:not_a_graph)
+    end
+
+    assert_raise ArgumentError, ~r/expected valid json_export_options tuple/, fn ->
+      JSON.to_json(Yog.directed(), :invalid_options)
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      JSON.to_json_file(Yog.directed(), 123)
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      JSON.write(123, Yog.directed())
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      JSON.write_with(123, JSON.default_export_options(), Yog.directed())
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      JSON.to_json_file_multi(%{kind: :directed, nodes: %{}, edges: %{}}, 123)
+    end
+
+    assert_raise ArgumentError, ~r/expected input to be a binary string or map/, fn ->
+      JSON.json_type(123)
+    end
+
+    assert_raise ArgumentError, ~r/expected json_string to be a binary string/, fn ->
+      JSON.from_json(123)
+    end
+
+    assert_raise ArgumentError, ~r/expected json_string to be a binary string/, fn ->
+      JSON.from_json!(123)
+    end
+
+    assert_raise ArgumentError, ~r/expected map to be a map/, fn ->
+      JSON.from_map(123)
+    end
   end
 
   # =============================================================================
@@ -531,7 +609,6 @@ defmodule Yog.IO.JSONTest do
     graph = Yog.directed() |> Yog.add_node(1, "Test")
     options = JSON.default_export_options()
 
-    # Try to write to an invalid path
     result = JSON.to_json_file(graph, "/invalid/path/file.json", options)
     assert {:error, _} = result
   end
@@ -541,7 +618,6 @@ defmodule Yog.IO.JSONTest do
   # =============================================================================
 
   test "to_json_multi exports multigraph" do
-    # Create a multigraph (using the internal structure)
     multigraph = %{
       kind: :directed,
       nodes: %{1 => "Alice", 2 => "Bob"},
@@ -564,7 +640,6 @@ defmodule Yog.IO.JSONTest do
     assert length(result["edges"]) == 2
     assert result["edge_count"] == 2
 
-    # Check that edges have IDs
     assert Enum.all?(result["edges"], fn e -> Map.has_key?(e, "id") end)
   end
 
@@ -623,5 +698,31 @@ defmodule Yog.IO.JSONTest do
 
     assert is_binary(result)
     assert String.contains?(result, "json_error")
+  end
+
+  describe "property tests" do
+    property "roundtrip to_json and from_json preserves node and edge counts for graphs" do
+      check all(
+              kind <- StreamData.member_of([:directed, :undirected]),
+              n <- StreamData.integer(1..15),
+              raw_edges <-
+                StreamData.list_of(
+                  StreamData.tuple({StreamData.integer(1..n), StreamData.integer(1..n)})
+                )
+            ) do
+        graph =
+          Enum.reduce(1..n, Yog.Model.new(kind), &Yog.add_node(&2, &1, "Node#{&1}"))
+
+        graph =
+          Enum.reduce(raw_edges, graph, fn {u, v}, acc ->
+            Yog.add_edge_ensure(acc, u, v, "Edge")
+          end)
+
+        json_str = JSON.to_json(graph)
+        assert {:ok, parsed} = JSON.from_json(json_str)
+        assert Yog.Model.node_count(parsed) == Yog.Model.node_count(graph)
+        assert Yog.Model.edge_count(parsed) == Yog.Model.edge_count(graph)
+      end
+    end
   end
 end
