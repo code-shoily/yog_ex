@@ -1,19 +1,11 @@
 defmodule Yog.DAG.AlgorithmTest do
-  @moduledoc """
-  Tests for Yog.DAG.Algorithms module.
-
-  These algorithms leverage the acyclic structure of DAGs to provide
-  efficient, total functions for operations like topological sorting,
-  longest path, transitive closure, and more.
-  """
-
-  use ExUnit.Case
+  use ExUnit.Case, async: true
+  use ExUnitProperties
 
   doctest Yog.DAG.Algorithm
 
-  alias Yog.DAG.Model
-
   alias Yog.DAG.Algorithm
+  alias Yog.DAG.Model
 
   # Helper to build a DAG from edges
   defp build_dag(edges) do
@@ -266,6 +258,139 @@ defmodule Yog.DAG.AlgorithmTest do
       lcas = Algorithm.lowest_common_ancestors(dag, :b, :b)
       # A node is its own ancestor in this context
       assert :b in lcas
+    end
+
+    test "returns empty list when missing node" do
+      {:ok, dag} = build_dag([{:a, :b, 1}])
+      assert Algorithm.lowest_common_ancestors(dag, :a, :non_existent) == []
+    end
+  end
+
+  describe "validation & missing node handling" do
+    test "raises ArgumentError when non-DAG is passed" do
+      invalid = :not_a_dag
+
+      assert_raise ArgumentError, ~r/expected a Yog.DAG struct/, fn ->
+        Algorithm.topological_sort(invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.DAG struct/, fn ->
+        Algorithm.topological_generations(invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.DAG struct/, fn ->
+        Algorithm.longest_path(invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.DAG struct/, fn ->
+        Algorithm.shortest_path(invalid, :a, :b)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.DAG struct/, fn ->
+        Algorithm.lowest_common_ancestors(invalid, :a, :b)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.DAG struct/, fn ->
+        Algorithm.sources(invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.DAG struct/, fn ->
+        Algorithm.sinks(invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.DAG struct/, fn ->
+        Algorithm.ancestors(invalid, :a)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.DAG struct/, fn ->
+        Algorithm.descendants(invalid, :a)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.DAG struct/, fn ->
+        Algorithm.single_source_distances(invalid, :a)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.DAG struct/, fn ->
+        Algorithm.longest_path(invalid, :a, :b)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.DAG struct/, fn ->
+        Algorithm.path_count(invalid, :a, :b)
+      end
+    end
+
+    test "gracefully handles non-existent nodes" do
+      {:ok, dag} = build_dag([{:a, :b, 1}])
+
+      assert Algorithm.ancestors(dag, :non_existent) == []
+      assert Algorithm.descendants(dag, :non_existent) == []
+      assert Algorithm.single_source_distances(dag, :non_existent) == %{}
+      assert Algorithm.shortest_path(dag, :a, :non_existent) == :error
+      assert Algorithm.longest_path(dag, :a, :non_existent) == :error
+      assert Algorithm.path_count(dag, :a, :non_existent) == 0
+    end
+  end
+
+  describe "property tests for DAG algorithms" do
+    property "ancestors and descendants are duals" do
+      check all(
+              n <- StreamData.integer(2..12),
+              raw_edges <-
+                StreamData.list_of(
+                  StreamData.tuple({StreamData.integer(1..n), StreamData.integer(1..n)})
+                )
+            ) do
+        dag =
+          Enum.reduce(raw_edges, Model.new(:directed), fn {u, v}, acc ->
+            case Model.add_edge(acc, u, v, 1) do
+              {:ok, new_dag} -> new_dag
+              {:error, :cycle_detected} -> acc
+            end
+          end)
+
+        nodes = Yog.DAG.nodes(dag)
+
+        for u <- nodes, v <- nodes do
+          in_ancestors = u in Algorithm.ancestors(dag, v)
+          in_descendants = v in Algorithm.descendants(dag, u)
+          assert in_ancestors == in_descendants
+        end
+      end
+    end
+
+    property "single_source_distances agrees with shortest_path" do
+      check all(
+              n <- StreamData.integer(2..10),
+              raw_edges <-
+                StreamData.list_of(
+                  StreamData.tuple({StreamData.integer(1..n), StreamData.integer(1..n)})
+                )
+            ) do
+        dag =
+          Enum.reduce(raw_edges, Model.new(:directed), fn {u, v}, acc ->
+            case Model.add_edge(acc, u, v, 1) do
+              {:ok, new_dag} -> new_dag
+              {:error, :cycle_detected} -> acc
+            end
+          end)
+
+        nodes = Yog.DAG.nodes(dag)
+
+        if nodes != [] do
+          from = hd(nodes)
+          dists = Algorithm.single_source_distances(dag, from)
+
+          for to <- nodes do
+            case Algorithm.shortest_path(dag, from, to) do
+              {:ok, path} ->
+                assert Map.get(dists, to) == path.weight
+
+              :error ->
+                refute Map.has_key?(dists, to)
+            end
+          end
+        end
+      end
     end
   end
 end

@@ -168,18 +168,19 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 
 | Algorithm | Module | Purpose | Time Complexity | Space Complexity |
 |-----------|--------|---------|-----------------|------------------|
+| Topological Sort | `Yog.DAG.Algorithm` | Total topological ordering of vertices | O(V+E) | O(V) |
+| Topological Generations | `Yog.DAG.Algorithm` | Layer-by-layer parallel generation ordering | O(V+E) | O(V) |
 | Longest Path | `Yog.DAG.Algorithm` | Critical path in weighted DAG | O(V+E) | O(V) |
-| Shortest Path | `Yog.DAG.Algorithm` | Shortest path in DAG | O(V+E) | O(V) |
+| Shortest Path | `Yog.DAG.Algorithm` | Shortest path in DAG via dynamic programming | O(V+E) | O(V) |
+| Lowest Common Ancestors | `Yog.DAG.Algorithm` | Closest shared dependencies of two nodes | O(V(V+E)) | O(V) |
+| Sources | `Yog.DAG.Algorithm` | In-degree 0 nodes | O(V) | O(V) |
+| Sinks | `Yog.DAG.Algorithm` | Out-degree 0 nodes | O(V) | O(V) |
+| Ancestors | `Yog.DAG.Algorithm` | All ancestors of a node (including itself) | O(V+E) | O(V) |
+| Descendants | `Yog.DAG.Algorithm` | All descendants of a node (including itself) | O(V+E) | O(V) |
+| Single-Source Distances | `Yog.DAG.Algorithm` | SSSP in DAG via dynamic programming | O(V+E) | O(V) |
+| Path Count | `Yog.DAG.Algorithm` | Number of distinct paths between two nodes | O(V+E) | O(V) |
 | Transitive Closure | `Yog.Transform` | Reachability matrix | O(V³) | O(V²) |
 | Transitive Reduction | `Yog.Transform` | Minimal equivalent DAG | O(V³) | O(V²) |
-| LCA | `Yog.Pathfinding.LCA` | Lowest common ancestors | O(V log V) preprocess, O(log V) query | O(V log V) |
-| Topological Generations | `Yog.DAG` | Layer-by-layer ordering | O(V+E) | O(V) |
-| Sources | `Yog.DAG` | In-degree 0 nodes | O(V+E) | O(V) |
-| Sinks | `Yog.DAG` | Out-degree 0 nodes | O(V+E) | O(V) |
-| Ancestors | `Yog.DAG` | All ancestors of a node | O(V+E) | O(V) |
-| Descendants | `Yog.DAG` | All descendants of a node | O(V+E) | O(V) |
-| Single-Source Distances | `Yog.DAG` | SSSP in DAG | O(V+E) | O(V) |
-| Path Count | `Yog.DAG` | Number of distinct paths | O(V+E) | O(V) |
 
 ## Graph Operations
 

@@ -7,20 +7,16 @@ defmodule Yog.DAG.Algorithm do
   longest path, transitive closure, and more.
   """
 
+  alias Yog.DAG
   alias Yog.Pathfinding.Path
 
   @doc """
   Returns a topological ordering of all nodes in the DAG.
 
-  Unlike `Yog.traversal.topological_sort/1` which returns `{:ok, sorted}` or
-  `{:error, :cycle_detected}` (since general graphs may contain cycles), this
-  version is **total** - it always returns a valid ordering because the `DAG`
-  type guarantees acyclicity.
-
   In a topological ordering, every node appears before all nodes it has edges to.
   This is useful for scheduling tasks with dependencies, build systems, etc.
 
-  **Time Complexity:** O(V + E)
+  Time complexity: $\\mathcal{O}(V + E)$
 
   ## Example
 
@@ -41,19 +37,19 @@ defmodule Yog.DAG.Algorithm do
       iex> List.last(sorted)
       4
   """
-  @spec topological_sort(Yog.DAG.t()) :: [Yog.node_id()]
-  def topological_sort(dag) do
-    graph = dag.graph
-
-    # We can safely unwrap because the graph is proven to be acyclic
+  @spec topological_sort(DAG.t()) :: [Yog.node_id()]
+  def topological_sort(%DAG{graph: graph}) do
     case Yog.Traversal.topological_sort(graph) do
       {:ok, sorted} ->
         sorted
 
-      # This should never happen since DAG guarantees acyclicity
       {:error, :contains_cycle} ->
         raise RuntimeError, "DAG invariant violated: graph contains a cycle"
     end
+  end
+
+  def topological_sort(dag) do
+    raise ArgumentError, "expected a Yog.DAG struct, got: #{inspect(dag)}"
   end
 
   @doc """
@@ -61,10 +57,9 @@ defmodule Yog.DAG.Algorithm do
 
   Each generation is a list of nodes with the same longest-path distance
   from a source. Nodes within the same generation are independent and can
-  be processed in parallel. This is especially useful in Elixir for
-  batching `Task.async_stream` workloads over a dependency graph.
+  be processed in parallel.
 
-  **Time Complexity:** O(V + E)
+  Time complexity: $\\mathcal{O}(V + E)$
 
   ## Example
 
@@ -82,10 +77,8 @@ defmodule Yog.DAG.Algorithm do
       iex> Yog.DAG.Algorithm.topological_generations(dag)
       [[:a], [:b, :c], [:d]]
   """
-  @spec topological_generations(Yog.DAG.t()) :: [[Yog.node_id()]]
-  def topological_generations(dag) do
-    graph = dag.graph
-
+  @spec topological_generations(DAG.t()) :: [[Yog.node_id()]]
+  def topological_generations(%DAG{graph: graph}) do
     {in_degrees, initial_zeros} =
       Enum.reduce(Yog.Model.all_nodes(graph), {%{}, []}, fn node, {deg_acc, zero_acc} ->
         deg = Yog.Model.in_degree(graph, node)
@@ -97,6 +90,10 @@ defmodule Yog.DAG.Algorithm do
       end)
 
     do_generations(graph, in_degrees, initial_zeros, [])
+  end
+
+  def topological_generations(dag) do
+    raise ArgumentError, "expected a Yog.DAG struct, got: #{inspect(dag)}"
   end
 
   defp do_generations(_graph, _in_degrees, [], acc) do
@@ -126,17 +123,9 @@ defmodule Yog.DAG.Algorithm do
   Finds the longest path (critical path) in a weighted DAG.
 
   The longest path is the path with maximum total edge weight from any source
-  node to any sink node. This is the dual of shortest path and is useful for:
-  - Project scheduling (finding the critical path)
-  - Dependency chains with durations
-  - Determining minimum time to complete all tasks
+  node to any sink node.
 
-  **Time Complexity:** O(V + E) - linear via dynamic programming on the topologically sorted DAG.
-
-  ## Note
-
-  For unweighted graphs, this finds the path with most edges.
-  Weights must be non-negative for meaningful results.
+  Time complexity: $\\mathcal{O}(V + E)$
 
   ## Example
 
@@ -152,8 +141,8 @@ defmodule Yog.DAG.Algorithm do
       iex> length(path)
       3
   """
-  @spec longest_path(Yog.DAG.t()) :: [Yog.node_id()]
-  def longest_path(dag) do
+  @spec longest_path(DAG.t()) :: [Yog.node_id()]
+  def longest_path(%DAG{} = dag) do
     graph = dag.graph
     sorted_nodes = topological_sort(dag)
 
@@ -165,24 +154,398 @@ defmodule Yog.DAG.Algorithm do
         update_longest_distances(out_edges, node, node_dist, dist_acc, pred_acc)
       end)
 
-    # All nodes are potential sources with distance 0
     all_distances =
       Enum.reduce(sorted_nodes, distances, fn node, acc ->
         Map.put_new(acc, node, 0)
       end)
 
-    # Find the node with maximum distance
     {max_node, _max_dist} =
       all_distances
       |> Enum.max_by(fn {_node, dist} -> dist end, fn -> {nil, 0} end)
 
-    # Reconstruct path by following predecessors backward
     if max_node do
       reconstruct_path_backward(max_node, nil, predecessors, [])
     else
       []
     end
   end
+
+  def longest_path(dag) do
+    raise ArgumentError, "expected a Yog.DAG struct, got: #{inspect(dag)}"
+  end
+
+  @doc """
+  Finds the shortest path between two nodes in a weighted DAG.
+
+  Time complexity: $\\mathcal{O}(V + E)$
+
+  ## Example
+
+      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(:a, nil)
+      ...>   |> Yog.add_node(:b, nil)
+      ...>   |> Yog.add_node(:c, nil)
+      ...>   |> Yog.add_edge_ensure(:a, :b, 3)
+      ...>   |> Yog.add_edge_ensure(:b, :c, 2)
+      ...> )
+      iex> {:ok, path} = Yog.DAG.Algorithm.shortest_path(dag, :a, :c)
+      iex> path.nodes == [:a, :b, :c] and path.weight == 5
+      true
+  """
+  @spec shortest_path(DAG.t(), Yog.node_id(), Yog.node_id()) ::
+          {:ok, Path.t()} | :error
+  def shortest_path(%DAG{graph: graph} = dag, from, to) do
+    if Yog.Model.has_node?(graph, from) and Yog.Model.has_node?(graph, to) do
+      sorted_nodes = topological_sort(dag)
+      relevant_nodes = Enum.drop_while(sorted_nodes, fn node -> node != from end)
+
+      if relevant_nodes == [] do
+        :error
+      else
+        {distances, predecessors} = solve_shortest_path_dp(relevant_nodes, from, graph)
+
+        case Map.fetch(distances, to) do
+          {:ok, total_dist} ->
+            path = reconstruct_path_backward(to, from, predecessors, [])
+            {:ok, Path.new(path, total_dist)}
+
+          _ ->
+            :error
+        end
+      end
+    else
+      :error
+    end
+  end
+
+  def shortest_path(dag, _from, _to) do
+    raise ArgumentError, "expected a Yog.DAG struct, got: #{inspect(dag)}"
+  end
+
+  @doc """
+  Finds the lowest common ancestors (LCAs) of two nodes.
+
+  Time complexity: $\\mathcal{O}(V \\cdot (V + E))$
+
+  ## Example
+
+      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(:x, nil)
+      ...>   |> Yog.add_node(:a, nil)
+      ...>   |> Yog.add_node(:b, nil)
+      ...>   |> Yog.add_edge_ensure(:x, :a, 1)
+      ...>   |> Yog.add_edge_ensure(:x, :b, 1)
+      ...> )
+      iex> lcas = Yog.DAG.Algorithm.lowest_common_ancestors(dag, :a, :b)
+      iex> :x in lcas
+      true
+  """
+  @spec lowest_common_ancestors(DAG.t(), Yog.node_id(), Yog.node_id()) ::
+          [Yog.node_id()]
+  def lowest_common_ancestors(%DAG{graph: graph} = dag, node_a, node_b) do
+    if Yog.Model.has_node?(graph, node_a) and Yog.Model.has_node?(graph, node_b) do
+      ancestors_a = get_ancestors_set(dag, node_a)
+      ancestors_b = get_ancestors_set(dag, node_b)
+
+      common_ancestors =
+        MapSet.intersection(ancestors_a, ancestors_b)
+        |> MapSet.to_list()
+
+      Enum.filter(common_ancestors, fn candidate ->
+        is_ancestor_of_another =
+          Enum.any?(common_ancestors, fn other ->
+            candidate != other and Yog.Traversal.reachable?(graph, candidate, other)
+          end)
+
+        not is_ancestor_of_another
+      end)
+    else
+      []
+    end
+  end
+
+  def lowest_common_ancestors(dag, _node_a, _node_b) do
+    raise ArgumentError, "expected a Yog.DAG struct, got: #{inspect(dag)}"
+  end
+
+  @doc """
+  Returns all source nodes (nodes with in-degree 0).
+
+  Time complexity: $\\mathcal{O}(V)$
+
+  ## Example
+
+      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(:a, nil)
+      ...>   |> Yog.add_node(:b, nil)
+      ...>   |> Yog.add_node(:c, nil)
+      ...>   |> Yog.add_edge_ensure(:a, :b, 1)
+      ...>   |> Yog.add_edge_ensure(:a, :c, 1)
+      ...> )
+      iex> Yog.DAG.Algorithm.sources(dag)
+      [:a]
+  """
+  @spec sources(DAG.t()) :: [Yog.node_id()]
+  def sources(%DAG{graph: graph}) do
+    graph.nodes
+    |> Map.keys()
+    |> Enum.filter(fn node -> Yog.Model.in_degree(graph, node) == 0 end)
+    |> Enum.sort()
+  end
+
+  def sources(dag) do
+    raise ArgumentError, "expected a Yog.DAG struct, got: #{inspect(dag)}"
+  end
+
+  @doc """
+  Returns all sink nodes (nodes with out-degree 0).
+
+  Time complexity: $\\mathcal{O}(V)$
+
+  ## Example
+
+      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(:a, nil)
+      ...>   |> Yog.add_node(:b, nil)
+      ...>   |> Yog.add_node(:c, nil)
+      ...>   |> Yog.add_edge_ensure(:a, :b, 1)
+      ...>   |> Yog.add_edge_ensure(:a, :c, 1)
+      ...> )
+      iex> Yog.DAG.Algorithm.sinks(dag)
+      [:b, :c]
+  """
+  @spec sinks(DAG.t()) :: [Yog.node_id()]
+  def sinks(%DAG{graph: graph}) do
+    graph.nodes
+    |> Map.keys()
+    |> Enum.filter(fn node -> Yog.Model.out_degree(graph, node) == 0 end)
+    |> Enum.sort()
+  end
+
+  def sinks(dag) do
+    raise ArgumentError, "expected a Yog.DAG struct, got: #{inspect(dag)}"
+  end
+
+  @doc """
+  Returns all ancestors of a node (nodes that have a path to the given node).
+
+  The result includes the node itself.
+
+  Time complexity: $\\mathcal{O}(V + E)$
+
+  ## Example
+
+      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(:a, nil)
+      ...>   |> Yog.add_node(:b, nil)
+      ...>   |> Yog.add_node(:c, nil)
+      ...>   |> Yog.add_edge_ensure(:a, :b, 1)
+      ...>   |> Yog.add_edge_ensure(:b, :c, 1)
+      ...> )
+      iex> Yog.DAG.Algorithm.ancestors(dag, :c)
+      [:a, :b, :c]
+  """
+  @spec ancestors(DAG.t(), Yog.node_id()) :: [Yog.node_id()]
+  def ancestors(%DAG{graph: graph} = dag, node) do
+    if Yog.Model.has_node?(graph, node) do
+      dag |> get_ancestors_set(node) |> MapSet.to_list() |> Enum.sort()
+    else
+      []
+    end
+  end
+
+  def ancestors(dag, _node) do
+    raise ArgumentError, "expected a Yog.DAG struct, got: #{inspect(dag)}"
+  end
+
+  @doc """
+  Returns all descendants of a node (nodes reachable from the given node).
+
+  The result includes the node itself.
+
+  Time complexity: $\\mathcal{O}(V + E)$
+
+  ## Example
+
+      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(:a, nil)
+      ...>   |> Yog.add_node(:b, nil)
+      ...>   |> Yog.add_node(:c, nil)
+      ...>   |> Yog.add_edge_ensure(:a, :b, 1)
+      ...>   |> Yog.add_edge_ensure(:b, :c, 1)
+      ...> )
+      iex> Yog.DAG.Algorithm.descendants(dag, :a)
+      [:a, :b, :c]
+  """
+  @spec descendants(DAG.t(), Yog.node_id()) :: [Yog.node_id()]
+  def descendants(%DAG{graph: graph}, node) do
+    if Yog.Model.has_node?(graph, node) do
+      collect_descendants(graph, [node], MapSet.new([node])) |> MapSet.to_list() |> Enum.sort()
+    else
+      []
+    end
+  end
+
+  def descendants(dag, _node) do
+    raise ArgumentError, "expected a Yog.DAG struct, got: #{inspect(dag)}"
+  end
+
+  @doc """
+  Computes single-source shortest distances to all reachable nodes.
+
+  Time complexity: $\\mathcal{O}(V + E)$
+
+  ## Example
+
+      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(:a, nil)
+      ...>   |> Yog.add_node(:b, nil)
+      ...>   |> Yog.add_node(:c, nil)
+      ...>   |> Yog.add_edge_ensure(:a, :b, 3)
+      ...>   |> Yog.add_edge_ensure(:b, :c, 2)
+      ...>   |> Yog.add_edge_ensure(:a, :c, 10)
+      ...> )
+      iex> Yog.DAG.Algorithm.single_source_distances(dag, :a)
+      %{a: 0, b: 3, c: 5}
+  """
+  @spec single_source_distances(DAG.t(), Yog.node_id()) :: %{Yog.node_id() => number()}
+  def single_source_distances(%DAG{graph: graph} = dag, from) do
+    if Yog.Model.has_node?(graph, from) do
+      sorted_nodes = topological_sort(dag)
+
+      relevant_nodes = Enum.drop_while(sorted_nodes, fn node -> node != from end)
+
+      if relevant_nodes == [] do
+        %{}
+      else
+        {distances, _predecessors} = solve_shortest_path_dp(relevant_nodes, from, graph)
+        distances
+      end
+    else
+      %{}
+    end
+  end
+
+  def single_source_distances(dag, _from) do
+    raise ArgumentError, "expected a Yog.DAG struct, got: #{inspect(dag)}"
+  end
+
+  @doc """
+  Finds the longest path between two specific nodes in a weighted DAG.
+
+  Time complexity: $\\mathcal{O}(V + E)$
+
+  ## Example
+
+      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(:a, nil)
+      ...>   |> Yog.add_node(:b, nil)
+      ...>   |> Yog.add_node(:c, nil)
+      ...>   |> Yog.add_node(:d, nil)
+      ...>   |> Yog.add_edge_ensure(:a, :b, 1)
+      ...>   |> Yog.add_edge_ensure(:a, :c, 5)
+      ...>   |> Yog.add_edge_ensure(:b, :d, 1)
+      ...>   |> Yog.add_edge_ensure(:c, :d, 1)
+      ...> )
+      iex> {:ok, path} = Yog.DAG.Algorithm.longest_path(dag, :a, :d)
+      iex> path.nodes
+      [:a, :c, :d]
+      iex> path.weight
+      6
+  """
+  @spec longest_path(DAG.t(), Yog.node_id(), Yog.node_id()) ::
+          {:ok, Path.t()} | :error
+  def longest_path(%DAG{graph: graph} = dag, from, to) do
+    if Yog.Model.has_node?(graph, from) and Yog.Model.has_node?(graph, to) do
+      sorted_nodes = topological_sort(dag)
+
+      relevant_nodes = Enum.drop_while(sorted_nodes, fn node -> node != from end)
+
+      if relevant_nodes == [] do
+        :error
+      else
+        {distances, predecessors} = solve_longest_path_dp(relevant_nodes, from, graph)
+
+        case Map.fetch(distances, to) do
+          {:ok, total_dist} ->
+            path = reconstruct_path_backward(to, from, predecessors, [])
+            {:ok, Path.new(path, total_dist)}
+
+          _ ->
+            :error
+        end
+      end
+    else
+      :error
+    end
+  end
+
+  def longest_path(dag, _from, _to) do
+    raise ArgumentError, "expected a Yog.DAG struct, got: #{inspect(dag)}"
+  end
+
+  @doc """
+  Counts the number of distinct paths between two nodes in a DAG.
+
+  Time complexity: $\\mathcal{O}(V + E)$
+
+  ## Example
+
+      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
+      ...>   Yog.directed()
+      ...>   |> Yog.add_node(:a, nil)
+      ...>   |> Yog.add_node(:b, nil)
+      ...>   |> Yog.add_node(:c, nil)
+      ...>   |> Yog.add_node(:d, nil)
+      ...>   |> Yog.add_edge_ensure(:a, :b, 1)
+      ...>   |> Yog.add_edge_ensure(:a, :c, 1)
+      ...>   |> Yog.add_edge_ensure(:b, :d, 1)
+      ...>   |> Yog.add_edge_ensure(:c, :d, 1)
+      ...> )
+      iex> Yog.DAG.Algorithm.path_count(dag, :a, :d)
+      2
+  """
+  @spec path_count(DAG.t(), Yog.node_id(), Yog.node_id()) :: non_neg_integer()
+  def path_count(%DAG{graph: graph} = dag, from, to) do
+    if Yog.Model.has_node?(graph, from) and Yog.Model.has_node?(graph, to) do
+      sorted_nodes = topological_sort(dag)
+
+      relevant_nodes = Enum.drop_while(sorted_nodes, fn node -> node != from end)
+
+      if relevant_nodes == [] do
+        0
+      else
+        Enum.reduce(relevant_nodes, %{from => 1}, fn node, counts ->
+          count = Map.get(counts, node, 0)
+
+          successors = Yog.Model.successor_ids(graph, node)
+
+          Enum.reduce(successors, counts, fn succ, acc ->
+            Map.update(acc, succ, count, &(&1 + count))
+          end)
+        end)
+        |> Map.get(to, 0)
+      end
+    else
+      0
+    end
+  end
+
+  def path_count(dag, _from, _to) do
+    raise ArgumentError, "expected a Yog.DAG struct, got: #{inspect(dag)}"
+  end
+
+  # ============================================================
+  # Private Helpers
+  # ============================================================
 
   defp update_longest_distances(edges, node, node_dist, dist_acc, pred_acc) do
     Enum.reduce(edges, {dist_acc, pred_acc}, fn {target, weight}, {d_acc, p_acc} = acc ->
@@ -199,51 +562,6 @@ defmodule Yog.DAG.Algorithm do
 
   defp should_update_longest?(nil, _), do: true
   defp should_update_longest?(curr, next), do: next > curr
-
-  @doc """
-  Finds the shortest path between two nodes in a weighted DAG.
-
-  Uses dynamic programming on the topologically sorted DAG.
-
-  **Time Complexity:** O(V + E)
-
-  ## Example
-
-      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(:a, nil)
-      ...>   |> Yog.add_node(:b, nil)
-      ...>   |> Yog.add_node(:c, nil)
-      ...>   |> Yog.add_edge_ensure(:a, :b, 3)
-      ...>   |> Yog.add_edge_ensure(:b, :c, 2)
-      ...> )
-      iex> {:ok, path} = Yog.DAG.Algorithm.shortest_path(dag, :a, :c)
-      iex> path.nodes == [:a, :b, :c] and path.weight == 5
-      true
-  """
-  @spec shortest_path(Yog.DAG.t(), Yog.node_id(), Yog.node_id()) ::
-          {:ok, Path.t()} | :error
-  def shortest_path(dag, from, to) do
-    graph = dag.graph
-    sorted_nodes = topological_sort(dag)
-
-    relevant_nodes = Enum.drop_while(sorted_nodes, fn node -> node != from end)
-
-    if relevant_nodes == [] do
-      :error
-    else
-      {distances, predecessors} = solve_shortest_path_dp(relevant_nodes, from, graph)
-
-      case Map.fetch(distances, to) do
-        {:ok, total_dist} ->
-          path = reconstruct_path_backward(to, from, predecessors, [])
-          {:ok, Path.new(path, total_dist)}
-
-        _ ->
-          :error
-      end
-    end
-  end
 
   defp solve_shortest_path_dp(nodes, from, graph) do
     Enum.reduce(nodes, {%{from => 0}, %{}}, fn node, {dist_acc, pred_acc} = acc ->
@@ -273,303 +591,6 @@ defmodule Yog.DAG.Algorithm do
 
   defp should_update_shortest?(nil, _), do: true
   defp should_update_shortest?(current, new), do: new < current
-
-  @doc """
-  Finds the lowest common ancestors (LCAs) of two nodes.
-
-  A common ancestor of nodes A and B is any node that has paths to both A and B.
-  The "lowest" common ancestors are those that are not ancestors of any other
-  common ancestor - they are the "closest" shared dependencies.
-
-  This is useful for:
-  - Finding merge bases in version control
-  - Identifying shared dependencies
-  - Computing dominators in control flow graphs
-
-  **Time Complexity:** O(V × (V + E))
-
-  ## Example
-
-      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(:x, nil)
-      ...>   |> Yog.add_node(:a, nil)
-      ...>   |> Yog.add_node(:b, nil)
-      ...>   |> Yog.add_edge_ensure(:x, :a, 1)
-      ...>   |> Yog.add_edge_ensure(:x, :b, 1)
-      ...> )
-      iex> lcas = Yog.DAG.Algorithm.lowest_common_ancestors(dag, :a, :b)
-      iex> :x in lcas
-      true
-  """
-  @spec lowest_common_ancestors(Yog.DAG.t(), Yog.node_id(), Yog.node_id()) ::
-          [Yog.node_id()]
-  def lowest_common_ancestors(dag, node_a, node_b) do
-    graph = dag.graph
-    ancestors_a = get_ancestors_set(dag, node_a)
-    ancestors_b = get_ancestors_set(dag, node_b)
-
-    common_ancestors =
-      MapSet.intersection(ancestors_a, ancestors_b)
-      |> MapSet.to_list()
-
-    Enum.filter(common_ancestors, fn candidate ->
-      is_ancestor_of_another =
-        Enum.any?(common_ancestors, fn other ->
-          candidate != other and Yog.Traversal.reachable?(graph, candidate, other)
-        end)
-
-      not is_ancestor_of_another
-    end)
-  end
-
-  @doc """
-  Returns all source nodes (nodes with in-degree 0).
-
-  Source nodes have no incoming edges and represent starting points
-  in a DAG (e.g., tasks with no prerequisites).
-
-  **Time Complexity:** O(V)
-
-  ## Example
-
-      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(:a, nil)
-      ...>   |> Yog.add_node(:b, nil)
-      ...>   |> Yog.add_node(:c, nil)
-      ...>   |> Yog.add_edge_ensure(:a, :b, 1)
-      ...>   |> Yog.add_edge_ensure(:a, :c, 1)
-      ...> )
-      iex> Yog.DAG.Algorithm.sources(dag)
-      [:a]
-  """
-  @spec sources(Yog.DAG.t()) :: [Yog.node_id()]
-  def sources(dag) do
-    graph = dag.graph
-
-    graph.nodes
-    |> Map.keys()
-    |> Enum.filter(fn node -> Yog.Model.in_degree(graph, node) == 0 end)
-    |> Enum.sort()
-  end
-
-  @doc """
-  Returns all sink nodes (nodes with out-degree 0).
-
-  Sink nodes have no outgoing edges and represent terminal points
-  in a DAG (e.g., final deliverables with no downstream tasks).
-
-  **Time Complexity:** O(V)
-
-  ## Example
-
-      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(:a, nil)
-      ...>   |> Yog.add_node(:b, nil)
-      ...>   |> Yog.add_node(:c, nil)
-      ...>   |> Yog.add_edge_ensure(:a, :b, 1)
-      ...>   |> Yog.add_edge_ensure(:a, :c, 1)
-      ...> )
-      iex> Yog.DAG.Algorithm.sinks(dag)
-      [:b, :c]
-  """
-  @spec sinks(Yog.DAG.t()) :: [Yog.node_id()]
-  def sinks(dag) do
-    graph = dag.graph
-
-    graph.nodes
-    |> Map.keys()
-    |> Enum.filter(fn node -> Yog.Model.out_degree(graph, node) == 0 end)
-    |> Enum.sort()
-  end
-
-  @doc """
-  Returns all ancestors of a node (nodes that have a path to the given node).
-
-  The result includes the node itself.
-
-  **Time Complexity:** O(V + E)
-
-  ## Example
-
-      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(:a, nil)
-      ...>   |> Yog.add_node(:b, nil)
-      ...>   |> Yog.add_node(:c, nil)
-      ...>   |> Yog.add_edge_ensure(:a, :b, 1)
-      ...>   |> Yog.add_edge_ensure(:b, :c, 1)
-      ...> )
-      iex> Yog.DAG.Algorithm.ancestors(dag, :c)
-      [:a, :b, :c]
-  """
-  @spec ancestors(Yog.DAG.t(), Yog.node_id()) :: [Yog.node_id()]
-  def ancestors(dag, node) do
-    dag |> get_ancestors_set(node) |> MapSet.to_list() |> Enum.sort()
-  end
-
-  @doc """
-  Returns all descendants of a node (nodes reachable from the given node).
-
-  The result includes the node itself.
-
-  **Time Complexity:** O(V + E)
-
-  ## Example
-
-      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(:a, nil)
-      ...>   |> Yog.add_node(:b, nil)
-      ...>   |> Yog.add_node(:c, nil)
-      ...>   |> Yog.add_edge_ensure(:a, :b, 1)
-      ...>   |> Yog.add_edge_ensure(:b, :c, 1)
-      ...> )
-      iex> Yog.DAG.Algorithm.descendants(dag, :a)
-      [:a, :b, :c]
-  """
-  @spec descendants(Yog.DAG.t(), Yog.node_id()) :: [Yog.node_id()]
-  def descendants(dag, node) do
-    graph = dag.graph
-    collect_descendants(graph, [node], MapSet.new([node])) |> MapSet.to_list() |> Enum.sort()
-  end
-
-  @doc """
-  Computes single-source shortest distances to all reachable nodes.
-
-  Uses dynamic programming on the topological order for O(V + E) performance,
-  faster than Dijkstra's O((V + E) log V).
-
-  **Time Complexity:** O(V + E)
-
-  ## Example
-
-      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(:a, nil)
-      ...>   |> Yog.add_node(:b, nil)
-      ...>   |> Yog.add_node(:c, nil)
-      ...>   |> Yog.add_edge_ensure(:a, :b, 3)
-      ...>   |> Yog.add_edge_ensure(:b, :c, 2)
-      ...>   |> Yog.add_edge_ensure(:a, :c, 10)
-      ...> )
-      iex> Yog.DAG.Algorithm.single_source_distances(dag, :a)
-      %{a: 0, b: 3, c: 5}
-  """
-  @spec single_source_distances(Yog.DAG.t(), Yog.node_id()) :: %{Yog.node_id() => number()}
-  def single_source_distances(dag, from) do
-    graph = dag.graph
-    sorted_nodes = topological_sort(dag)
-
-    relevant_nodes = Enum.drop_while(sorted_nodes, fn node -> node != from end)
-
-    if relevant_nodes == [] do
-      %{}
-    else
-      {distances, _predecessors} = solve_shortest_path_dp(relevant_nodes, from, graph)
-      distances
-    end
-  end
-
-  @doc """
-  Finds the longest path between two specific nodes in a weighted DAG.
-
-  **Time Complexity:** O(V + E)
-
-  ## Example
-
-      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(:a, nil)
-      ...>   |> Yog.add_node(:b, nil)
-      ...>   |> Yog.add_node(:c, nil)
-      ...>   |> Yog.add_node(:d, nil)
-      ...>   |> Yog.add_edge_ensure(:a, :b, 1)
-      ...>   |> Yog.add_edge_ensure(:a, :c, 5)
-      ...>   |> Yog.add_edge_ensure(:b, :d, 1)
-      ...>   |> Yog.add_edge_ensure(:c, :d, 1)
-      ...> )
-      iex> {:ok, path} = Yog.DAG.Algorithm.longest_path(dag, :a, :d)
-      iex> path.nodes
-      [:a, :c, :d]
-      iex> path.weight
-      6
-  """
-  @spec longest_path(Yog.DAG.t(), Yog.node_id(), Yog.node_id()) ::
-          {:ok, Path.t()} | :error
-  def longest_path(dag, from, to) do
-    graph = dag.graph
-    sorted_nodes = topological_sort(dag)
-
-    relevant_nodes = Enum.drop_while(sorted_nodes, fn node -> node != from end)
-
-    if relevant_nodes == [] do
-      :error
-    else
-      {distances, predecessors} = solve_longest_path_dp(relevant_nodes, from, graph)
-
-      case Map.fetch(distances, to) do
-        {:ok, total_dist} ->
-          path = reconstruct_path_backward(to, from, predecessors, [])
-          {:ok, Path.new(path, total_dist)}
-
-        _ ->
-          :error
-      end
-    end
-  end
-
-  @doc """
-  Counts the number of distinct paths between two nodes in a DAG.
-
-  Uses dynamic programming on the topological order.
-
-  **Time Complexity:** O(V + E)
-
-  ## Example
-
-      iex> {:ok, dag} = Yog.DAG.Model.from_graph(
-      ...>   Yog.directed()
-      ...>   |> Yog.add_node(:a, nil)
-      ...>   |> Yog.add_node(:b, nil)
-      ...>   |> Yog.add_node(:c, nil)
-      ...>   |> Yog.add_node(:d, nil)
-      ...>   |> Yog.add_edge_ensure(:a, :b, 1)
-      ...>   |> Yog.add_edge_ensure(:a, :c, 1)
-      ...>   |> Yog.add_edge_ensure(:b, :d, 1)
-      ...>   |> Yog.add_edge_ensure(:c, :d, 1)
-      ...> )
-      iex> Yog.DAG.Algorithm.path_count(dag, :a, :d)
-      2
-  """
-  @spec path_count(Yog.DAG.t(), Yog.node_id(), Yog.node_id()) :: non_neg_integer()
-  def path_count(dag, from, to) do
-    graph = dag.graph
-    sorted_nodes = topological_sort(dag)
-
-    relevant_nodes = Enum.drop_while(sorted_nodes, fn node -> node != from end)
-
-    if relevant_nodes == [] do
-      0
-    else
-      Enum.reduce(relevant_nodes, %{from => 1}, fn node, counts ->
-        count = Map.get(counts, node, 0)
-
-        successors = Yog.Model.successor_ids(graph, node)
-
-        Enum.reduce(successors, counts, fn succ, acc ->
-          Map.update(acc, succ, count, &(&1 + count))
-        end)
-      end)
-      |> Map.get(to, 0)
-    end
-  end
-
-  # ============================================================
-  # Private Helpers
-  # ============================================================
 
   defp solve_longest_path_dp(nodes, from, graph) do
     Enum.reduce(nodes, {%{from => 0}, %{}}, fn node, {dist_acc, pred_acc} = acc ->
@@ -622,7 +643,6 @@ defmodule Yog.DAG.Algorithm do
     collect_ancestors(graph, [node], MapSet.new([node]))
   end
 
-  # Collects all ancestors by traversing backwards through in_edges (BFS/DFS hybrid)
   defp collect_ancestors(_graph, [], visited), do: visited
 
   defp collect_ancestors(graph, [current | rest], visited) do
