@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Pre-1.0 Module Audit & Hardening** — Completed stabilizing audit pass across core, IO, flow, transform, operation, pathfinding, and multigraph modules. Standardized error handling, updated complexity math documentation ($\mathcal{O}(\dots)$), and significantly expanded unit and property-based test coverage.
+- **Pre-1.0 Module Audit & Hardening** — Completed stabilizing audit pass across core, IO (`XMLUtils`), flow, transform, operation, pathfinding, and multigraph modules. Standardized error handling, updated complexity math documentation ($\mathcal{O}(\dots)$), and significantly expanded unit and property-based test coverage (#280).
 
 
 ## [0.99.1] - 2026-07-10

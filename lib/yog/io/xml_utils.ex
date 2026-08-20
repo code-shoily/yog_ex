@@ -1,54 +1,7 @@
 defmodule Yog.IO.XMLUtils do
   @moduledoc false
 
-  @doc """
-  Escapes special XML characters in a string.
-  """
-  def escape_xml(value) do
-    str = Yog.Utils.safe_string(value)
-
-    if String.contains?(str, ["&", "<", ">", "\"", "'"]) do
-      String.replace(str, ~r/[&<>"']/, fn
-        "&" -> "&amp;"
-        "<" -> "&lt;"
-        ">" -> "&gt;"
-        "\"" -> "&quot;"
-        "'" -> "&apos;"
-      end)
-    else
-      str
-    end
-  end
-
-  @doc """
-  Attempts to parse XML using xmerl.
-  """
-  def try_parse_xml(xml) do
-    xml_charlist = String.to_charlist(xml)
-    {doc, _} = :xmerl_scan.string(xml_charlist, quiet: true, space: :normalize)
-    {:ok, doc}
-  rescue
-    e ->
-      {:error, Exception.message(e)}
-  catch
-    :exit, {:fatal, {{:error, {:wfc_Legal_Character, _}}, _, _, _}} ->
-      {:error, :bad_character}
-
-    :exit, {:fatal, {{:unexpected_char, _}, _, _, _}} ->
-      {:error, :bad_character}
-
-    :exit, reason ->
-      {:error, inspect(reason)}
-  end
-
-  @doc """
-  Sanitizes XML string by replacing smart characters and removing invalid characters.
-  """
-  def sanitize_xml(xml) do
-    xml
-    |> replace_smart_characters()
-    |> remove_invalid_xml_chars()
-  end
+  @xml_escape_regex ~r/[&<>"']/
 
   @char_replacements [
     # Dashes
@@ -134,25 +87,138 @@ defmodule Yog.IO.XMLUtils do
     {0x00FF, "y"}
   ]
 
-  defp replace_smart_characters(xml) do
-    Enum.reduce(@char_replacements, xml, fn {codepoint, replacement}, acc ->
-      String.replace(acc, <<codepoint::utf8>>, replacement)
-    end)
+  @char_replacements_map Map.new(@char_replacements)
+
+  @doc """
+  Escapes special XML characters (`&`, `<`, `>`, `"`, `'`) in a string or value.
+
+  Converts non-binary values to strings using `Yog.Utils.safe_string/1` before escaping.
+
+  Time complexity: $O(N)$ where $N$ is the length of the string.
+
+  ## Examples
+
+      iex> Yog.IO.XMLUtils.escape_xml("<foo>")
+      "&lt;foo&gt;"
+
+      iex> Yog.IO.XMLUtils.escape_xml("a & b")
+      "a &amp; b"
+
+      iex> Yog.IO.XMLUtils.escape_xml(123)
+      "123"
+  """
+  @spec escape_xml(any()) :: String.t()
+  def escape_xml(value) do
+    str = Yog.Utils.safe_string(value)
+
+    if String.contains?(str, ["&", "<", ">", "\"", "'"]) do
+      String.replace(str, @xml_escape_regex, fn
+        "&" -> "&amp;"
+        "<" -> "&lt;"
+        ">" -> "&gt;"
+        "\"" -> "&quot;"
+        "'" -> "&apos;"
+      end)
+    else
+      str
+    end
   end
 
-  defp remove_invalid_xml_chars(xml) do
+  @doc """
+  Attempts to parse an XML binary string using Erlang's `:xmerl_scan`.
+
+  Returns `{:ok, doc}` on success, `{:error, :bad_character}` if the XML contains
+  unsupported or illegal XML control characters, or `{:error, reason}` for other parse failures.
+
+  Raises `ArgumentError` if `xml` is not a binary string.
+
+  Time complexity: $O(N)$ where $N$ is the length of the string.
+
+  ## Examples
+
+      iex> {:ok, doc} = Yog.IO.XMLUtils.try_parse_xml("<?xml version=\\"1.0\\"?><root/>")
+      iex> is_tuple(doc)
+      true
+
+      iex> Yog.IO.XMLUtils.try_parse_xml("<unclosed>")
+      {:error, "{:fatal, {:unexpected_end, {:file, :file_name_unknown}, {:line, 1}, {:col, 11}}}"}
+  """
+  @spec try_parse_xml(String.t()) :: {:ok, tuple()} | {:error, :bad_character | String.t()}
+  def try_parse_xml(xml) when is_binary(xml) do
+    xml_charlist = String.to_charlist(xml)
+    {doc, _} = :xmerl_scan.string(xml_charlist, quiet: true, space: :normalize)
+    {:ok, doc}
+  rescue
+    e ->
+      {:error, Exception.message(e)}
+  catch
+    :exit, {:fatal, {{:error, {:wfc_Legal_Character, _}}, _, _, _}} ->
+      {:error, :bad_character}
+
+    :exit, {:fatal, {{:unexpected_char, _}, _, _, _}} ->
+      {:error, :bad_character}
+
+    :exit, reason ->
+      {:error, inspect(reason)}
+  end
+
+  def try_parse_xml(xml) do
+    raise ArgumentError, "expected xml to be a binary string, got: #{inspect(xml)}"
+  end
+
+  @doc """
+  Sanitizes an XML string by replacing smart characters (smart quotes, dashes, non-breaking spaces,
+  accented characters) with ASCII equivalents and removing invalid XML 1.0 control characters.
+
+  Raises `ArgumentError` if `xml` is not a binary string.
+
+  Time complexity: $O(N)$ single pass where $N$ is the length of the string.
+
+  ## Examples
+
+      iex> Yog.IO.XMLUtils.sanitize_xml("<root>hello \\u201Cworld\\u201D</root>")
+      "<root>hello \\"world\\"</root>"
+
+      iex> Yog.IO.XMLUtils.sanitize_xml("<root>hello\\bworld</root>")
+      "<root>helloworld</root>"
+  """
+  @spec sanitize_xml(String.t()) :: String.t()
+  def sanitize_xml(xml) when is_binary(xml) do
     xml
     |> String.to_charlist()
-    |> Enum.filter(fn cp ->
-      case cp do
-        0x09 -> true
-        0x0A -> true
-        0x0D -> true
-        _ when cp >= 0x20 and cp <= 0xD7FF -> true
-        _ when cp >= 0xE000 and cp <= 0xFFFD -> true
-        _ -> false
-      end
-    end)
-    |> List.to_string()
+    |> sanitize_charlist([])
+    |> IO.iodata_to_binary()
+  rescue
+    _ ->
+      reraise ArgumentError,
+              "expected valid UTF-8 binary string, got: #{inspect(xml)}",
+              __STACKTRACE__
   end
+
+  def sanitize_xml(xml) do
+    raise ArgumentError, "expected xml to be a binary string, got: #{inspect(xml)}"
+  end
+
+  defp sanitize_charlist([], acc), do: Enum.reverse(acc)
+
+  defp sanitize_charlist([cp | rest], acc) do
+    case Map.fetch(@char_replacements_map, cp) do
+      {:ok, replacement} ->
+        sanitize_charlist(rest, [replacement | acc])
+
+      :error ->
+        if valid_xml_char?(cp) do
+          sanitize_charlist(rest, [<<cp::utf8>> | acc])
+        else
+          sanitize_charlist(rest, acc)
+        end
+    end
+  end
+
+  defp valid_xml_char?(0x09), do: true
+  defp valid_xml_char?(0x0A), do: true
+  defp valid_xml_char?(0x0D), do: true
+  defp valid_xml_char?(cp) when cp >= 0x20 and cp <= 0xD7FF, do: true
+  defp valid_xml_char?(cp) when cp >= 0xE000 and cp <= 0xFFFD, do: true
+  defp valid_xml_char?(_), do: false
 end
