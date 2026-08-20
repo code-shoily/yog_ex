@@ -1,5 +1,6 @@
 defmodule Yog.IO.MatrixMarketTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
+  use ExUnitProperties
 
   alias Yog.IO.MatrixMarket
   doctest MatrixMarket
@@ -64,6 +65,32 @@ defmodule Yog.IO.MatrixMarketTest do
       result = MatrixMarket.serialize_with(options, graph)
       assert String.contains?(result, "1 2 5")
     end
+
+    test "input and options validation" do
+      assert_raise ArgumentError, ~r/expected weight_formatter to be an arity-1 function/, fn ->
+        MatrixMarket.options_with(:invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected opts to be a keyword list/, fn ->
+        MatrixMarket.options_with(fn w -> w end, :invalid_opts)
+      end
+
+      assert_raise ArgumentError, ~r/expected node_formatter to be an arity-1 function/, fn ->
+        MatrixMarket.options_with(fn w -> w end, node_formatter: :invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected edge_formatter to be an arity-1 function/, fn ->
+        MatrixMarket.options_with(fn w -> w end, edge_formatter: :invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        MatrixMarket.serialize(:not_a_graph)
+      end
+
+      assert_raise ArgumentError, ~r/expected valid options tuple/, fn ->
+        MatrixMarket.serialize_with(:invalid_opts, Yog.directed())
+      end
+    end
   end
 
   describe "parsing" do
@@ -80,7 +107,6 @@ defmodule Yog.IO.MatrixMarketTest do
       assert Yog.Model.node_count(graph) == 3
       assert Yog.Model.edge_count(graph) == 2
       assert Yog.Model.type(graph) == :directed
-      # Successors of 1
       assert Yog.successor_ids(graph, 1) == [2]
     end
 
@@ -119,7 +145,6 @@ defmodule Yog.IO.MatrixMarketTest do
         MatrixMarket.parse_with(input, :directed, fn id -> "Node#{id}" end, fn w -> w * 2 end)
 
       assert Yog.Model.node(graph, 1) == "Node1"
-      # self loop weight 10.0
       {_, _, weight} = hd(Yog.Model.all_edges(graph))
       assert weight == 10.0
     end
@@ -134,7 +159,6 @@ defmodule Yog.IO.MatrixMarketTest do
 
       {:ok, {:matrix_market_result, graph, _warnings}} = MatrixMarket.parse(input)
       assert Yog.Model.edge_count(graph) == 2
-      # weight should be 1.0 by default for pattern
       {_, _, weight} = hd(Yog.Model.all_edges(graph))
       assert weight == 1.0
     end
@@ -186,7 +210,6 @@ defmodule Yog.IO.MatrixMarketTest do
     test "complex field edge cases" do
       input = "%%MatrixMarket matrix coordinate complex general\n1 1 1\n1 1 1.5"
       {:ok, {:matrix_market_result, _, warnings}} = MatrixMarket.parse(input)
-      # Incomplete complex line
       assert length(warnings) == 1
     end
 
@@ -197,8 +220,25 @@ defmodule Yog.IO.MatrixMarketTest do
         MatrixMarket.parse_with(input, :directed, & &1, & &1)
 
       {_, _, weight} = hd(Yog.Model.all_edges(elem(elem(MatrixMarket.parse(input), 1), 1)))
-      # Should fallback to string
       assert weight == "not_a_number"
+    end
+
+    test "input validation errors for parse" do
+      assert_raise ArgumentError, ~r/expected input to be a binary string/, fn ->
+        MatrixMarket.parse(123)
+      end
+
+      assert_raise ArgumentError, ~r/Invalid graph type/, fn ->
+        MatrixMarket.parse("%%MatrixMarket matrix coordinate real general\n1 1 0", :invalid_kind)
+      end
+
+      assert_raise ArgumentError, ~r/expected node_parser to be an arity-1 function/, fn ->
+        MatrixMarket.parse_with("header", :directed, :invalid, fn w -> w end)
+      end
+
+      assert_raise ArgumentError, ~r/expected edge_parser to be an arity-1 function/, fn ->
+        MatrixMarket.parse_with("header", :directed, fn id -> id end, :invalid)
+      end
     end
   end
 
@@ -211,7 +251,6 @@ defmodule Yog.IO.MatrixMarketTest do
 
       assert Yog.Model.node_count(graph) == 3
       assert Yog.Model.edge_count(graph) == 3
-      # edges are 1->2, 2->3, 3->1
       assert Yog.has_edge?(graph, 1, 2)
       assert Yog.has_edge?(graph, 2, 3)
       assert Yog.has_edge?(graph, 3, 1)
@@ -248,6 +287,24 @@ defmodule Yog.IO.MatrixMarketTest do
 
       assert {:error, :enoent} =
                MatrixMarket.read_with("nonexistent_file.mtx", :directed, & &1, & &1)
+    end
+
+    test "read/1, read_with/4, write/2, write_with/3 raise ArgumentError for non-binary paths" do
+      assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+        MatrixMarket.read(123)
+      end
+
+      assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+        MatrixMarket.read_with(123, :directed, & &1, & &1)
+      end
+
+      assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+        MatrixMarket.write(123, Yog.directed())
+      end
+
+      assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+        MatrixMarket.write_with(123, MatrixMarket.default_options(), Yog.directed())
+      end
     end
 
     test "header parsing invalid parts" do
@@ -295,24 +352,18 @@ defmodule Yog.IO.MatrixMarketTest do
     end
 
     test "edge line parsing missing weight value or custom field fallback" do
-      # 1. Custom/unknown field type:
-      # We construct a header manually, or wait, parse parses the header.
-      # If header has custom field type, we can trigger {_, [w | _]} -> w fallback.
-      # Let's write an input with custom field "unknown_field":
       input1 = """
       %%MatrixMarket matrix coordinate unknown_field general
       2 2 1
       1 2 custom_val
       """
 
-      # Use raw parser with custom parser mapping string directly
       {:ok, {:matrix_market_result, graph1, _}} =
         MatrixMarket.parse_with(input1, :directed, & &1, & &1)
 
       {_, _, weight1} = hd(Yog.Model.all_edges(graph1))
       assert weight1 == "custom_val"
 
-      # 2. Missing weight value for real field (defaults to 1.0):
       input2 = """
       %%MatrixMarket matrix coordinate real general
       2 2 1
@@ -322,6 +373,42 @@ defmodule Yog.IO.MatrixMarketTest do
       {:ok, {:matrix_market_result, graph2, _}} = MatrixMarket.parse(input2)
       {_, _, weight2} = hd(Yog.Model.all_edges(graph2))
       assert weight2 == 1.0
+    end
+  end
+
+  describe "property tests" do
+    property "roundtrip serialize and parse preserves node and edge counts" do
+      check all(
+              kind <- StreamData.member_of([:directed, :undirected]),
+              n <- StreamData.integer(0..20),
+              raw_edges <-
+                StreamData.list_of(
+                  StreamData.tuple(
+                    {StreamData.integer(1..max(n, 1)), StreamData.integer(1..max(n, 1))}
+                  )
+                )
+            ) do
+        graph =
+          if n == 0 do
+            Yog.Model.new(kind)
+          else
+            base = Enum.reduce(1..n, Yog.Model.new(kind), &Yog.add_node(&2, &1, nil))
+
+            Enum.reduce(raw_edges, base, fn {u, v}, acc ->
+              if u <= n and v <= n do
+                Yog.add_edge_ensure(acc, u, v, 1.0)
+              else
+                acc
+              end
+            end)
+          end
+
+        mtx = MatrixMarket.serialize(graph)
+        assert {:ok, {:matrix_market_result, parsed, _warnings}} = MatrixMarket.parse(mtx)
+
+        assert Yog.Model.node_count(parsed) == Yog.Model.node_count(graph)
+        assert Yog.Model.edge_count(parsed) == Yog.Model.edge_count(graph)
+      end
     end
   end
 end
