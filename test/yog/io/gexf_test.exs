@@ -1,5 +1,6 @@
 defmodule Yog.IO.GEXFTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
+  use ExUnitProperties
 
   alias Yog.IO.GEXF
 
@@ -97,6 +98,85 @@ defmodule Yog.IO.GEXFTest do
     assert String.contains?(xml, "<attvalue for=\"1\" value=\"user\"")
     assert String.contains?(xml, "<attvalue for=\"0\" value=\"friend\"")
     assert String.contains?(xml, "<attvalue for=\"1\" value=\"strong\"")
+  end
+
+  test "serialize DAG" do
+    dag =
+      Yog.DAG.new()
+      |> Yog.DAG.add_node(1, "Node1")
+      |> Yog.DAG.add_node(2, "Node2")
+
+    {:ok, dag} = Yog.DAG.add_edge(dag, 1, 2, "link")
+
+    xml = GEXF.serialize(dag)
+
+    assert String.contains?(xml, "<node id=\"1\" label=\"Node1\">")
+    assert String.contains?(xml, "<node id=\"2\" label=\"Node2\">")
+    assert String.contains?(xml, "source=\"1\"")
+    assert String.contains?(xml, "target=\"2\"")
+  end
+
+  test "input and options validation" do
+    assert_raise ArgumentError, ~r/expected node_fmt to be an arity-1 function/, fn ->
+      GEXF.options_with(:invalid, & &1)
+    end
+
+    assert_raise ArgumentError, ~r/expected edge_fmt to be an arity-1 function/, fn ->
+      GEXF.options_with(& &1, :invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected node_attr to be an arity-1 function/, fn ->
+      GEXF.serialize_with_options(:invalid, & &1, GEXF.default_options(), Yog.directed())
+    end
+
+    assert_raise ArgumentError, ~r/expected edge_attr to be an arity-1 function/, fn ->
+      GEXF.serialize_with_options(& &1, :invalid, GEXF.default_options(), Yog.directed())
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      GEXF.serialize_with_options(& &1, & &1, GEXF.default_options(), :not_a_graph)
+    end
+
+    assert_raise ArgumentError, ~r/expected valid gexf_options tuple/, fn ->
+      GEXF.serialize_with_options(
+        & &1,
+        & &1,
+        :invalid_options,
+        Yog.directed()
+      )
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      GEXF.write(123, Yog.directed())
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      GEXF.write_with(123, & &1, & &1, Yog.directed())
+    end
+
+    assert_raise ArgumentError, ~r/expected xml to be a binary string/, fn ->
+      GEXF.deserialize(123)
+    end
+
+    assert_raise ArgumentError, ~r/expected node_folder to be an arity-1 function/, fn ->
+      GEXF.deserialize_with(:invalid, & &1, "<gexf></gexf>")
+    end
+
+    assert_raise ArgumentError, ~r/expected edge_folder to be an arity-1 function/, fn ->
+      GEXF.deserialize_with(& &1, :invalid, "<gexf></gexf>")
+    end
+
+    assert_raise ArgumentError, ~r/expected xml to be a binary string/, fn ->
+      GEXF.deserialize_with(& &1, & &1, 123)
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      GEXF.read(123)
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      GEXF.read_with(123, & &1, & &1)
+    end
   end
 
   test "serialize escapes XML special chars" do
@@ -935,6 +1015,32 @@ defmodule Yog.IO.GEXFTest do
     test "xmerl parsing with completely invalid xml" do
       assert {:error, {:parse_error, _}} =
                GEXF.parse_gexf_xmerl("<gexf>invalid xml", fn x -> x end, fn x -> x end)
+    end
+  end
+
+  describe "property tests" do
+    property "roundtrip serialize and deserialize preserves node and edge counts" do
+      check all(
+              kind <- StreamData.member_of([:directed, :undirected]),
+              n <- StreamData.integer(1..15),
+              raw_edges <-
+                StreamData.list_of(
+                  StreamData.tuple({StreamData.integer(1..n), StreamData.integer(1..n)})
+                )
+            ) do
+        graph =
+          Enum.reduce(1..n, Yog.Model.new(kind), &Yog.add_node(&2, &1, "Node#{&1}"))
+
+        graph =
+          Enum.reduce(raw_edges, graph, fn {u, v}, acc ->
+            Yog.add_edge_ensure(acc, u, v, "Edge")
+          end)
+
+        xml = GEXF.serialize(graph)
+        assert {:ok, parsed} = GEXF.deserialize(xml)
+        assert Yog.Model.node_count(parsed) == Yog.Model.node_count(graph)
+        assert Yog.Model.edge_count(parsed) == Yog.Model.edge_count(graph)
+      end
     end
   end
 end
