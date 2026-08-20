@@ -1,8 +1,26 @@
 defmodule Yog.IO.GraphML.SaxyHandler do
-  @moduledoc false
+  @moduledoc """
+  SAX event handler for streaming GraphML parsing using `Saxy`.
+
+  Maintains parser state across XML elements (`<graph>`, `<node>`, `<edge>`, `<data>`)
+  to construct node and edge lists with custom attributes.
+  """
+
   if Code.ensure_loaded?(Saxy) do
     @behaviour Saxy.Handler
   end
+
+  @type t :: %__MODULE__{
+          node_folder: (map() -> any()) | nil,
+          edge_folder: (map() -> any()) | nil,
+          graph_type: :directed | :undirected,
+          nodes: list({any(), any()}),
+          edges: list({any(), any(), any()}),
+          current_element: :node | :edge | nil,
+          current_attrs: map(),
+          current_data_key: String.t() | nil,
+          current_data_value: String.t()
+        }
 
   defstruct node_folder: nil,
             edge_folder: nil,
@@ -14,6 +32,12 @@ defmodule Yog.IO.GraphML.SaxyHandler do
             current_data_key: nil,
             current_data_value: ""
 
+  @doc """
+  Processes SAX events emitted during GraphML XML streaming parsing.
+
+  Time complexity: $\\mathcal{O}(1)$ per XML event.
+  """
+  @spec handle_event(atom(), any(), t()) :: {:ok, t()}
   def handle_event(:start_document, _prolog, state) do
     {:ok, state}
   end
@@ -35,14 +59,8 @@ defmodule Yog.IO.GraphML.SaxyHandler do
   def handle_event(:start_element, {"node", attrs}, state) do
     id =
       case List.keyfind(attrs, "id", 0) do
-        {"id", id_str} ->
-          case Integer.parse(id_str) do
-            {int, _} -> int
-            :error -> id_str
-          end
-
-        _ ->
-          nil
+        {"id", id_str} -> parse_id(id_str)
+        _ -> nil
       end
 
     {:ok, %{state | current_element: :node, current_attrs: %{"_id" => id}}}
@@ -51,26 +69,14 @@ defmodule Yog.IO.GraphML.SaxyHandler do
   def handle_event(:start_element, {"edge", attrs}, state) do
     source =
       case List.keyfind(attrs, "source", 0) do
-        {"source", src} ->
-          case Integer.parse(src) do
-            {int, _} -> int
-            :error -> src
-          end
-
-        _ ->
-          nil
+        {"source", src} -> parse_id(src)
+        _ -> nil
       end
 
     target =
       case List.keyfind(attrs, "target", 0) do
-        {"target", tgt} ->
-          case Integer.parse(tgt) do
-            {int, _} -> int
-            :error -> tgt
-          end
-
-        _ ->
-          nil
+        {"target", tgt} -> parse_id(tgt)
+        _ -> nil
       end
 
     {:ok,
@@ -98,7 +104,8 @@ defmodule Yog.IO.GraphML.SaxyHandler do
   def handle_event(:end_element, "node", state) do
     id = Map.get(state.current_attrs, "_id")
     attrs = Map.delete(state.current_attrs, "_id")
-    data = state.node_folder.(attrs)
+    folder = if is_function(state.node_folder, 1), do: state.node_folder, else: & &1
+    data = folder.(attrs)
     nodes = [{id, data} | state.nodes]
 
     {:ok, %{state | nodes: nodes, current_element: nil, current_attrs: %{}}}
@@ -108,7 +115,8 @@ defmodule Yog.IO.GraphML.SaxyHandler do
     source = Map.get(state.current_attrs, "_source")
     target = Map.get(state.current_attrs, "_target")
     attrs = state.current_attrs |> Map.delete("_source") |> Map.delete("_target")
-    weight = state.edge_folder.(attrs)
+    folder = if is_function(state.edge_folder, 1), do: state.edge_folder, else: & &1
+    weight = folder.(attrs)
     edges = [{source, target, weight} | state.edges]
 
     {:ok, %{state | edges: edges, current_element: nil, current_attrs: %{}}}
@@ -139,4 +147,13 @@ defmodule Yog.IO.GraphML.SaxyHandler do
   def handle_event(:characters, _chars, state) do
     {:ok, state}
   end
+
+  defp parse_id(id_str) when is_binary(id_str) do
+    case Integer.parse(id_str) do
+      {int, ""} -> int
+      _ -> id_str
+    end
+  end
+
+  defp parse_id(id), do: id
 end
