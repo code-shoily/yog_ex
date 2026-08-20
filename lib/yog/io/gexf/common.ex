@@ -1,11 +1,24 @@
 defmodule Yog.IO.GEXF.Common do
-  @moduledoc false
+  @moduledoc """
+  Shared XML serialization and deserialization helpers for GEXF graph IO.
+
+  Provides common XML building functions, attribute discovery, XPath parsing,
+  and SAXY/xmerl graph reconstruction for both standard graphs (`Yog.IO.GEXF`)
+  and multigraphs (`Yog.IO.GEXF.Multi`).
+  """
+
   alias Yog.IO.XMLUtils
 
   # ==========================================================================
   # Serialization helpers
   # ==========================================================================
 
+  @doc """
+  Discovers attribute keys and infers their GEXF data types across an attribute list.
+
+  Time complexity: $\\mathcal{O}(N \\cdot K)$ where $N$ is item count and $K$ is attribute count per item.
+  """
+  @spec discover_keys_with_types(list(map()), String.t()) :: map()
   def discover_keys_with_types(attrs_list, special_key) do
     attrs_list
     |> Enum.reduce(%{}, fn attrs, acc ->
@@ -21,17 +34,41 @@ defmodule Yog.IO.GEXF.Common do
     end)
   end
 
+  @doc """
+  Returns `true` if key string starts with `"viz:"`.
+
+  Time complexity: $\\mathcal{O}(1)$
+  """
+  @spec viz_key?(String.t()) :: boolean()
   def viz_key?("viz:" <> _), do: true
   def viz_key?(_), do: false
 
+  @doc """
+  Infers GEXF attribute type from Elixir term value.
+
+  Time complexity: $\\mathcal{O}(1)$
+  """
+  @spec infer_type(any()) :: String.t()
   def infer_type(v) when is_integer(v), do: "integer"
   def infer_type(v) when is_float(v), do: "double"
   def infer_type(v) when is_boolean(v), do: "boolean"
   def infer_type(_), do: "string"
 
+  @doc """
+  Converts a key term to a binary string.
+
+  Time complexity: $\\mathcal{O}(1)$
+  """
+  @spec to_string_key(any()) :: String.t()
   def to_string_key(k) when is_binary(k), do: k
   def to_string_key(k), do: Yog.Utils.safe_string(k)
 
+  @doc """
+  Builds GEXF XML attribute definition blocks for nodes and edges.
+
+  Time complexity: $\\mathcal{O}(K)$ where $K$ is key count.
+  """
+  @spec build_attribute_definitions(map(), map()) :: iodata()
   def build_attribute_definitions(node_keys, edge_keys) do
     node_defs =
       node_keys
@@ -75,6 +112,12 @@ defmodule Yog.IO.GEXF.Common do
     ]
   end
 
+  @doc """
+  Builds GEXF XML `<nodes>` element block from nodes map.
+
+  Time complexity: $\\mathcal{O}(V)$
+  """
+  @spec build_nodes_xml(map(), (any() -> map()), map(), (any() -> String.t())) :: iodata()
   def build_nodes_xml(nodes_map, node_attr, node_keys, node_fmt \\ &Yog.Utils.safe_string/1) do
     if map_size(nodes_map) == 0 do
       "    <nodes></nodes>\n"
@@ -108,6 +151,21 @@ defmodule Yog.IO.GEXF.Common do
     end
   end
 
+  @doc """
+  Builds single GEXF XML `<edge>` element block.
+
+  Time complexity: $\\mathcal{O}(1)$
+  """
+  @spec build_single_edge_xml(
+          any(),
+          any(),
+          any(),
+          any(),
+          (any() -> map()),
+          map(),
+          (any() -> String.t()),
+          (any() -> String.t())
+        ) :: iodata()
   def build_single_edge_xml(
         edge_id,
         from,
@@ -143,6 +201,12 @@ defmodule Yog.IO.GEXF.Common do
     ]
   end
 
+  @doc """
+  Builds GEXF XML visual attribute elements (`viz:*`).
+
+  Time complexity: $\\mathcal{O}(A)$ where $A$ is attribute count.
+  """
+  @spec build_viz_xml(map()) :: iodata()
   def build_viz_xml(attrs) do
     has_viz? =
       Enum.any?(attrs, fn {k, _} ->
@@ -200,6 +264,12 @@ defmodule Yog.IO.GEXF.Common do
     end
   end
 
+  @doc """
+  Builds GEXF XML `<attvalue>` element entries.
+
+  Time complexity: $\\mathcal{O}(A)$ where $A$ is attribute count.
+  """
+  @spec build_attvalues(map(), map(), String.t()) :: iodata()
   def build_attvalues(attrs, keys_map, special_key) do
     Enum.flat_map(attrs, fn {key, value} ->
       k_str = to_string_key(key)
@@ -228,6 +298,12 @@ defmodule Yog.IO.GEXF.Common do
   # Saxy deserialization graph building
   # ==========================================================================
 
+  @doc """
+  Reconstructs a graph or multigraph from SAXY parser state.
+
+  Time complexity: $\\mathcal{O}(V + E)$
+  """
+  @spec build_graph_from_saxy_state(map(), module(), boolean()) :: any()
   def build_graph_from_saxy_state(state, model_module, false) do
     Enum.reduce(state.nodes, model_module.new(state.graph_type), fn {id, data}, acc ->
       model_module.add_node(acc, id, data)
@@ -257,6 +333,18 @@ defmodule Yog.IO.GEXF.Common do
   # xmerl deserialization helpers
   # ==========================================================================
 
+  @doc """
+  Reconstructs a graph or multigraph from an xmerl XML document tree.
+
+  Time complexity: $\\mathcal{O}(V + E)$
+  """
+  @spec build_graph_from_doc(
+          tuple(),
+          (map() -> any()),
+          (map() -> any()),
+          module(),
+          boolean()
+        ) :: {:ok, any()}
   def build_graph_from_doc(doc, node_folder, edge_folder, model_module, false) do
     graph_type = extract_graph_type(doc)
     attr_map = build_attr_map(doc)
@@ -300,6 +388,12 @@ defmodule Yog.IO.GEXF.Common do
     {:ok, final_graph}
   end
 
+  @doc """
+  Extracts `:directed` or `:undirected` graph type from XML document root.
+
+  Time complexity: $\\mathcal{O}(1)$
+  """
+  @spec extract_graph_type(tuple()) :: :directed | :undirected
   def extract_graph_type(doc) do
     case :xmerl_xpath.string(~c'string(/gexf/graph/@defaultedgetype)', doc) do
       {:xmlObj, :string, ~c"undirected"} ->
@@ -313,6 +407,12 @@ defmodule Yog.IO.GEXF.Common do
     end
   end
 
+  @doc """
+  Builds attribute mapping dictionaries for node and edge definitions in XML document.
+
+  Time complexity: $\\mathcal{O}(K)$
+  """
+  @spec build_attr_map(tuple()) :: %{node: map(), edge: map()}
   def build_attr_map(doc) do
     node_attrs =
       :xmerl_xpath.string(~c'/gexf/graph/attributes[@class="node"]/attribute', doc)
@@ -337,6 +437,12 @@ defmodule Yog.IO.GEXF.Common do
     %{node: node_attrs, edge: edge_attrs}
   end
 
+  @doc """
+  Extracts nodes list `{id, data}` from XML document.
+
+  Time complexity: $\\mathcal{O}(V)$
+  """
+  @spec extract_nodes(tuple(), (map() -> any()), map()) :: list({any(), any()})
   def extract_nodes(doc, node_folder, attr_map) do
     node_elements = :xmerl_xpath.string(~c'/gexf/graph/nodes/node', doc)
 
@@ -351,6 +457,12 @@ defmodule Yog.IO.GEXF.Common do
     end)
   end
 
+  @doc """
+  Extracts standard edges list `{from, to, weight}` from XML document.
+
+  Time complexity: $\\mathcal{O}(E)$
+  """
+  @spec extract_edges_simple(tuple(), (map() -> any()), map()) :: list({any(), any(), any()})
   def extract_edges_simple(doc, edge_folder, attr_map) do
     edge_elements = :xmerl_xpath.string(~c'/gexf/graph/edges/edge', doc)
 
@@ -367,6 +479,13 @@ defmodule Yog.IO.GEXF.Common do
     end)
   end
 
+  @doc """
+  Extracts multigraph edges list `{eid, from, to, weight}` from XML document.
+
+  Time complexity: $\\mathcal{O}(E)$
+  """
+  @spec extract_edges_multi(tuple(), (map() -> any()), map()) ::
+          list({any(), any(), any(), any()})
   def extract_edges_multi(doc, edge_folder, attr_map) do
     edge_elements = :xmerl_xpath.string(~c'/gexf/graph/edges/edge', doc)
 
@@ -387,6 +506,12 @@ defmodule Yog.IO.GEXF.Common do
     end)
   end
 
+  @doc """
+  Extracts `<attvalue>` attribute values from an XML element.
+
+  Time complexity: $\\mathcal{O}(A)$
+  """
+  @spec extract_attvalues(tuple(), map()) :: map()
   def extract_attvalues(element, attr_map) do
     attvalues = :xmerl_xpath.string(~c'.//attvalue', element)
 
@@ -398,6 +523,12 @@ defmodule Yog.IO.GEXF.Common do
     end)
   end
 
+  @doc """
+  Extracts visual attributes (`viz:color`, `viz:size`, `viz:position`, `viz:shape`) from element.
+
+  Time complexity: $\\mathcal{O}(1)$
+  """
+  @spec extract_viz_attributes(tuple(), map()) :: map()
   def extract_viz_attributes(element, attrs) do
     attrs
     |> extract_viz_color(element)
@@ -451,14 +582,50 @@ defmodule Yog.IO.GEXF.Common do
     end
   end
 
-  def xmerl_cast_value(val, "integer"), do: String.to_integer(val)
-  def xmerl_cast_value(val, "long"), do: String.to_integer(val)
-  def xmerl_cast_value(val, "double"), do: String.to_float(val)
-  def xmerl_cast_value(val, "float"), do: String.to_float(val)
+  @doc """
+  Casts string values to declared GEXF attribute types for xmerl parsing.
+
+  Time complexity: $\\mathcal{O}(1)$
+  """
+  @spec xmerl_cast_value(String.t(), String.t()) :: any()
+  def xmerl_cast_value(val, "integer") do
+    case Integer.parse(val) do
+      {i, ""} -> i
+      _ -> val
+    end
+  end
+
+  def xmerl_cast_value(val, "long") do
+    case Integer.parse(val) do
+      {i, ""} -> i
+      _ -> val
+    end
+  end
+
+  def xmerl_cast_value(val, "double") do
+    case Float.parse(val) do
+      {f, ""} -> f
+      _ -> val
+    end
+  end
+
+  def xmerl_cast_value(val, "float") do
+    case Float.parse(val) do
+      {f, ""} -> f
+      _ -> val
+    end
+  end
+
   def xmerl_cast_value("true", "boolean"), do: true
   def xmerl_cast_value("false", "boolean"), do: false
   def xmerl_cast_value(val, _), do: val
 
+  @doc """
+  Parses an integer attribute from an xmerl element safely.
+
+  Time complexity: $\\mathcal{O}(1)$
+  """
+  @spec xmerl_get_int(tuple(), String.t(), integer()) :: integer()
   def xmerl_get_int(elem, name, default) do
     case xmerl_string_value(:xmerl_xpath.string(~c'string(@#{name})', elem)) do
       "" ->
@@ -472,6 +639,12 @@ defmodule Yog.IO.GEXF.Common do
     end
   end
 
+  @doc """
+  Parses a float attribute from an xmerl element safely.
+
+  Time complexity: $\\mathcal{O}(1)$
+  """
+  @spec xmerl_get_float(tuple(), String.t(), float()) :: float()
   def xmerl_get_float(elem, name, default) do
     case xmerl_string_value(:xmerl_xpath.string(~c'string(@#{name})', elem)) do
       "" ->
@@ -485,13 +658,27 @@ defmodule Yog.IO.GEXF.Common do
     end
   end
 
-  def parse_id(id_str) do
+  @doc """
+  Parses an ID string to integer if possible, preserving binary string otherwise.
+
+  Time complexity: $\\mathcal{O}(1)$
+  """
+  @spec parse_id(String.t() | any()) :: any()
+  def parse_id(id_str) when is_binary(id_str) do
     case Integer.parse(id_str) do
       {int, ""} -> int
       _ -> id_str
     end
   end
 
+  def parse_id(id), do: id
+
+  @doc """
+  Extracts string content from an xmerl XPath query result.
+
+  Time complexity: $\\mathcal{O}(N)$ where $N$ is charlist length.
+  """
+  @spec xmerl_string_value(any()) :: String.t()
   def xmerl_string_value(result) do
     case result do
       {:xmlObj, :string, charlist} -> List.to_string(charlist)
