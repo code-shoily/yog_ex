@@ -1,5 +1,6 @@
 defmodule Yog.IO.GDFTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
+  use ExUnitProperties
 
   alias Yog.IO.GDF
 
@@ -111,6 +112,20 @@ defmodule Yog.IO.GDFTest do
     assert String.contains?(gdf_str, "1,2,true,42")
   end
 
+  test "serialize DAG" do
+    dag =
+      Yog.DAG.new()
+      |> Yog.DAG.add_node(1, "Node1")
+      |> Yog.DAG.add_node(2, "Node2")
+
+    {:ok, dag} = Yog.DAG.add_edge(dag, 1, 2, "link")
+
+    gdf_str = GDF.serialize(dag)
+    assert String.contains?(gdf_str, "1,Node1")
+    assert String.contains?(gdf_str, "2,Node2")
+    assert String.contains?(gdf_str, "1,2,true,link")
+  end
+
   test "serialize with custom attributes" do
     graph =
       Yog.directed()
@@ -135,8 +150,6 @@ defmodule Yog.IO.GDFTest do
   test "serialize without types" do
     graph = Yog.directed() |> Yog.add_node(1, "Alice")
 
-    # Access GdfOptions tuple to disable includes_types:
-    # {GdfOptions(separator, include_types, include_directed)}
     options = {:gdf_options, ",", false, :none}
     node_attr = fn name -> %{"label" => name} end
     edge_attr = fn _ -> %{} end
@@ -172,6 +185,58 @@ defmodule Yog.IO.GDFTest do
     gdf_str = GDF.serialize(graph)
 
     assert String.contains?(gdf_str, "\"Alice \"\"The Admin\"\"\"")
+  end
+
+  test "input and options validation" do
+    assert_raise ArgumentError, ~r/expected node_attr to be an arity-1 function/, fn ->
+      GDF.serialize_with(:invalid, & &1, GDF.default_options(), Yog.directed())
+    end
+
+    assert_raise ArgumentError, ~r/expected edge_attr to be an arity-1 function/, fn ->
+      GDF.serialize_with(& &1, :invalid, GDF.default_options(), Yog.directed())
+    end
+
+    assert_raise ArgumentError, ~r/expected valid gdf_options tuple/, fn ->
+      GDF.serialize_with(& &1, & &1, :invalid_options, Yog.directed())
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      GDF.serialize(:not_a_graph)
+    end
+
+    assert_raise ArgumentError, ~r/expected gdf to be a binary string/, fn ->
+      GDF.deserialize(123)
+    end
+
+    assert_raise ArgumentError, ~r/expected node_folder to be an arity-1 function/, fn ->
+      GDF.deserialize_with(:invalid, & &1, "nodedef>name VARCHAR")
+    end
+
+    assert_raise ArgumentError, ~r/expected edge_folder to be an arity-1 function/, fn ->
+      GDF.deserialize_with(& &1, :invalid, "nodedef>name VARCHAR")
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      GDF.read(123)
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      GDF.read_with(123, & &1, & &1)
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      GDF.write(123, Yog.directed())
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      GDF.write_with(
+        123,
+        fn d -> %{"label" => d} end,
+        fn d -> %{"label" => d} end,
+        GDF.default_options(),
+        Yog.directed()
+      )
+    end
   end
 
   # =============================================================================
@@ -780,5 +845,31 @@ defmodule Yog.IO.GDFTest do
 
     # Cleanup
     File.rm(output_path)
+  end
+
+  describe "property tests" do
+    property "roundtrip serialize and deserialize preserves node and edge counts for 1-indexed graphs" do
+      check all(
+              kind <- StreamData.member_of([:directed, :undirected]),
+              n <- StreamData.integer(1..15),
+              raw_edges <-
+                StreamData.list_of(
+                  StreamData.tuple({StreamData.integer(1..n), StreamData.integer(1..n)})
+                )
+            ) do
+        graph =
+          Enum.reduce(1..n, Yog.Model.new(kind), &Yog.add_node(&2, &1, "Node#{&1}"))
+
+        graph =
+          Enum.reduce(raw_edges, graph, fn {u, v}, acc ->
+            Yog.add_edge_ensure(acc, u, v, "Edge")
+          end)
+
+        gdf = GDF.serialize(graph)
+        assert {:ok, parsed} = GDF.deserialize(gdf)
+        assert Yog.Model.node_count(parsed) == Yog.Model.node_count(graph)
+        assert Yog.Model.edge_count(parsed) == Yog.Model.edge_count(graph)
+      end
+    end
   end
 end

@@ -46,14 +46,15 @@ defmodule Yog.IO.GDF do
   @doc """
   Default GDF serialization options.
 
-  Returns a Gleam `GdfOptions` record used by the `_with` serialization functions.
+  Returns a options tuple used by the `_with` serialization functions.
   It includes:
   - `separator`: `","`
   - `include_types`: `true`
-  - `include_directed`: `{:none}` (auto-detects from graph type)
+  - `include_directed`: `:none` (auto-detects from graph type)
   - `node_formatter`: `Kernel.to_string/1`
   - `edge_formatter`: `Kernel.to_string/1`
   """
+  @spec default_options() :: tuple()
   def default_options do
     {:gdf_options, ",", true, :none, &Yog.Utils.safe_string/1, &Yog.Utils.safe_string/1}
   end
@@ -64,7 +65,9 @@ defmodule Yog.IO.GDF do
   This function allows you to control how node and edge data are converted
   to GDF attributes, and customize the output format.
 
-  **Time Complexity:** O(V + E)
+  Raises `ArgumentError` if attribute mappers, options, or graph input are invalid.
+
+  Time complexity: $\\mathcal{O}(V + E)$
 
   ## Example
 
@@ -84,22 +87,53 @@ defmodule Yog.IO.GDF do
       iex> String.contains?(gdf, "30")
       true
   """
+  @spec serialize_with(
+          (any() -> map()),
+          (any() -> map()),
+          tuple(),
+          Yog.graph() | Yog.DAG.t()
+        ) :: String.t()
   def serialize_with(node_attr, edge_attr, options, graph) do
-    {separator, include_types, node_fmt, edge_fmt} =
-      case options do
-        {:gdf_options, sep, types, _, n_fmt, e_fmt} ->
-          {sep, types, n_fmt, e_fmt}
+    if not is_function(node_attr, 1) do
+      raise ArgumentError, "expected node_attr to be an arity-1 function"
+    end
 
-        {:gdf_options, sep, types, _} ->
-          {sep, types, &Yog.Utils.safe_string/1, &Yog.Utils.safe_string/1}
+    if not is_function(edge_attr, 1) do
+      raise ArgumentError, "expected edge_attr to be an arity-1 function"
+    end
+
+    target_graph =
+      case graph do
+        %Yog.Graph{} ->
+          graph
+
+        %Yog.DAG{graph: inner} ->
+          inner
+
+        _ ->
+          raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(graph)}"
       end
 
-    %Yog.Graph{kind: type, nodes: nodes_map} = graph
+    {separator, include_types, node_fmt, edge_fmt} =
+      case options do
+        {:gdf_options, sep, types, _, n_fmt, e_fmt}
+        when is_binary(sep) and is_boolean(types) and is_function(n_fmt, 1) and
+               is_function(e_fmt, 1) ->
+          {sep, types, n_fmt, e_fmt}
+
+        {:gdf_options, sep, types, _} when is_binary(sep) and is_boolean(types) ->
+          {sep, types, &Yog.Utils.safe_string/1, &Yog.Utils.safe_string/1}
+
+        _ ->
+          raise ArgumentError, "expected valid gdf_options tuple, got: #{inspect(options)}"
+      end
+
+    %Yog.Graph{kind: type, nodes: nodes_map} = target_graph
 
     # 1. Schema Discovery for Nodes
     all_nodes_data =
       nodes_map
-      |> Enum.sort_by(fn {id, _} -> id end)
+      |> Enum.sort()
       |> Enum.map(fn {id, data} ->
         attrs = node_attr.(data)
         # Ensure ID is there as 'name', and remove any user 'name' to avoid collision
@@ -127,7 +161,7 @@ defmodule Yog.IO.GDF do
       end)
 
     # 2. Schema Discovery for Edges
-    edges = Model.all_edges(graph)
+    edges = Model.all_edges(target_graph)
 
     all_edges_data =
       Enum.map(edges, fn {from, to, weight} ->
@@ -193,7 +227,9 @@ defmodule Yog.IO.GDF do
   node data and edge data are already strings. The string data is used
   as the "label" attribute for both nodes and edges.
 
-  **Time Complexity:** O(V + E)
+  Raises `ArgumentError` if `graph` is invalid.
+
+  Time complexity: $\\mathcal{O}(V + E)$
 
   ## Example
 
@@ -208,6 +244,7 @@ defmodule Yog.IO.GDF do
       iex> String.contains?(gdf, "1,2,true,friend")
       true
   """
+  @spec serialize(Yog.graph() | Yog.DAG.t()) :: String.t()
   def serialize(graph) do
     node_attr = fn data -> %{"label" => Yog.Utils.to_label("", data)} end
     edge_attr = fn data -> %{"label" => Yog.Utils.to_weight_label(data)} end
@@ -221,7 +258,9 @@ defmodule Yog.IO.GDF do
   integer weights. Node data is used as labels, and edge weights are
   serialized to the "weight" column.
 
-  **Time Complexity:** O(V + E)
+  Raises `ArgumentError` if `graph` is invalid.
+
+  Time complexity: $\\mathcal{O}(V + E)$
 
   ## Example
 
@@ -234,6 +273,7 @@ defmodule Yog.IO.GDF do
       iex> String.contains?(gdf, "1,2,true,5")
       true
   """
+  @spec serialize_weighted(Yog.graph() | Yog.DAG.t()) :: String.t()
   def serialize_weighted(graph) do
     node_attr = fn data -> %{"label" => Yog.Utils.to_label("", data)} end
     edge_attr = fn data -> %{"weight" => Yog.Utils.to_weight_label(data)} end
@@ -243,7 +283,19 @@ defmodule Yog.IO.GDF do
   @doc """
   Writes a graph to a GDF file.
 
-  Returns `{:ok, nil}` on success, or `{:error, reason}` on failure.
+  Raises `ArgumentError` if `path` is not a binary string or `graph` is invalid.
+
+  Time complexity: $\\mathcal{O}(V + E)$ + file I/O
+
+  ## Parameters
+
+  - `path` - File path to write to (typically `.gdf` extension)
+  - `graph` - The graph to serialize
+
+  ## Returns
+
+  - `{:ok, nil}` on success
+  - `{:error, reason}` on failure
 
   ## Example
 
@@ -256,7 +308,8 @@ defmodule Yog.IO.GDF do
       iex> Yog.IO.GDF.write(path, graph)
       {:ok, nil}
   """
-  def write(path, graph) do
+  @spec write(String.t(), Yog.graph() | Yog.DAG.t()) :: {:ok, nil} | {:error, atom()}
+  def write(path, graph) when is_binary(path) do
     content = serialize(graph)
 
     case File.write(path, content) do
@@ -265,16 +318,35 @@ defmodule Yog.IO.GDF do
     end
   end
 
+  def write(path, _graph) do
+    raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
+  end
+
   @doc """
   Writes a graph to a GDF file with custom attribute mappers.
+
+  Raises `ArgumentError` if `path` is not a binary string or parameters are invalid.
+
+  Time complexity: $\\mathcal{O}(V + E)$ + file I/O
   """
-  def write_with(path, node_attr, edge_attr, options, graph) do
+  @spec write_with(
+          String.t(),
+          (any() -> map()),
+          (any() -> map()),
+          tuple(),
+          Yog.graph() | Yog.DAG.t()
+        ) :: {:ok, nil} | {:error, atom()}
+  def write_with(path, node_attr, edge_attr, options, graph) when is_binary(path) do
     content = serialize_with(node_attr, edge_attr, options, graph)
 
     case File.write(path, content) do
       :ok -> {:ok, nil}
       error -> error
     end
+  end
+
+  def write_with(path, _node_attr, _edge_attr, _options, _graph) do
+    raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
   end
 
   @doc """
@@ -284,7 +356,9 @@ defmodule Yog.IO.GDF do
   to your node and edge data types. Use `deserialize/1` for simple cases
   where you want node/edge data as string dictionaries.
 
-  **Time Complexity:** O(V + E)
+  Raises `ArgumentError` if `gdf` is not a binary string or mappers are invalid.
+
+  Time complexity: $\\mathcal{O}(V + E)$
 
   ## Example
 
@@ -306,8 +380,22 @@ defmodule Yog.IO.GDF do
       iex> Yog.Model.node_count(graph)
       2
   """
-  def deserialize_with(node_folder, edge_folder, gdf) do
+  @spec deserialize_with((map() -> any()), (map() -> any()), String.t()) ::
+          {:ok, Yog.graph()} | {:error, term()}
+  def deserialize_with(node_folder, edge_folder, gdf) when is_binary(gdf) do
+    if not is_function(node_folder, 1) do
+      raise ArgumentError, "expected node_folder to be an arity-1 function"
+    end
+
+    if not is_function(edge_folder, 1) do
+      raise ArgumentError, "expected edge_folder to be an arity-1 function"
+    end
+
     parse_gdf(gdf, node_folder, edge_folder)
+  end
+
+  def deserialize_with(_node_folder, _edge_folder, gdf) do
+    raise ArgumentError, "expected gdf to be a binary string, got: #{inspect(gdf)}"
   end
 
   @doc """
@@ -316,7 +404,9 @@ defmodule Yog.IO.GDF do
   This is a simplified version of `deserialize_with` for graphs where
   you want node data and edge data as string dictionaries containing all attributes.
 
-  **Time Complexity:** O(V + E)
+  Raises `ArgumentError` if `gdf` is not a binary string.
+
+  Time complexity: $\\mathcal{O}(V + E)$
 
   ## Example
 
@@ -331,30 +421,50 @@ defmodule Yog.IO.GDF do
       iex> Map.get(node1_data, "label")
       "Alice"
   """
+  @spec deserialize(String.t()) :: {:ok, Yog.graph()} | {:error, term()}
   def deserialize(gdf) do
-    parse_gdf(gdf, fn attrs -> attrs end, fn attrs -> attrs end)
+    deserialize_with(fn attrs -> attrs end, fn attrs -> attrs end, gdf)
   end
 
   @doc """
   Reads a graph from a GDF file.
 
+  Raises `ArgumentError` if `path` is not a binary string.
+
+  Time complexity: $\\mathcal{O}(V + E)$ + file I/O
+
   Returns `{:ok, graph}` on success, where the attributes on nodes and edges are generic.
   """
-  def read(path) do
+  @spec read(String.t()) :: {:ok, Yog.graph()} | {:error, term()}
+  def read(path) when is_binary(path) do
     case File.read(path) do
       {:ok, content} -> deserialize(content)
       {:error, _} = error -> error
     end
   end
 
+  def read(path) do
+    raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
+  end
+
   @doc """
   Reads a graph from a GDF file with custom data mappers.
+
+  Raises `ArgumentError` if `path` is not a binary string.
+
+  Time complexity: $\\mathcal{O}(V + E)$ + file I/O
   """
-  def read_with(path, node_folder, edge_folder) do
+  @spec read_with(String.t(), (map() -> any()), (map() -> any())) ::
+          {:ok, Yog.graph()} | {:error, term()}
+  def read_with(path, node_folder, edge_folder) when is_binary(path) do
     case File.read(path) do
       {:ok, content} -> deserialize_with(node_folder, edge_folder, content)
       {:error, _} = error -> error
     end
+  end
+
+  def read_with(path, _node_folder, _edge_folder) do
+    raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
   end
 
   # Private functions
@@ -362,14 +472,12 @@ defmodule Yog.IO.GDF do
   defp escape_csv(value, separator, formatter) do
     str_value = if is_binary(value), do: value, else: formatter.(value)
 
-    # Check if we need to quote (contains separator, quotes, or newlines)
     needs_quoting =
       String.contains?(str_value, separator) or
         String.contains?(str_value, "\"") or
         String.contains?(str_value, "\n")
 
     if needs_quoting do
-      # Escape quotes by doubling them
       escaped = String.replace(str_value, "\"", "\"\"")
       "\"#{escaped}\""
     else
@@ -391,18 +499,15 @@ defmodule Yog.IO.GDF do
   end
 
   defp parse_node_section(lines) do
-    # Find nodedef> line
     case Enum.find_index(lines, fn line -> String.starts_with?(line, "nodedef>") end) do
       nil ->
         {:error, :missing_nodedef}
 
       nodedef_index ->
         header_line = Enum.at(lines, nodedef_index)
-        # Parse column names from header
         columns_part = String.trim_leading(header_line, "nodedef>")
         columns = parse_column_names(columns_part)
 
-        # Get node data lines (until edgedef> or end)
         data_lines =
           lines
           |> Enum.drop(nodedef_index + 1)
@@ -419,7 +524,6 @@ defmodule Yog.IO.GDF do
   end
 
   defp parse_edge_section([]) do
-    # No edge section
     {:ok, [], []}
   end
 
@@ -437,7 +541,6 @@ defmodule Yog.IO.GDF do
   end
 
   defp parse_column_names(columns_str) do
-    # Split by comma/separator and remove type annotations
     columns_str
     |> String.split(",")
     |> Enum.map(fn col ->
@@ -463,8 +566,6 @@ defmodule Yog.IO.GDF do
     else
       [id_str | _rest] = values
 
-      # Yog supports any term as ID. Convert to integer if possible for convenience,
-      # but keep as string otherwise.
       id =
         case Integer.parse(id_str) do
           {val, ""} -> val
@@ -481,7 +582,6 @@ defmodule Yog.IO.GDF do
   defp build_edges(graph, columns, data_lines, edge_folder) do
     initial_graph = maybe_convert_to_undirected(graph, columns, data_lines)
 
-    # Process all edges
     Enum.reduce_while(data_lines, {:ok, initial_graph}, fn line, {:ok, acc_graph} ->
       process_edge_line(line, columns, acc_graph, edge_folder)
     end)
@@ -537,7 +637,6 @@ defmodule Yog.IO.GDF do
           _ -> node2_str
         end
 
-      # Ensure nodes exist (auto-create if needed)
       acc_graph = ensure_node_exists(acc_graph, from, edge_folder)
       acc_graph = ensure_node_exists(acc_graph, to, edge_folder)
 
@@ -553,18 +652,14 @@ defmodule Yog.IO.GDF do
   end
 
   defp ensure_node_exists(graph, node_id, _edge_folder) do
-    %Yog.Graph{nodes: nodes_map} = graph
-
-    if Map.has_key?(nodes_map, node_id) do
+    if Yog.Model.has_node?(graph, node_id) do
       graph
     else
-      # Auto-create node with empty map as data
       Yog.Model.add_node(graph, node_id, %{})
     end
   end
 
   defp parse_csv_line(line, columns) do
-    # Parse CSV with quote handling
     values = parse_csv_values(line)
 
     if length(values) == length(columns) do
@@ -579,13 +674,11 @@ defmodule Yog.IO.GDF do
   end
 
   defp parse_csv_values(line) do
-    # Simple CSV parser that handles quotes
     line
     |> String.split(~r/,(?=(?:[^"]*"[^"]*")*[^"]*$)/)
     |> Enum.map(fn value ->
       value = String.trim(value)
 
-      # Remove surrounding quotes and unescape doubled quotes
       if String.starts_with?(value, "\"") and String.ends_with?(value, "\"") do
         value
         |> String.slice(1..-2//1)
