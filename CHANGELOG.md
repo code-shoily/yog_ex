@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Pre-1.0 Module Audit & Hardening** — Completed stabilizing audit pass across core (`Yog.Model`), IO (`XMLUtils`, `Graph6`, `Sparse6`, `MatrixMarket`, `Matrix`, `LEDA`, `Pajek`, `GDF`, `JSON`, `GEXF.SaxyHandler`, `GEXF.Multi`, `GEXF.Common`, `GEXF`, `GraphML.Xmerl`, `GraphML.SaxyHandler`, `GraphML`), flow, transform, operation, pathfinding, and multigraph modules. Standardized error handling, updated complexity math documentation ($\mathcal{O}(\dots)$), and significantly expanded unit and property-based test coverage (#158, #262, #263, #264, #265, #266, #267, #268, #269, #271, #272, #273, #276, #277, #278, #279, #280).
+- **Pre-1.0 Module Audit & Hardening** — Completed stabilizing audit pass across core (`Yog.Model`, `Yog.DAG`, `Yog.DAG.Model`), IO (`XMLUtils`, `Graph6`, `Sparse6`, `MatrixMarket`, `Matrix`, `LEDA`, `Pajek`, `GDF`, `JSON`, `GEXF.SaxyHandler`, `GEXF.Multi`, `GEXF.Common`, `GEXF`, `GraphML.Xmerl`, `GraphML.SaxyHandler`, `GraphML`), flow, transform, operation, pathfinding, and multigraph modules. Standardized error handling, updated complexity math documentation ($\mathcal{O}(\dots)$), and significantly expanded unit and property-based test coverage (#158, #162, #163, #262, #263, #264, #265, #266, #267, #268, #269, #271, #272, #273, #276, #277, #278, #279, #280).
 
 
 ## [0.99.1] - 2026-07-10

@@ -10,7 +10,7 @@ defmodule Yog.DAG.Model do
   ## Design Goals
 
   - **Safety**: Ensure acyclicity at creation and during all edge insertions.
-  - **Efficiency**: Use targeted path checks for O(V+E) validation on insertion.
+  - **Efficiency**: Use targeted path checks for $\\mathcal{O}(V + E)$ validation on insertion.
   - **Interoperability**: Easy conversion to and from regular `Yog.Graph` structures.
 
   ## Example
@@ -38,6 +38,10 @@ defmodule Yog.DAG.Model do
   @doc """
   Creates a new, empty DAG. Only `:directed` graphs are supported.
 
+  Raises `ArgumentError` if graph_type is not `:directed`.
+
+  Time complexity: $\\mathcal{O}(1)$
+
   ## Example
 
       iex> dag = Yog.DAG.Model.new(:directed)
@@ -53,8 +57,14 @@ defmodule Yog.DAG.Model do
     raise ArgumentError, "DAG must be directed; received :undirected"
   end
 
+  def new(graph_type) do
+    raise ArgumentError, "expected graph_type to be :directed, got: #{inspect(graph_type)}"
+  end
+
   @doc """
   Creates a DAG from a list of edges.
+
+  Time complexity: $\\mathcal{O}(V + E)$
 
   ## Example
 
@@ -64,7 +74,7 @@ defmodule Yog.DAG.Model do
   """
   @spec from_edges([{Yog.node_id(), Yog.node_id()} | {Yog.node_id(), Yog.node_id(), any()}]) ::
           {:ok, t()} | {:error, :cycle_detected}
-  def from_edges(edges) do
+  def from_edges(edges) when is_list(edges) do
     edges
     |> Enum.reduce(Yog.Graph.new(:directed), fn
       {from, to}, g -> Yog.add_edge_ensure(g, from, to, 1)
@@ -73,8 +83,14 @@ defmodule Yog.DAG.Model do
     |> from_graph()
   end
 
+  def from_edges(edges) do
+    raise ArgumentError, "expected edges to be a list, got: #{inspect(edges)}"
+  end
+
   @doc """
   Creates a DAG from a list of edges with a default weight.
+
+  Time complexity: $\\mathcal{O}(V + E)$
 
   ## Example
 
@@ -84,12 +100,36 @@ defmodule Yog.DAG.Model do
   """
   @spec from_edges([{Yog.node_id(), Yog.node_id()}], any()) ::
           {:ok, t()} | {:error, :cycle_detected}
-  def from_edges(edges, default_weight) do
+  def from_edges(edges, default_weight) when is_list(edges) do
     edges
     |> Enum.reduce(Yog.Graph.new(:directed), fn {from, to}, g ->
       Yog.add_edge_ensure(g, from, to, default_weight)
     end)
     |> from_graph()
+  end
+
+  def from_edges(edges, _default_weight) do
+    raise ArgumentError, "expected edges to be a list, got: #{inspect(edges)}"
+  end
+
+  @doc """
+  Same as `from_edges/1` but raises on error.
+
+  Time complexity: $\\mathcal{O}(V + E)$
+  """
+  @spec from_edges!(
+          [{Yog.node_id(), Yog.node_id()} | {Yog.node_id(), Yog.node_id(), any()}],
+          any()
+        ) ::
+          t()
+  def from_edges!(edges, default_weight \\ 1) do
+    case from_edges(edges, default_weight) do
+      {:ok, dag} ->
+        dag
+
+      {:error, :cycle_detected} ->
+        raise ArgumentError, "cannot create DAG from edge list containing cycles"
+    end
   end
 
   @doc """
@@ -98,7 +138,7 @@ defmodule Yog.DAG.Model do
   Validates that the graph contains no cycles. If validation passes, returns
   `{:ok, dag}`; otherwise returns `{:error, :cycle_detected}`.
 
-  **Time Complexity:** O(V + E)
+  Time complexity: $\\mathcal{O}(V + E)$
 
   ## Example
 
@@ -124,11 +164,33 @@ defmodule Yog.DAG.Model do
     end
   end
 
+  def from_graph(graph) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(graph)}"
+  end
+
+  @doc """
+  Same as `from_graph/1` but raises on error.
+
+  Time complexity: $\\mathcal{O}(V + E)$
+  """
+  @spec from_graph!(Yog.graph()) :: t()
+  def from_graph!(graph) do
+    case from_graph(graph) do
+      {:ok, dag} ->
+        dag
+
+      {:error, :cycle_detected} ->
+        raise ArgumentError, "cannot create DAG from graph containing cycles"
+    end
+  end
+
   @doc """
   Unwraps a `DAG` back into a regular `Graph`.
 
   This is useful when you need to use operations that work on any graph type,
   or when you want to export the DAG to formats that accept general graphs.
+
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Example
 
@@ -140,12 +202,16 @@ defmodule Yog.DAG.Model do
   @spec to_graph(t()) :: Yog.graph()
   def to_graph(%DAG{graph: graph}), do: graph
 
+  def to_graph(dag) do
+    raise ArgumentError, "expected a Yog.DAG struct, got: #{inspect(dag)}"
+  end
+
   @doc """
   Adds a node to the DAG.
 
   Adding a node cannot create a cycle, so this operation is infallible.
 
-  **Time Complexity:** O(1)
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Example
 
@@ -154,8 +220,14 @@ defmodule Yog.DAG.Model do
       "A"
   """
   @spec add_node(t(), Yog.node_id(), any()) :: t()
+  def add_node(dag, id, data \\ nil)
+
   def add_node(%DAG{graph: graph}, id, data) do
     %DAG{graph: Yog.Model.add_node(graph, id, data)}
+  end
+
+  def add_node(dag, _id, _data) do
+    raise ArgumentError, "expected a Yog.DAG struct, got: #{inspect(dag)}"
   end
 
   @doc """
@@ -163,8 +235,7 @@ defmodule Yog.DAG.Model do
 
   Removing nodes/edges cannot create a cycle, so this operation is infallible.
 
-  **Time Complexity:** O(deg(v)) - proportional to the number of edges
-  connected to the node.
+  Time complexity: $\\mathcal{O}(\\text{deg}(v))$
 
   ## Example
 
@@ -178,12 +249,16 @@ defmodule Yog.DAG.Model do
     %DAG{graph: Yog.Model.remove_node(graph, id)}
   end
 
+  def remove_node(dag, _id) do
+    raise ArgumentError, "expected a Yog.DAG struct, got: #{inspect(dag)}"
+  end
+
   @doc """
   Removes an edge from the DAG.
 
   Removing edges cannot create a cycle, so this operation is infallible.
 
-  **Time Complexity:** O(1)
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Example
 
@@ -197,6 +272,10 @@ defmodule Yog.DAG.Model do
     %DAG{graph: Yog.Model.remove_edge(graph, from, to)}
   end
 
+  def remove_edge(dag, _from, _to) do
+    raise ArgumentError, "expected a Yog.DAG struct, got: #{inspect(dag)}"
+  end
+
   @doc """
   Adds an edge to the DAG.
 
@@ -204,7 +283,7 @@ defmodule Yog.DAG.Model do
   validate the resulting graph. Returns `{:ok, dag}` if no cycle is created,
   and `{:error, :cycle_detected}` otherwise.
 
-  **Time Complexity:** O(V + E) (due to required cycle check on insertion).
+  Time complexity: $\\mathcal{O}(V + E)$
 
   ## Example
 
@@ -215,15 +294,35 @@ defmodule Yog.DAG.Model do
   """
   @spec add_edge(t(), Yog.node_id(), Yog.node_id(), any()) ::
           {:ok, t()} | {:error, :cycle_detected}
+  def add_edge(dag, from, to, weight \\ 1)
+
   def add_edge(%DAG{graph: graph}, from, to, weight) do
-    # An edge from A to B creates a cycle ONLY if there's already a path from B to A.
-    # We use a targeted BFS (reachable?) which terminates early to avoid full O(V+E)
-    # Kahn's topological sort checking per edge.
-    if Yog.Traversal.reachable?(graph, to, from) do
+    if from == to or Yog.Traversal.reachable?(graph, to, from) do
       {:error, :cycle_detected}
     else
       new_graph = Yog.Model.add_edge_ensure(graph, from, to, weight)
       {:ok, %DAG{graph: new_graph}}
+    end
+  end
+
+  def add_edge(dag, _from, _to, _weight) do
+    raise ArgumentError, "expected a Yog.DAG struct, got: #{inspect(dag)}"
+  end
+
+  @doc """
+  Same as `add_edge/4` but raises on error.
+
+  Time complexity: $\\mathcal{O}(V + E)$
+  """
+  @spec add_edge!(t(), Yog.node_id(), Yog.node_id(), any()) :: t()
+  def add_edge!(dag, from, to, weight \\ 1) do
+    case add_edge(dag, from, to, weight) do
+      {:ok, new_dag} ->
+        new_dag
+
+      {:error, :cycle_detected} ->
+        raise ArgumentError,
+              "cycle detected when adding edge from #{inspect(from)} to #{inspect(to)}"
     end
   end
 end

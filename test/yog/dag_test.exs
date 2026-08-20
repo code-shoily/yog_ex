@@ -1,15 +1,6 @@
 defmodule Yog.DAGTest do
-  @moduledoc """
-  Tests for Yog.DAG facade module.
-
-  These tests verify the unified facade properly delegates to:
-  - Yog.DAG.Model for construction and modification operations
-  - Yog.DAG.Algorithm for algorithmic operations
-
-  Coverage target: 80%+ for facade delegation verification.
-  """
-
-  use ExUnit.Case
+  use ExUnit.Case, async: true
+  use ExUnitProperties
 
   doctest Yog.DAG
 
@@ -903,6 +894,54 @@ defmodule Yog.DAGTest do
     test "longest_path/1 on single node DAG" do
       dag = DAG.new() |> DAG.add_node(:a, nil)
       assert DAG.longest_path(dag) == [:a]
+    end
+
+    test "add_edges/2 and add_edges!/2 validation and lifecycle" do
+      dag = DAG.new() |> DAG.add_node(1, "A") |> DAG.add_node(2, "B") |> DAG.add_node(3, "C")
+
+      assert {:ok, dag2} = DAG.add_edges(dag, [{1, 2}, {2, 3}])
+      assert DAG.edge_count(dag2) == 2
+
+      assert {:error, :cycle_detected} = DAG.add_edges(dag2, [{3, 1}])
+
+      assert_raise ArgumentError, ~r/cycle detected while adding edges/, fn ->
+        DAG.add_edges!(dag2, [{3, 1}])
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.DAG struct/, fn ->
+        DAG.add_edges(:not_a_dag, [{1, 2}])
+      end
+    end
+  end
+
+  describe "property tests for DAG facade" do
+    property "topological_sort produces valid ordering for any constructed DAG" do
+      check all(
+              n <- StreamData.integer(1..15),
+              raw_edges <-
+                StreamData.list_of(
+                  StreamData.tuple({StreamData.integer(1..n), StreamData.integer(1..n)})
+                )
+            ) do
+        dag = DAG.new()
+
+        dag =
+          Enum.reduce(raw_edges, dag, fn {u, v}, acc ->
+            case DAG.add_edge(acc, u, v, 1) do
+              {:ok, new_dag} -> new_dag
+              {:error, :cycle_detected} -> acc
+            end
+          end)
+
+        sorted = DAG.topological_sort(dag)
+        positions = sorted |> Enum.with_index() |> Map.new()
+
+        graph = DAG.to_graph(dag)
+
+        for {from, to, _w} <- Yog.all_edges(graph) do
+          assert Map.fetch!(positions, from) < Map.fetch!(positions, to)
+        end
+      end
     end
   end
 end

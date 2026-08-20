@@ -1,12 +1,6 @@
 defmodule Yog.DAG.ModelTest do
-  @moduledoc """
-  Tests for Yog.DAG.Model module.
-
-  The DAG (Directed Acyclic Graph) type guarantees acyclicity at the type level,
-  enabling total functions for operations like topological sorting.
-  """
-
-  use ExUnit.Case
+  use ExUnit.Case, async: true
+  use ExUnitProperties
 
   doctest Yog.DAG.Model
 
@@ -223,6 +217,78 @@ defmodule Yog.DAG.ModelTest do
         |> Yog.add_edge_ensure(3, 1, 3)
 
       assert {:error, :cycle_detected} = Model.from_graph(graph)
+    end
+
+    test "input validation raises ArgumentError on invalid structs and parameters" do
+      assert_raise ArgumentError, ~r/expected graph_type to be :directed/, fn ->
+        Model.new(:invalid_kind)
+      end
+
+      assert_raise ArgumentError, ~r/expected edges to be a list/, fn ->
+        Model.from_edges(:not_a_list)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph struct/, fn ->
+        Model.from_graph(:not_a_graph)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.DAG struct/, fn ->
+        Model.to_graph(:not_a_dag)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.DAG struct/, fn ->
+        Model.add_node(:not_a_dag, 1, "A")
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.DAG struct/, fn ->
+        Model.remove_node(:not_a_dag, 1)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.DAG struct/, fn ->
+        Model.remove_edge(:not_a_dag, 1, 2)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.DAG struct/, fn ->
+        Model.add_edge(:not_a_dag, 1, 2, 10)
+      end
+
+      assert_raise ArgumentError, ~r/cannot create DAG from graph containing cycles/, fn ->
+        Model.from_graph!(Yog.from_unweighted_edges(:directed, [{1, 2}, {2, 1}]))
+      end
+
+      assert_raise ArgumentError, ~r/cannot create DAG from edge list containing cycles/, fn ->
+        Model.from_edges!([{:a, :b}, {:b, :a}])
+      end
+
+      assert_raise ArgumentError, ~r/cycle detected when adding edge/, fn ->
+        dag = Model.new(:directed) |> Model.add_node(1, "A")
+        Model.add_edge!(dag, 1, 1, 10)
+      end
+    end
+  end
+
+  describe "property tests for Model invariants" do
+    property "constructed DAG is always acyclic" do
+      check all(
+              n <- StreamData.integer(1..15),
+              raw_edges <-
+                StreamData.list_of(
+                  StreamData.tuple({StreamData.integer(1..n), StreamData.integer(1..n)})
+                )
+            ) do
+        dag = Model.new(:directed)
+
+        dag =
+          Enum.reduce(raw_edges, dag, fn {u, v}, acc ->
+            case Model.add_edge(acc, u, v, 1) do
+              {:ok, new_dag} -> new_dag
+              {:error, :cycle_detected} -> acc
+            end
+          end)
+
+        graph = Model.to_graph(dag)
+        assert Yog.Property.Cyclicity.acyclic?(graph)
+      end
     end
   end
 end
