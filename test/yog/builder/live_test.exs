@@ -275,4 +275,22 @@ defmodule Yog.Builder.LiveTest do
     assert Live.get_label(builder, id) == {:ok, "A"}
     assert Live.get_label(builder, 999) == {:error, nil}
   end
+
+  test "raises ArgumentError on invalid inputs" do
+    assert_raise ArgumentError, ~r/expected a Yog.Builder.Live struct/, fn ->
+      Live.add_node(:invalid, "A")
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Builder.Labeled struct/, fn ->
+      Live.from_labeled(:invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Live.sync(Live.new(), :invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Multi.Graph struct/, fn ->
+      Live.sync_multi(Live.new(), :invalid)
+    end
+  end
 end

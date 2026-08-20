@@ -386,5 +386,19 @@ defmodule Yog.Builder.GridTest do
       assert Grid.find_node(b, fn x -> x == "A" end) == {:ok, 0}
       assert Grid.find_node(l, fn x -> x == "A" end) == {:ok, 0}
     end
+
+    test "raises ArgumentError on invalid inputs" do
+      assert_raise ArgumentError, ~r/expected grid_data to be a 2D list/, fn ->
+        Grid.from_2d_list(:not_a_list, :directed, Grid.always())
+      end
+
+      assert_raise ArgumentError, ~r/expected graph_type to be :directed or :undirected/, fn ->
+        Grid.from_2d_list([[1]], :invalid, Grid.always())
+      end
+
+      assert_raise ArgumentError, ~r/expected a GridGraph struct or grid tuple/, fn ->
+        Grid.to_graph(:invalid)
+      end
+    end
   end
 end

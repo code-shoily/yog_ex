@@ -94,13 +94,18 @@ defmodule Yog.Builder.Labeled do
       true
   """
   @spec new(Model.graph_type()) :: t()
-  def new(graph_type) do
+  def new(graph_type) when graph_type in [:directed, :undirected] do
     %__MODULE__{
       kind: graph_type,
       graph: Model.new(graph_type),
       label_to_id: %{},
       next_id: 0
     }
+  end
+
+  def new(other) do
+    raise ArgumentError,
+          "expected graph_type to be :directed or :undirected, got: #{inspect(other)}"
   end
 
   # ============= Node Operations =============
@@ -116,10 +121,12 @@ defmodule Yog.Builder.Labeled do
       ["Node A"]
   """
   @spec add_node(t(), label()) :: t()
-  def add_node(builder, label) do
+  def add_node(%__MODULE__{} = builder, label) do
     {new_builder, _id} = ensure_node(builder, label)
     new_builder
   end
+
+  def add_node(other, _label), do: raise_struct_error(other)
 
   @doc """
   Gets or creates a node for the given label.
@@ -152,6 +159,8 @@ defmodule Yog.Builder.Labeled do
     end
   end
 
+  def ensure_node(other, _label), do: raise_struct_error(other)
+
   # ============= Edge Operations =============
 
   @doc """
@@ -168,7 +177,7 @@ defmodule Yog.Builder.Labeled do
       [{"B", 10}]
   """
   @spec add_edge(t(), label(), label(), term()) :: t()
-  def add_edge(builder, from, to, weight) do
+  def add_edge(%__MODULE__{} = builder, from, to, weight) do
     {builder_with_src, src_id} = ensure_node(builder, from)
     {builder_with_both, dst_id} = ensure_node(builder_with_src, to)
 
@@ -177,6 +186,8 @@ defmodule Yog.Builder.Labeled do
 
     %{builder_with_both | graph: new_graph}
   end
+
+  def add_edge(other, _from, _to, _weight), do: raise_struct_error(other)
 
   @doc """
   Adds an unweighted edge between two labeled nodes.
@@ -188,9 +199,11 @@ defmodule Yog.Builder.Labeled do
       iex> {:ok, [{"B", nil}]} = Yog.Builder.Labeled.successors(builder, "A")
   """
   @spec add_unweighted_edge(t(), label(), label()) :: t()
-  def add_unweighted_edge(builder, from, to) do
+  def add_unweighted_edge(%__MODULE__{} = builder, from, to) do
     add_edge(builder, from, to, nil)
   end
+
+  def add_unweighted_edge(other, _from, _to), do: raise_struct_error(other)
 
   @doc """
   Adds a simple edge with weight 1 between two labeled nodes.
@@ -205,9 +218,11 @@ defmodule Yog.Builder.Labeled do
       true
   """
   @spec add_simple_edge(t(), label(), label()) :: t()
-  def add_simple_edge(builder, from, to) do
+  def add_simple_edge(%__MODULE__{} = builder, from, to) do
     add_edge(builder, from, to, 1)
   end
+
+  def add_simple_edge(other, _from, _to), do: raise_struct_error(other)
 
   # ============= Batch Construction =============
 
@@ -221,10 +236,24 @@ defmodule Yog.Builder.Labeled do
       iex> {:ok, [{"B", 5}]} = Yog.Builder.Labeled.successors(builder, "A")
   """
   @spec from_list(Model.graph_type(), [{label(), label(), term()}]) :: t()
-  def from_list(graph_type, edges) do
-    Enum.reduce(edges, new(graph_type), fn {src, dst, weight}, builder ->
-      add_edge(builder, src, dst, weight)
+  def from_list(graph_type, edges)
+      when graph_type in [:directed, :undirected] and is_list(edges) do
+    Enum.reduce(edges, new(graph_type), fn
+      {src, dst, weight}, builder ->
+        add_edge(builder, src, dst, weight)
+
+      other, _acc ->
+        raise ArgumentError, "expected edge tuple {src, dst, weight}, got: #{inspect(other)}"
     end)
+  end
+
+  def from_list(graph_type, _edges) when graph_type not in [:directed, :undirected] do
+    raise ArgumentError,
+          "expected graph_type to be :directed or :undirected, got: #{inspect(graph_type)}"
+  end
+
+  def from_list(_graph_type, edges) do
+    raise ArgumentError, "expected edges to be a list, got: #{inspect(edges)}"
   end
 
   @doc """
@@ -237,10 +266,24 @@ defmodule Yog.Builder.Labeled do
       iex> {:ok, [{"B", nil}]} = Yog.Builder.Labeled.successors(builder, "A")
   """
   @spec from_unweighted_list(Model.graph_type(), [{label(), label()}]) :: t()
-  def from_unweighted_list(graph_type, edges) do
-    Enum.reduce(edges, new(graph_type), fn {src, dst}, builder ->
-      add_unweighted_edge(builder, src, dst)
+  def from_unweighted_list(graph_type, edges)
+      when graph_type in [:directed, :undirected] and is_list(edges) do
+    Enum.reduce(edges, new(graph_type), fn
+      {src, dst}, builder ->
+        add_unweighted_edge(builder, src, dst)
+
+      other, _acc ->
+        raise ArgumentError, "expected unweighted edge tuple {src, dst}, got: #{inspect(other)}"
     end)
+  end
+
+  def from_unweighted_list(graph_type, _edges) when graph_type not in [:directed, :undirected] do
+    raise ArgumentError,
+          "expected graph_type to be :directed or :undirected, got: #{inspect(graph_type)}"
+  end
+
+  def from_unweighted_list(_graph_type, edges) do
+    raise ArgumentError, "expected edges to be a list, got: #{inspect(edges)}"
   end
 
   # ============= Conversion =============
@@ -260,6 +303,7 @@ defmodule Yog.Builder.Labeled do
   """
   @spec to_graph(t()) :: Yog.graph()
   def to_graph(%__MODULE__{graph: graph}), do: graph
+  def to_graph(other), do: raise_struct_error(other)
 
   @doc """
   Gets the label-to-ID registry as a map.
@@ -276,6 +320,7 @@ defmodule Yog.Builder.Labeled do
   """
   @spec to_registry(t()) :: %{label() => Yog.node_id()}
   def to_registry(%__MODULE__{label_to_id: label_to_id}), do: label_to_id
+  def to_registry(other), do: raise_struct_error(other)
 
   # ============= Queries =============
 
@@ -299,6 +344,8 @@ defmodule Yog.Builder.Labeled do
   def get_id(%__MODULE__{label_to_id: label_to_id}, label) do
     do_get_id(label_to_id, label)
   end
+
+  def get_id(other, _label), do: raise_struct_error(other)
 
   defp do_get_id(label_to_id, label) do
     case Map.fetch(label_to_id, label) do
@@ -333,6 +380,8 @@ defmodule Yog.Builder.Labeled do
     end
   end
 
+  def get_label(other, _id), do: raise_struct_error(other)
+
   @doc """
   Returns all labels that have been added to the builder.
 
@@ -346,6 +395,7 @@ defmodule Yog.Builder.Labeled do
   """
   @spec all_labels(t()) :: [label()]
   def all_labels(%__MODULE__{label_to_id: label_to_id}), do: Map.keys(label_to_id)
+  def all_labels(other), do: raise_struct_error(other)
 
   @doc """
   Checks if a label has been registered in the builder.
@@ -363,6 +413,8 @@ defmodule Yog.Builder.Labeled do
   def has_label?(%__MODULE__{label_to_id: label_to_id}, label) do
     Map.has_key?(label_to_id, label)
   end
+
+  def has_label?(other, _label), do: raise_struct_error(other)
 
   @doc """
   Checks if an edge exists between two labeled nodes.
@@ -384,6 +436,8 @@ defmodule Yog.Builder.Labeled do
     end
   end
 
+  def has_edge?(other, _from, _to), do: raise_struct_error(other)
+
   @doc """
   Returns the number of registered nodes.
 
@@ -397,6 +451,7 @@ defmodule Yog.Builder.Labeled do
   """
   @spec node_count(t()) :: non_neg_integer()
   def node_count(%__MODULE__{label_to_id: label_to_id}), do: map_size(label_to_id)
+  def node_count(other), do: raise_struct_error(other)
 
   @doc """
   Returns the number of edges in the graph.
@@ -411,6 +466,7 @@ defmodule Yog.Builder.Labeled do
   """
   @spec edge_count(t()) :: non_neg_integer()
   def edge_count(%__MODULE__{graph: graph}), do: Model.edge_count(graph)
+  def edge_count(other), do: raise_struct_error(other)
 
   @doc """
   Gets the next available node ID.
@@ -428,6 +484,7 @@ defmodule Yog.Builder.Labeled do
   """
   @spec next_id(t()) :: Yog.node_id()
   def next_id(%__MODULE__{next_id: next_id}), do: next_id
+  def next_id(other), do: raise_struct_error(other)
 
   @doc """
   Gets the successors of a node by its label.
@@ -446,6 +503,8 @@ defmodule Yog.Builder.Labeled do
   def successors(%__MODULE__{graph: graph, label_to_id: label_to_id}, label) do
     do_successors(graph, label_to_id, label)
   end
+
+  def successors(other, _label), do: raise_struct_error(other)
 
   defp do_successors(graph, label_to_id, label) do
     case Map.fetch(label_to_id, label) do
@@ -477,6 +536,8 @@ defmodule Yog.Builder.Labeled do
     do_predecessors(graph, label_to_id, label)
   end
 
+  def predecessors(other, _label), do: raise_struct_error(other)
+
   defp do_predecessors(graph, label_to_id, label) do
     case Map.fetch(label_to_id, label) do
       {:ok, id} ->
@@ -496,5 +557,9 @@ defmodule Yog.Builder.Labeled do
         label -> [{label, edge_data}]
       end
     end)
+  end
+
+  defp raise_struct_error(other) do
+    raise ArgumentError, "expected a Yog.Builder.Labeled struct, got: #{inspect(other)}"
   end
 end

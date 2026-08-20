@@ -107,25 +107,32 @@ defmodule Yog.Builder.Toroidal do
           (term(), term() -> boolean())
         ) ::
           ToroidalGraph.t()
-  def from_2d_list_with_topology(grid_data, graph_type, topology, can_move_fn) do
+  def from_2d_list_with_topology(grid_data, graph_type, topology, can_move_fn)
+      when is_list(grid_data) and graph_type in [:directed, :undirected] and is_list(topology) and
+             is_function(can_move_fn, 2) do
     rows = length(grid_data)
 
     cols =
       case grid_data do
-        [first_row | _] -> length(first_row)
+        [first_row | _] when is_list(first_row) -> length(first_row)
         [] -> 0
+        _ -> raise ArgumentError, "expected grid_data to be a 2D list"
       end
 
     # Flatten grid into list of cells with coordinates
     cells =
       grid_data
       |> Enum.with_index()
-      |> Enum.flat_map(fn {row, row_idx} ->
-        row
-        |> Enum.with_index()
-        |> Enum.map(fn {cell, col_idx} ->
-          {row_idx, col_idx, cell}
-        end)
+      |> Enum.flat_map(fn
+        {row, row_idx} when is_list(row) ->
+          row
+          |> Enum.with_index()
+          |> Enum.map(fn {cell, col_idx} ->
+            {row_idx, col_idx, cell}
+          end)
+
+        _other ->
+          raise ArgumentError, "expected grid_data to be a 2D list"
       end)
 
     # Add all nodes
@@ -154,6 +161,25 @@ defmodule Yog.Builder.Toroidal do
     ToroidalGraph.new(graph_with_edges, rows, cols, detected_topology)
   end
 
+  def from_2d_list_with_topology(grid_data, graph_type, topology, can_move_fn) do
+    cond do
+      not is_list(grid_data) ->
+        raise ArgumentError, "expected grid_data to be a 2D list, got: #{inspect(grid_data)}"
+
+      graph_type not in [:directed, :undirected] ->
+        raise ArgumentError,
+              "expected graph_type to be :directed or :undirected, got: #{inspect(graph_type)}"
+
+      not is_list(topology) ->
+        raise ArgumentError,
+              "expected topology to be a list of offsets, got: #{inspect(topology)}"
+
+      not is_function(can_move_fn, 2) ->
+        raise ArgumentError,
+              "expected can_move_fn to be a 2-arity function, got: #{inspect(can_move_fn)}"
+    end
+  end
+
   @doc """
   Converts a toroidal grid into a standard Graph.
   """
@@ -168,6 +194,11 @@ defmodule Yog.Builder.Toroidal do
 
   def to_graph({:toroidal_grid, graph, _rows, _cols}) do
     graph
+  end
+
+  def to_graph(other) do
+    raise ArgumentError,
+          "expected a ToroidalGraph struct or toroidal grid, got: #{inspect(other)}"
   end
 
   # =============================================================================
@@ -208,6 +239,11 @@ defmodule Yog.Builder.Toroidal do
     end
   end
 
+  def get_cell(other, _row, _col) do
+    raise ArgumentError,
+          "expected a ToroidalGraph struct or toroidal grid, got: #{inspect(other)}"
+  end
+
   @doc """
   Finds a node in the grid where the cell data matches a predicate.
 
@@ -218,16 +254,27 @@ defmodule Yog.Builder.Toroidal do
           (term() -> boolean())
         ) ::
           {:ok, Yog.node_id()} | {:error, nil}
-  def find_node(%ToroidalGraph{graph: graph, rows: rows, cols: cols}, predicate) do
+  def find_node(%ToroidalGraph{graph: graph, rows: rows, cols: cols}, predicate)
+      when is_function(predicate, 1) do
     do_find_node(graph, rows, cols, predicate)
   end
 
-  def find_node(%GridGraph{graph: graph, rows: rows, cols: cols}, predicate) do
+  def find_node(%GridGraph{graph: graph, rows: rows, cols: cols}, predicate)
+      when is_function(predicate, 1) do
     do_find_node(graph, rows, cols, predicate)
   end
 
-  def find_node({:toroidal_grid, graph, rows, cols}, predicate) do
+  def find_node({:toroidal_grid, graph, rows, cols}, predicate) when is_function(predicate, 1) do
     do_find_node(graph, rows, cols, predicate)
+  end
+
+  def find_node(_grid, predicate) when not is_function(predicate, 1) do
+    raise ArgumentError, "expected predicate to be a 1-arity function, got: #{inspect(predicate)}"
+  end
+
+  def find_node(other, _predicate) do
+    raise ArgumentError,
+          "expected a ToroidalGraph struct or toroidal grid, got: #{inspect(other)}"
   end
 
   defp do_find_node(graph, rows, cols, predicate) do
@@ -290,7 +337,9 @@ defmodule Yog.Builder.Toroidal do
   """
   @spec toroidal_manhattan_distance(Yog.node_id(), Yog.node_id(), integer(), integer()) ::
           integer()
-  def toroidal_manhattan_distance(from_id, to_id, cols, rows) do
+  def toroidal_manhattan_distance(from_id, to_id, cols, rows)
+      when is_integer(from_id) and from_id >= 0 and is_integer(to_id) and to_id >= 0 and
+             is_integer(cols) and cols > 0 and is_integer(rows) and rows > 0 do
     {from_row, from_col} = id_to_coord(from_id, cols)
     {to_row, to_col} = id_to_coord(to_id, cols)
 
@@ -302,6 +351,11 @@ defmodule Yog.Builder.Toroidal do
     min_col_dist = min(col_diff, cols - col_diff)
 
     min_row_dist + min_col_dist
+  end
+
+  def toroidal_manhattan_distance(from_id, to_id, cols, rows) do
+    raise ArgumentError,
+          "expected valid integer node IDs and positive dimensions, got: #{inspect({from_id, to_id, cols, rows})}"
   end
 
   @doc """
@@ -317,7 +371,9 @@ defmodule Yog.Builder.Toroidal do
   """
   @spec toroidal_chebyshev_distance(Yog.node_id(), Yog.node_id(), integer(), integer()) ::
           integer()
-  def toroidal_chebyshev_distance(from_id, to_id, cols, rows) do
+  def toroidal_chebyshev_distance(from_id, to_id, cols, rows)
+      when is_integer(from_id) and from_id >= 0 and is_integer(to_id) and to_id >= 0 and
+             is_integer(cols) and cols > 0 and is_integer(rows) and rows > 0 do
     {from_row, from_col} = id_to_coord(from_id, cols)
     {to_row, to_col} = id_to_coord(to_id, cols)
 
@@ -329,6 +385,11 @@ defmodule Yog.Builder.Toroidal do
     min_col_dist = min(col_diff, cols - col_diff)
 
     max(min_row_dist, min_col_dist)
+  end
+
+  def toroidal_chebyshev_distance(from_id, to_id, cols, rows) do
+    raise ArgumentError,
+          "expected valid integer node IDs and positive dimensions, got: #{inspect({from_id, to_id, cols, rows})}"
   end
 
   @doc """
@@ -344,7 +405,9 @@ defmodule Yog.Builder.Toroidal do
   """
   @spec toroidal_octile_distance(Yog.node_id(), Yog.node_id(), integer(), integer()) ::
           float()
-  def toroidal_octile_distance(from_id, to_id, cols, rows) do
+  def toroidal_octile_distance(from_id, to_id, cols, rows)
+      when is_integer(from_id) and from_id >= 0 and is_integer(to_id) and to_id >= 0 and
+             is_integer(cols) and cols > 0 and is_integer(rows) and rows > 0 do
     {from_row, from_col} = id_to_coord(from_id, cols)
     {to_row, to_col} = id_to_coord(to_id, cols)
 
@@ -360,6 +423,11 @@ defmodule Yog.Builder.Toroidal do
 
     # √2 ≈ 1.414213562373095
     min_d * 1.414213562373095 + (max_d - min_d)
+  end
+
+  def toroidal_octile_distance(from_id, to_id, cols, rows) do
+    raise ArgumentError,
+          "expected valid integer node IDs and positive dimensions, got: #{inspect({from_id, to_id, cols, rows})}"
   end
 
   # =============================================================================

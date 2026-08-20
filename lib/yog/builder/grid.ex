@@ -100,25 +100,32 @@ defmodule Yog.Builder.Grid do
   @spec from_2d_list_with_topology([[term()]], Model.graph_type(), topology(), (term(), term() ->
                                                                                   boolean())) ::
           GridGraph.t()
-  def from_2d_list_with_topology(grid_data, graph_type, topology, can_move_fn) do
+  def from_2d_list_with_topology(grid_data, graph_type, topology, can_move_fn)
+      when is_list(grid_data) and graph_type in [:directed, :undirected] and is_list(topology) and
+             is_function(can_move_fn, 2) do
     rows = length(grid_data)
 
     cols =
       case grid_data do
-        [first_row | _] -> length(first_row)
+        [first_row | _] when is_list(first_row) -> length(first_row)
         [] -> 0
+        _ -> raise ArgumentError, "expected grid_data to be a 2D list"
       end
 
     # Flatten grid data into a list of {row, col, cell} tuples
     cells =
       grid_data
       |> Enum.with_index()
-      |> Enum.flat_map(fn {row, row_idx} ->
-        row
-        |> Enum.with_index()
-        |> Enum.map(fn {cell, col_idx} ->
-          {row_idx, col_idx, cell}
-        end)
+      |> Enum.flat_map(fn
+        {row, row_idx} when is_list(row) ->
+          row
+          |> Enum.with_index()
+          |> Enum.map(fn {cell, col_idx} ->
+            {row_idx, col_idx, cell}
+          end)
+
+        _other ->
+          raise ArgumentError, "expected grid_data to be a 2D list"
       end)
 
     # Create graph with all nodes
@@ -150,6 +157,25 @@ defmodule Yog.Builder.Grid do
     GridGraph.new(graph_with_edges, rows, cols, detected_topology)
   end
 
+  def from_2d_list_with_topology(grid_data, graph_type, topology, can_move_fn) do
+    cond do
+      not is_list(grid_data) ->
+        raise ArgumentError, "expected grid_data to be a 2D list, got: #{inspect(grid_data)}"
+
+      graph_type not in [:directed, :undirected] ->
+        raise ArgumentError,
+              "expected graph_type to be :directed or :undirected, got: #{inspect(graph_type)}"
+
+      not is_list(topology) ->
+        raise ArgumentError,
+              "expected topology to be a list of offsets, got: #{inspect(topology)}"
+
+      not is_function(can_move_fn, 2) ->
+        raise ArgumentError,
+              "expected can_move_fn to be a 2-arity function, got: #{inspect(can_move_fn)}"
+    end
+  end
+
   @doc """
   Converts a grid builder into a usable Graph for algorithms.
   """
@@ -166,6 +192,10 @@ defmodule Yog.Builder.Grid do
   # Support legacy Gleam format
   def to_graph({:grid, graph, _rows, _cols}) do
     graph
+  end
+
+  def to_graph(other) do
+    raise ArgumentError, "expected a GridGraph struct or grid tuple, got: #{inspect(other)}"
   end
 
   # =============================================================================
@@ -194,6 +224,10 @@ defmodule Yog.Builder.Grid do
   # Support legacy Gleam format
   def get_cell({:grid, graph, rows, cols}, row, col) do
     do_get_cell(graph, rows, cols, row, col)
+  end
+
+  def get_cell(other, _row, _col) do
+    raise ArgumentError, "expected a GridGraph struct or grid tuple, got: #{inspect(other)}"
   end
 
   defp do_get_cell(graph, rows, cols, row, col) do
@@ -226,17 +260,26 @@ defmodule Yog.Builder.Grid do
   @spec find_node(GridGraph.t() | grid() | {:grid, Yog.graph(), integer(), integer()}, (term() ->
                                                                                           boolean())) ::
           {:ok, Yog.node_id()} | {:error, nil}
-  def find_node(%GridGraph{graph: graph, rows: rows, cols: cols}, predicate) do
+  def find_node(%GridGraph{graph: graph, rows: rows, cols: cols}, predicate)
+      when is_function(predicate, 1) do
     do_find_node(graph, rows, cols, predicate)
   end
 
-  def find_node({:grid_builder, graph, rows, cols}, predicate) do
+  def find_node({:grid_builder, graph, rows, cols}, predicate) when is_function(predicate, 1) do
     do_find_node(graph, rows, cols, predicate)
   end
 
   # Support legacy Gleam format
-  def find_node({:grid, graph, rows, cols}, predicate) do
+  def find_node({:grid, graph, rows, cols}, predicate) when is_function(predicate, 1) do
     do_find_node(graph, rows, cols, predicate)
+  end
+
+  def find_node(_grid, predicate) when not is_function(predicate, 1) do
+    raise ArgumentError, "expected predicate to be a 1-arity function, got: #{inspect(predicate)}"
+  end
+
+  def find_node(other, _predicate) do
+    raise ArgumentError, "expected a GridGraph struct or grid tuple, got: #{inspect(other)}"
   end
 
   defp do_find_node(graph, rows, cols, predicate) do
@@ -269,8 +312,15 @@ defmodule Yog.Builder.Grid do
       23
   """
   @spec coord_to_id(integer(), integer(), integer()) :: Yog.node_id()
-  def coord_to_id(row, col, cols) do
+  def coord_to_id(row, col, cols)
+      when is_integer(row) and row >= 0 and is_integer(col) and col >= 0 and is_integer(cols) and
+             cols > 0 do
     row * cols + col
+  end
+
+  def coord_to_id(row, col, cols) do
+    raise ArgumentError,
+          "expected non-negative integer row, col, and positive integer cols, got: #{inspect({row, col, cols})}"
   end
 
   @doc """
@@ -282,8 +332,13 @@ defmodule Yog.Builder.Grid do
       {2, 3}
   """
   @spec id_to_coord(Yog.node_id(), integer()) :: {integer(), integer()}
-  def id_to_coord(id, cols) do
+  def id_to_coord(id, cols) when is_integer(id) and id >= 0 and is_integer(cols) and cols > 0 do
     {div(id, cols), rem(id, cols)}
+  end
+
+  def id_to_coord(id, cols) do
+    raise ArgumentError,
+          "expected non-negative integer id and positive integer cols, got: #{inspect({id, cols})}"
   end
 
   # =============================================================================

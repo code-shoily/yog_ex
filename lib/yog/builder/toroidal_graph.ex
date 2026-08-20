@@ -29,13 +29,24 @@ defmodule Yog.Builder.ToroidalGraph do
   Creates a new toroidal graph result.
   """
   @spec new(Yog.graph(), non_neg_integer(), non_neg_integer(), atom()) :: t()
-  def new(graph, rows, cols, topology \\ :rook) do
+  def new(graph, rows, cols, topology \\ :rook)
+
+  def new(graph, rows, cols, topology)
+      when is_integer(rows) and rows >= 0 and is_integer(cols) and cols >= 0 and is_atom(topology) do
+    target_graph = validate_graph!(graph)
+
     %__MODULE__{
-      graph: graph,
+      graph: target_graph,
       rows: rows,
       cols: cols,
       topology: topology
     }
+  end
+
+  def new(_graph, rows, cols, _topology)
+      when not is_integer(rows) or rows < 0 or not is_integer(cols) or cols < 0 do
+    raise ArgumentError,
+          "expected non-negative integer rows and cols, got: #{inspect({rows, cols})}"
   end
 
   @doc """
@@ -46,6 +57,8 @@ defmodule Yog.Builder.ToroidalGraph do
     GridGraph.new(toroidal.graph, toroidal.rows, toroidal.cols, toroidal.topology)
   end
 
+  def to_grid_graph(other), do: raise_struct_error(other)
+
   # Delegate common functions to GridGraph or implement them directly
   # for consistent access.
 
@@ -54,6 +67,7 @@ defmodule Yog.Builder.ToroidalGraph do
   """
   @spec to_graph(t()) :: Yog.graph()
   def to_graph(%__MODULE__{graph: graph}), do: graph
+  def to_graph(other), do: raise_struct_error(other)
 
   @doc """
   Converts coordinate to ID.
@@ -62,10 +76,25 @@ defmodule Yog.Builder.ToroidalGraph do
     GridGraph.coord_to_id(to_grid_graph(grid), row, col)
   end
 
+  def coord_to_id(other, _row, _col), do: raise_struct_error(other)
+
   @doc """
   Converts ID to coordinate.
   """
   def id_to_coord(%__MODULE__{} = grid, id) do
     GridGraph.id_to_coord(to_grid_graph(grid), id)
+  end
+
+  def id_to_coord(other, _id), do: raise_struct_error(other)
+
+  defp validate_graph!(%Yog.Graph{} = g), do: g
+  defp validate_graph!(%Yog.DAG{graph: g}), do: g
+
+  defp validate_graph!(other) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
+  end
+
+  defp raise_struct_error(other) do
+    raise ArgumentError, "expected a Yog.Builder.ToroidalGraph struct, got: #{inspect(other)}"
   end
 end

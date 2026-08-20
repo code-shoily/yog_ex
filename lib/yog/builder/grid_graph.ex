@@ -61,12 +61,9 @@ defmodule Yog.Builder.GridGraph do
       :rook
   """
   @spec new(Yog.graph(), non_neg_integer(), non_neg_integer()) :: t()
+  @spec new(Yog.graph(), non_neg_integer(), non_neg_integer()) :: t()
   def new(graph, rows, cols) do
-    %__MODULE__{
-      graph: graph,
-      rows: rows,
-      cols: cols
-    }
+    new(graph, rows, cols, :rook)
   end
 
   @doc """
@@ -80,13 +77,22 @@ defmodule Yog.Builder.GridGraph do
       :queen
   """
   @spec new(Yog.graph(), non_neg_integer(), non_neg_integer(), atom()) :: t()
-  def new(graph, rows, cols, topology) do
+  def new(graph, rows, cols, topology)
+      when is_integer(rows) and rows >= 0 and is_integer(cols) and cols >= 0 and is_atom(topology) do
+    target_graph = validate_graph!(graph)
+
     %__MODULE__{
-      graph: graph,
+      graph: target_graph,
       rows: rows,
       cols: cols,
       topology: topology
     }
+  end
+
+  def new(_graph, rows, cols, _topology)
+      when not is_integer(rows) or rows < 0 or not is_integer(cols) or cols < 0 do
+    raise ArgumentError,
+          "expected non-negative integer rows and cols, got: #{inspect({rows, cols})}"
   end
 
   @doc """
@@ -101,6 +107,7 @@ defmodule Yog.Builder.GridGraph do
   """
   @spec to_graph(t()) :: Yog.graph()
   def to_graph(%__MODULE__{graph: graph}), do: graph
+  def to_graph(other), do: raise_struct_error(other)
 
   @doc """
   Gets the cell data at a specific grid coordinate.
@@ -117,7 +124,8 @@ defmodule Yog.Builder.GridGraph do
       {:error, nil}
   """
   @spec get_cell(t(), non_neg_integer(), non_neg_integer()) :: {:ok, term()} | {:error, nil}
-  def get_cell(%__MODULE__{graph: graph, rows: rows, cols: cols}, row, col) do
+  def get_cell(%__MODULE__{graph: graph, rows: rows, cols: cols}, row, col)
+      when is_integer(row) and is_integer(col) do
     if valid_coord?(rows, cols, row, col) do
       node_id = coord_to_id_raw(cols, row, col)
 
@@ -129,6 +137,9 @@ defmodule Yog.Builder.GridGraph do
       {:error, nil}
     end
   end
+
+  def get_cell(%__MODULE__{}, _row, _col), do: {:error, nil}
+  def get_cell(other, _row, _col), do: raise_struct_error(other)
 
   @doc """
   Converts grid coordinates to a node ID.
@@ -147,9 +158,11 @@ defmodule Yog.Builder.GridGraph do
       11
   """
   @spec coord_to_id(t(), non_neg_integer(), non_neg_integer()) :: Yog.Model.node_id()
-  def coord_to_id(%__MODULE__{cols: cols}, row, col) do
+  def coord_to_id(%__MODULE__{cols: cols}, row, col) when is_integer(row) and is_integer(col) do
     coord_to_id_raw(cols, row, col)
   end
+
+  def coord_to_id(other, _row, _col), do: raise_struct_error(other)
 
   @doc """
   Converts a node ID back to grid coordinates.
@@ -168,11 +181,13 @@ defmodule Yog.Builder.GridGraph do
       {2, 3}
   """
   @spec id_to_coord(t(), Yog.Model.node_id()) :: {non_neg_integer(), non_neg_integer()}
-  def id_to_coord(%__MODULE__{cols: cols}, node_id) when is_integer(node_id) do
+  def id_to_coord(%__MODULE__{cols: cols}, node_id) when is_integer(node_id) and node_id >= 0 do
     row = div(node_id, cols)
     col = rem(node_id, cols)
     {row, col}
   end
+
+  def id_to_coord(other, _node_id), do: raise_struct_error(other)
 
   @doc """
   Checks if a coordinate is within the grid bounds.
@@ -187,9 +202,13 @@ defmodule Yog.Builder.GridGraph do
       false
   """
   @spec valid_coord?(t(), non_neg_integer(), non_neg_integer()) :: boolean()
-  def valid_coord?(%__MODULE__{rows: rows, cols: cols}, row, col) do
+  def valid_coord?(%__MODULE__{rows: rows, cols: cols}, row, col)
+      when is_integer(row) and is_integer(col) do
     valid_coord?(rows, cols, row, col)
   end
+
+  def valid_coord?(%__MODULE__{}, _row, _col), do: false
+  def valid_coord?(other, _row, _col), do: raise_struct_error(other)
 
   @doc """
   Backward compatibility: convert from legacy map format.
@@ -199,13 +218,13 @@ defmodule Yog.Builder.GridGraph do
     topology = Map.get(map, :topology, :rook)
     predicate = Map.get(map, :predicate)
 
-    %__MODULE__{
-      graph: g,
-      rows: r,
-      cols: c,
-      topology: topology,
-      predicate: predicate
-    }
+    new(g, r, c, topology)
+    |> Map.put(:predicate, predicate)
+  end
+
+  def from_map(other) do
+    raise ArgumentError,
+          "expected a map with :graph, :rows, and :cols keys, got: #{inspect(other)}"
   end
 
   @doc """
@@ -218,6 +237,19 @@ defmodule Yog.Builder.GridGraph do
       rows: grid.rows,
       cols: grid.cols
     }
+  end
+
+  def to_map(other), do: raise_struct_error(other)
+
+  defp validate_graph!(%Yog.Graph{} = g), do: g
+  defp validate_graph!(%Yog.DAG{graph: g}), do: g
+
+  defp validate_graph!(other) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
+  end
+
+  defp raise_struct_error(other) do
+    raise ArgumentError, "expected a Yog.Builder.GridGraph struct, got: #{inspect(other)}"
   end
 
   # ============================================================

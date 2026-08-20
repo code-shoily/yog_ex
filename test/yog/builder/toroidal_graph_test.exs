@@ -32,9 +32,21 @@ defmodule Yog.Builder.ToroidalGraphTest do
     graph = Yog.directed()
     toroidal = ToroidalGraph.new(graph, 3, 4)
 
-    # 3 rows, 4 cols
-    # (1, 2) -> 1 * 4 + 2 = 6
     assert ToroidalGraph.coord_to_id(toroidal, 1, 2) == 6
     assert ToroidalGraph.id_to_coord(toroidal, 6) == {1, 2}
+  end
+
+  test "raises ArgumentError on invalid inputs" do
+    assert_raise ArgumentError, ~r/expected non-negative integer rows and cols/, fn ->
+      ToroidalGraph.new(Yog.directed(), -1, 3)
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      ToroidalGraph.new(:invalid, 3, 3)
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Builder.ToroidalGraph struct/, fn ->
+      ToroidalGraph.to_graph(:invalid)
+    end
   end
 end

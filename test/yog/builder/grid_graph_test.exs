@@ -29,4 +29,18 @@ defmodule Yog.Builder.GridGraphTest do
     # (0, 1) -> ID 1 is not in graph
     assert GridGraph.get_cell(grid, 0, 1) == {:error, nil}
   end
+
+  test "raises ArgumentError on invalid inputs" do
+    assert_raise ArgumentError, ~r/expected non-negative integer rows and cols/, fn ->
+      GridGraph.new(Yog.directed(), -1, 3)
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      GridGraph.new(:invalid, 3, 3)
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Builder.GridGraph struct/, fn ->
+      GridGraph.to_graph(:invalid)
+    end
+  end
 end

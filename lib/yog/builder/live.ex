@@ -162,10 +162,14 @@ defmodule Yog.Builder.Live do
       true
   """
   @spec from_labeled(Labeled.t()) :: t()
-  def from_labeled(labeled_builder) do
+  def from_labeled(%Labeled{} = labeled_builder) do
     registry = Labeled.to_registry(labeled_builder)
     next_id = Labeled.next_id(labeled_builder)
     %__MODULE__{registry: registry, next_id: next_id, pending: []}
+  end
+
+  def from_labeled(other) do
+    raise ArgumentError, "expected a Yog.Builder.Labeled struct, got: #{inspect(other)}"
   end
 
   # =============================================================================
@@ -185,10 +189,12 @@ defmodule Yog.Builder.Live do
       ["A"]
   """
   @spec add_node(t(), label()) :: t()
-  def add_node(builder, label) do
+  def add_node(%__MODULE__{} = builder, label) do
     {new_builder, _id} = ensure_node(builder, label)
     new_builder
   end
+
+  def add_node(other, _label), do: raise_struct_error(other)
 
   @doc """
   Adds an edge between two labeled nodes with a weight.
@@ -203,7 +209,7 @@ defmodule Yog.Builder.Live do
       true
   """
   @spec add_edge(t(), label(), label(), term()) :: t()
-  def add_edge(builder, from, to, weight) do
+  def add_edge(%__MODULE__{} = builder, from, to, weight) do
     {builder_with_src, src_id} = ensure_node(builder, from)
     {builder_with_both, dst_id} = ensure_node(builder_with_src, to)
 
@@ -211,6 +217,8 @@ defmodule Yog.Builder.Live do
     transition = {:add_edge, src_id, dst_id, weight}
     %{builder_with_both | pending: [transition | pending]}
   end
+
+  def add_edge(other, _from, _to, _weight), do: raise_struct_error(other)
 
   @doc """
   Adds an unweighted edge (weight = nil) between two labeled nodes.
@@ -223,9 +231,11 @@ defmodule Yog.Builder.Live do
       true
   """
   @spec add_unweighted_edge(t(), label(), label()) :: t()
-  def add_unweighted_edge(builder, from, to) do
+  def add_unweighted_edge(%__MODULE__{} = builder, from, to) do
     add_edge(builder, from, to, nil)
   end
+
+  def add_unweighted_edge(other, _from, _to), do: raise_struct_error(other)
 
   @doc """
   Adds a simple edge with weight 1 between two labeled nodes.
@@ -238,9 +248,11 @@ defmodule Yog.Builder.Live do
       true
   """
   @spec add_simple_edge(t(), label(), label()) :: t()
-  def add_simple_edge(builder, from, to) do
+  def add_simple_edge(%__MODULE__{} = builder, from, to) do
     add_edge(builder, from, to, 1)
   end
+
+  def add_simple_edge(other, _from, _to), do: raise_struct_error(other)
 
   @doc """
   Removes an edge between two labeled nodes.
@@ -260,6 +272,8 @@ defmodule Yog.Builder.Live do
     do_remove_edge(builder, registry, pending, from, to)
   end
 
+  def remove_edge(other, _from, _to), do: raise_struct_error(other)
+
   defp do_remove_edge(builder, registry, pending, from, to) do
     case {Map.fetch(registry, from), Map.fetch(registry, to)} do
       {{:ok, src_id}, {:ok, dst_id}} ->
@@ -267,7 +281,6 @@ defmodule Yog.Builder.Live do
         %{builder | pending: [transition | pending]}
 
       _ ->
-        # One or both nodes don't exist, nothing to remove
         builder
     end
   end
@@ -291,6 +304,8 @@ defmodule Yog.Builder.Live do
     do_remove_node(builder, registry, pending, label)
   end
 
+  def remove_node(other, _label), do: raise_struct_error(other)
+
   defp do_remove_node(builder, registry, pending, label) do
     case Map.fetch(registry, label) do
       {:ok, id} ->
@@ -299,7 +314,6 @@ defmodule Yog.Builder.Live do
         %{builder | registry: new_registry, pending: [transition | pending]}
 
       :error ->
-        # Node doesn't exist, nothing to remove
         builder
     end
   end
@@ -319,20 +333,14 @@ defmodule Yog.Builder.Live do
       2
   """
   @spec sync(t(), Yog.graph()) :: {t(), Yog.graph()}
-  def sync(%__MODULE__{pending: []} = builder, graph) do
-    {builder, graph}
-  end
-
-  def sync(%__MODULE__{pending: pending} = builder, graph) do
-    # Reverse to apply in insertion order (we prepended)
-    transitions = Enum.reverse(pending)
-
-    # Apply all transitions
-    new_graph = apply_transitions(graph, transitions)
-
-    # Return builder with empty pending
+  def sync(%__MODULE__{} = builder, graph) do
+    target_graph = validate_graph!(graph)
+    transitions = Enum.reverse(builder.pending)
+    new_graph = apply_transitions(target_graph, transitions)
     {%{builder | pending: []}, new_graph}
   end
+
+  def sync(other, _graph), do: raise_struct_error(other)
 
   @doc """
   Applies all pending changes to a multigraph.
@@ -351,15 +359,17 @@ defmodule Yog.Builder.Live do
       2
   """
   @spec sync_multi(t(), Yog.Multi.Graph.t()) :: {t(), Yog.Multi.Graph.t()}
-  def sync_multi(%__MODULE__{pending: []} = builder, graph) do
-    {builder, graph}
-  end
-
-  def sync_multi(%__MODULE__{pending: pending} = builder, graph) do
-    transitions = Enum.reverse(pending)
+  def sync_multi(%__MODULE__{} = builder, %Yog.Multi.Graph{} = graph) do
+    transitions = Enum.reverse(builder.pending)
     new_graph = apply_multi_transitions(graph, transitions)
     {%{builder | pending: []}, new_graph}
   end
+
+  def sync_multi(%__MODULE__{}, other) do
+    raise ArgumentError, "expected a Yog.Multi.Graph struct, got: #{inspect(other)}"
+  end
+
+  def sync_multi(other, _graph), do: raise_struct_error(other)
 
   @doc """
   Discards all pending changes without applying them.
@@ -376,6 +386,7 @@ defmodule Yog.Builder.Live do
   """
   @spec purge_pending(t()) :: t()
   def purge_pending(%__MODULE__{} = builder), do: %{builder | pending: []}
+  def purge_pending(other), do: raise_struct_error(other)
 
   @doc """
   Creates a checkpoint by clearing pending changes while preserving the registry.
@@ -392,6 +403,7 @@ defmodule Yog.Builder.Live do
   """
   @spec checkpoint(t()) :: t()
   def checkpoint(%__MODULE__{} = builder), do: %{builder | pending: []}
+  def checkpoint(other), do: raise_struct_error(other)
 
   @doc """
   Looks up the internal node ID for a given label.
@@ -412,6 +424,8 @@ defmodule Yog.Builder.Live do
   def get_id(%__MODULE__{registry: registry}, label) do
     do_get_id(registry, label)
   end
+
+  def get_id(other, _label), do: raise_struct_error(other)
 
   defp do_get_id(registry, label) do
     case Map.fetch(registry, label) do
@@ -451,6 +465,8 @@ defmodule Yog.Builder.Live do
     end
   end
 
+  def get_label(other, _id), do: raise_struct_error(other)
+
   @doc """
   Returns all labels that have been registered.
 
@@ -464,6 +480,7 @@ defmodule Yog.Builder.Live do
   """
   @spec all_labels(t()) :: [label()]
   def all_labels(%__MODULE__{registry: registry}), do: Map.keys(registry)
+  def all_labels(other), do: raise_struct_error(other)
 
   @doc """
   Checks if a label has been registered in the builder.
@@ -482,6 +499,8 @@ defmodule Yog.Builder.Live do
     Map.has_key?(registry, label)
   end
 
+  def has_label?(other, _label), do: raise_struct_error(other)
+
   @doc """
   Returns the number of registered nodes.
 
@@ -494,6 +513,7 @@ defmodule Yog.Builder.Live do
   """
   @spec node_count(t()) :: integer()
   def node_count(%__MODULE__{registry: registry}), do: map_size(registry)
+  def node_count(other), do: raise_struct_error(other)
 
   @doc """
   Returns the number of pending changes.
@@ -509,10 +529,22 @@ defmodule Yog.Builder.Live do
   """
   @spec pending_count(t()) :: integer()
   def pending_count(%__MODULE__{pending: pending}), do: length(pending)
+  def pending_count(other), do: raise_struct_error(other)
 
   # =============================================================================
   # Private helpers - parsing
   # =============================================================================
+
+  defp validate_graph!(%Yog.Graph{} = g), do: g
+  defp validate_graph!(%Yog.DAG{graph: g}), do: g
+
+  defp validate_graph!(other) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
+  end
+
+  defp raise_struct_error(other) do
+    raise ArgumentError, "expected a Yog.Builder.Live struct, got: #{inspect(other)}"
+  end
 
   defp ensure_node(
          %__MODULE__{registry: registry, next_id: next_id, pending: pending} = builder,
@@ -570,7 +602,6 @@ defmodule Yog.Builder.Live do
           new_g
 
         {:remove_edge, src, dst} ->
-          # Remove all parallel edges between src and dst
           edges = MultiModel.edges_between(g, src, dst)
 
           Enum.reduce(edges, g, fn {edge_id, _data}, acc_g ->

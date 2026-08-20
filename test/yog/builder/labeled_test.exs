@@ -107,5 +107,19 @@ defmodule Yog.Builder.LabeledTest do
       assert Labeled.get_label(builder, id) == {:ok, "A"}
       assert Labeled.get_label(builder, 999) == {:error, nil}
     end
+
+    test "raises ArgumentError on invalid inputs" do
+      assert_raise ArgumentError, ~r/expected graph_type to be :directed or :undirected/, fn ->
+        Labeled.new(:invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Builder.Labeled struct/, fn ->
+        Labeled.add_node(:invalid, "A")
+      end
+
+      assert_raise ArgumentError, ~r/expected edges to be a list/, fn ->
+        Labeled.from_list(:directed, :not_a_list)
+      end
+    end
   end
 end

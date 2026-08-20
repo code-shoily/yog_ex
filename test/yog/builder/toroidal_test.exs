@@ -166,5 +166,15 @@ defmodule Yog.Builder.ToroidalTest do
       grid = Yog.Builder.GridGraph.new(graph, 2, 2)
       assert Toroidal.to_graph(grid) == graph
     end
+
+    test "raises ArgumentError on invalid inputs" do
+      assert_raise ArgumentError, ~r/expected grid_data to be a 2D list/, fn ->
+        Toroidal.from_2d_list(:invalid, :directed, Toroidal.always())
+      end
+
+      assert_raise ArgumentError, ~r/expected a ToroidalGraph struct or toroidal grid/, fn ->
+        Toroidal.to_graph(:invalid)
+      end
+    end
   end
 end
