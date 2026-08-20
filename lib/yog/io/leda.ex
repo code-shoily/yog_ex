@@ -52,6 +52,7 @@ defmodule Yog.IO.LEDA do
       iex> :ok
       :ok
   """
+  @spec default_options() :: tuple()
   def default_options do
     {:leda_options, fn data -> Yog.Utils.to_label("", data) end, &Yog.Utils.to_weight_label/1,
      fn s -> s end, fn s -> s end, &Yog.Utils.safe_string/1, &Yog.Utils.safe_string/1}
@@ -60,7 +61,9 @@ defmodule Yog.IO.LEDA do
   @doc """
   Creates LEDA options with custom serializers and deserializers.
 
-  **Time Complexity:** O(1)
+  Raises `ArgumentError` if any serializer or deserializer is not an arity-1 function or `opts` is invalid.
+
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Parameters
 
@@ -86,9 +89,45 @@ defmodule Yog.IO.LEDA do
         fn str -> String.to_integer(str) end        # Deserialize edge
       )
   """
+  @spec options_with(
+          (any() -> any()),
+          (any() -> any()),
+          (any() -> any()),
+          (any() -> any()),
+          keyword()
+        ) :: tuple()
   def options_with(node_ser, edge_ser, node_deser, edge_deser, opts \\ []) do
+    if not is_function(node_ser, 1) do
+      raise ArgumentError, "expected node_serializer to be an arity-1 function"
+    end
+
+    if not is_function(edge_ser, 1) do
+      raise ArgumentError, "expected edge_serializer to be an arity-1 function"
+    end
+
+    if not is_function(node_deser, 1) do
+      raise ArgumentError, "expected node_deserializer to be an arity-1 function"
+    end
+
+    if not is_function(edge_deser, 1) do
+      raise ArgumentError, "expected edge_deserializer to be an arity-1 function"
+    end
+
+    if not Keyword.keyword?(opts) do
+      raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
+    end
+
     node_fmt = Keyword.get(opts, :node_formatter, &Yog.Utils.safe_string/1)
     edge_fmt = Keyword.get(opts, :edge_formatter, &Yog.Utils.safe_string/1)
+
+    if not is_function(node_fmt, 1) do
+      raise ArgumentError, "expected node_formatter to be an arity-1 function"
+    end
+
+    if not is_function(edge_fmt, 1) do
+      raise ArgumentError, "expected edge_formatter to be an arity-1 function"
+    end
+
     {:leda_options, node_ser, edge_ser, node_deser, edge_deser, node_fmt, edge_fmt}
   end
 
@@ -97,11 +136,13 @@ defmodule Yog.IO.LEDA do
 
   Allows full control over how node and edge data are converted to LEDA format.
 
-  **Time Complexity:** O(V + E) where V is nodes and E is edges
+  Raises `ArgumentError` if `graph` or `options` are invalid.
+
+  Time complexity: $\\mathcal{O}(V + E)$ where $V$ is node count and $E$ is edge count.
 
   ## Parameters
 
-  - `options` - LEDA options tuple (see `options_with/4`)
+  - `options` - LEDA options tuple (see `options_with/5`)
   - `graph` - The graph to serialize
 
   ## Returns
@@ -123,22 +164,40 @@ defmodule Yog.IO.LEDA do
 
       leda = Yog.IO.LEDA.serialize_with(options, graph)
   """
+  @spec serialize_with(tuple(), Yog.graph() | Yog.DAG.t()) :: String.t()
   def serialize_with(options, graph) do
-    {node_ser, edge_ser, _node_deser, _edge_deser, node_fmt, _edge_fmt} =
-      case options do
-        {:leda_options, ns, es, nd, ed, nf, ef} ->
-          {ns, es, nd, ed, nf, ef}
+    target_graph =
+      case graph do
+        %Yog.Graph{} ->
+          graph
 
-        {:leda_options, ns, es, nd, ed} ->
-          {ns, es, nd, ed, &Yog.Utils.safe_string/1, &Yog.Utils.safe_string/1}
+        %Yog.DAG{graph: inner} ->
+          inner
+
+        _ ->
+          raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(graph)}"
       end
 
-    %Yog.Graph{kind: type, nodes: nodes_map} = graph
+    {node_ser, edge_ser, _node_deser, _edge_deser, node_fmt, _edge_fmt} =
+      case options do
+        {:leda_options, ns, es, nd, ed, nf, ef}
+        when is_function(ns, 1) and is_function(es, 1) and is_function(nd, 1) and
+               is_function(ed, 1) and is_function(nf, 1) and is_function(ef, 1) ->
+          {ns, es, nd, ed, nf, ef}
 
-    # Direction: -1 for directed, -2 for undirected
+        {:leda_options, ns, es, nd, ed}
+        when is_function(ns, 1) and is_function(es, 1) and is_function(nd, 1) and
+               is_function(ed, 1) ->
+          {ns, es, nd, ed, &Yog.Utils.safe_string/1, &Yog.Utils.safe_string/1}
+
+        _ ->
+          raise ArgumentError, "expected valid leda_options tuple, got: #{inspect(options)}"
+      end
+
+    %Yog.Graph{kind: type, nodes: nodes_map} = target_graph
+
     direction = if type == :directed, do: "-1", else: "-2"
 
-    # Nodes section
     node_count = map_size(nodes_map)
 
     node_lines =
@@ -149,8 +208,7 @@ defmodule Yog.IO.LEDA do
         "|{#{serialized}}|"
       end)
 
-    # Edges section
-    edges = Model.all_edges(graph)
+    edges = Model.all_edges(target_graph)
     edge_count = length(edges)
 
     edge_lines =
@@ -170,7 +228,9 @@ defmodule Yog.IO.LEDA do
 
   Node and edge data are converted to strings.
 
-  **Time Complexity:** O(V + E)
+  Raises `ArgumentError` if `graph` is invalid.
+
+  Time complexity: $\\mathcal{O}(V + E)$
 
   ## Example
 
@@ -182,6 +242,7 @@ defmodule Yog.IO.LEDA do
       iex> String.contains?(leda, "LEDA.GRAPH") and String.contains?(leda, "Alice")
       true
   """
+  @spec serialize(Yog.graph() | Yog.DAG.t()) :: String.t()
   def serialize(graph) do
     serialize_with(default_options(), graph)
   end
@@ -191,8 +252,9 @@ defmodule Yog.IO.LEDA do
 
   Provided for compatibility with other serialization libraries.
 
-  **Time Complexity:** O(V + E)
+  Time complexity: $\\mathcal{O}(V + E)$
   """
+  @spec to_string(Yog.graph() | Yog.DAG.t()) :: String.t()
   def to_string(graph) do
     serialize(graph)
   end
@@ -200,7 +262,9 @@ defmodule Yog.IO.LEDA do
   @doc """
   Writes a graph to a LEDA file using default string conversion.
 
-  **Time Complexity:** O(V + E) + file I/O
+  Raises `ArgumentError` if `path` is not a binary string or `graph` is invalid.
+
+  Time complexity: $\\mathcal{O}(V + E)$ + file I/O
 
   ## Parameters
 
@@ -221,20 +285,27 @@ defmodule Yog.IO.LEDA do
       Yog.IO.LEDA.write("network.leda", graph)
       # => :ok
   """
-  def write(path, graph) do
+  @spec write(String.t(), Yog.graph() | Yog.DAG.t()) :: :ok | {:error, atom()}
+  def write(path, graph) when is_binary(path) do
     content = serialize(graph)
     File.write(path, content)
+  end
+
+  def write(path, _graph) do
+    raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
   end
 
   @doc """
   Writes a graph to a LEDA file with custom serialization options.
 
-  **Time Complexity:** O(V + E) + file I/O
+  Raises `ArgumentError` if `path` is not a binary string or options/graph are invalid.
+
+  Time complexity: $\\mathcal{O}(V + E)$ + file I/O
 
   ## Parameters
 
   - `path` - File path to write to
-  - `options` - LEDA options tuple (see `options_with/4`)
+  - `options` - LEDA options tuple (see `options_with/5`)
   - `graph` - The graph to serialize
 
   ## Returns
@@ -252,9 +323,14 @@ defmodule Yog.IO.LEDA do
 
       Yog.IO.LEDA.write_with("network.leda", options, graph)
   """
-  def write_with(path, options, graph) do
+  @spec write_with(String.t(), tuple(), Yog.graph() | Yog.DAG.t()) :: :ok | {:error, atom()}
+  def write_with(path, options, graph) when is_binary(path) do
     content = serialize_with(options, graph)
     File.write(path, content)
+  end
+
+  def write_with(path, _options, _graph) do
+    raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
   end
 
   @doc """
@@ -263,7 +339,9 @@ defmodule Yog.IO.LEDA do
   This function allows you to transform LEDA data into custom Elixir data
   structures as the graph is built.
 
-  **Time Complexity:** O(V + E)
+  Raises `ArgumentError` if `input` is not a binary string or parsers are invalid.
+
+  Time complexity: $\\mathcal{O}(V + E)$
 
   ## Parameters
 
@@ -290,11 +368,25 @@ defmodule Yog.IO.LEDA do
       {:ok, {:leda_result, graph, _warnings}} =
         Yog.IO.LEDA.parse_with(leda_str, node_parser, edge_parser)
   """
-  def parse_with(input, node_parser, edge_parser) do
+  @spec parse_with(String.t(), (any() -> any()), (any() -> any())) ::
+          {:ok, {:leda_result, Yog.graph(), list()}} | {:error, term()}
+  def parse_with(input, node_parser, edge_parser) when is_binary(input) do
+    if not is_function(node_parser, 1) do
+      raise ArgumentError, "expected node_parser to be an arity-1 function"
+    end
+
+    if not is_function(edge_parser, 1) do
+      raise ArgumentError, "expected edge_parser to be an arity-1 function"
+    end
+
     case parse_leda(input, node_parser, edge_parser) do
       {:ok, graph, warnings} -> {:ok, {:leda_result, graph, warnings}}
       {:error, _} = error -> error
     end
+  end
+
+  def parse_with(input, _node_parser, _edge_parser) do
+    raise ArgumentError, "expected input to be a binary string, got: #{inspect(input)}"
   end
 
   @doc """
@@ -303,7 +395,9 @@ defmodule Yog.IO.LEDA do
   Node and edge data are stored as strings. For custom data structures,
   use `parse_with/3`.
 
-  **Time Complexity:** O(V + E)
+  Raises `ArgumentError` if `input` is not a binary string.
+
+  Time complexity: $\\mathcal{O}(V + E)$
 
   ## Parameters
 
@@ -321,6 +415,7 @@ defmodule Yog.IO.LEDA do
       iex> Yog.Model.node_count(graph)
       2
   """
+  @spec parse(String.t()) :: {:ok, {:leda_result, Yog.graph(), list()}} | {:error, term()}
   def parse(input) do
     parse_with(input, fn s -> s end, fn s -> s end)
   end
@@ -328,7 +423,9 @@ defmodule Yog.IO.LEDA do
   @doc """
   Reads a graph from a LEDA file using String labels.
 
-  **Time Complexity:** O(V + E) + file I/O
+  Raises `ArgumentError` if `path` is not a binary string.
+
+  Time complexity: $\\mathcal{O}(V + E)$ + file I/O
 
   ## Parameters
 
@@ -346,27 +443,39 @@ defmodule Yog.IO.LEDA do
 
       IO.puts("Loaded graph with \#{Yog.Model.node_count(graph)} nodes")
   """
-  def read(path) do
+  @spec read(String.t()) :: {:ok, {:leda_result, Yog.graph(), list()}} | {:error, term()}
+  def read(path) when is_binary(path) do
     case File.read(path) do
       {:ok, content} -> parse(content)
       {:error, _} = error -> error
     end
   end
 
+  def read(path) do
+    raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
+  end
+
   @doc """
   Reads a graph from a LEDA file with custom parsers.
+
+  Raises `ArgumentError` if `path` is not a binary string.
   """
-  def read_with(path, node_parser, edge_parser) do
+  @spec read_with(String.t(), (any() -> any()), (any() -> any())) ::
+          {:ok, {:leda_result, Yog.graph(), list()}} | {:error, term()}
+  def read_with(path, node_parser, edge_parser) when is_binary(path) do
     case File.read(path) do
       {:ok, content} -> parse_with(content, node_parser, edge_parser)
       {:error, _} = error -> error
     end
   end
 
+  def read_with(path, _node_parser, _edge_parser) do
+    raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
+  end
+
   # Private functions
 
   defp parse_leda(input, node_parser, edge_parser) do
-    # Handle empty input
     if String.trim(input) == "" do
       {:error, :empty_input}
     else
@@ -449,13 +558,11 @@ defmodule Yog.IO.LEDA do
   end
 
   defp parse_node_data(line, node_parser) do
-    # Extract data from |{...}| format
     case Regex.run(~r/\|{(.*)}\|/, line) do
       [_, data] ->
         {:ok, node_parser.(data)}
 
       nil ->
-        # No delimiter, use raw line
         {:ok, node_parser.(String.trim(line))}
     end
   end
@@ -482,7 +589,6 @@ defmodule Yog.IO.LEDA do
     trimmed = String.trim(line)
 
     if trimmed == "" do
-      # Skip empty lines
       parse_edges_loop(rest, graph, edge_parser, remaining, warnings)
     else
       case parse_edge_line(trimmed, graph, edge_parser) do
@@ -490,19 +596,16 @@ defmodule Yog.IO.LEDA do
           parse_edges_loop(rest, new_graph, edge_parser, remaining - 1, warnings)
 
         {:warning, warning} ->
-          # Skip this edge but continue
           parse_edges_loop(rest, graph, edge_parser, remaining - 1, [warning | warnings])
       end
     end
   end
 
   defp parse_edges_loop([], graph, _edge_parser, _remaining, warnings) do
-    # Allow incomplete edge lists
     {:ok, graph, Enum.reverse(warnings)}
   end
 
   defp parse_edge_line(line, graph, edge_parser) do
-    # Parse: "source target reversal_index |{data}|"
     case Regex.run(~r/^(\d+)\s+(\d+)\s+(\d+)\s+\|{(.*)}\|/, line) do
       [_, from_str, to_str, _rev_idx, edge_data] ->
         add_parsed_edge(graph, from_str, to_str, edge_data, edge_parser, line)
@@ -520,9 +623,7 @@ defmodule Yog.IO.LEDA do
   end
 
   defp try_add_edge(graph, from, to, weight) do
-    %Yog.Graph{nodes: nodes_map} = graph
-
-    if Map.has_key?(nodes_map, from) and Map.has_key?(nodes_map, to) do
+    if Yog.Model.has_node?(graph, from) and Yog.Model.has_node?(graph, to) do
       {:ok, new_graph} = Yog.Model.add_edge(graph, from, to, weight)
       {:ok, new_graph}
     else

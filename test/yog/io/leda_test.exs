@@ -1,5 +1,6 @@
 defmodule Yog.IO.LEDATest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
+  use ExUnitProperties
 
   alias Yog.IO.LEDA
 
@@ -71,6 +72,50 @@ defmodule Yog.IO.LEDATest do
     assert String.contains?(result, "LEDA.GRAPH")
   end
 
+  test "serialize DAG" do
+    dag =
+      Yog.DAG.new()
+      |> Yog.DAG.add_node(1, "Node1")
+      |> Yog.DAG.add_node(2, "Node2")
+
+    {:ok, dag} = Yog.DAG.add_edge(dag, 1, 2, "link")
+
+    result = LEDA.serialize(dag)
+    assert String.contains?(result, "LEDA.GRAPH")
+    assert String.contains?(result, "|{Node1}|")
+    assert String.contains?(result, "|{Node2}|")
+  end
+
+  test "input and option validation" do
+    assert_raise ArgumentError, ~r/expected node_serializer to be an arity-1 function/, fn ->
+      LEDA.options_with(:invalid, &to_string/1, & &1, & &1)
+    end
+
+    assert_raise ArgumentError, ~r/expected edge_serializer to be an arity-1 function/, fn ->
+      LEDA.options_with(&to_string/1, :invalid, & &1, & &1)
+    end
+
+    assert_raise ArgumentError, ~r/expected node_deserializer to be an arity-1 function/, fn ->
+      LEDA.options_with(&to_string/1, &to_string/1, :invalid, & &1)
+    end
+
+    assert_raise ArgumentError, ~r/expected edge_deserializer to be an arity-1 function/, fn ->
+      LEDA.options_with(&to_string/1, &to_string/1, & &1, :invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected opts to be a keyword list/, fn ->
+      LEDA.options_with(&to_string/1, &to_string/1, & &1, & &1, :invalid_opts)
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      LEDA.serialize(:not_a_graph)
+    end
+
+    assert_raise ArgumentError, ~r/expected valid leda_options tuple/, fn ->
+      LEDA.serialize_with(:invalid_opts, Yog.directed())
+    end
+  end
+
   # =============================================================================
   # PARSING TESTS
   # =============================================================================
@@ -122,6 +167,20 @@ defmodule Yog.IO.LEDATest do
     assert Yog.Model.node_count(graph) == 2
     assert Yog.Model.node(graph, 1) == 100
     assert Yog.Model.node(graph, 2) == 200
+  end
+
+  test "parse_with input validation" do
+    assert_raise ArgumentError, ~r/expected input to be a binary string/, fn ->
+      LEDA.parse(123)
+    end
+
+    assert_raise ArgumentError, ~r/expected node_parser to be an arity-1 function/, fn ->
+      LEDA.parse_with("LEDA.GRAPH", :invalid, & &1)
+    end
+
+    assert_raise ArgumentError, ~r/expected edge_parser to be an arity-1 function/, fn ->
+      LEDA.parse_with("LEDA.GRAPH", & &1, :invalid)
+    end
   end
 
   # =============================================================================
@@ -292,7 +351,6 @@ defmodule Yog.IO.LEDATest do
 
   test "parse with premature EOF in edges" do
     input = "LEDA.GRAPH\nstring\nstring\n-1\n2\n|{A}|\n|{B}|\n5\n1 2 0 |{edge1}|"
-    # Expected 5 edges, only got 1.
     {:ok, {:leda_result, graph, warnings}} = LEDA.parse(input)
     assert Yog.Model.edge_count(graph) == 1
     assert warnings == []
@@ -314,20 +372,15 @@ defmodule Yog.IO.LEDATest do
 
     {:ok, {:leda_result, graph, warnings}} = LEDA.read(fixture_path)
 
-    # Verify no warnings
     assert warnings == []
-
-    # Verify graph structure
     assert Yog.Model.node_count(graph) == 3
     assert Yog.Model.edge_count(graph) == 3
     assert Yog.Model.type(graph) == :directed
 
-    # Verify node data
     assert Yog.Model.node(graph, 1) == "Alice"
     assert Yog.Model.node(graph, 2) == "Bob"
     assert Yog.Model.node(graph, 3) == "Charlie"
 
-    # Verify edges exist
     assert length(Yog.successors(graph, 1)) == 2
     assert length(Yog.successors(graph, 2)) == 1
   end
@@ -336,27 +389,21 @@ defmodule Yog.IO.LEDATest do
     fixture_path = "test/fixtures/io/sample.leda"
     output_path = "/tmp/test_yog_leda_output.leda"
 
-    # Read original fixture
     {:ok, {:leda_result, original, _}} = LEDA.read(fixture_path)
 
-    # Write to temp file
     assert :ok = LEDA.write(output_path, original)
     assert File.exists?(output_path)
 
-    # Read back the written file
     {:ok, {:leda_result, reloaded, _}} = LEDA.read(output_path)
 
-    # Verify structure matches
     assert Yog.Model.node_count(reloaded) == Yog.Model.node_count(original)
     assert Yog.Model.edge_count(reloaded) == Yog.Model.edge_count(original)
     assert Yog.Model.type(reloaded) == Yog.Model.type(original)
 
-    # Verify node data matches
     assert Yog.Model.node(reloaded, 1) == "Alice"
     assert Yog.Model.node(reloaded, 2) == "Bob"
     assert Yog.Model.node(reloaded, 3) == "Charlie"
 
-    # Cleanup
     File.rm(output_path)
   end
 
@@ -378,6 +425,24 @@ defmodule Yog.IO.LEDATest do
              LEDA.write_with("/nonexistent_dir/file.leda", LEDA.default_options(), graph)
 
     assert {:error, :enoent} = LEDA.read_with("/nonexistent_dir/file.leda", & &1, & &1)
+  end
+
+  test "read/1, read_with/3, write/2, write_with/3 raise ArgumentError for non-binary paths" do
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      LEDA.read(123)
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      LEDA.read_with(123, & &1, & &1)
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      LEDA.write(123, Yog.directed())
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      LEDA.write_with(123, LEDA.default_options(), Yog.directed())
+    end
   end
 
   test "parse truncated and malformed inputs" do
@@ -428,5 +493,46 @@ defmodule Yog.IO.LEDATest do
     {:ok, {:leda_result, graph, warnings}} = LEDA.parse(input)
     assert Yog.Model.edge_count(graph) == 2
     assert warnings == []
+  end
+
+  describe "property tests" do
+    property "roundtrip serialize and parse preserves node and edge counts for 1-indexed graphs" do
+      check all(
+              kind <- StreamData.member_of([:directed, :undirected]),
+              n <- StreamData.integer(0..15),
+              raw_edges <-
+                StreamData.list_of(
+                  StreamData.tuple(
+                    {StreamData.integer(1..max(n, 1)), StreamData.integer(1..max(n, 1))}
+                  )
+                )
+            ) do
+        graph =
+          if n == 0 do
+            Yog.Model.new(kind)
+          else
+            base =
+              Enum.reduce(
+                1..n,
+                Yog.Model.new(kind),
+                &Yog.add_node(&2, &1, "Node#{&1}")
+              )
+
+            Enum.reduce(raw_edges, base, fn {u, v}, acc ->
+              if u <= n and v <= n do
+                Yog.add_edge_ensure(acc, u, v, "Edge")
+              else
+                acc
+              end
+            end)
+          end
+
+        leda = LEDA.serialize(graph)
+        assert {:ok, {:leda_result, parsed, _warnings}} = LEDA.parse(leda)
+
+        assert Yog.Model.node_count(parsed) == Yog.Model.node_count(graph)
+        assert Yog.Model.edge_count(parsed) == Yog.Model.edge_count(graph)
+      end
+    end
   end
 end
