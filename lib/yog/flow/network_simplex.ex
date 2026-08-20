@@ -119,13 +119,16 @@ defmodule Yog.Flow.NetworkSimplex do
           (any() -> integer()),
           (any() -> integer())
         ) :: {:ok, min_cost_flow_result()} | {:error, min_cost_flow_error()}
-  def min_cost_flow(graph, get_demand, get_capacity, get_cost) do
-    nodes = Model.all_nodes(graph)
+  def min_cost_flow(graph, get_demand, get_capacity, get_cost)
+      when is_function(get_demand, 1) and is_function(get_capacity, 1) and
+             is_function(get_cost, 1) do
+    target_graph = validate_graph!(graph)
+    nodes = Model.all_nodes(target_graph)
 
     # Compute demands for all nodes
     demands =
       Map.new(nodes, fn node ->
-        data = Model.node(graph, node)
+        data = Model.node(target_graph, node)
         {node, get_demand.(data)}
       end)
 
@@ -144,7 +147,7 @@ defmodule Yog.Flow.NetworkSimplex do
         # Build edge information
         edges =
           Enum.flat_map(nodes, fn from ->
-            Model.successors(graph, from)
+            Model.successors(target_graph, from)
             |> Enum.map(fn {to, data} ->
               capacity = get_capacity.(data)
               cost = get_cost.(data)
@@ -156,6 +159,31 @@ defmodule Yog.Flow.NetworkSimplex do
         solve_min_cost_flow(nodes, edges, demands)
       end
     end
+  end
+
+  def min_cost_flow(graph, get_demand, get_capacity, get_cost) do
+    _target_graph = validate_graph!(graph)
+
+    cond do
+      not is_function(get_demand, 1) ->
+        raise ArgumentError,
+              "expected get_demand to be a 1-arity function, got: #{inspect(get_demand)}"
+
+      not is_function(get_capacity, 1) ->
+        raise ArgumentError,
+              "expected get_capacity to be a 1-arity function, got: #{inspect(get_capacity)}"
+
+      not is_function(get_cost, 1) ->
+        raise ArgumentError,
+              "expected get_cost to be a 1-arity function, got: #{inspect(get_cost)}"
+    end
+  end
+
+  defp validate_graph!(%Yog.Graph{} = g), do: g
+  defp validate_graph!(%Yog.DAG{graph: g}), do: g
+
+  defp validate_graph!(other) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
   end
 
   defp solve_min_cost_flow(nodes, edges, demands) do

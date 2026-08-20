@@ -311,5 +311,17 @@ defmodule Yog.Flow.SuccessiveShortestPathTest do
                  get_cost
                )
     end
+
+    test "raises ArgumentError on invalid graph or function inputs" do
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        SuccessiveShortestPath.min_cost_flow(:invalid, fn _ -> 0 end, fn _ -> 1 end, fn _ -> 1 end)
+      end
+
+      assert_raise ArgumentError, ~r/expected get_demand to be a 1-arity function/, fn ->
+        SuccessiveShortestPath.min_cost_flow(Yog.directed(), :not_a_func, fn _ -> 1 end, fn _ ->
+          1
+        end)
+      end
+    end
   end
 end

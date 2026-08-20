@@ -566,5 +566,19 @@ defmodule Yog.MatchingTest do
       matching = Matching.blossom_maximum_matching(graph)
       assert valid_matching?(matching)
     end
+
+    test "raises ArgumentError on invalid struct input" do
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Matching.hopcroft_karp(:invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Matching.hungarian(:invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Matching.blossom_maximum_matching(:invalid)
+      end
+    end
   end
 end

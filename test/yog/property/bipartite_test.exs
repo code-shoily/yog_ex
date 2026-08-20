@@ -372,4 +372,22 @@ defmodule Yog.Property.BipartiteTest do
         assert length(matching) == 2
     end
   end
+
+  test "raises ArgumentError on invalid struct inputs" do
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Bipartite.bipartite?(:invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Bipartite.partition(:invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Bipartite.coloring(:invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected matches to be a map/, fn ->
+      Bipartite.get_partner(:invalid, 1)
+    end
+  end
 end

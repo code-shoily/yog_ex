@@ -93,6 +93,9 @@ defmodule Yog.Matching do
     end
   end
 
+  def hopcroft_karp(%Yog.DAG{graph: graph}), do: hopcroft_karp(graph)
+  def hopcroft_karp(other), do: raise_struct_error(other)
+
   defp do_hopcroft_karp(graph, left, right) do
     u_nodes = MapSet.to_list(left)
     v_nodes = MapSet.to_list(right)
@@ -257,7 +260,9 @@ defmodule Yog.Matching do
   """
   @spec hungarian(Graph.t(), optimization()) ::
           {number(), %{Yog.node_id() => Yog.node_id()}}
-  def hungarian(%Graph{} = graph, optimization \\ :min) when optimization in [:min, :max] do
+  def hungarian(graph, optimization \\ :min)
+
+  def hungarian(%Graph{} = graph, optimization) when optimization in [:min, :max] do
     case Bipartite.partition(graph) do
       {:ok, %{left: left, right: right}} ->
         do_hungarian(graph, left, right, optimization)
@@ -266,6 +271,9 @@ defmodule Yog.Matching do
         raise ArgumentError, "hungarian/2 requires a bipartite graph"
     end
   end
+
+  def hungarian(%Yog.DAG{graph: graph}, optimization), do: hungarian(graph, optimization)
+  def hungarian(other, _optimization), do: raise_struct_error(other)
 
   defp do_hungarian(graph, left, right, optimization) do
     left_nodes = MapSet.to_list(left) |> Enum.sort()
@@ -478,7 +486,10 @@ defmodule Yog.Matching do
     if nodes == [] do
       %{}
     else
-      adj = blossom_adj(graph, nodes)
+      adj =
+        Map.new(nodes, fn u ->
+          {u, Model.neighbor_ids(graph, u)}
+        end)
 
       Enum.reduce(nodes, %{}, fn u, match_acc ->
         if Map.has_key?(match_acc, u) do
@@ -490,8 +501,11 @@ defmodule Yog.Matching do
     end
   end
 
-  defp blossom_adj(graph, nodes) do
-    Map.new(nodes, fn u -> {u, Model.neighbor_ids(graph, u)} end)
+  def blossom_maximum_matching(%Yog.DAG{graph: graph}), do: blossom_maximum_matching(graph)
+  def blossom_maximum_matching(other), do: raise_struct_error(other)
+
+  defp raise_struct_error(other) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
   end
 
   # Try to find an augmenting path from `root` and augment the matching.

@@ -198,12 +198,15 @@ defmodule Yog.Property.Bipartite do
   O(V + E)
   """
   @spec bipartite?(Yog.graph()) :: boolean()
-  def bipartite?(graph) do
+  def bipartite?(%Yog.Graph{} = graph) do
     case do_partition(graph) do
       {:ok, _} -> true
       {:error, _} -> false
     end
   end
+
+  def bipartite?(%Yog.DAG{graph: graph}), do: bipartite?(graph)
+  def bipartite?(other), do: raise_struct_error(other)
 
   @doc """
   Returns the two partitions of a bipartite graph, or an error if not bipartite.
@@ -243,7 +246,9 @@ defmodule Yog.Property.Bipartite do
   @spec partition(Yog.graph()) ::
           {:ok, %{left: MapSet.t(Yog.node_id()), right: MapSet.t(Yog.node_id())}}
           | {:error, :not_bipartite}
-  def partition(graph), do: do_partition(graph)
+  def partition(%Yog.Graph{} = graph), do: do_partition(graph)
+  def partition(%Yog.DAG{graph: graph}), do: partition(graph)
+  def partition(other), do: raise_struct_error(other)
 
   defp do_partition(graph) do
     nodes = Model.all_nodes(graph)
@@ -345,7 +350,7 @@ defmodule Yog.Property.Bipartite do
       {:error, :not_bipartite}
   """
   @spec coloring(Yog.graph()) :: {:ok, %{Yog.node_id() => 0 | 1}} | {:error, :not_bipartite}
-  def coloring(graph) do
+  def coloring(%Yog.Graph{} = graph) do
     case do_partition(graph) do
       {:ok, %{left: left, right: right}} ->
         left_map = Map.new(left, fn id -> {id, 0} end)
@@ -356,6 +361,9 @@ defmodule Yog.Property.Bipartite do
         {:error, :not_bipartite}
     end
   end
+
+  def coloring(%Yog.DAG{graph: graph}), do: coloring(graph)
+  def coloring(other), do: raise_struct_error(other)
 
   @doc """
   Finds a maximum matching in a bipartite graph.
@@ -393,7 +401,7 @@ defmodule Yog.Property.Bipartite do
           left: MapSet.t(Yog.node_id()),
           right: MapSet.t(Yog.node_id())
         }) :: [{Yog.node_id(), Yog.node_id()}]
-  def maximum_matching(graph, partition_map) do
+  def maximum_matching(%Yog.Graph{} = graph, %{left: _, right: _} = partition_map) do
     left = MapSet.to_list(partition_map.left)
     _right = MapSet.to_list(partition_map.right)
 
@@ -420,6 +428,13 @@ defmodule Yog.Property.Bipartite do
       end)
 
     Enum.reverse(matching)
+  end
+
+  def maximum_matching(%Yog.DAG{graph: graph}, partition_map),
+    do: maximum_matching(graph, partition_map)
+
+  def maximum_matching(graph, _partition_map) do
+    _target_graph = validate_graph!(graph)
   end
 
   # Find augmenting path using DFS
@@ -573,24 +588,19 @@ defmodule Yog.Property.Bipartite do
     end)
   end
 
-  @doc """
-  Gets the partner of a person in a stable matching.
-
-  Returns the partner if the person is matched, `nil` otherwise.
-
-  ## Examples
-
-      iex> residents = %{1 => [101, 102], 2 => [102, 101]}
-      iex> hospitals = %{101 => [1, 2], 102 => [2, 1]}
-      iex> matches = Yog.Property.Bipartite.stable_marriage(residents, hospitals)
-      iex> partner = Yog.Property.Bipartite.get_partner(matches, 1)
-      iex> partner in [101, 102]
-      true
-      iex> Yog.Property.Bipartite.get_partner(matches, 999)
-      nil
-  """
   @spec get_partner(%{(k :: any()) => v :: any()}, any()) :: any() | nil
   def get_partner(matches, person) when is_map(matches) do
     Map.get(matches, person)
+  end
+
+  def get_partner(other, _person) do
+    raise ArgumentError, "expected matches to be a map, got: #{inspect(other)}"
+  end
+
+  defp validate_graph!(%Yog.Graph{} = g), do: g
+  defp validate_graph!(other), do: raise_struct_error(other)
+
+  defp raise_struct_error(other) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
   end
 end

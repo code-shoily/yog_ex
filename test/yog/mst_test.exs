@@ -917,5 +917,19 @@ defmodule Yog.MSTTest do
       {:ok, result} = MST.minimum_arborescence(in: graph, root: 1)
       assert result.total_weight == 42
     end
+
+    test "raises ArgumentError on invalid struct inputs" do
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        MST.kruskal(:invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        MST.prim(:invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        MST.boruvka(:invalid)
+      end
+    end
   end
 end

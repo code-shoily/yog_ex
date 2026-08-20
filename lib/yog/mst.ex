@@ -111,9 +111,12 @@ defmodule Yog.MST do
     {:error, :undirected_only}
   end
 
-  def kruskal(graph, compare) do
+  def kruskal(%Yog.Graph{} = graph, compare) when is_function(compare, 2) do
     Kruskal.compute(graph, compare)
   end
+
+  def kruskal(%Yog.DAG{graph: graph}, compare), do: kruskal(graph, compare)
+  def kruskal(other, _compare), do: raise_struct_error(other)
 
   @doc """
   Finds the Maximum Spanning Tree (MaxST) using Kruskal's algorithm.
@@ -180,9 +183,12 @@ defmodule Yog.MST do
     {:error, :undirected_only}
   end
 
-  def prim(graph, compare, start_node) do
+  def prim(%Yog.Graph{} = graph, compare, start_node) when is_function(compare, 2) do
     Prim.compute(graph, compare, start_node)
   end
+
+  def prim(%Yog.DAG{graph: graph}, compare, start_node), do: prim(graph, compare, start_node)
+  def prim(other, _compare, _start_node), do: raise_struct_error(other)
 
   @doc """
   Finds the Maximum Spanning Tree (MaxST) using Prim's algorithm.
@@ -244,9 +250,12 @@ defmodule Yog.MST do
     {:error, :undirected_only}
   end
 
-  def boruvka(graph, compare) do
+  def boruvka(%Yog.Graph{} = graph, compare) when is_function(compare, 2) do
     Boruvka.compute(graph, compare)
   end
+
+  def boruvka(%Yog.DAG{graph: graph}, compare), do: boruvka(graph, compare)
+  def boruvka(other, _compare), do: raise_struct_error(other)
 
   # =============================================================================
   # Wilson's Algorithm (Uniform Spanning Tree)
@@ -286,9 +295,12 @@ defmodule Yog.MST do
     {:error, :undirected_only}
   end
 
-  def uniform_spanning_tree(graph, opts) do
+  def uniform_spanning_tree(%Yog.Graph{} = graph, opts) when is_list(opts) do
     Wilson.compute(graph, opts)
   end
+
+  def uniform_spanning_tree(%Yog.DAG{graph: graph}, opts), do: uniform_spanning_tree(graph, opts)
+  def uniform_spanning_tree(other, _opts), do: raise_struct_error(other)
 
   # =============================================================================
   # Edmonds' Algorithm (Minimum Spanning Arborescence)
@@ -313,19 +325,24 @@ defmodule Yog.MST do
     graph = Keyword.fetch!(opts, :in)
     root = Keyword.fetch!(opts, :root)
     compare = opts[:compare] || (&Yog.Utils.compare/2)
-    Edmonds.compute(graph, root, compare)
+    minimum_arborescence(graph, root, compare)
   end
 
   @spec minimum_arborescence(Yog.graph(), term()) :: {:ok, Result.t()} | {:error, term()}
   def minimum_arborescence(graph, root) do
-    Edmonds.compute(graph, root)
+    minimum_arborescence(graph, root, &Yog.Utils.compare/2)
   end
 
   @spec minimum_arborescence(Yog.graph(), term(), (term(), term() -> :lt | :eq | :gt)) ::
           {:ok, Result.t()} | {:error, term()}
-  def minimum_arborescence(graph, root, compare) do
+  def minimum_arborescence(%Yog.Graph{} = graph, root, compare) when is_function(compare, 2) do
     Edmonds.compute(graph, root, compare)
   end
+
+  def minimum_arborescence(%Yog.DAG{graph: graph}, root, compare),
+    do: minimum_arborescence(graph, root, compare)
+
+  def minimum_arborescence(other, _root, _compare), do: raise_struct_error(other)
 
   @doc """
   Alias for `minimum_arborescence/2`.
@@ -352,4 +369,8 @@ defmodule Yog.MST do
           {:ok, Result.t()} | {:error, :undirected_only}
   def maximum_spanning_tree(opts) when is_list(opts), do: kruskal_max(opts)
   def maximum_spanning_tree(graph), do: kruskal_max(graph)
+
+  defp raise_struct_error(other) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
+  end
 end
