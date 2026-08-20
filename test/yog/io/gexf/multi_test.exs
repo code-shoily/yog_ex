@@ -1,5 +1,6 @@
 defmodule Yog.IO.GEXF.MultiTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
+  use ExUnitProperties
 
   alias Yog.IO.GEXF.Multi
 
@@ -39,7 +40,6 @@ defmodule Yog.IO.GEXF.MultiTest do
 
     assert String.contains?(xml, "<node id=\"1\" label=\"A\">")
     assert String.contains?(xml, "<node id=\"2\" label=\"B\">")
-    # Both parallel edges should be present
     assert String.contains?(xml, "<edge id=\"#{eid1}\"")
     assert String.contains?(xml, "<edge id=\"#{eid2}\"")
     assert String.contains?(xml, "source=\"1\"")
@@ -84,6 +84,69 @@ defmodule Yog.IO.GEXF.MultiTest do
     assert is_function(edge_fmt, 1)
   end
 
+  test "input and options validation" do
+    assert_raise ArgumentError, ~r/expected node_fmt to be an arity-1 function/, fn ->
+      Multi.options_with(:invalid, & &1)
+    end
+
+    assert_raise ArgumentError, ~r/expected edge_fmt to be an arity-1 function/, fn ->
+      Multi.options_with(& &1, :invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected node_attr to be an arity-1 function/, fn ->
+      Multi.serialize_with_options(:invalid, & &1, Multi.default_options(), Yog.Multi.directed())
+    end
+
+    assert_raise ArgumentError, ~r/expected edge_attr to be an arity-1 function/, fn ->
+      Multi.serialize_with_options(& &1, :invalid, Multi.default_options(), Yog.Multi.directed())
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Multi.Graph struct/, fn ->
+      Multi.serialize_with_options(& &1, & &1, Multi.default_options(), :not_a_multigraph)
+    end
+
+    assert_raise ArgumentError, ~r/expected valid gexf_options tuple/, fn ->
+      Multi.serialize_with_options(
+        & &1,
+        & &1,
+        :invalid_options,
+        Yog.Multi.directed()
+      )
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      Multi.write(123, Yog.Multi.directed())
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      Multi.write_with(123, & &1, & &1, Yog.Multi.directed())
+    end
+
+    assert_raise ArgumentError, ~r/expected xml to be a binary string/, fn ->
+      Multi.deserialize(123)
+    end
+
+    assert_raise ArgumentError, ~r/expected node_folder to be an arity-1 function/, fn ->
+      Multi.deserialize_with(:invalid, & &1, "<gexf></gexf>")
+    end
+
+    assert_raise ArgumentError, ~r/expected edge_folder to be an arity-1 function/, fn ->
+      Multi.deserialize_with(& &1, :invalid, "<gexf></gexf>")
+    end
+
+    assert_raise ArgumentError, ~r/expected xml to be a binary string/, fn ->
+      Multi.deserialize_with(& &1, & &1, 123)
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      Multi.read(123)
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      Multi.read_with(123, & &1, & &1)
+    end
+  end
+
   # =============================================================================
   # FILE I/O TESTS
   # =============================================================================
@@ -107,7 +170,6 @@ defmodule Yog.IO.GEXF.MultiTest do
       assert Yog.Multi.Model.order(graph) == 2
       assert Map.has_key?(graph.nodes, 1)
       assert Map.has_key?(graph.nodes, 2)
-      # Parallel edges preserved in multigraph deserialization
       assert length(Yog.Multi.Model.successors(graph, 1)) == 2
     after
       File.rm(path)
@@ -254,5 +316,34 @@ defmodule Yog.IO.GEXF.MultiTest do
 
     {:ok, graph} = Multi.deserialize(xml)
     assert Yog.Multi.Model.size(graph) == 1
+  end
+
+  describe "property tests" do
+    property "roundtrip serialize and deserialize preserves multigraph order and size" do
+      check all(
+              kind <- StreamData.member_of([:directed, :undirected]),
+              n <- StreamData.integer(1..10),
+              raw_edges <-
+                StreamData.list_of(
+                  StreamData.tuple({StreamData.integer(1..n), StreamData.integer(1..n)})
+                )
+            ) do
+        graph =
+          Enum.reduce(1..n, Yog.Multi.Model.new(kind), fn id, acc ->
+            Yog.Multi.add_node(acc, id, "Node#{id}")
+          end)
+
+        graph =
+          Enum.reduce(raw_edges, graph, fn {u, v}, acc ->
+            {g, _eid} = Yog.Multi.add_edge(acc, u, v, "Edge")
+            g
+          end)
+
+        xml = Multi.serialize(graph)
+        assert {:ok, parsed} = Multi.deserialize(xml)
+        assert Yog.Multi.Model.order(parsed) == Yog.Multi.Model.order(graph)
+        assert Yog.Multi.Model.size(parsed) == Yog.Multi.Model.size(graph)
+      end
+    end
   end
 end
