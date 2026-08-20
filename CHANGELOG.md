@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Pre-1.0 Module Audit & Hardening** — Completed stabilizing audit pass across core, IO (`XMLUtils`, `Graph6`, `Sparse6`, `MatrixMarket`, `Matrix`, `LEDA`), flow, transform, operation, pathfinding, and multigraph modules. Standardized error handling, updated complexity math documentation ($\mathcal{O}(\dots)$), and significantly expanded unit and property-based test coverage (#273, #276, #277, #278, #279, #280).
+- **Pre-1.0 Module Audit & Hardening** — Completed stabilizing audit pass across core, IO (`XMLUtils`, `Graph6`, `Sparse6`, `MatrixMarket`, `Matrix`, `LEDA`, `Pajek`), flow, transform, operation, pathfinding, and multigraph modules. Standardized error handling, updated complexity math documentation ($\mathcal{O}(\dots)$), and significantly expanded unit and property-based test coverage (#272, #273, #276, #277, #278, #279, #280).
 
 
 ## [0.99.1] - 2026-07-10

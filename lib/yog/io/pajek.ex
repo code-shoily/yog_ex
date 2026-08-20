@@ -44,6 +44,7 @@ defmodule Yog.IO.Pajek do
       iex> :ok
       :ok
   """
+  @spec default_node_attributes() :: tuple()
   def default_node_attributes do
     {:node_attributes, :none, :none, :none, :none, :none}
   end
@@ -66,6 +67,7 @@ defmodule Yog.IO.Pajek do
       iex> :ok
       :ok
   """
+  @spec default_options() :: tuple()
   def default_options do
     {:pajek_options, fn data -> Yog.Utils.to_label("", data) end, fn _ -> :none end,
      fn _ -> default_node_attributes() end, false, false, &Yog.Utils.safe_string/1,
@@ -75,7 +77,9 @@ defmodule Yog.IO.Pajek do
   @doc """
   Creates Pajek options with custom configurations for visualizations and labels.
 
-  **Time Complexity:** O(1)
+  Raises `ArgumentError` if function parameters, booleans, or keyword options are invalid.
+
+  Time complexity: $\\mathcal{O}(1)$
 
   ## Parameters
 
@@ -102,6 +106,14 @@ defmodule Yog.IO.Pajek do
         false                                        # No visuals
       )
   """
+  @spec options_with(
+          (any() -> any()),
+          (any() -> any()),
+          (any() -> any()),
+          boolean(),
+          boolean(),
+          keyword()
+        ) :: tuple()
   def options_with(
         node_label,
         edge_weight,
@@ -110,8 +122,40 @@ defmodule Yog.IO.Pajek do
         include_visuals,
         opts \\ []
       ) do
+    if not is_function(node_label, 1) do
+      raise ArgumentError, "expected node_label to be an arity-1 function"
+    end
+
+    if not is_function(edge_weight, 1) do
+      raise ArgumentError, "expected edge_weight to be an arity-1 function"
+    end
+
+    if not is_function(node_attributes, 1) do
+      raise ArgumentError, "expected node_attributes to be an arity-1 function"
+    end
+
+    if not is_boolean(include_coordinates) do
+      raise ArgumentError, "expected include_coordinates to be a boolean"
+    end
+
+    if not is_boolean(include_visuals) do
+      raise ArgumentError, "expected include_visuals to be a boolean"
+    end
+
+    if not Keyword.keyword?(opts) do
+      raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
+    end
+
     node_fmt = Keyword.get(opts, :node_formatter, &Yog.Utils.safe_string/1)
     edge_fmt = Keyword.get(opts, :edge_formatter, &Yog.Utils.safe_string/1)
+
+    if not is_function(node_fmt, 1) do
+      raise ArgumentError, "expected node_formatter to be an arity-1 function"
+    end
+
+    if not is_function(edge_fmt, 1) do
+      raise ArgumentError, "expected edge_formatter to be an arity-1 function"
+    end
 
     {:pajek_options, node_label, edge_weight, node_attributes, include_coordinates,
      include_visuals, node_fmt, edge_fmt}
@@ -122,11 +166,13 @@ defmodule Yog.IO.Pajek do
 
   Allows full control over labels, weights, and visualization attributes.
 
-  **Time Complexity:** O(V + E) where V is nodes and E is edges
+  Raises `ArgumentError` if `graph` or `options` are invalid.
+
+  Time complexity: $\\mathcal{O}(V + E)$ where $V$ is node count and $E$ is edge count.
 
   ## Parameters
 
-  - `options` - Pajek options tuple (see `options_with/5`)
+  - `options` - Pajek options tuple (see `options_with/6`)
   - `graph` - The graph to serialize
 
   ## Returns
@@ -149,20 +195,39 @@ defmodule Yog.IO.Pajek do
 
       pajek = Yog.IO.Pajek.serialize_with(options, graph)
   """
+  @spec serialize_with(tuple(), Yog.graph() | Yog.DAG.t()) :: String.t()
   def serialize_with(options, graph) do
+    target_graph =
+      case graph do
+        %Yog.Graph{} ->
+          graph
+
+        %Yog.DAG{graph: inner} ->
+          inner
+
+        _ ->
+          raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(graph)}"
+      end
+
     {node_label_fn, edge_weight_fn, _node_attr_fn, _include_coords, _include_visuals, node_fmt,
      edge_fmt} =
       case options do
-        {:pajek_options, nl, ew, na, ic, iv, nf, ef} ->
+        {:pajek_options, nl, ew, na, ic, iv, nf, ef}
+        when is_function(nl, 1) and is_function(ew, 1) and is_function(na, 1) and
+               is_boolean(ic) and is_boolean(iv) and is_function(nf, 1) and is_function(ef, 1) ->
           {nl, ew, na, ic, iv, nf, ef}
 
-        {:pajek_options, nl, ew, na, ic, iv} ->
+        {:pajek_options, nl, ew, na, ic, iv}
+        when is_function(nl, 1) and is_function(ew, 1) and is_function(na, 1) and
+               is_boolean(ic) and is_boolean(iv) ->
           {nl, ew, na, ic, iv, &Yog.Utils.safe_string/1, &Yog.Utils.safe_string/1}
+
+        _ ->
+          raise ArgumentError, "expected valid pajek_options tuple, got: #{inspect(options)}"
       end
 
-    %Yog.Graph{kind: type, nodes: nodes_map} = graph
+    %Yog.Graph{kind: type, nodes: nodes_map} = target_graph
 
-    # Vertices section
     node_count = map_size(nodes_map)
     vertices_header = "*Vertices #{node_count}\n"
 
@@ -174,8 +239,7 @@ defmodule Yog.IO.Pajek do
         ~s(#{node_fmt.(id)} "#{node_fmt.(label)}")
       end)
 
-    # Edges section
-    edges = Model.all_edges(graph)
+    edges = Model.all_edges(target_graph)
 
     edge_header = if type == :directed, do: "*Arcs\n", else: "*Edges\n"
 
@@ -198,7 +262,9 @@ defmodule Yog.IO.Pajek do
 
   Node data is converted to strings, edge weights are omitted.
 
-  **Time Complexity:** O(V + E)
+  Raises `ArgumentError` if `graph` is invalid.
+
+  Time complexity: $\\mathcal{O}(V + E)$
 
   ## Example
 
@@ -210,6 +276,7 @@ defmodule Yog.IO.Pajek do
       iex> String.contains?(pajek, "*Vertices 2") and String.contains?(pajek, ~s("Alice"))
       true
   """
+  @spec serialize(Yog.graph() | Yog.DAG.t()) :: String.t()
   def serialize(graph) do
     serialize_with(default_options(), graph)
   end
@@ -219,8 +286,9 @@ defmodule Yog.IO.Pajek do
 
   Provided for compatibility with other serialization libraries.
 
-  **Time Complexity:** O(V + E)
+  Time complexity: $\\mathcal{O}(V + E)$
   """
+  @spec to_string(Yog.graph() | Yog.DAG.t()) :: String.t()
   def to_string(graph) do
     serialize(graph)
   end
@@ -228,7 +296,9 @@ defmodule Yog.IO.Pajek do
   @doc """
   Writes a graph to a Pajek file using default string conversion.
 
-  **Time Complexity:** O(V + E) + file I/O
+  Raises `ArgumentError` if `path` is not a binary string or `graph` is invalid.
+
+  Time complexity: $\\mathcal{O}(V + E)$ + file I/O
 
   ## Parameters
 
@@ -250,20 +320,27 @@ defmodule Yog.IO.Pajek do
       Yog.IO.Pajek.write("network.net", graph)
       # => :ok
   """
-  def write(path, graph) do
+  @spec write(String.t(), Yog.graph() | Yog.DAG.t()) :: :ok | {:error, atom()}
+  def write(path, graph) when is_binary(path) do
     content = serialize(graph)
     File.write(path, content)
+  end
+
+  def write(path, _graph) do
+    raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
   end
 
   @doc """
   Writes a graph to a Pajek file with custom options.
 
-  **Time Complexity:** O(V + E) + file I/O
+  Raises `ArgumentError` if `path` is not a binary string or options/graph are invalid.
+
+  Time complexity: $\\mathcal{O}(V + E)$ + file I/O
 
   ## Parameters
 
   - `path` - File path to write to (typically `.net` extension)
-  - `options` - Pajek options tuple (see `options_with/5`)
+  - `options` - Pajek options tuple (see `options_with/6`)
   - `graph` - The graph to serialize
 
   ## Returns
@@ -282,9 +359,14 @@ defmodule Yog.IO.Pajek do
 
       Yog.IO.Pajek.write_with("network.net", options, graph)
   """
-  def write_with(path, options, graph) do
+  @spec write_with(String.t(), tuple(), Yog.graph() | Yog.DAG.t()) :: :ok | {:error, atom()}
+  def write_with(path, options, graph) when is_binary(path) do
     content = serialize_with(options, graph)
     File.write(path, content)
+  end
+
+  def write_with(path, _options, _graph) do
+    raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
   end
 
   @doc """
@@ -293,7 +375,9 @@ defmodule Yog.IO.Pajek do
   This function allows you to transform Pajek data into custom Elixir data
   structures as the graph is built.
 
-  **Time Complexity:** O(V + E)
+  Raises `ArgumentError` if `input` is not a binary string or parsers are invalid.
+
+  Time complexity: $\\mathcal{O}(V + E)$
 
   ## Parameters
 
@@ -320,11 +404,25 @@ defmodule Yog.IO.Pajek do
       {:ok, {:pajek_result, graph, _warnings}} =
         Yog.IO.Pajek.parse_with(pajek_str, node_parser, edge_parser)
   """
-  def parse_with(input, node_parser, edge_parser) do
+  @spec parse_with(String.t(), (any() -> any()), (any() -> any())) ::
+          {:ok, {:pajek_result, Yog.graph(), list()}} | {:error, term()}
+  def parse_with(input, node_parser, edge_parser) when is_binary(input) do
+    if not is_function(node_parser, 1) do
+      raise ArgumentError, "expected node_parser to be an arity-1 function"
+    end
+
+    if not is_function(edge_parser, 1) do
+      raise ArgumentError, "expected edge_parser to be an arity-1 function"
+    end
+
     case parse_pajek(input, node_parser, edge_parser) do
       {:ok, graph, warnings} -> {:ok, {:pajek_result, graph, warnings}}
       {:error, _} = error -> error
     end
+  end
+
+  def parse_with(input, _node_parser, _edge_parser) do
+    raise ArgumentError, "expected input to be a binary string, got: #{inspect(input)}"
   end
 
   @doc """
@@ -333,7 +431,9 @@ defmodule Yog.IO.Pajek do
   Node labels are stored as strings, edge weights as numbers. For custom data
   structures, use `parse_with/3`.
 
-  **Time Complexity:** O(V + E)
+  Raises `ArgumentError` if `input` is not a binary string.
+
+  Time complexity: $\\mathcal{O}(V + E)$
 
   ## Parameters
 
@@ -351,6 +451,7 @@ defmodule Yog.IO.Pajek do
       iex> Yog.Model.node_count(graph)
       2
   """
+  @spec parse(String.t()) :: {:ok, {:pajek_result, Yog.graph(), list()}} | {:error, term()}
   def parse(input) do
     parse_with(input, fn s -> s end, fn _ -> "" end)
   end
@@ -358,7 +459,9 @@ defmodule Yog.IO.Pajek do
   @doc """
   Reads a graph from a Pajek file using String labels.
 
-  **Time Complexity:** O(V + E) + file I/O
+  Raises `ArgumentError` if `path` is not a binary string.
+
+  Time complexity: $\\mathcal{O}(V + E)$ + file I/O
 
   ## Parameters
 
@@ -376,17 +479,24 @@ defmodule Yog.IO.Pajek do
 
       IO.puts("Loaded \#{Yog.Model.node_count(graph)} nodes")
   """
-  def read(path) do
+  @spec read(String.t()) :: {:ok, {:pajek_result, Yog.graph(), list()}} | {:error, term()}
+  def read(path) when is_binary(path) do
     case File.read(path) do
       {:ok, content} -> parse(content)
       {:error, _} = error -> error
     end
   end
 
+  def read(path) do
+    raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
+  end
+
   @doc """
   Reads a graph from a Pajek file with custom parsers.
 
-  **Time Complexity:** O(V + E) + file I/O
+  Raises `ArgumentError` if `path` is not a binary string.
+
+  Time complexity: $\\mathcal{O}(V + E)$ + file I/O
 
   ## Parameters
 
@@ -407,11 +517,17 @@ defmodule Yog.IO.Pajek do
       {:ok, {:pajek_result, graph, _warnings}} =
         Yog.IO.Pajek.read_with("network.net", node_parser, edge_parser)
   """
-  def read_with(path, node_parser, edge_parser) do
+  @spec read_with(String.t(), (any() -> any()), (any() -> any())) ::
+          {:ok, {:pajek_result, Yog.graph(), list()}} | {:error, term()}
+  def read_with(path, node_parser, edge_parser) when is_binary(path) do
     case File.read(path) do
       {:ok, content} -> parse_with(content, node_parser, edge_parser)
       {:error, _} = error -> error
     end
+  end
+
+  def read_with(path, _node_parser, _edge_parser) do
+    raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
   end
 
   # Private functions
@@ -421,7 +537,6 @@ defmodule Yog.IO.Pajek do
       {:error, :empty_input}
     else
       lines = String.split(input, "\n", trim: false)
-      # Remove comments and blank lines
       lines = Enum.reject(lines, fn line -> String.starts_with?(String.trim(line), "%") end)
       parse_lines(lines, node_parser, edge_parser)
     end
@@ -442,7 +557,6 @@ defmodule Yog.IO.Pajek do
   defp parse_vertices_header([line | rest]) do
     trimmed = String.trim(line)
 
-    # Skip empty lines
     if trimmed == "" do
       parse_vertices_header(rest)
     else
@@ -478,7 +592,6 @@ defmodule Yog.IO.Pajek do
   defp parse_nodes_loop([line | rest], graph, node_parser, node_count, current_id, warnings) do
     trimmed = String.trim(line)
 
-    # Skip empty lines
     if trimmed == "" do
       parse_nodes_loop(rest, graph, node_parser, node_count, current_id, warnings)
     else
@@ -500,8 +613,6 @@ defmodule Yog.IO.Pajek do
   end
 
   defp parse_node_line(line, node_parser) do
-    # Try to parse: id "label" [x y] [shape] [size] [color]
-    # We support both quoted and unquoted labels
     if String.contains?(line, "\"") do
       parse_quoted_node(line, node_parser)
     else
@@ -542,11 +653,9 @@ defmodule Yog.IO.Pajek do
   defp parse_edge_header([line | rest]) do
     trimmed = String.trim(line)
 
-    # Skip empty lines
     if trimmed == "" do
       parse_edge_header(rest)
     else
-      # Case-insensitive match for *Arcs or *Edges
       cond do
         String.match?(trimmed, ~r/^\*arcs/i) ->
           {:ok, :directed, rest}
@@ -555,19 +664,16 @@ defmodule Yog.IO.Pajek do
           {:ok, :undirected, rest}
 
         true ->
-          # No edge header found, assume no edges
           {:ok, :directed, [line | rest]}
       end
     end
   end
 
   defp parse_edge_header([]) do
-    # No edges section
     {:ok, :directed, []}
   end
 
   defp parse_edges(lines, graph, graph_type, edge_parser) do
-    # Convert graph to the appropriate type
     final_graph =
       if graph_type == :undirected do
         Yog.to_undirected(graph, fn a, _b -> a end)
@@ -585,7 +691,6 @@ defmodule Yog.IO.Pajek do
   defp parse_edges_loop([line | rest], graph, edge_parser, warnings) do
     trimmed = String.trim(line)
 
-    # Skip empty lines or lines starting with *
     if trimmed == "" or String.starts_with?(trimmed, "*") do
       parse_edges_loop(rest, graph, edge_parser, warnings)
     else
@@ -600,19 +705,16 @@ defmodule Yog.IO.Pajek do
   end
 
   defp parse_edge_line(line, graph, edge_parser) do
-    # Parse: source target [weight]
     parts = String.split(line, ~r/\s+/)
 
     case parts do
       [from_str, to_str] ->
-        # No weight
         {:ok, from} = parse_int(from_str)
         {:ok, to} = parse_int(to_str)
         weight = edge_parser.(:none)
         add_edge_to_graph(graph, from, to, weight)
 
       [from_str, to_str | weight_parts] ->
-        # With weight
         {:ok, from} = parse_int(from_str)
         {:ok, to} = parse_int(to_str)
         weight_str = Enum.join(weight_parts, " ")
@@ -633,9 +735,7 @@ defmodule Yog.IO.Pajek do
   end
 
   defp add_edge_to_graph(graph, from, to, weight) do
-    %Yog.Graph{nodes: nodes_map} = graph
-
-    if Map.has_key?(nodes_map, from) and Map.has_key?(nodes_map, to) do
+    if Yog.Model.has_node?(graph, from) and Yog.Model.has_node?(graph, to) do
       case Yog.Model.add_edge(graph, from, to, weight) do
         {:ok, new_graph} -> {:ok, new_graph}
         {:error, reason} -> {:warning, {:edge_add_failed, reason}}

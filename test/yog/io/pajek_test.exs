@@ -1,5 +1,6 @@
 defmodule Yog.IO.PajekTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
+  use ExUnitProperties
 
   alias Yog.IO.Pajek
 
@@ -98,6 +99,20 @@ defmodule Yog.IO.PajekTest do
     assert String.contains?(result, ~s("Bob"))
   end
 
+  test "serialize DAG" do
+    dag =
+      Yog.DAG.new()
+      |> Yog.DAG.add_node(1, "Node1")
+      |> Yog.DAG.add_node(2, "Node2")
+
+    {:ok, dag} = Yog.DAG.add_edge(dag, 1, 2, "link")
+
+    result = Pajek.serialize(dag)
+    assert String.contains?(result, "*Vertices 2")
+    assert String.contains?(result, ~s("Node1"))
+    assert String.contains?(result, ~s("Node2"))
+  end
+
   test "serialize complex types" do
     graph =
       Yog.directed()
@@ -131,6 +146,76 @@ defmodule Yog.IO.PajekTest do
     result = Pajek.to_string(graph)
 
     assert String.contains?(result, "*Vertices 2")
+  end
+
+  test "input and options validation" do
+    assert_raise ArgumentError, ~r/expected node_label to be an arity-1 function/, fn ->
+      Pajek.options_with(:invalid, & &1, & &1, false, false)
+    end
+
+    assert_raise ArgumentError, ~r/expected edge_weight to be an arity-1 function/, fn ->
+      Pajek.options_with(& &1, :invalid, & &1, false, false)
+    end
+
+    assert_raise ArgumentError, ~r/expected node_attributes to be an arity-1 function/, fn ->
+      Pajek.options_with(& &1, & &1, :invalid, false, false)
+    end
+
+    assert_raise ArgumentError, ~r/expected include_coordinates to be a boolean/, fn ->
+      Pajek.options_with(& &1, & &1, & &1, :invalid, false)
+    end
+
+    assert_raise ArgumentError, ~r/expected include_visuals to be a boolean/, fn ->
+      Pajek.options_with(& &1, & &1, & &1, false, :invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected opts to be a keyword list/, fn ->
+      Pajek.options_with(& &1, & &1, & &1, false, false, :invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected node_formatter to be an arity-1 function/, fn ->
+      Pajek.options_with(& &1, & &1, & &1, false, false, node_formatter: :invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected edge_formatter to be an arity-1 function/, fn ->
+      Pajek.options_with(& &1, & &1, & &1, false, false, edge_formatter: :invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Pajek.serialize(:not_a_graph)
+    end
+
+    assert_raise ArgumentError, ~r/expected valid pajek_options tuple/, fn ->
+      Pajek.serialize_with(:invalid, Yog.directed())
+    end
+
+    assert_raise ArgumentError, ~r/expected input to be a binary string/, fn ->
+      Pajek.parse(123)
+    end
+
+    assert_raise ArgumentError, ~r/expected node_parser to be an arity-1 function/, fn ->
+      Pajek.parse_with("*Vertices 1", :invalid, & &1)
+    end
+
+    assert_raise ArgumentError, ~r/expected edge_parser to be an arity-1 function/, fn ->
+      Pajek.parse_with("*Vertices 1", & &1, :invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      Pajek.read(123)
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      Pajek.read_with(123, & &1, & &1)
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      Pajek.write(123, Yog.directed())
+    end
+
+    assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+      Pajek.write_with(123, Pajek.default_options(), Yog.directed())
+    end
   end
 
   # =============================================================================
@@ -244,11 +329,6 @@ defmodule Yog.IO.PajekTest do
 
   test "node shape test" do
     default_attrs = Pajek.default_node_attributes()
-    # node attributes are {:node_attributes, x, y, shape, size, color}
-    # shape is the 4th element (1-based), because record fields start at index 2 (+name) in Erlang
-    # We can just verify it is :none since Gleam None compiles to :none
-    # The tuple is {:node_attributes, x, y, shape, size, color}
-    # NOTE: This elem() accesses a node_attributes tuple, NOT a graph, so keep it as-is
     shape = elem(default_attrs, 3)
     assert shape == :none
   end
@@ -406,7 +486,6 @@ defmodule Yog.IO.PajekTest do
     """
 
     {:ok, {:pajek_result, graph, _}} = Pajek.parse_with(input, & &1, & &1)
-    # Weight should be "string_weight"
     {_, _, weight} = hd(Yog.Model.all_edges(graph))
     assert weight == {:some, "string_weight"}
   end
@@ -490,20 +569,16 @@ defmodule Yog.IO.PajekTest do
 
     {:ok, {:pajek_result, graph, warnings}} = Pajek.read(fixture_path)
 
-    # Verify no warnings
     assert warnings == []
 
-    # Verify graph structure
     assert Yog.Model.node_count(graph) == 3
     assert Yog.Model.edge_count(graph) == 3
     assert Yog.Model.type(graph) == :directed
 
-    # Verify node data
     assert Yog.Model.node(graph, 1) == "Alice"
     assert Yog.Model.node(graph, 2) == "Bob"
     assert Yog.Model.node(graph, 3) == "Charlie"
 
-    # Verify edges exist
     assert length(Yog.successors(graph, 1)) == 2
     assert length(Yog.successors(graph, 2)) == 1
   end
@@ -567,22 +642,45 @@ defmodule Yog.IO.PajekTest do
   end
 
   test "parse invalid vertex count" do
-    # Triggers nil -> {:error, {:invalid_vertices_line, ...}} in parse_vertices_count
     input = "*Vertices abc\n1 \"A\"\n"
     assert {:error, {:invalid_vertices_line, _, _}} = Pajek.parse(input)
   end
 
   test "parse unexpected end of nodes" do
-    # Triggers parse_nodes_loop([], ...) error path
     input = "*Vertices 3\n1 \"A\"\n2 \"B\"\n"
     assert {:error, :unexpected_end_of_nodes} = Pajek.parse(input)
   end
 
   test "parse edge header empty input" do
-    # parse_edge_header([]) returns {:ok, :directed, []}
     input = "*Vertices 1\n1 \"A\"\n"
     {:ok, {:pajek_result, graph, _}} = Pajek.parse(input)
     assert Yog.Model.node_count(graph) == 1
     assert Yog.Model.edge_count(graph) == 0
+  end
+
+  describe "property tests" do
+    property "roundtrip serialize and parse preserves node and edge counts for 1-indexed graphs" do
+      check all(
+              kind <- StreamData.member_of([:directed, :undirected]),
+              n <- StreamData.integer(1..15),
+              raw_edges <-
+                StreamData.list_of(
+                  StreamData.tuple({StreamData.integer(1..n), StreamData.integer(1..n)})
+                )
+            ) do
+        graph =
+          Enum.reduce(1..n, Yog.Model.new(kind), &Yog.add_node(&2, &1, "Node#{&1}"))
+
+        graph =
+          Enum.reduce(raw_edges, graph, fn {u, v}, acc ->
+            Yog.add_edge_ensure(acc, u, v, "Edge")
+          end)
+
+        pajek = Pajek.serialize(graph)
+        assert {:ok, {:pajek_result, parsed, _warnings}} = Pajek.parse(pajek)
+        assert Yog.Model.node_count(parsed) == Yog.Model.node_count(graph)
+        assert Yog.Model.edge_count(parsed) == Yog.Model.edge_count(graph)
+      end
+    end
   end
 end
