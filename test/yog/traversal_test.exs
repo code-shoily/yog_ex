@@ -1,5 +1,6 @@
 defmodule Yog.TraversalTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
+  use ExUnitProperties
 
   doctest Yog.Traversal
 
@@ -1129,5 +1130,38 @@ defmodule Yog.TraversalTest do
       end)
 
     assert Enum.sort(result) == [1, 2]
+  end
+
+  test "input validation raises ArgumentError on invalid parameters" do
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Yog.Traversal.walk(in: :not_a_graph, from: 1, using: :breadth_first)
+    end
+
+    assert_raise ArgumentError, ~r/expected traversal order to be/, fn ->
+      Yog.Traversal.walk(in: Yog.directed(), from: 1, using: :invalid_order)
+    end
+
+    assert_raise ArgumentError, ~r/expected opts to be a keyword list/, fn ->
+      Yog.Traversal.implicit_fold(:not_a_list)
+    end
+
+    assert_raise ArgumentError, ~r/expected successors_of to be a 1-arity function/, fn ->
+      Yog.Traversal.implicit_fold(
+        from: 1,
+        using: :breadth_first,
+        successors_of: :not_a_func,
+        initial: [],
+        with: fn acc, node, _meta -> {:continue, [node | acc]} end
+      )
+    end
+  end
+
+  describe "Property tests for Traversal" do
+    property "reachable? is reflexive for existing nodes" do
+      check all(n <- StreamData.integer(1..20)) do
+        g = Yog.directed() |> Yog.add_node(n, nil)
+        assert Yog.Traversal.reachable?(g, n, n) == true
+      end
+    end
   end
 end

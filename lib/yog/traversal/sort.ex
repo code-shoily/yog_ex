@@ -91,10 +91,10 @@ defmodule Yog.Traversal.Sort do
   @doc """
   Performs a topological sort on a directed graph using Kahn's algorithm.
 
-  Time Complexity: O(V + E)
+  Time complexity: $\\mathcal{O}(V + E)$
   """
   @spec topological_sort(Yog.graph()) :: {:ok, [Yog.node_id()]} | {:error, :contains_cycle}
-  def topological_sort(graph) do
+  def topological_sort(%Yog.Graph{kind: :directed} = graph) do
     out_edges = graph.out_edges
     in_edges = graph.in_edges
     nodes = Map.keys(graph.nodes)
@@ -127,15 +127,24 @@ defmodule Yog.Traversal.Sort do
     do_kahn(out_edges, initial_q, in_degrees, [], 0, total_count)
   end
 
+  def topological_sort(%Yog.Graph{kind: :undirected}) do
+    raise ArgumentError, "topological_sort expects a directed graph"
+  end
+
+  def topological_sort(graph) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(graph)}"
+  end
+
   @doc """
   Performs a lexicographically smallest topological sort. Compares by node_data. Breaks tie
   by ID.
 
-  Time Complexity: O((V + E) log V) due to priority queue operations
+  Time complexity: $\\mathcal{O}((V + E) \\log V)$
   """
   @spec lexicographical_topological_sort(Yog.graph(), (term(), term() -> :lt | :eq | :gt)) ::
           {:ok, [Yog.node_id()]} | {:error, :contains_cycle}
-  def lexicographical_topological_sort(graph, compare_nodes) do
+  def lexicographical_topological_sort(%Yog.Graph{kind: :directed} = graph, compare_nodes)
+      when is_function(compare_nodes, 2) do
     out_edges = graph.out_edges
     in_edges = graph.in_edges
     nodes = Map.keys(graph.nodes)
@@ -178,6 +187,19 @@ defmodule Yog.Traversal.Sort do
       )
 
     do_lex_kahn(out_edges, node_map, initial_pq, in_degrees, [], 0, total_count, compare_nodes)
+  end
+
+  def lexicographical_topological_sort(%Yog.Graph{kind: :undirected}, _compare_nodes) do
+    raise ArgumentError, "lexicographical_topological_sort expects a directed graph"
+  end
+
+  def lexicographical_topological_sort(graph, compare_nodes) when is_function(compare_nodes, 2) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(graph)}"
+  end
+
+  def lexicographical_topological_sort(_graph, compare_nodes) do
+    raise ArgumentError,
+          "expected compare_nodes to be a 2-arity function, got: #{inspect(compare_nodes)}"
   end
 
   # Kahn's algorithm with simple queue (list)

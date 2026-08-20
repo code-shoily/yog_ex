@@ -23,12 +23,12 @@ defmodule Yog.Traversal.Implicit do
   - `:with`: Folder function `(acc, node_id, meta)`.
   """
   @spec implicit_fold(keyword()) :: any()
-  def implicit_fold(opts) do
+  def implicit_fold(opts) when is_list(opts) do
     from = Keyword.fetch!(opts, :from)
-    order = Keyword.fetch!(opts, :using)
+    order = validate_order!(Keyword.fetch!(opts, :using))
     initial = Keyword.fetch!(opts, :initial)
-    successors = Keyword.fetch!(opts, :successors_of)
-    folder = Keyword.fetch!(opts, :with)
+    successors = validate_fn!(Keyword.fetch!(opts, :successors_of), 1, :successors_of)
+    folder = validate_fn!(Keyword.fetch!(opts, :with), 3, :with)
 
     start_meta = %{depth: 0, parent: nil}
 
@@ -52,7 +52,7 @@ defmodule Yog.Traversal.Implicit do
         )
 
       :best_first ->
-        priority_fn = Keyword.fetch!(opts, :priority)
+        priority_fn = validate_fn!(Keyword.fetch!(opts, :priority), 2, :priority)
 
         do_implicit_best_first(
           PQ.new(fn {p1, _}, {p2, _} -> p1 <= p2 end)
@@ -77,17 +77,21 @@ defmodule Yog.Traversal.Implicit do
     end
   end
 
+  def implicit_fold(opts) do
+    raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
+  end
+
   @doc """
   Like `implicit_fold/1`, but deduplicates visited nodes by a custom key.
   """
   @spec implicit_fold_by(keyword()) :: any()
-  def implicit_fold_by(opts) do
+  def implicit_fold_by(opts) when is_list(opts) do
     from = Keyword.fetch!(opts, :from)
-    order = Keyword.fetch!(opts, :using)
+    order = validate_order!(Keyword.fetch!(opts, :using))
     initial = Keyword.fetch!(opts, :initial)
-    successors = Keyword.fetch!(opts, :successors_of)
-    key_fn = Keyword.fetch!(opts, :visited_by)
-    folder = Keyword.fetch!(opts, :with)
+    successors = validate_fn!(Keyword.fetch!(opts, :successors_of), 1, :successors_of)
+    key_fn = validate_fn!(Keyword.fetch!(opts, :visited_by), 1, :visited_by)
+    folder = validate_fn!(Keyword.fetch!(opts, :with), 3, :with)
 
     start_meta = %{depth: 0, parent: nil}
 
@@ -113,7 +117,7 @@ defmodule Yog.Traversal.Implicit do
         )
 
       :best_first ->
-        priority_fn = Keyword.fetch!(opts, :priority)
+        priority_fn = validate_fn!(Keyword.fetch!(opts, :priority), 2, :priority)
 
         do_implicit_best_first_by(
           PQ.new(fn {p1, _}, {p2, _} -> p1 <= p2 end)
@@ -137,6 +141,28 @@ defmodule Yog.Traversal.Implicit do
           folder,
           fn _id, _meta -> :rand.uniform() end
         )
+    end
+  end
+
+  def implicit_fold_by(opts) do
+    raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
+  end
+
+  defp validate_order!(order)
+       when order in [:breadth_first, :depth_first, :best_first, :random],
+       do: order
+
+  defp validate_order!(invalid) do
+    raise ArgumentError,
+          "expected traversal order to be :breadth_first, :depth_first, :best_first, or :random, got: #{inspect(invalid)}"
+  end
+
+  defp validate_fn!(fun, arity, name) do
+    if is_function(fun, arity) do
+      fun
+    else
+      raise ArgumentError,
+            "expected #{name} to be a #{arity}-arity function, got: #{inspect(fun)}"
     end
   end
 

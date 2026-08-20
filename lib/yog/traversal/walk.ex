@@ -77,10 +77,10 @@ defmodule Yog.Traversal.Walk do
       [1, 3, 2]
   """
   @spec walk(keyword()) :: [Yog.node_id()]
-  def walk(opts) do
+  def walk(opts) when is_list(opts) do
     from = Keyword.fetch!(opts, :from)
-    graph = Keyword.fetch!(opts, :in)
-    order = Keyword.fetch!(opts, :using)
+    graph = validate_graph!(Keyword.fetch!(opts, :in))
+    order = validate_order!(Keyword.fetch!(opts, :using))
 
     fold_walk(
       over: graph,
@@ -93,6 +93,10 @@ defmodule Yog.Traversal.Walk do
     |> Enum.reverse()
   end
 
+  def walk(opts) do
+    raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
+  end
+
   @spec walk(Yog.graph(), Yog.node_id(), order()) :: [Yog.node_id()]
   def walk(graph, from, order) do
     walk(in: graph, from: from, using: order)
@@ -102,10 +106,10 @@ defmodule Yog.Traversal.Walk do
   Walks the graph but stops early when a condition is met.
   """
   @spec walk_until(keyword()) :: [Yog.node_id()]
-  def walk_until(opts) do
+  def walk_until(opts) when is_list(opts) do
     from = Keyword.fetch!(opts, :from)
-    graph = Keyword.fetch!(opts, :in)
-    order = Keyword.fetch!(opts, :using)
+    graph = validate_graph!(Keyword.fetch!(opts, :in))
+    order = validate_order!(Keyword.fetch!(opts, :using))
     should_stop = Keyword.fetch!(opts, :until)
 
     fold_walk(
@@ -125,6 +129,10 @@ defmodule Yog.Traversal.Walk do
       end
     )
     |> Enum.reverse()
+  end
+
+  def walk_until(opts) do
+    raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
   end
 
   @spec walk_until(Yog.graph(), Yog.node_id(), order(), (Yog.node_id() -> boolean())) ::
@@ -150,10 +158,10 @@ defmodule Yog.Traversal.Walk do
   - `:halt` - Stop the entire traversal immediately.
   """
   @spec fold_walk(keyword()) :: any()
-  def fold_walk(opts) do
-    graph = Keyword.fetch!(opts, :over)
+  def fold_walk(opts) when is_list(opts) do
+    graph = validate_graph!(Keyword.fetch!(opts, :over))
     from = Keyword.fetch!(opts, :from)
-    order = Keyword.fetch!(opts, :using)
+    order = validate_order!(Keyword.fetch!(opts, :using))
     initial = Keyword.fetch!(opts, :initial)
     folder = Keyword.fetch!(opts, :with)
 
@@ -205,6 +213,10 @@ defmodule Yog.Traversal.Walk do
     end
   end
 
+  def fold_walk(opts) do
+    raise ArgumentError, "expected opts to be a keyword list, got: #{inspect(opts)}"
+  end
+
   @spec fold_walk(
           Yog.graph(),
           Yog.node_id(),
@@ -222,9 +234,11 @@ defmodule Yog.Traversal.Walk do
   """
   @spec find_path(Yog.graph(), Yog.node_id(), Yog.node_id()) :: [Yog.node_id()] | nil
   def find_path(graph, from, to) do
+    target_graph = validate_graph!(graph)
+
     parents =
       fold_walk(
-        over: graph,
+        over: target_graph,
         from: from,
         using: :breadth_first,
         initial: %{},
@@ -284,8 +298,29 @@ defmodule Yog.Traversal.Walk do
       4
   """
   @spec random_walk(Yog.graph(), Yog.node_id(), integer()) :: [Yog.node_id()]
-  def random_walk(graph, from, steps) do
-    do_random_walk(graph.out_edges, from, steps, [from])
+  def random_walk(graph, from, steps) when is_integer(steps) do
+    target_graph = validate_graph!(graph)
+    do_random_walk(target_graph.out_edges, from, steps, [from])
+  end
+
+  def random_walk(_graph, _from, steps) do
+    raise ArgumentError, "expected steps to be an integer, got: #{inspect(steps)}"
+  end
+
+  defp validate_graph!(%Yog.Graph{} = g), do: g
+  defp validate_graph!(%Yog.DAG{graph: g}), do: g
+
+  defp validate_graph!(other) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
+  end
+
+  defp validate_order!(order)
+       when order in [:breadth_first, :depth_first, :best_first, :random],
+       do: order
+
+  defp validate_order!(invalid) do
+    raise ArgumentError,
+          "expected traversal order to be :breadth_first, :depth_first, :best_first, or :random, got: #{inspect(invalid)}"
   end
 
   defp do_random_walk(_out_edges, _current, steps, acc) when steps <= 0,
