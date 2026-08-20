@@ -1,11 +1,18 @@
 defmodule Yog.IO.GraphML.Xmerl do
-  @moduledoc false
+  @moduledoc """
+  Fallback GraphML parser using `:xmerl`.
+
+  Provides XPath-based XML parsing routines for GraphML graphs when `Saxy` streaming parser is absent or for direct fallback processing.
+  """
 
   alias Yog.IO.XMLUtils
 
   @doc """
   Builds a graph from an xmerl-parsed XML document.
+
+  Time complexity: $\\mathcal{O}(V + E)$
   """
+  @spec build_graph_from_doc(tuple(), (map() -> any()), (map() -> any())) :: {:ok, Yog.graph()}
   def build_graph_from_doc(doc, node_folder, edge_folder) do
     graph_type = extract_graph_type(doc)
     nodes = extract_nodes(doc, node_folder)
@@ -30,8 +37,22 @@ defmodule Yog.IO.GraphML.Xmerl do
 
   @doc """
   Parses GraphML XML using the xmerl fallback path.
+
+  Raises `ArgumentError` if xml or folder functions are invalid.
+
+  Time complexity: $\\mathcal{O}(V + E)$
   """
-  def parse_graphml_xmerl(xml, node_folder, edge_folder) do
+  @spec parse_graphml_xmerl(String.t(), (map() -> any()), (map() -> any())) ::
+          {:ok, Yog.graph()} | {:error, term()}
+  def parse_graphml_xmerl(xml, node_folder, edge_folder) when is_binary(xml) do
+    if not is_function(node_folder, 1) do
+      raise ArgumentError, "expected node_folder to be an arity-1 function"
+    end
+
+    if not is_function(edge_folder, 1) do
+      raise ArgumentError, "expected edge_folder to be an arity-1 function"
+    end
+
     case XMLUtils.try_parse_xml(xml) do
       {:ok, doc} ->
         build_graph_from_doc(doc, node_folder, edge_folder)
@@ -49,9 +70,16 @@ defmodule Yog.IO.GraphML.Xmerl do
     end
   end
 
+  def parse_graphml_xmerl(xml, _node_folder, _edge_folder) do
+    raise ArgumentError, "expected xml to be a binary string, got: #{inspect(xml)}"
+  end
+
   @doc """
   Extracts the graph type (directed/undirected) from an xmerl document.
+
+  Time complexity: $\\mathcal{O}(1)$
   """
+  @spec extract_graph_type(tuple()) :: :directed | :undirected
   def extract_graph_type(doc) do
     case :xmerl_xpath.string(~c'/graphml/graph/@edgedefault', doc) do
       [_attr | _] ->
@@ -68,7 +96,10 @@ defmodule Yog.IO.GraphML.Xmerl do
 
   @doc """
   Extracts nodes from an xmerl document.
+
+  Time complexity: $\\mathcal{O}(V \\cdot K)$ where $K$ is data attribute count per node.
   """
+  @spec extract_nodes(tuple(), (map() -> any())) :: list({any(), any()})
   def extract_nodes(doc, node_folder) do
     node_elements = :xmerl_xpath.string(~c'/graphml/graph/node', doc)
 
@@ -77,12 +108,7 @@ defmodule Yog.IO.GraphML.Xmerl do
         :xmerl_xpath.string(~c'string(@id)', node_elem)
         |> xmerl_string_value()
 
-      id =
-        case Integer.parse(id_str) do
-          {int, _} -> int
-          :error -> id_str
-        end
-
+      id = parse_id(id_str)
       data_elements = :xmerl_xpath.string(~c'./data', node_elem)
 
       attrs =
@@ -105,7 +131,10 @@ defmodule Yog.IO.GraphML.Xmerl do
 
   @doc """
   Extracts edges from an xmerl document.
+
+  Time complexity: $\\mathcal{O}(E \\cdot K)$ where $K$ is data attribute count per edge.
   """
+  @spec extract_edges(tuple(), (map() -> any())) :: list({any(), any(), any()})
   def extract_edges(doc, edge_folder) do
     edge_elements = :xmerl_xpath.string(~c'/graphml/graph/edge', doc)
 
@@ -118,17 +147,8 @@ defmodule Yog.IO.GraphML.Xmerl do
         :xmerl_xpath.string(~c'string(@target)', edge_elem)
         |> xmerl_string_value()
 
-      source =
-        case Integer.parse(source_str) do
-          {int, _} -> int
-          :error -> source_str
-        end
-
-      target =
-        case Integer.parse(target_str) do
-          {int, _} -> int
-          :error -> target_str
-        end
+      source = parse_id(source_str)
+      target = parse_id(target_str)
 
       data_elements = :xmerl_xpath.string(~c'./data', edge_elem)
 
@@ -152,12 +172,22 @@ defmodule Yog.IO.GraphML.Xmerl do
 
   @doc """
   Helper to extract a string value from an xmerl query result.
+
+  Time complexity: $\\mathcal{O}(N)$ where $N$ is charlist length.
   """
+  @spec xmerl_string_value(any()) :: String.t()
   def xmerl_string_value(result) do
     case result do
       {:xmlObj, :string, charlist} -> List.to_string(charlist)
       charlist when is_list(charlist) -> List.to_string(charlist)
       _ -> ""
+    end
+  end
+
+  defp parse_id(id_str) do
+    case Integer.parse(id_str) do
+      {int, ""} -> int
+      _ -> id_str
     end
   end
 end

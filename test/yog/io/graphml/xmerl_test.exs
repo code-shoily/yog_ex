@@ -130,6 +130,20 @@ defmodule Yog.IO.GraphML.XmerlTest do
     assert {:error, _} = Xmerl.parse_graphml_xmerl("not xml", fn _ -> %{} end, fn _ -> %{} end)
   end
 
+  test "input and function parameter validation" do
+    assert_raise ArgumentError, ~r/expected xml to be a binary string/, fn ->
+      Xmerl.parse_graphml_xmerl(123, & &1, & &1)
+    end
+
+    assert_raise ArgumentError, ~r/expected node_folder to be an arity-1 function/, fn ->
+      Xmerl.parse_graphml_xmerl("<graphml></graphml>", :invalid, & &1)
+    end
+
+    assert_raise ArgumentError, ~r/expected edge_folder to be an arity-1 function/, fn ->
+      Xmerl.parse_graphml_xmerl("<graphml></graphml>", & &1, :invalid)
+    end
+  end
+
   test "build_graph_from_doc constructs graph from xmerl doc" do
     xml = """
     <?xml version="1.0"?>
