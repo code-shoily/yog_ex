@@ -1,5 +1,6 @@
 defmodule Yog.IO.Sparse6Test do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
+  use ExUnitProperties
 
   alias Yog.IO.Sparse6
 
@@ -7,7 +8,6 @@ defmodule Yog.IO.Sparse6Test do
 
   describe "parse/1" do
     test "parses C5" do
-      # Round-trip test will verify this more thoroughly
       graph =
         Yog.undirected()
         |> Yog.add_edge_ensure(0, 1, 1)
@@ -37,6 +37,20 @@ defmodule Yog.IO.Sparse6Test do
     test "rejects empty input" do
       assert Sparse6.parse("") == {:error, :empty_input}
     end
+
+    test "rejects invalid payload characters outside 63..126 range" do
+      assert Sparse6.parse(":DgA ") == {:error, :invalid_character}
+    end
+
+    test "raises ArgumentError when input is not a binary" do
+      assert_raise ArgumentError, ~r/expected string to be a binary string/, fn ->
+        Sparse6.parse(123)
+      end
+
+      assert_raise ArgumentError, ~r/expected string to be a binary string/, fn ->
+        Sparse6.parse(nil)
+      end
+    end
   end
 
   describe "serialize/1" do
@@ -64,6 +78,12 @@ defmodule Yog.IO.Sparse6Test do
     test "rejects invalid node ids" do
       graph = Yog.undirected() |> Yog.add_edge_ensure(1, 2, 1)
       assert Sparse6.serialize(graph) == {:error, :invalid_node_ids}
+    end
+
+    test "raises ArgumentError when input is not a graph struct" do
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Sparse6.serialize(:not_a_graph)
+      end
     end
   end
 
@@ -211,8 +231,6 @@ defmodule Yog.IO.Sparse6Test do
     end
 
     test "large gaps (triggers extended number encoding)" do
-      # gap > 30 triggers ~
-      # gap > 4126 triggers ~~
       n = 5001
 
       graph =
@@ -278,6 +296,50 @@ defmodule Yog.IO.Sparse6Test do
       {:ok, [graph]} = Sparse6.read(@tmp_file)
       assert Yog.Model.node_count(graph) == 5
       File.rm(@tmp_file)
+    end
+
+    test "read/1 and write/2 raise ArgumentError for non-binary paths" do
+      assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+        Sparse6.read(123)
+      end
+
+      assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+        Sparse6.write(123, Yog.undirected())
+      end
+    end
+  end
+
+  describe "property tests" do
+    property "roundtrip serialize and parse preserves graph node and edge counts" do
+      check all(
+              n <- StreamData.integer(0..25),
+              raw_edges <-
+                StreamData.list_of(
+                  StreamData.tuple(
+                    {StreamData.integer(0..max(n - 1, 0)), StreamData.integer(0..max(n - 1, 0))}
+                  )
+                )
+            ) do
+        graph =
+          if n == 0 do
+            Yog.undirected()
+          else
+            base = Enum.reduce(0..(n - 1), Yog.undirected(), &Yog.add_node(&2, &1, nil))
+
+            Enum.reduce(raw_edges, base, fn {u, v}, acc ->
+              if u != v and u < n and v < n do
+                Yog.add_edge_ensure(acc, u, v, 1)
+              else
+                acc
+              end
+            end)
+          end
+
+        assert {:ok, s6} = Sparse6.serialize(graph)
+        assert {:ok, parsed} = Sparse6.parse(s6)
+        assert Yog.Model.node_count(parsed) == Yog.Model.node_count(graph)
+        assert Yog.Model.edge_count(parsed) == Yog.Model.edge_count(graph)
+      end
     end
   end
 end

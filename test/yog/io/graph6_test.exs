@@ -1,5 +1,6 @@
 defmodule Yog.IO.Graph6Test do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
+  use ExUnitProperties
 
   alias Yog.IO.Graph6
 
@@ -18,7 +19,6 @@ defmodule Yog.IO.Graph6Test do
     end
 
     test "parses K4" do
-      # K4 in graph6: "C~"
       assert {:ok, graph} = Graph6.parse("C~")
       assert Yog.Model.node_count(graph) == 4
       assert Yog.Model.edge_count(graph) == 6
@@ -43,6 +43,21 @@ defmodule Yog.IO.Graph6Test do
 
     test "rejects invalid payload length" do
       assert Graph6.parse("Dq") == {:error, :invalid_payload_length}
+    end
+
+    test "rejects invalid payload characters outside 63..126 range" do
+      # ASCII 32 (' ') is below 63
+      assert Graph6.parse("Dq ") == {:error, :invalid_character}
+    end
+
+    test "raises ArgumentError when input is not a binary" do
+      assert_raise ArgumentError, ~r/expected string to be a binary string/, fn ->
+        Graph6.parse(123)
+      end
+
+      assert_raise ArgumentError, ~r/expected string to be a binary string/, fn ->
+        Graph6.parse(nil)
+      end
     end
   end
 
@@ -85,6 +100,12 @@ defmodule Yog.IO.Graph6Test do
     test "rejects invalid node ids" do
       graph = Yog.undirected() |> Yog.add_edge_ensure(1, 2, 1)
       assert Graph6.serialize(graph) == {:error, :invalid_node_ids}
+    end
+
+    test "raises ArgumentError when input is not a graph struct" do
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Graph6.serialize(:not_a_graph)
+      end
     end
   end
 
@@ -226,35 +247,7 @@ defmodule Yog.IO.Graph6Test do
       assert {:error, :graph_too_large_for_graph6} = Graph6.serialize(graph)
     end
 
-    test "parses 6-character header for N > 258,047" do
-      # N = 300,000
-      # Header: ~~ + 6 chars
-      # a = 300,000 / 1,073,741,824 = 0
-      # b = 300,000 / 16,777_216 = 0
-      # c = 300,000 / 262,144 = 1
-      # r3 = 300,000 % 262,144 = 37,856
-      # d = 37,856 / 4096 = 9
-      # r4 = 37,856 % 4096 = 992
-      # e = 992 / 64 = 15
-      # f = 992 % 64 = 32
-      # Header: <<126, 126, 63, 63, 64, 72, 78, 95>>
-      _header = <<126, 126, 63, 63, 64, 72, 78, 95>>
-      # Expected bits = 300,000 * 299,999 / 2 = 44,999,850,000
-      # Expected chars = 7,499,975,000
-      # We won't test the full payload parsing here as it would still OOM, 
-      # but we can verify the header parsing logic if we mock the payload.
-      # However, parse/1 checks payload length.
-
-      # Let's just trust the logic for now or test parse_header if it was public.
-      # Since it's private, we'll skip the full 300k test and use a smaller one 
-      # for the header if we can.
-      # Actually, the 6-character header starts at 258,048. 
-      # Any N > 258,047 will trigger it.
-      :ok
-    end
-
     test "rejects invalid extended header" do
-      # Just tilde but no data
       assert Graph6.parse("~") == {:error, :invalid_extended_header}
     end
   end
@@ -350,6 +343,50 @@ defmodule Yog.IO.Graph6Test do
 
     test "invalid header character > 126" do
       assert {:error, :invalid_header} = Graph6.parse_header(<<127, "rest">>)
+    end
+
+    test "read/1 and write/2 raise ArgumentError for non-binary paths" do
+      assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+        Graph6.read(123)
+      end
+
+      assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
+        Graph6.write(123, Yog.undirected())
+      end
+    end
+  end
+
+  describe "property tests" do
+    property "roundtrip serialize and parse preserves graph node and edge counts" do
+      check all(
+              n <- StreamData.integer(0..25),
+              raw_edges <-
+                StreamData.list_of(
+                  StreamData.tuple(
+                    {StreamData.integer(0..max(n - 1, 0)), StreamData.integer(0..max(n - 1, 0))}
+                  )
+                )
+            ) do
+        graph =
+          if n == 0 do
+            Yog.undirected()
+          else
+            base = Enum.reduce(0..(n - 1), Yog.undirected(), &Yog.add_node(&2, &1, nil))
+
+            Enum.reduce(raw_edges, base, fn {u, v}, acc ->
+              if u != v and u < n and v < n do
+                Yog.add_edge_ensure(acc, u, v, 1)
+              else
+                acc
+              end
+            end)
+          end
+
+        assert {:ok, g6} = Graph6.serialize(graph)
+        assert {:ok, parsed} = Graph6.parse(g6)
+        assert Yog.Model.node_count(parsed) == Yog.Model.node_count(graph)
+        assert Yog.Model.edge_count(parsed) == Yog.Model.edge_count(graph)
+      end
     end
   end
 end

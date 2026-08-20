@@ -43,7 +43,11 @@ defmodule Yog.IO.Graph6 do
   Parses a graph6 string into an undirected graph.
 
   Returns `{:ok, graph}` on success, or `{:error, reason}` if the string is
-  malformed or contains invalid data.
+  empty, malformed, or contains invalid characters or payload lengths.
+
+  Raises `ArgumentError` if `string` is not a binary string.
+
+  Time complexity: $\\mathcal{O}(V^2)$ where $V$ is the number of nodes.
 
   ## Examples
 
@@ -54,13 +58,19 @@ defmodule Yog.IO.Graph6 do
       5
   """
   @spec parse(String.t()) :: {:ok, Yog.graph()} | {:error, atom()}
-  def parse(<<>>), do: {:error, :empty_input}
+  def parse("") do
+    {:error, :empty_input}
+  end
 
   def parse(string) when is_binary(string) do
     with {:ok, n, rest} <- parse_header(string),
          {:ok, bits} <- parse_payload(rest, n) do
       {:ok, build_graph(bits, n)}
     end
+  end
+
+  def parse(string) do
+    raise ArgumentError, "expected string to be a binary string, got: #{inspect(string)}"
   end
 
   @doc """
@@ -71,6 +81,10 @@ defmodule Yog.IO.Graph6 do
   Returns `{:ok, string}` on success, or `{:error, reason}` if the graph
   cannot be represented in graph6 format.
 
+  Raises `ArgumentError` if `graph` is not a `Yog.Graph` or `Yog.DAG` struct.
+
+  Time complexity: $\\mathcal{O}(V^2 + E)$ where $V$ is the number of nodes and $E$ is the number of edges.
+
   ## Examples
 
       iex> graph = Yog.undirected() |> Yog.add_edge_ensure(0, 1, 1) |> Yog.add_edge_ensure(0, 2, 1) |> Yog.add_edge_ensure(1, 3, 1) |> Yog.add_edge_ensure(2, 4, 1) |> Yog.add_edge_ensure(3, 4, 1)
@@ -79,7 +93,7 @@ defmodule Yog.IO.Graph6 do
       "DqK"
   """
   @spec serialize(Yog.graph()) :: {:ok, String.t()} | {:error, atom()}
-  def serialize(graph) do
+  def serialize(graph) when is_struct(graph, Yog.Graph) or is_struct(graph, Yog.DAG) do
     cond do
       Model.type(graph) != :undirected ->
         {:error, :directed_graph_not_supported}
@@ -93,9 +107,6 @@ defmodule Yog.IO.Graph6 do
         if valid_node_range?(nodes) do
           n = length(nodes)
 
-          # Safety check: Graph6 is O(V^2) and not suitable for very large graphs
-          # 258,048 is the threshold for 6-char header, but bitstring size is ~4.1GB.
-          # We'll allow up to 100k nodes (~625MB bitstring) before warning/erroring.
           if n > 100_000 do
             {:error, :graph_too_large_for_graph6}
           else
@@ -103,7 +114,6 @@ defmodule Yog.IO.Graph6 do
               header = encode_header(n)
               expected_bits = div(n * (n - 1), 2)
               expected_chars = div(expected_bits + 5, 6)
-              # In Graph6, '?' represents 0 (63-63)
               payload = String.duplicate("?", expected_chars)
               {:ok, header <> payload}
             else
@@ -119,14 +129,20 @@ defmodule Yog.IO.Graph6 do
     end
   end
 
+  def serialize(graph) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(graph)}"
+  end
+
   @doc """
   Reads one or more graph6 graphs from a file.
 
   Each non-empty line in the file is treated as a separate graph6 string.
   Returns `{:ok, [graph]}` on success.
+
+  Raises `ArgumentError` if `path` is not a binary string.
   """
   @spec read(String.t()) :: {:ok, [Yog.graph()]} | {:error, atom()}
-  def read(path) do
+  def read(path) when is_binary(path) do
     case File.read(path) do
       {:ok, content} ->
         lines =
@@ -153,14 +169,20 @@ defmodule Yog.IO.Graph6 do
     end
   end
 
+  def read(path) do
+    raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
+  end
+
   @doc """
   Writes one or more graphs to a graph6 file.
 
   Accepts either a single graph or a list of graphs. Each graph is written
   on its own line.
+
+  Raises `ArgumentError` if `path` is not a binary string or if `graphs` is not a valid graph struct or list of graph structs.
   """
   @spec write(String.t(), Yog.graph() | [Yog.graph()]) :: :ok | {:error, atom()}
-  def write(path, graphs) when is_list(graphs) do
+  def write(path, graphs) when is_binary(path) and is_list(graphs) do
     lines =
       Enum.reduce_while(graphs, {:ok, []}, fn graph, {:ok, acc} ->
         case serialize(graph) do
@@ -175,8 +197,12 @@ defmodule Yog.IO.Graph6 do
     end
   end
 
-  def write(path, graph) do
+  def write(path, graph) when is_binary(path) do
     write(path, [graph])
+  end
+
+  def write(path, _graphs) when not is_binary(path) do
+    raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
   end
 
   # =============================================================================
@@ -184,7 +210,7 @@ defmodule Yog.IO.Graph6 do
   # =============================================================================
 
   @doc false
-  def parse_header(<<c, rest::binary>>) do
+  def parse_header(<<c, rest::binary>>) when c in 63..126 do
     value = c - 63
 
     cond do
@@ -199,7 +225,11 @@ defmodule Yog.IO.Graph6 do
     end
   end
 
-  defp parse_extended_header(<<126, a, b, c, d, e, f, rest::binary>>) do
+  def parse_header(_), do: {:error, :invalid_header}
+
+  defp parse_extended_header(<<126, a, b, c, d, e, f, rest::binary>>)
+       when a in 63..126 and b in 63..126 and c in 63..126 and d in 63..126 and e in 63..126 and
+              f in 63..126 do
     n =
       (a - 63) * 1_073_741_824 +
         (b - 63) * 16_777_216 +
@@ -211,7 +241,8 @@ defmodule Yog.IO.Graph6 do
     {:ok, n, rest}
   end
 
-  defp parse_extended_header(<<a, b, c, rest::binary>>) do
+  defp parse_extended_header(<<a, b, c, rest::binary>>)
+       when a in 63..126 and b in 63..126 and c in 63..126 do
     n = (a - 63) * 4096 + (b - 63) * 64 + (c - 63)
     {:ok, n, rest}
   end
@@ -223,21 +254,28 @@ defmodule Yog.IO.Graph6 do
     expected_chars = div(expected_bits + 5, 6)
 
     if byte_size(rest) == expected_chars do
-      # Fast path: if it's all '?' (0), return early without building bitstring
-      if all_zeros?(rest) do
-        {:ok, :empty}
-      else
-        bits =
-          for <<c <- rest>>, into: <<>> do
-            <<c - 63::6>>
-          end
+      if valid_payload_chars?(rest) do
+        if all_zeros?(rest) do
+          {:ok, :empty}
+        else
+          bits =
+            for <<c <- rest>>, into: <<>> do
+              <<c - 63::6>>
+            end
 
-        {:ok, bits}
+          {:ok, bits}
+        end
+      else
+        {:error, :invalid_character}
       end
     else
       {:error, :invalid_payload_length}
     end
   end
+
+  defp valid_payload_chars?(<<>>), do: true
+  defp valid_payload_chars?(<<c, rest::binary>>) when c in 63..126, do: valid_payload_chars?(rest)
+  defp valid_payload_chars?(_), do: false
 
   defp all_zeros?(<<>>), do: true
   defp all_zeros?(<<"?", rest::binary>>), do: all_zeros?(rest)
@@ -280,7 +318,6 @@ defmodule Yog.IO.Graph6 do
   end
 
   defp adjacency_bits(graph, n) do
-    # Get all edges once and group by higher endpoint
     edges_by_high =
       Enum.reduce(Model.all_edges(graph), %{}, fn {u, v, _}, acc ->
         {low, high} = if u < v, do: {u, v}, else: {v, u}

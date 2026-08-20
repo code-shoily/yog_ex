@@ -42,9 +42,23 @@ defmodule Yog.IO.Sparse6 do
   Parses a sparse6 string into an undirected graph.
 
   Returns `{:ok, graph}` on success, or `{:error, reason}` if the string is
-  malformed.
+  empty, missing the `:` prefix, or malformed.
+
+  Raises `ArgumentError` if `string` is not a binary string.
+
+  Time complexity: $\\mathcal{O}(V + E)$ where $V$ is the number of nodes and $E$ is the number of edges.
+
+  ## Examples
+
+      iex> {:ok, graph} = Yog.IO.Sparse6.parse(":DgA?")
+      iex> Yog.Model.node_count(graph)
+      5
   """
   @spec parse(String.t()) :: {:ok, Yog.graph()} | {:error, atom()}
+  def parse("") do
+    {:error, :empty_input}
+  end
+
   def parse(":" <> rest) when is_binary(rest) do
     with {:ok, n, data} <- parse_header(rest),
          {:ok, numbers} <- decode_numbers(data) do
@@ -52,8 +66,13 @@ defmodule Yog.IO.Sparse6 do
     end
   end
 
-  def parse(<<>>), do: {:error, :empty_input}
-  def parse(_), do: {:error, :missing_sparse6_prefix}
+  def parse(string) when is_binary(string) do
+    {:error, :missing_sparse6_prefix}
+  end
+
+  def parse(string) do
+    raise ArgumentError, "expected string to be a binary string, got: #{inspect(string)}"
+  end
 
   @doc """
   Serializes an undirected simple graph to a sparse6 string.
@@ -62,9 +81,20 @@ defmodule Yog.IO.Sparse6 do
 
   Returns `{:ok, string}` on success, or `{:error, reason}` if the graph
   cannot be represented in sparse6 format.
+
+  Raises `ArgumentError` if `graph` is not a `Yog.Graph` or `Yog.DAG` struct.
+
+  Time complexity: $\\mathcal{O}(V + E \\log E)$ where $V$ is the number of nodes and $E$ is the number of edges.
+
+  ## Examples
+
+      iex> graph = Yog.undirected() |> Yog.add_edge_ensure(0, 1, 1) |> Yog.add_edge_ensure(1, 2, 1) |> Yog.add_edge_ensure(2, 3, 1)
+      iex> {:ok, s6} = Yog.IO.Sparse6.serialize(graph)
+      iex> String.starts_with?(s6, ":")
+      true
   """
   @spec serialize(Yog.graph()) :: {:ok, String.t()} | {:error, atom()}
-  def serialize(graph) do
+  def serialize(graph) when is_struct(graph, Yog.Graph) or is_struct(graph, Yog.DAG) do
     cond do
       Model.type(graph) != :undirected ->
         {:error, :directed_graph_not_supported}
@@ -87,14 +117,20 @@ defmodule Yog.IO.Sparse6 do
     end
   end
 
+  def serialize(graph) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(graph)}"
+  end
+
   @doc """
   Reads one or more sparse6 graphs from a file.
 
   Each non-empty line in the file is treated as a separate sparse6 string.
   Returns `{:ok, [graph]}` on success.
+
+  Raises `ArgumentError` if `path` is not a binary string.
   """
   @spec read(String.t()) :: {:ok, [Yog.graph()]} | {:error, atom()}
-  def read(path) do
+  def read(path) when is_binary(path) do
     case File.read(path) do
       {:ok, content} ->
         lines =
@@ -121,14 +157,20 @@ defmodule Yog.IO.Sparse6 do
     end
   end
 
+  def read(path) do
+    raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
+  end
+
   @doc """
   Writes one or more graphs to a sparse6 file.
 
   Accepts either a single graph or a list of graphs. Each graph is written
   on its own line.
+
+  Raises `ArgumentError` if `path` is not a binary string or if `graphs` is not a valid graph struct or list of graph structs.
   """
   @spec write(String.t(), Yog.graph() | [Yog.graph()]) :: :ok | {:error, atom()}
-  def write(path, graphs) when is_list(graphs) do
+  def write(path, graphs) when is_binary(path) and is_list(graphs) do
     lines =
       Enum.reduce_while(graphs, {:ok, []}, fn graph, {:ok, acc} ->
         case serialize(graph) do
@@ -143,15 +185,19 @@ defmodule Yog.IO.Sparse6 do
     end
   end
 
-  def write(path, graph) do
+  def write(path, graph) when is_binary(path) do
     write(path, [graph])
+  end
+
+  def write(path, _graphs) when not is_binary(path) do
+    raise ArgumentError, "expected path to be a binary string, got: #{inspect(path)}"
   end
 
   # =============================================================================
   # Private helpers - parsing
   # =============================================================================
 
-  defp parse_header(<<c, rest::binary>>) do
+  defp parse_header(<<c, rest::binary>>) when c in 63..126 do
     value = c - 63
 
     cond do
@@ -166,7 +212,11 @@ defmodule Yog.IO.Sparse6 do
     end
   end
 
-  defp parse_extended_header(<<126, a, b, c, d, e, f, rest::binary>>) do
+  defp parse_header(_), do: {:error, :invalid_header}
+
+  defp parse_extended_header(<<126, a, b, c, d, e, f, rest::binary>>)
+       when a in 63..126 and b in 63..126 and c in 63..126 and d in 63..126 and e in 63..126 and
+              f in 63..126 do
     n =
       (a - 63) * 1_073_741_824 +
         (b - 63) * 16_777_216 +
@@ -178,7 +228,8 @@ defmodule Yog.IO.Sparse6 do
     {:ok, n, rest}
   end
 
-  defp parse_extended_header(<<a, b, c, rest::binary>>) do
+  defp parse_extended_header(<<a, b, c, rest::binary>>)
+       when a in 63..126 and b in 63..126 and c in 63..126 do
     n = (a - 63) * 4096 + (b - 63) * 64 + (c - 63)
     {:ok, n, rest}
   end
@@ -191,7 +242,7 @@ defmodule Yog.IO.Sparse6 do
 
   defp decode_numbers(<<>>, acc), do: {:ok, Enum.reverse(acc)}
 
-  defp decode_numbers(<<c, rest::binary>>, acc) do
+  defp decode_numbers(<<c, rest::binary>>, acc) when c in 63..126 do
     value = c - 63
 
     if value == 63 do
@@ -201,9 +252,11 @@ defmodule Yog.IO.Sparse6 do
     end
   end
 
+  defp decode_numbers(<<_c, _rest::binary>>, _acc), do: {:error, :invalid_character}
+
   defp decode_extended_number(<<>>, _acc, _x), do: {:error, :truncated_extended_number}
 
-  defp decode_extended_number(<<c, rest::binary>>, acc, x) do
+  defp decode_extended_number(<<c, rest::binary>>, acc, x) when c in 63..126 do
     value = c - 63
     x = x * 64 + value
 
@@ -213,6 +266,8 @@ defmodule Yog.IO.Sparse6 do
       decode_numbers(rest, [x | acc])
     end
   end
+
+  defp decode_extended_number(<<_c, _rest::binary>>, _acc, _x), do: {:error, :invalid_character}
 
   defp build_graph(numbers, n) do
     initial_graph =
@@ -238,29 +293,21 @@ defmodule Yog.IO.Sparse6 do
   defp take_column(numbers, v, prev_edges) do
     case numbers do
       [^v | rest] ->
-        # Column is explicitly specified, read differences until next column marker
         {edges, remaining} = read_differences(rest, v, [])
         {Enum.reverse(edges), remaining}
 
       _ ->
-        # Column not specified: either empty or same as previous
         if prev_edges == [] do
           {[], numbers}
         else
-          # Same as previous column
           {prev_edges, numbers}
         end
     end
   end
 
-  # Read differences for column v until we hit the next column marker
   defp read_differences([], _v, acc), do: {acc, []}
 
   defp read_differences([x | rest], v, acc) do
-    # If x >= v, it's a column marker for a future column (or same column, which shouldn't happen),
-    # so we stop. Note: x can never equal v because that would mean u=0 and v=v, giving x=v.
-    # Actually x = v - u, and u can be 0, so x CAN equal v. Wait, if u=0, x=v, which is valid.
-    # But x > v is impossible for a valid edge, so x > v means it's a column marker.
     if x > v do
       {acc, [x | rest]}
     else
@@ -282,7 +329,6 @@ defmodule Yog.IO.Sparse6 do
   end
 
   defp encode_edges(graph, n) do
-    # Build adjacency by column (higher endpoint), rows in decreasing order
     edges_by_high =
       Enum.reduce(Model.all_edges(graph), %{}, fn {u, v, _}, acc ->
         {low, high} = if u < v, do: {u, v}, else: {v, u}
@@ -302,15 +348,17 @@ defmodule Yog.IO.Sparse6 do
     {numbers_rev, _prev} =
       Enum.reduce(columns, {[], []}, fn {v, rows}, {acc, prev} ->
         cond do
-          rows == [] ->
-            {acc, []}
-
           rows == prev ->
             {acc, rows}
 
+          rows == [] ->
+            if prev == [] do
+              {acc, []}
+            else
+              {[v | acc], []}
+            end
+
           true ->
-            # diffs: [d1, d2, ...]
-            # acc: [... d2, d1, v]
             diffs = Enum.map(rows, fn u -> v - u end)
             new_acc = Enum.reverse(diffs, [v | acc])
             {new_acc, rows}
