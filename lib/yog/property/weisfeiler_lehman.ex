@@ -20,13 +20,25 @@ defmodule Yog.Property.WeisfeilerLehman do
     to base initialization labels. Defaults to stringified structural node degrees.
   """
   @spec graph_hash(Graph.t(), keyword()) :: String.t()
-  def graph_hash(%Graph{} = graph, opts \\ []) do
+  def graph_hash(graph, opts \\ [])
+
+  def graph_hash(%Graph{} = graph, opts) when is_list(opts) do
     iterations = Keyword.get(opts, :iterations, 3)
+
+    unless is_integer(iterations) and iterations >= 0 do
+      raise ArgumentError,
+            "expected :iterations to be a non-negative integer, got: #{inspect(iterations)}"
+    end
 
     node_label_fn =
       Keyword.get(opts, :node_label_fn, fn g, node ->
         Yog.Model.degree(g, node) |> to_string()
       end)
+
+    unless is_function(node_label_fn, 2) do
+      raise ArgumentError,
+            "expected :node_label_fn to be a 2-arity function, got: #{inspect(node_label_fn)}"
+    end
 
     initial_labels =
       Yog.Utils.map_fold(graph.nodes, %{}, fn node, _data, acc ->
@@ -59,5 +71,11 @@ defmodule Yog.Property.WeisfeilerLehman do
       |> Enum.join("")
 
     :crypto.hash(:md5, final_combined) |> Base.encode16(case: :lower)
+  end
+
+  def graph_hash(%Yog.DAG{graph: graph}, opts), do: graph_hash(graph, opts)
+
+  def graph_hash(other, _opts) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
   end
 end

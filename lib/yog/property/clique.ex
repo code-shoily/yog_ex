@@ -157,25 +157,26 @@ defmodule Yog.Property.Clique do
   O(3^(n/3)) worst case
   """
   @spec max_clique(Yog.graph()) :: MapSet.t(Yog.node_id()) | {:error, :undirected_only}
-  def max_clique(graph) do
-    if Model.type(graph) == :directed do
-      {:error, :undirected_only}
-    else
-      nodes = Model.all_nodes(graph)
+  def max_clique(%Yog.Graph{kind: :directed}), do: {:error, :undirected_only}
 
-      if nodes == [] do
+  def max_clique(%Yog.Graph{kind: :undirected} = graph) do
+    nodes = Model.all_nodes(graph)
+
+    if nodes == [] do
+      MapSet.new()
+    else
+      all_cliques = all_maximal_cliques(graph)
+
+      if all_cliques == [] do
         MapSet.new()
       else
-        all_cliques = all_maximal_cliques(graph)
-
-        if all_cliques == [] do
-          MapSet.new()
-        else
-          Enum.max_by(all_cliques, &MapSet.size/1)
-        end
+        Enum.max_by(all_cliques, &MapSet.size/1)
       end
     end
   end
+
+  def max_clique(%Yog.DAG{graph: graph}), do: max_clique(graph)
+  def max_clique(other), do: raise_struct_error(other)
 
   @doc """
   Finds all maximal cliques in an undirected graph.
@@ -214,33 +215,34 @@ defmodule Yog.Property.Clique do
   O(3^(n/3)) worst case
   """
   @spec all_maximal_cliques(Yog.graph()) :: [MapSet.t(Yog.node_id())] | {:error, :undirected_only}
-  def all_maximal_cliques(graph) do
-    if Model.type(graph) == :directed do
-      {:error, :undirected_only}
+  def all_maximal_cliques(%Yog.Graph{kind: :directed}), do: {:error, :undirected_only}
+
+  def all_maximal_cliques(%Yog.Graph{kind: :undirected} = graph) do
+    nodes = Model.all_nodes(graph)
+
+    if nodes == [] do
+      []
     else
-      nodes = Model.all_nodes(graph)
+      adj =
+        Map.new(nodes, fn u ->
+          neighbors =
+            Model.neighbor_ids(graph, u)
+            |> MapSet.new()
+            |> MapSet.delete(u)
 
-      if nodes == [] do
-        []
-      else
-        adj =
-          Map.new(nodes, fn u ->
-            neighbors =
-              Model.neighbor_ids(graph, u)
-              |> MapSet.new()
-              |> MapSet.delete(u)
+          {u, neighbors}
+        end)
 
-            {u, neighbors}
-          end)
+      p = MapSet.new(nodes)
+      r = MapSet.new()
+      x = MapSet.new()
 
-        p = MapSet.new(nodes)
-        r = MapSet.new()
-        x = MapSet.new()
-
-        bron_kerbosch_pivot(r, p, x, adj, [])
-      end
+      bron_kerbosch_pivot(r, p, x, adj, [])
     end
   end
+
+  def all_maximal_cliques(%Yog.DAG{graph: graph}), do: all_maximal_cliques(graph)
+  def all_maximal_cliques(other), do: raise_struct_error(other)
 
   # Bron-Kerbosch with pivot optimization
   # R = current clique, P = candidates, X = excluded
@@ -344,12 +346,17 @@ defmodule Yog.Property.Clique do
   """
   @spec k_cliques(Yog.graph(), integer()) ::
           [MapSet.t(Yog.node_id())] | {:error, :undirected_only}
-  def k_cliques(graph, k) do
-    if Model.type(graph) == :directed do
-      {:error, :undirected_only}
-    else
-      do_k_cliques(graph, k)
-    end
+  def k_cliques(%Yog.Graph{kind: :directed}, _k), do: {:error, :undirected_only}
+
+  def k_cliques(%Yog.Graph{kind: :undirected} = graph, k) when is_integer(k) do
+    do_k_cliques(graph, k)
+  end
+
+  def k_cliques(%Yog.DAG{graph: graph}, k), do: k_cliques(graph, k)
+  def k_cliques(other, _k), do: raise_struct_error(other)
+
+  defp raise_struct_error(other) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
   end
 
   defp do_k_cliques(_graph, k) when k <= 0, do: []

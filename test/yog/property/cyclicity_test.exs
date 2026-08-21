@@ -166,4 +166,14 @@ defmodule Yog.Property.CyclicityTest do
 
     assert Cyclicity.cyclic?(g)
   end
+
+  test "raises ArgumentError on invalid struct inputs" do
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Cyclicity.acyclic?(:invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Cyclicity.cyclic?(:invalid)
+    end
+  end
 end

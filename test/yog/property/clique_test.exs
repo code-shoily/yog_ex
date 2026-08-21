@@ -136,4 +136,18 @@ defmodule Yog.Property.CliqueTest do
     assert Clique.all_maximal_cliques(graph) == {:error, :undirected_only}
     assert Clique.k_cliques(graph, 2) == {:error, :undirected_only}
   end
+
+  test "raises ArgumentError on invalid struct inputs" do
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Clique.max_clique(:invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Clique.all_maximal_cliques(:invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Clique.k_cliques(:invalid, 2)
+    end
+  end
 end

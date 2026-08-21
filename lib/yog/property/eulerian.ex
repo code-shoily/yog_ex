@@ -163,7 +163,7 @@ defmodule Yog.Property.Eulerian do
   O(V + E)
   """
   @spec has_eulerian_circuit?(Yog.graph()) :: boolean()
-  def has_eulerian_circuit?(graph) do
+  def has_eulerian_circuit?(%Yog.Graph{} = graph) do
     nodes = Model.all_nodes(graph)
 
     if nodes == [] do
@@ -175,6 +175,9 @@ defmodule Yog.Property.Eulerian do
       end
     end
   end
+
+  def has_eulerian_circuit?(%Yog.DAG{graph: graph}), do: has_eulerian_circuit?(graph)
+  def has_eulerian_circuit?(other), do: raise_struct_error(other)
 
   defp has_eulerian_circuit_undirected?(graph, nodes) do
     all_even =
@@ -236,7 +239,7 @@ defmodule Yog.Property.Eulerian do
   O(V + E)
   """
   @spec has_eulerian_path?(Yog.graph()) :: boolean()
-  def has_eulerian_path?(graph) do
+  def has_eulerian_path?(%Yog.Graph{} = graph) do
     nodes = Model.all_nodes(graph)
 
     if nodes == [] do
@@ -248,6 +251,9 @@ defmodule Yog.Property.Eulerian do
       end
     end
   end
+
+  def has_eulerian_path?(%Yog.DAG{graph: graph}), do: has_eulerian_path?(graph)
+  def has_eulerian_path?(other), do: raise_struct_error(other)
 
   defp has_eulerian_path_undirected?(graph, nodes) do
     odd_count =
@@ -333,7 +339,7 @@ defmodule Yog.Property.Eulerian do
   O(E)
   """
   @spec eulerian_circuit(Yog.graph()) :: {:ok, [Yog.node_id()]} | {:error, :no_eulerian_circuit}
-  def eulerian_circuit(graph) do
+  def eulerian_circuit(%Yog.Graph{} = graph) do
     if has_eulerian_circuit?(graph) do
       nodes = Model.all_nodes(graph)
       start = hd(nodes)
@@ -342,6 +348,9 @@ defmodule Yog.Property.Eulerian do
       {:error, :no_eulerian_circuit}
     end
   end
+
+  def eulerian_circuit(%Yog.DAG{graph: graph}), do: eulerian_circuit(graph)
+  def eulerian_circuit(other), do: raise_struct_error(other)
 
   @doc """
   Finds an Eulerian path in the graph using Hierholzer's algorithm.
@@ -381,7 +390,7 @@ defmodule Yog.Property.Eulerian do
   O(E)
   """
   @spec eulerian_path(Yog.graph()) :: {:ok, [Yog.node_id()]} | {:error, :no_eulerian_path}
-  def eulerian_path(graph) do
+  def eulerian_path(%Yog.Graph{} = graph) do
     cond do
       has_eulerian_circuit?(graph) ->
         {:ok, _circuit} = eulerian_circuit(graph)
@@ -393,6 +402,13 @@ defmodule Yog.Property.Eulerian do
       true ->
         {:error, :no_eulerian_path}
     end
+  end
+
+  def eulerian_path(%Yog.DAG{graph: graph}), do: eulerian_path(graph)
+  def eulerian_path(other), do: raise_struct_error(other)
+
+  defp raise_struct_error(other) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
   end
 
   # =============================================================================

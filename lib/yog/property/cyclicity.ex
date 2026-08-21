@@ -165,9 +165,12 @@ defmodule Yog.Property.Cyclicity do
   O(V + E)
   """
   @spec acyclic?(Yog.graph()) :: boolean()
-  def acyclic?(graph) do
+  def acyclic?(%Yog.Graph{} = graph) do
     not cyclic?(graph)
   end
+
+  def acyclic?(%Yog.DAG{graph: graph}), do: acyclic?(graph)
+  def acyclic?(other), do: raise_struct_error(other)
 
   @doc """
   Checks if the graph contains at least one cycle.
@@ -196,17 +199,22 @@ defmodule Yog.Property.Cyclicity do
   O(V + E)
   """
   @spec cyclic?(Yog.graph()) :: boolean()
-  def cyclic?(graph) do
-    case graph.kind do
-      :directed ->
-        case Sort.topological_sort(graph) do
-          {:error, :contains_cycle} -> true
-          _ -> false
-        end
-
-      :undirected ->
-        has_undirected_cycle?(graph)
+  def cyclic?(%Yog.Graph{kind: :directed} = graph) do
+    case Sort.topological_sort(graph) do
+      {:error, :contains_cycle} -> true
+      _ -> false
     end
+  end
+
+  def cyclic?(%Yog.Graph{kind: :undirected} = graph) do
+    has_undirected_cycle?(graph)
+  end
+
+  def cyclic?(%Yog.DAG{graph: graph}), do: cyclic?(graph)
+  def cyclic?(other), do: raise_struct_error(other)
+
+  defp raise_struct_error(other) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
   end
 
   # =============================================================================

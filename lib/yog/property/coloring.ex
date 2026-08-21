@@ -92,7 +92,7 @@ defmodule Yog.Property.Coloring do
   O(V²) in the worst case; O(V log V + E) with more efficient structures.
   """
   @spec coloring_greedy(Yog.graph()) :: coloring_result()
-  def coloring_greedy(graph) do
+  def coloring_greedy(%Yog.Graph{} = graph) do
     nodes = Model.all_nodes(graph)
 
     if nodes == [] do
@@ -116,6 +116,9 @@ defmodule Yog.Property.Coloring do
     end
   end
 
+  def coloring_greedy(%Yog.DAG{graph: graph}), do: coloring_greedy(graph)
+  def coloring_greedy(other), do: raise_struct_error(other)
+
   # ============= DSatur (Degree of Saturation) =============
 
   @doc """
@@ -137,7 +140,7 @@ defmodule Yog.Property.Coloring do
   O(V²) for this implementation.
   """
   @spec coloring_dsatur(Yog.graph()) :: coloring_result()
-  def coloring_dsatur(graph) do
+  def coloring_dsatur(%Yog.Graph{} = graph) do
     nodes = Model.all_nodes(graph)
 
     if nodes == [] do
@@ -155,6 +158,9 @@ defmodule Yog.Property.Coloring do
       do_dsatur(uncolored, adj, degrees, %{}, forbidden_colors, saturations, 0)
     end
   end
+
+  def coloring_dsatur(%Yog.DAG{graph: graph}), do: coloring_dsatur(graph)
+  def coloring_dsatur(other), do: raise_struct_error(other)
 
   defp do_dsatur(uncolored, adj, degrees, coloring, forbidden_colors, saturations, max_color) do
     if MapSet.size(uncolored) == 0 do
@@ -243,7 +249,9 @@ defmodule Yog.Property.Coloring do
   Exponential in the worst case. Intended for small graphs only.
   """
   @spec coloring_exact(Yog.graph(), pos_integer()) :: exact_result()
-  def coloring_exact(graph, timeout_ms \\ 5000) do
+  def coloring_exact(graph, timeout_ms \\ 5000)
+
+  def coloring_exact(%Yog.Graph{} = graph, timeout_ms) when is_integer(timeout_ms) do
     nodes = Model.all_nodes(graph)
 
     if nodes == [] do
@@ -275,6 +283,13 @@ defmodule Yog.Property.Coloring do
         {:ok, result.best_chromatic, result.best_coloring}
       end
     end
+  end
+
+  def coloring_exact(%Yog.DAG{graph: graph}, timeout_ms), do: coloring_exact(graph, timeout_ms)
+  def coloring_exact(other, _timeout_ms), do: raise_struct_error(other)
+
+  defp raise_struct_error(other) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
   end
 
   defp exact_backtrack([], coloring, max_used, state) do

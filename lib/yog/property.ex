@@ -599,6 +599,7 @@ defmodule Yog.Property do
       iex> Yog.Property.isomorphic?(g1, triangle)
       false
   """
+  @spec isomorphic?(Yog.graph(), Yog.graph()) :: boolean()
   def isomorphic?(g1, g2) do
     hash(g1) == hash(g2)
   end

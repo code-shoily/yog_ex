@@ -90,4 +90,18 @@ defmodule Yog.Property.PlanarityTest do
     assert Planarity.planar_embedding(graph) == :nonplanar
     assert Planarity.kuratowski_witness(graph) == :nonplanar
   end
+
+  test "raises ArgumentError on invalid struct inputs" do
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Planarity.planar?(:invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Planarity.planar_embedding(:invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Planarity.kuratowski_witness(:invalid)
+    end
+  end
 end

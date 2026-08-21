@@ -320,4 +320,26 @@ defmodule Yog.Property.StructureTest do
   test "chordal? empty graph" do
     assert Structure.chordal?(Yog.undirected())
   end
+
+  test "raises ArgumentError on invalid struct inputs" do
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Structure.tree?(:invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Structure.arborescence?(:invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Structure.forest?(:invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Structure.branching?(:invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Structure.complete?(:invalid)
+    end
+  end
 end

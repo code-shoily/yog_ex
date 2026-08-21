@@ -53,7 +53,7 @@ defmodule Yog.Property.TreeDecomposition do
       true
   """
   @spec valid?(t(), Yog.graph()) :: boolean()
-  def valid?(%__MODULE__{} = td, graph) do
+  def valid?(%__MODULE__{} = td, %Yog.Graph{} = graph) do
     vertices = MapSet.new(Model.all_nodes(graph))
     bag_indices = Map.keys(td.bags)
 
@@ -100,6 +100,17 @@ defmodule Yog.Property.TreeDecomposition do
       end
 
     vertex_coverage and edge_coverage and running_intersection
+  end
+
+  def valid?(%__MODULE__{} = td, %Yog.DAG{graph: graph}), do: valid?(td, graph)
+
+  def valid?(%__MODULE__{}, other) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
+  end
+
+  def valid?(other, _graph) do
+    raise ArgumentError,
+          "expected a Yog.Property.TreeDecomposition struct, got: #{inspect(other)}"
   end
 
   # Check that a subset of bag indices induces a connected subgraph in the tree.

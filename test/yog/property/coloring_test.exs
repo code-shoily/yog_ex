@@ -291,4 +291,18 @@ defmodule Yog.Property.ColoringTest do
     assert {:ok, 1, colors} = Coloring.coloring_exact(graph)
     assert valid_coloring?(graph, colors)
   end
+
+  test "raises ArgumentError on invalid struct inputs" do
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Coloring.coloring_greedy(:invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Coloring.coloring_dsatur(:invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Coloring.coloring_exact(:invalid)
+    end
+  end
 end

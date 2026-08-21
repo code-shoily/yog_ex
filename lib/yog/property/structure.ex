@@ -113,17 +113,15 @@ defmodule Yog.Property.Structure do
   O(V + E)
   """
   @spec tree?(Yog.graph()) :: boolean()
-  def tree?(graph) do
-    case Model.type(graph) do
-      :undirected ->
-        n = Model.node_count(graph)
-        e = Model.edge_count(graph)
-        n > 0 and e == n - 1 and connected?(graph)
-
-      :directed ->
-        false
-    end
+  def tree?(%Yog.Graph{kind: :undirected} = graph) do
+    n = Model.node_count(graph)
+    e = Model.edge_count(graph)
+    n > 0 and e == n - 1 and connected?(graph)
   end
+
+  def tree?(%Yog.Graph{kind: :directed}), do: false
+  def tree?(%Yog.DAG{graph: graph}), do: tree?(graph)
+  def tree?(other), do: raise_struct_error(other)
 
   @doc """
   Checks if the graph is an arborescence (directed tree with a single root).
@@ -137,38 +135,36 @@ defmodule Yog.Property.Structure do
   (no need for explicit BFS check).
   """
   @spec arborescence?(Yog.graph()) :: boolean()
-  def arborescence?(graph) do
-    case Model.type(graph) do
-      :directed ->
-        n = Model.node_count(graph)
+  def arborescence?(%Yog.Graph{kind: :directed} = graph) do
+    n = Model.node_count(graph)
 
-        if n > 0 and Model.edge_count(graph) == n - 1 do
-          {roots, non_roots_with_valid_degree} =
-            graph
-            |> Model.all_nodes()
-            |> Enum.reduce({[], 0}, fn node, {roots, valid} ->
-              case Model.in_degree(graph, node) do
-                0 -> {[node | roots], valid}
-                1 -> {roots, valid + 1}
-                _ -> {roots, valid}
-              end
-            end)
+    if n > 0 and Model.edge_count(graph) == n - 1 do
+      {roots, non_roots_with_valid_degree} =
+        graph
+        |> Model.all_nodes()
+        |> Enum.reduce({[], 0}, fn node, {roots, valid} ->
+          case Model.in_degree(graph, node) do
+            0 -> {[node | roots], valid}
+            1 -> {roots, valid + 1}
+            _ -> {roots, valid}
+          end
+        end)
 
-          match?([_], roots) and non_roots_with_valid_degree == n - 1
-        else
-          false
-        end
-
-      _ ->
-        false
+      match?([_], roots) and non_roots_with_valid_degree == n - 1
+    else
+      false
     end
   end
+
+  def arborescence?(%Yog.Graph{kind: :undirected}), do: false
+  def arborescence?(%Yog.DAG{graph: graph}), do: arborescence?(graph)
+  def arborescence?(other), do: raise_struct_error(other)
 
   @doc """
   Finds the root of an arborescence.
   """
   @spec arborescence_root(Yog.graph()) :: Yog.node_id() | nil
-  def arborescence_root(graph) do
+  def arborescence_root(%Yog.Graph{} = graph) do
     if arborescence?(graph) do
       graph
       |> Model.all_nodes()
@@ -181,6 +177,9 @@ defmodule Yog.Property.Structure do
       nil
     end
   end
+
+  def arborescence_root(%Yog.DAG{graph: graph}), do: arborescence_root(graph)
+  def arborescence_root(other), do: raise_struct_error(other)
 
   @doc """
   Checks if the graph is a forest (a loopless undirected graph consisting
@@ -197,23 +196,21 @@ defmodule Yog.Property.Structure do
       true
   """
   @spec forest?(Yog.graph()) :: boolean()
-  def forest?(graph) do
-    case Model.type(graph) do
-      :undirected ->
-        n = Model.node_count(graph)
+  def forest?(%Yog.Graph{kind: :undirected} = graph) do
+    n = Model.node_count(graph)
 
-        if n == 0 do
-          true
-        else
-          e = Model.edge_count(graph)
-          c = length(Components.connected_components(graph))
-          e == n - c
-        end
-
-      :directed ->
-        false
+    if n == 0 do
+      true
+    else
+      e = Model.edge_count(graph)
+      c = length(Components.connected_components(graph))
+      e == n - c
     end
   end
+
+  def forest?(%Yog.Graph{kind: :directed}), do: false
+  def forest?(%Yog.DAG{graph: graph}), do: forest?(graph)
+  def forest?(other), do: raise_struct_error(other)
 
   @doc """
   Checks if a directed graph is a branching (a directed forest).
@@ -231,28 +228,26 @@ defmodule Yog.Property.Structure do
       true
   """
   @spec branching?(Yog.graph()) :: boolean()
-  def branching?(graph) do
-    case Model.type(graph) do
-      :directed ->
-        # Condition 1: All nodes have in-degree <= 1
-        valid_in_degrees? =
-          graph
-          |> Model.all_nodes()
-          |> Enum.all?(fn node -> Model.in_degree(graph, node) <= 1 end)
+  def branching?(%Yog.Graph{kind: :directed} = graph) do
+    # Condition 1: All nodes have in-degree <= 1
+    valid_in_degrees? =
+      graph
+      |> Model.all_nodes()
+      |> Enum.all?(fn node -> Model.in_degree(graph, node) <= 1 end)
 
-        # Condition 2: No directed cycles
-        valid_in_degrees? and Cyclicity.acyclic?(graph)
-
-      :undirected ->
-        false
-    end
+    # Condition 2: No directed cycles
+    valid_in_degrees? and Cyclicity.acyclic?(graph)
   end
+
+  def branching?(%Yog.Graph{kind: :undirected}), do: false
+  def branching?(%Yog.DAG{graph: graph}), do: branching?(graph)
+  def branching?(other), do: raise_struct_error(other)
 
   @doc """
   Checks if the graph is complete (every pair of distinct nodes is connected).
   """
   @spec complete?(Yog.graph()) :: boolean()
-  def complete?(graph) do
+  def complete?(%Yog.Graph{} = graph) do
     n = Model.node_count(graph)
 
     if n <= 1 do
@@ -270,11 +265,14 @@ defmodule Yog.Property.Structure do
     end
   end
 
+  def complete?(%Yog.DAG{graph: graph}), do: complete?(graph)
+  def complete?(other), do: raise_struct_error(other)
+
   @doc """
   Checks if the graph is k-regular (every node has degree exactly k).
   """
   @spec regular?(Yog.graph(), integer()) :: boolean()
-  def regular?(graph, k) do
+  def regular?(%Yog.Graph{} = graph, k) when is_integer(k) and k >= 0 do
     nodes = Model.all_nodes(graph)
 
     if nodes == [] do
@@ -292,6 +290,9 @@ defmodule Yog.Property.Structure do
     end
   end
 
+  def regular?(%Yog.DAG{graph: graph}, k), do: regular?(graph, k)
+  def regular?(other, _k), do: raise_struct_error(other)
+
   @doc """
   Returns the minimum degree of the graph.
 
@@ -308,7 +309,7 @@ defmodule Yog.Property.Structure do
       0
   """
   @spec minimum_degree(Yog.graph()) :: non_neg_integer()
-  def minimum_degree(graph) do
+  def minimum_degree(%Yog.Graph{} = graph) do
     nodes = Model.all_nodes(graph)
 
     if nodes == [] do
@@ -320,6 +321,9 @@ defmodule Yog.Property.Structure do
     end
   end
 
+  def minimum_degree(%Yog.DAG{graph: graph}), do: minimum_degree(graph)
+  def minimum_degree(other), do: raise_struct_error(other)
+
   @doc """
   Checks if the graph is connected.
 
@@ -327,7 +331,7 @@ defmodule Yog.Property.Structure do
   For directed graphs, this checks for strong connectivity.
   """
   @spec connected?(Yog.graph()) :: boolean()
-  def connected?(graph) do
+  def connected?(%Yog.Graph{} = graph) do
     case Model.type(graph) do
       :undirected ->
         case Components.connected_components(graph) do
@@ -341,11 +345,14 @@ defmodule Yog.Property.Structure do
     end
   end
 
+  def connected?(%Yog.DAG{graph: graph}), do: connected?(graph)
+  def connected?(other), do: raise_struct_error(other)
+
   @doc """
   Checks if a directed graph is strongly connected.
   """
   @spec strongly_connected?(Yog.graph()) :: boolean()
-  def strongly_connected?(graph) do
+  def strongly_connected?(%Yog.Graph{} = graph) do
     case Model.type(graph) do
       :undirected ->
         connected?(graph)
@@ -359,11 +366,14 @@ defmodule Yog.Property.Structure do
     end
   end
 
+  def strongly_connected?(%Yog.DAG{graph: graph}), do: strongly_connected?(graph)
+  def strongly_connected?(other), do: raise_struct_error(other)
+
   @doc """
   Checks if a directed graph is weakly connected.
   """
   @spec weakly_connected?(Yog.graph()) :: boolean()
-  def weakly_connected?(graph) do
+  def weakly_connected?(%Yog.Graph{} = graph) do
     case Model.type(graph) do
       :undirected ->
         connected?(graph)
@@ -377,11 +387,14 @@ defmodule Yog.Property.Structure do
     end
   end
 
+  def weakly_connected?(%Yog.DAG{graph: graph}), do: weakly_connected?(graph)
+  def weakly_connected?(other), do: raise_struct_error(other)
+
   @doc """
   Checks if the graph is chordal using Maximum Cardinality Search.
   """
   @spec chordal?(Yog.graph()) :: boolean()
-  def chordal?(graph) do
+  def chordal?(%Yog.Graph{} = graph) do
     case Model.type(graph) do
       :undirected ->
         peo?(graph, mcs_ordering(graph))
@@ -389,6 +402,13 @@ defmodule Yog.Property.Structure do
       :directed ->
         false
     end
+  end
+
+  def chordal?(%Yog.DAG{graph: graph}), do: chordal?(graph)
+  def chordal?(other), do: raise_struct_error(other)
+
+  defp raise_struct_error(other) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
   end
 
   # =============================================================================

@@ -38,94 +38,92 @@ defmodule Yog.Property.Planarity do
   if back-edges can be partitioned into "Left" and "Right" sides without crossing.
   """
   @spec planar?(Yog.graph()) :: boolean()
-  def planar?(graph) do
-    case Model.type(graph) do
-      :undirected ->
-        if planar_heuristic?(graph) do
-          case run_exact_planar_test(graph) do
-            {:ok, _metadata} -> true
-            :nonplanar -> false
-          end
-        else
-          false
-        end
-
-      :directed ->
-        false
+  def planar?(%Yog.Graph{kind: :undirected} = graph) do
+    if planar_heuristic?(graph) do
+      case run_exact_planar_test(graph) do
+        {:ok, _metadata} -> true
+        :nonplanar -> false
+      end
+    else
+      false
     end
   end
+
+  def planar?(%Yog.Graph{kind: :directed}), do: false
+  def planar?(%Yog.DAG{graph: graph}), do: planar?(graph)
+  def planar?(other), do: raise_struct_error(other)
 
   @doc """
   Returns a combinatorial embedding if the graph is planar.
   """
   @spec planar_embedding(Yog.graph()) :: {:ok, map()} | {:nonplanar, map()} | :nonplanar
-  def planar_embedding(graph) do
-    case Model.type(graph) do
-      :undirected ->
-        if planar_heuristic?(graph) do
-          case run_exact_planar_test(graph) do
-            {:ok, component_meta_list} ->
-              embedding =
-                Enum.reduce(component_meta_list, %{}, fn meta, acc ->
-                  Map.merge(acc, build_component_embedding(meta))
-                end)
+  def planar_embedding(%Yog.Graph{kind: :undirected} = graph) do
+    if planar_heuristic?(graph) do
+      case run_exact_planar_test(graph) do
+        {:ok, component_meta_list} ->
+          embedding =
+            Enum.reduce(component_meta_list, %{}, fn meta, acc ->
+              Map.merge(acc, build_component_embedding(meta))
+            end)
 
-              {:ok, embedding}
+          {:ok, embedding}
 
-            :nonplanar ->
-              case kuratowski_witness(graph) do
-                {:ok, witness} -> {:nonplanar, witness}
-                :planar -> :nonplanar
-              end
-          end
-        else
+        :nonplanar ->
           case kuratowski_witness(graph) do
             {:ok, witness} -> {:nonplanar, witness}
             :planar -> :nonplanar
           end
-        end
-
-      :directed ->
-        :nonplanar
+      end
+    else
+      case kuratowski_witness(graph) do
+        {:ok, witness} -> {:nonplanar, witness}
+        :planar -> :nonplanar
+      end
     end
   end
+
+  def planar_embedding(%Yog.Graph{kind: :directed}), do: :nonplanar
+  def planar_embedding(%Yog.DAG{graph: graph}), do: planar_embedding(graph)
+  def planar_embedding(other), do: raise_struct_error(other)
 
   @doc """
   Identifies a Kuratowski witness (a subdivision of K5 or K3,3) that proves
   the graph is non-planar.
   """
   @spec kuratowski_witness(Yog.graph()) :: {:ok, map()} | :planar | :nonplanar
-  def kuratowski_witness(graph) do
-    case Model.type(graph) do
-      :undirected ->
-        if planar?(graph) do
-          :planar
-        else
-          minimal = do_reduce_to_minimal(graph)
-          type = identify_kuratowski_type(minimal)
+  def kuratowski_witness(%Yog.Graph{kind: :undirected} = graph) do
+    if planar?(graph) do
+      :planar
+    else
+      minimal = do_reduce_to_minimal(graph)
+      type = identify_kuratowski_type(minimal)
 
-          # Fallback: if minimal reduction obscured the Kuratowski type
-          # (e.g., due to false negatives in the exact planarity test),
-          # try identifying on the original graph.
-          type = if type == :unknown, do: identify_kuratowski_type(graph), else: type
+      # Fallback: if minimal reduction obscured the Kuratowski type
+      # (e.g., due to false negatives in the exact planarity test),
+      # try identifying on the original graph.
+      type = if type == :unknown, do: identify_kuratowski_type(graph), else: type
 
-          edges =
-            minimal
-            |> Model.all_edges()
-            |> Enum.map(fn {u, v, _w} -> {u, v} end)
+      edges =
+        minimal
+        |> Model.all_edges()
+        |> Enum.map(fn {u, v, _w} -> {u, v} end)
 
-          {:ok,
-           %{
-             type: type,
-             nodes: Model.all_nodes(minimal),
-             edges: edges,
-             subgraph: minimal
-           }}
-        end
-
-      :directed ->
-        :nonplanar
+      {:ok,
+       %{
+         type: type,
+         nodes: Model.all_nodes(minimal),
+         edges: edges,
+         subgraph: minimal
+       }}
     end
+  end
+
+  def kuratowski_witness(%Yog.Graph{kind: :directed}), do: :nonplanar
+  def kuratowski_witness(%Yog.DAG{graph: graph}), do: kuratowski_witness(graph)
+  def kuratowski_witness(other), do: raise_struct_error(other)
+
+  defp raise_struct_error(other) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
   end
 
   # =============================================================================

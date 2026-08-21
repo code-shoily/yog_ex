@@ -438,4 +438,22 @@ defmodule Yog.Property.EulerianTest do
     # But not a circuit (nodes 1 and 4 have odd degree)
     assert Eulerian.has_eulerian_circuit?(graph) == false
   end
+
+  test "raises ArgumentError on invalid struct inputs" do
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Eulerian.has_eulerian_circuit?(:invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Eulerian.has_eulerian_path?(:invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Eulerian.eulerian_circuit(:invalid)
+    end
+
+    assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+      Eulerian.eulerian_path(:invalid)
+    end
+  end
 end
