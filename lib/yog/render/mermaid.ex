@@ -336,7 +336,25 @@ defmodule Yog.Render.Mermaid do
   ````
   """
   @spec to_mermaid(Yog.graph(), options()) :: String.t()
-  def to_mermaid(graph, options \\ default_options()) do
+  def to_mermaid(graph, options \\ default_options())
+
+  def to_mermaid(%Yog.Graph{} = graph, options) do
+    do_to_mermaid(graph, options)
+  end
+
+  def to_mermaid(%Yog.DAG{graph: graph}, options) do
+    do_to_mermaid(graph, options)
+  end
+
+  def to_mermaid(graph, options) when is_map(graph) do
+    do_to_mermaid(graph, options)
+  end
+
+  def to_mermaid(other, _options) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
+  end
+
+  defp do_to_mermaid(graph, options) do
     nodes = extract_nodes(graph)
     edges = extract_edges(graph)
     kind = extract_kind(graph)
@@ -645,6 +663,7 @@ defmodule Yog.Render.Mermaid do
 
   defp extract_nodes(graph) do
     case graph do
+      %Yog.DAG{graph: g} -> extract_nodes(g)
       %{nodes: n} when is_map(n) -> n
       _ -> %{}
     end
@@ -652,6 +671,7 @@ defmodule Yog.Render.Mermaid do
 
   defp extract_edges(graph) do
     case graph do
+      %Yog.DAG{graph: g} -> extract_edges(g)
       %{out_edges: e} when is_map(e) -> e
       _ -> %{}
     end
@@ -659,6 +679,7 @@ defmodule Yog.Render.Mermaid do
 
   defp extract_kind(graph) do
     case graph do
+      %Yog.DAG{graph: g} -> extract_kind(g)
       %{kind: k} -> k
       _ -> :directed
     end

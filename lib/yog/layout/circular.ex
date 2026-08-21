@@ -46,7 +46,17 @@ defmodule Yog.Layout.Circular do
 
   """
   @spec layout(Graph.t(), keyword()) :: %{Graph.node_id() => {float(), float()}}
-  def layout(graph, opts \\ []) do
+  def layout(graph, opts \\ [])
+
+  def layout(%Yog.DAG{graph: graph}, opts), do: layout(graph, opts)
+
+  def layout(%Graph{} = graph, opts), do: do_layout(graph, opts)
+
+  def layout(other, _opts) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
+  end
+
+  defp do_layout(graph, opts) do
     radius = Keyword.get(opts, :radius, 1.0)
     {cx, cy} = Keyword.get(opts, :center, {0.0, 0.0})
 

@@ -392,7 +392,9 @@ defmodule Yog.Multi.DOT do
   Converts a multigraph (`Yog.Multi.Graph`) to DOT syntax.
   """
   @spec to_dot(Yog.Multi.Graph.t(), options()) :: String.t()
-  def to_dot(graph, options \\ default_options()) do
+  def to_dot(graph, options \\ default_options())
+
+  def to_dot(%Yog.Multi.Graph{} = graph, options) do
     nodes = Map.get(graph, :nodes, %{})
     edges = Map.get(graph, :edges, %{})
     kind = Map.get(graph, :kind, :directed)
@@ -452,6 +454,10 @@ defmodule Yog.Multi.DOT do
     ]
     |> Enum.reject(&(&1 == ""))
     |> Enum.join("")
+  end
+
+  def to_dot(other, _options) do
+    raise ArgumentError, "expected a Yog.Multi.Graph struct, got: #{inspect(other)}"
   end
 
   # =============================================================================

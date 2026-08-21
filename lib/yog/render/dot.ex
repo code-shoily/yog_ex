@@ -376,7 +376,25 @@ defmodule Yog.Render.DOT do
       diagram = Yog.Render.DOT.to_dot(graph, Yog.Render.DOT.default_options())
   """
   @spec to_dot(Yog.graph(), options()) :: String.t()
-  def to_dot(graph, options \\ default_options()) do
+  def to_dot(graph, options \\ default_options())
+
+  def to_dot(%Yog.Graph{} = graph, options) do
+    do_to_dot(graph, options)
+  end
+
+  def to_dot(%Yog.DAG{graph: graph}, options) do
+    do_to_dot(graph, options)
+  end
+
+  def to_dot(graph, options) when is_map(graph) do
+    do_to_dot(graph, options)
+  end
+
+  def to_dot(other, _options) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
+  end
+
+  defp do_to_dot(graph, options) do
     nodes = extract_nodes(graph)
     edges = extract_edges(graph)
     kind = extract_kind(graph)
@@ -653,6 +671,7 @@ defmodule Yog.Render.DOT do
 
   defp extract_nodes(graph) do
     case graph do
+      %Yog.DAG{graph: g} -> extract_nodes(g)
       %{nodes: n} when is_map(n) -> n
       _ -> %{}
     end
@@ -660,6 +679,7 @@ defmodule Yog.Render.DOT do
 
   defp extract_edges(graph) do
     case graph do
+      %Yog.DAG{graph: g} -> extract_edges(g)
       %{out_edges: e} when is_map(e) -> e
       _ -> %{}
     end
@@ -667,6 +687,7 @@ defmodule Yog.Render.DOT do
 
   defp extract_kind(graph) do
     case graph do
+      %Yog.DAG{graph: g} -> extract_kind(g)
       %{kind: k} -> k
       _ -> :directed
     end

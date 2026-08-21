@@ -127,6 +127,11 @@ defmodule Yog.Render.ASCII do
     |> Enum.join("\n")
   end
 
+  def grid_to_string(other, _occupants) do
+    raise ArgumentError,
+          "expected a Yog.Builder.GridGraph or Yog.Builder.ToroidalGraph struct, got: #{inspect(other)}"
+  end
+
   @doc """
   Converts a grid to ASCII art using Unicode box-drawing characters.
 
@@ -183,6 +188,11 @@ defmodule Yog.Render.ASCII do
         intersection_row
       end
     end)
+  end
+
+  def grid_to_string_unicode(other, _occupants) do
+    raise ArgumentError,
+          "expected a Yog.Builder.GridGraph or Yog.Builder.ToroidalGraph struct, got: #{inspect(other)}"
   end
 
   # =============================================================================

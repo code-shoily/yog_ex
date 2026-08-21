@@ -210,7 +210,17 @@ defmodule Yog.Layout do
           %{Graph.node_id() => {float(), float()}},
           keyword()
         ) :: %{Graph.node_id() => {float(), float()}}
-  def manual(graph, positions, opts \\ []) do
+  def manual(graph, positions, opts \\ [])
+
+  def manual(%Yog.DAG{graph: graph}, positions, opts), do: manual(graph, positions, opts)
+
+  def manual(%Graph{} = graph, positions, opts), do: do_manual(graph, positions, opts)
+
+  def manual(other, _positions, _opts) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
+  end
+
+  defp do_manual(graph, positions, opts) do
     strict = Keyword.get(opts, :strict, false)
     missing = Keyword.get(opts, :missing, {:random, []})
     center = Keyword.get(opts, :center, {0.0, 0.0})

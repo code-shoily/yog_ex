@@ -42,7 +42,24 @@ defmodule Yog.Layout.GraphViz do
   @spec layout(Yog.Graph.t() | Yog.Multi.Graph.t(), keyword()) :: %{
           any() => {float(), float()}
         }
-  def layout(graph, opts \\ []) do
+  def layout(graph, opts \\ [])
+
+  def layout(%Yog.DAG{graph: graph}, opts), do: layout(graph, opts)
+
+  def layout(%Yog.Graph{} = graph, opts) when is_list(opts) do
+    do_layout(graph, false, opts)
+  end
+
+  def layout(%Yog.Multi.Graph{} = graph, opts) when is_list(opts) do
+    do_layout(graph, true, opts)
+  end
+
+  def layout(other, _opts) do
+    raise ArgumentError,
+          "expected a Yog.Graph, Yog.DAG, or Yog.Multi.Graph struct, got: #{inspect(other)}"
+  end
+
+  defp do_layout(graph, is_multi, opts) do
     engine_name = Keyword.get(opts, :engine, :dot) |> to_string()
     dot_opts = Keyword.get(opts, :dot_options, %{})
     scale = Keyword.get(opts, :position_scale, 72.0)
@@ -55,8 +72,6 @@ defmodule Yog.Layout.GraphViz do
       _path ->
         :ok
     end
-
-    is_multi = is_struct(graph, Yog.Multi.Graph)
 
     dot_string =
       if is_multi do

@@ -50,7 +50,25 @@ defmodule Yog.Render.SVG do
           %{Graph.node_id() => {float(), float()}},
           keyword()
         ) :: String.t()
-  def to_svg(graph, positions, opts \\ []) do
+  def to_svg(graph, positions, opts \\ [])
+
+  def to_svg(%Yog.DAG{graph: graph}, positions, opts), do: to_svg(graph, positions, opts)
+
+  def to_svg(%Graph{} = graph, positions, opts) when is_map(positions) and is_list(opts) do
+    do_to_svg(graph, positions, opts)
+  end
+
+  def to_svg(%Yog.Multi.Graph{} = graph, positions, opts)
+      when is_map(positions) and is_list(opts) do
+    do_to_svg(graph, positions, opts)
+  end
+
+  def to_svg(other, _positions, _opts) do
+    raise ArgumentError,
+          "expected a Yog.Graph, Yog.DAG, or Yog.Multi.Graph struct, got: #{inspect(other)}"
+  end
+
+  defp do_to_svg(graph, positions, opts) do
     width = Keyword.get(opts, :width, 600)
     height = Keyword.get(opts, :height, 400)
     padding = Keyword.get(opts, :padding, 40)

@@ -49,7 +49,17 @@ defmodule Yog.Layout.Shell do
   @spec layout(Graph.t(), [[Graph.node_id()]], keyword()) :: %{
           Graph.node_id() => {float(), float()}
         }
-  def layout(graph, shells, opts \\ []) do
+  def layout(graph, shells, opts \\ [])
+
+  def layout(%Yog.DAG{graph: graph}, shells, opts), do: layout(graph, shells, opts)
+
+  def layout(%Graph{} = graph, shells, opts), do: do_layout(graph, shells, opts)
+
+  def layout(other, _shells, _opts) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
+  end
+
+  defp do_layout(graph, shells, opts) do
     {cx, cy} = Keyword.get(opts, :center, {0.0, 0.0})
     custom_radii = Keyword.get(opts, :radii)
 

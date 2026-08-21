@@ -732,5 +732,11 @@ defmodule Yog.Multi.DOTTest do
       dot = DOT.to_dot(multi, opts)
       assert String.contains?(dot, "fillcolor")
     end
+
+    test "raises ArgumentError on invalid struct inputs" do
+      assert_raise ArgumentError, ~r/expected a Yog.Multi.Graph struct/, fn ->
+        DOT.to_dot(:invalid)
+      end
+    end
   end
 end

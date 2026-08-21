@@ -630,5 +630,20 @@ defmodule Yog.Render.MermaidTest do
       assert String.contains?(mermaid, "n_1[\"Second User\"]")
       assert String.contains?(mermaid, "n_0 -->|1| n_1")
     end
+
+    test "raises ArgumentError on invalid struct inputs" do
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Mermaid.to_mermaid(:invalid)
+      end
+    end
+
+    test "renders Yog.DAG structs properly" do
+      g = Yog.directed() |> Yog.add_edge_ensure(1, 2, 1)
+      {:ok, dag} = Yog.DAG.from_graph(g)
+
+      mermaid = Mermaid.to_mermaid(dag)
+      assert String.contains?(mermaid, "graph TD")
+      assert String.contains?(mermaid, "-->")
+    end
   end
 end

@@ -72,4 +72,21 @@ defmodule Yog.Render.SVGTest do
     assert String.contains?(svg, " Q ")
     assert String.contains?(svg, " C ")
   end
+
+  test "raises ArgumentError on invalid struct inputs" do
+    assert_raise ArgumentError,
+                 ~r/expected a Yog.Graph, Yog.DAG, or Yog.Multi.Graph struct/,
+                 fn ->
+                   SVG.to_svg(:invalid, %{})
+                 end
+  end
+
+  test "renders Yog.DAG structs properly" do
+    g = Yog.directed() |> Yog.add_edge_ensure(1, 2, 1)
+    {:ok, dag} = Yog.DAG.from_graph(g)
+    pos = Layout.circular(dag)
+
+    svg = SVG.to_svg(dag, pos)
+    assert String.starts_with?(svg, "<svg")
+  end
 end

@@ -58,7 +58,17 @@ defmodule Yog.Layout.Multipartite do
   @spec layout(Graph.t(), [[Graph.node_id()]], keyword()) :: %{
           Graph.node_id() => {float(), float()}
         }
-  def layout(graph, layers, opts \\ []) do
+  def layout(graph, layers, opts \\ [])
+
+  def layout(%Yog.DAG{graph: graph}, layers, opts), do: layout(graph, layers, opts)
+
+  def layout(%Graph{} = graph, layers, opts), do: do_layout(graph, layers, opts)
+
+  def layout(other, _layers, _opts) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
+  end
+
+  defp do_layout(graph, layers, opts) do
     align = Keyword.get(opts, :align, :vertical)
     width = Keyword.get(opts, :width, 1.0)
     height = Keyword.get(opts, :height, 1.0)

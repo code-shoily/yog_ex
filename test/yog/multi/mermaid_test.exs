@@ -511,5 +511,11 @@ defmodule Yog.Multi.MermaidTest do
       assert String.contains?(mermaid, "n_1[\"Second User\"]")
       assert String.contains?(mermaid, "n_0 -->|1| n_1")
     end
+
+    test "raises ArgumentError on invalid struct inputs" do
+      assert_raise ArgumentError, ~r/expected a Yog.Multi.Graph struct/, fn ->
+        Mermaid.to_mermaid(:invalid)
+      end
+    end
   end
 end

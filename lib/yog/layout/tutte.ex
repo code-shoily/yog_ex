@@ -55,7 +55,18 @@ defmodule Yog.Layout.Tutte do
   @spec layout(Graph.t(), [Graph.node_id()], keyword()) :: %{
           Graph.node_id() => {float(), float()}
         }
-  def layout(graph, boundary_nodes, opts \\ []) do
+  def layout(graph, boundary_nodes, opts \\ [])
+
+  def layout(%Yog.DAG{graph: graph}, boundary_nodes, opts),
+    do: layout(graph, boundary_nodes, opts)
+
+  def layout(%Graph{} = graph, boundary_nodes, opts), do: do_layout(graph, boundary_nodes, opts)
+
+  def layout(other, _boundary_nodes, _opts) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
+  end
+
+  defp do_layout(graph, boundary_nodes, opts) do
     iterations = Keyword.get(opts, :iterations, 100)
     radius = Keyword.get(opts, :radius, 1.0)
     {cx, cy} = Keyword.get(opts, :center, {0.0, 0.0})

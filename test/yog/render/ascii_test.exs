@@ -236,5 +236,19 @@ defmodule Yog.Render.ASCIITest do
       # matches {false, true, false, false}
       assert String.contains?(unicode5, "│")
     end
+
+    test "raises ArgumentError on invalid struct inputs" do
+      assert_raise ArgumentError,
+                   ~r/expected a Yog.Builder.GridGraph or Yog.Builder.ToroidalGraph struct/,
+                   fn ->
+                     ASCII.grid_to_string(:invalid)
+                   end
+
+      assert_raise ArgumentError,
+                   ~r/expected a Yog.Builder.GridGraph or Yog.Builder.ToroidalGraph struct/,
+                   fn ->
+                     ASCII.grid_to_string_unicode(:invalid)
+                   end
+    end
   end
 end

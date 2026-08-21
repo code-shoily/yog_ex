@@ -771,5 +771,20 @@ defmodule Yog.Render.DOTTest do
       dot = DOT.to_dot(graph, opts)
       assert String.contains?(dot, "1 [label=<table border=\"0\"><tr><td>Node</td></tr></table>]")
     end
+
+    test "raises ArgumentError on invalid struct inputs" do
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        DOT.to_dot(:invalid)
+      end
+    end
+
+    test "renders Yog.DAG structs properly" do
+      g = Yog.directed() |> Yog.add_edge_ensure(1, 2, 1)
+      {:ok, dag} = Yog.DAG.from_graph(g)
+
+      dot = DOT.to_dot(dag)
+      assert String.contains?(dot, "digraph")
+      assert String.contains?(dot, "1 -> 2")
+    end
   end
 end

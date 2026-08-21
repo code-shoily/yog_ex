@@ -345,7 +345,9 @@ defmodule Yog.Multi.Mermaid do
   Converts a multigraph (`Yog.Multi.Graph`) to Mermaid syntax.
   """
   @spec to_mermaid(Yog.Multi.Graph.t(), options()) :: String.t()
-  def to_mermaid(graph, options \\ default_options()) do
+  def to_mermaid(graph, options \\ default_options())
+
+  def to_mermaid(%Yog.Multi.Graph{} = graph, options) do
     nodes = Map.get(graph, :nodes, %{})
     edges = Map.get(graph, :edges, %{})
     kind = Map.get(graph, :kind, :directed)
@@ -444,6 +446,10 @@ defmodule Yog.Multi.Mermaid do
     |> Enum.join("")
     |> String.trim_trailing("\n")
     |> Kernel.<>("\n")
+  end
+
+  def to_mermaid(other, _options) do
+    raise ArgumentError, "expected a Yog.Multi.Graph struct, got: #{inspect(other)}"
   end
 
   # =============================================================================

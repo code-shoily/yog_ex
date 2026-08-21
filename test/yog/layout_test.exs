@@ -699,4 +699,56 @@ defmodule Yog.LayoutTest do
       end
     end
   end
+
+  describe "input validation across layout algorithms" do
+    test "raises ArgumentError on non-struct inputs" do
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Layout.circular(:invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Layout.random(:invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Layout.spring(:invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Layout.tutte(:invalid, [1, 2, 3])
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Layout.shell(:invalid, [[1]])
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Layout.multipartite(:invalid, [[1]])
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Layout.grid(:invalid, rows: [[1]])
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Layout.manual(:invalid, %{})
+      end
+
+      assert_raise ArgumentError,
+                   ~r/expected a Yog.Graph, Yog.DAG, or Yog.Multi.Graph struct/,
+                   fn ->
+                     Layout.graphviz(:invalid)
+                   end
+    end
+
+    test "supports Yog.DAG structs across layout algorithms" do
+      g = Yog.directed() |> Yog.add_edge_ensure(1, 2, 1)
+      {:ok, dag} = Yog.DAG.from_graph(g)
+
+      assert is_map(Layout.circular(dag))
+      assert is_map(Layout.random(dag))
+      assert is_map(Layout.spring(dag))
+      assert is_map(Layout.manual(dag, %{1 => {0.0, 0.0}, 2 => {1.0, 1.0}}))
+    end
+  end
 end
