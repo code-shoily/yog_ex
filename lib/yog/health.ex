@@ -88,7 +88,10 @@ defmodule Yog.Health do
       3
   """
   @spec diameter(Yog.graph(), metric_opts()) :: metric_value()
-  def diameter(graph, opts \\ []) do
+  def diameter(graph, opts \\ [])
+  def diameter(%Yog.DAG{graph: graph}, opts), do: diameter(graph, opts)
+
+  def diameter(%Yog.Graph{} = graph, opts) do
     %{zero: zero, add: add, compare: compare, weight_fn: weight_fn} = parse_metric_opts(opts)
 
     reweighted_graph =
@@ -139,6 +142,10 @@ defmodule Yog.Health do
     end
   end
 
+  def diameter(other, _opts) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
+  end
+
   @doc """
   The radius is the minimum eccentricity.
   Returns `nil` if the graph is disconnected or empty.
@@ -181,7 +188,10 @@ defmodule Yog.Health do
       1
   """
   @spec radius(Yog.graph(), metric_opts()) :: metric_value()
-  def radius(graph, opts \\ []) do
+  def radius(graph, opts \\ [])
+  def radius(%Yog.DAG{graph: graph}, opts), do: radius(graph, opts)
+
+  def radius(%Yog.Graph{} = graph, opts) do
     %{zero: zero, add: add, compare: compare, weight_fn: weight_fn} = parse_metric_opts(opts)
 
     reweighted_graph =
@@ -232,6 +242,10 @@ defmodule Yog.Health do
     end
   end
 
+  def radius(other, _opts) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
+  end
+
   @doc """
   Eccentricity is the maximum distance from a node to all other nodes.
   Returns `nil` if the node cannot reach all other nodes.
@@ -280,7 +294,10 @@ defmodule Yog.Health do
       2
   """
   @spec eccentricity(Yog.graph(), Yog.node_id(), metric_opts()) :: metric_value()
-  def eccentricity(graph, node, opts \\ []) do
+  def eccentricity(graph, node, opts \\ [])
+  def eccentricity(%Yog.DAG{graph: graph}, node, opts), do: eccentricity(graph, node, opts)
+
+  def eccentricity(%Yog.Graph{} = graph, node, opts) do
     %{zero: zero, add: add, compare: compare, weight_fn: weight_fn} = parse_metric_opts(opts)
 
     reweighted_graph =
@@ -305,6 +322,10 @@ defmodule Yog.Health do
         end)
       end
     end
+  end
+
+  def eccentricity(other, _node, _opts) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
   end
 
   # =============================================================================
@@ -347,7 +368,9 @@ defmodule Yog.Health do
       0.0
   """
   @spec assortativity(Yog.graph()) :: float()
-  def assortativity(graph) do
+  def assortativity(%Yog.DAG{graph: graph}), do: assortativity(graph)
+
+  def assortativity(%Yog.Graph{} = graph) do
     nodes = Map.keys(graph.nodes)
     out_edges = graph.out_edges
 
@@ -402,6 +425,10 @@ defmodule Yog.Health do
     end
   end
 
+  def assortativity(other) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
+  end
+
   @doc """
   Average shortest path length across all node pairs.
   Returns `nil` if the graph is disconnected or empty.
@@ -452,7 +479,10 @@ defmodule Yog.Health do
       true
   """
   @spec average_path_length(Yog.graph(), metric_opts()) :: float() | nil
-  def average_path_length(graph, opts \\ []) do
+  def average_path_length(graph, opts \\ [])
+  def average_path_length(%Yog.DAG{graph: graph}, opts), do: average_path_length(graph, opts)
+
+  def average_path_length(%Yog.Graph{} = graph, opts) do
     %{zero: zero, add: add, compare: compare, weight_fn: weight_fn, to_float: to_float} =
       parse_metric_opts(opts)
 
@@ -513,6 +543,10 @@ defmodule Yog.Health do
     end
   end
 
+  def average_path_length(other, _opts) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
+  end
+
   # =============================================================================
   # Efficiency Metrics
   # =============================================================================
@@ -535,7 +569,10 @@ defmodule Yog.Health do
       0.0
   """
   @spec efficiency(Yog.graph(), Yog.node_id(), Yog.node_id(), metric_opts()) :: float()
-  def efficiency(graph, u, v, opts \\ []) do
+  def efficiency(graph, u, v, opts \\ [])
+  def efficiency(%Yog.DAG{graph: graph}, u, v, opts), do: efficiency(graph, u, v, opts)
+
+  def efficiency(%Yog.Graph{} = graph, u, v, opts) do
     %{zero: zero, add: add, compare: compare, weight_fn: weight_fn, to_float: to_float} =
       parse_metric_opts(opts)
 
@@ -556,6 +593,10 @@ defmodule Yog.Health do
     end
   end
 
+  def efficiency(other, _u, _v, _opts) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
+  end
+
   @doc """
   Global efficiency of the graph.
 
@@ -573,7 +614,10 @@ defmodule Yog.Health do
       1.0
   """
   @spec global_efficiency(Yog.graph(), metric_opts()) :: float()
-  def global_efficiency(graph, opts \\ []) do
+  def global_efficiency(graph, opts \\ [])
+  def global_efficiency(%Yog.DAG{graph: graph}, opts), do: global_efficiency(graph, opts)
+
+  def global_efficiency(%Yog.Graph{} = graph, opts) do
     %{zero: zero, add: add, compare: compare, weight_fn: weight_fn, to_float: to_float} =
       parse_metric_opts(opts)
 
@@ -619,6 +663,10 @@ defmodule Yog.Health do
     end
   end
 
+  def global_efficiency(other, _opts) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
+  end
+
   @doc """
   Local efficiency of a single node.
 
@@ -638,7 +686,12 @@ defmodule Yog.Health do
       1.0
   """
   @spec local_efficiency(Yog.graph(), Yog.node_id(), metric_opts()) :: float()
-  def local_efficiency(graph, node, opts \\ []) do
+  def local_efficiency(graph, node, opts \\ [])
+
+  def local_efficiency(%Yog.DAG{graph: graph}, node, opts),
+    do: local_efficiency(graph, node, opts)
+
+  def local_efficiency(%Yog.Graph{} = graph, node, opts) do
     neighbors = Yog.neighbor_ids(graph, node)
 
     if length(neighbors) <= 1 do
@@ -648,6 +701,10 @@ defmodule Yog.Health do
       |> Transform.subgraph(neighbors)
       |> global_efficiency(opts)
     end
+  end
+
+  def local_efficiency(other, _node, _opts) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
   end
 
   @doc """
@@ -665,7 +722,12 @@ defmodule Yog.Health do
       1.0
   """
   @spec average_local_efficiency(Yog.graph(), metric_opts()) :: float()
-  def average_local_efficiency(graph, opts \\ []) do
+  def average_local_efficiency(graph, opts \\ [])
+
+  def average_local_efficiency(%Yog.DAG{graph: graph}, opts),
+    do: average_local_efficiency(graph, opts)
+
+  def average_local_efficiency(%Yog.Graph{} = graph, opts) do
     nodes = Map.keys(graph.nodes)
     n = length(nodes)
 
@@ -701,6 +763,10 @@ defmodule Yog.Health do
 
       total / n
     end
+  end
+
+  def average_local_efficiency(other, _opts) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
   end
 
   defp parse_metric_opts(opts) do

@@ -381,4 +381,82 @@ defmodule Yog.ConnectivityTest do
 
     assert Connectivity.degeneracy(graph) == 3
   end
+
+  describe "input validation across connectivity modules" do
+    test "raises ArgumentError on non-struct inputs" do
+      assert_raise ArgumentError, ~r/expected a Yog.Graph, Yog.DAG, or keyword list/, fn ->
+        Yog.Connectivity.Analysis.analyze(:invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Yog.Connectivity.SCC.strongly_connected_components(:invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Yog.Connectivity.SCC.kosaraju(:invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Yog.Connectivity.Components.connected_components(:invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Yog.Connectivity.Components.weakly_connected_components(:invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph struct/, fn ->
+        Yog.Connectivity.KCore.detect(:invalid, 1)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph struct/, fn ->
+        Yog.Connectivity.KCore.core_numbers(:invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Yog.Connectivity.Reachability.counts(:invalid, :descendants)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Yog.Connectivity.Reachability.counts_estimate(:invalid, :descendants)
+      end
+    end
+
+    test "raises ArgumentError on invalid parameters" do
+      g = Yog.undirected()
+
+      assert_raise ArgumentError, ~r/expected non-negative integer k/, fn ->
+        Yog.Connectivity.KCore.detect(g, -1)
+      end
+
+      assert_raise ArgumentError, ~r/expected direction :ancestors or :descendants/, fn ->
+        Yog.Connectivity.Reachability.counts(g, :invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected direction :ancestors or :descendants/, fn ->
+        Yog.Connectivity.Reachability.counts_estimate(g, :invalid)
+      end
+
+      directed = Yog.directed()
+
+      assert_raise ArgumentError, ~r/k-core decomposition requires an undirected graph/, fn ->
+        Yog.Connectivity.KCore.detect(directed, 1)
+      end
+
+      assert_raise ArgumentError, ~r/core_numbers\/1 requires an undirected graph/, fn ->
+        Yog.Connectivity.KCore.core_numbers(directed)
+      end
+    end
+
+    test "supports Yog.DAG structs across connectivity modules" do
+      g = Yog.directed() |> Yog.add_edge_ensure(1, 2, 1)
+      {:ok, dag} = Yog.DAG.from_graph(g)
+
+      assert is_list(Yog.Connectivity.SCC.strongly_connected_components(dag))
+      assert is_list(Yog.Connectivity.SCC.kosaraju(dag))
+      assert is_list(Yog.Connectivity.Components.connected_components(dag))
+      assert is_list(Yog.Connectivity.Components.weakly_connected_components(dag))
+      assert is_map(Yog.Connectivity.Reachability.counts(dag, :descendants))
+      assert is_map(Yog.Connectivity.Reachability.counts_estimate(dag, :descendants))
+    end
+  end
 end

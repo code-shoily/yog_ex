@@ -98,7 +98,11 @@ defmodule Yog.Connectivity.KCore do
     raise ArgumentError, "k-core decomposition requires an undirected graph"
   end
 
-  def detect(graph, k) when k >= 0 do
+  def detect(%Yog.DAG{}, _k) do
+    raise ArgumentError, "k-core decomposition requires an undirected graph"
+  end
+
+  def detect(%Yog.Graph{kind: :undirected} = graph, k) when is_integer(k) and k >= 0 do
     out_edges = graph.out_edges
     nodes = Map.keys(graph.nodes)
 
@@ -124,6 +128,14 @@ defmodule Yog.Connectivity.KCore do
 
     remaining = MapSet.difference(MapSet.new(nodes), pruned_nodes)
     Yog.Transform.subgraph(graph, MapSet.to_list(remaining))
+  end
+
+  def detect(%Yog.Graph{}, k) when not is_integer(k) or k < 0 do
+    raise ArgumentError, "expected non-negative integer k, got: #{inspect(k)}"
+  end
+
+  def detect(other, _k) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
   end
 
   defp do_prune(_, [], _, _, _, pruned), do: pruned
@@ -177,7 +189,11 @@ defmodule Yog.Connectivity.KCore do
     raise ArgumentError, "core_numbers/1 requires an undirected graph"
   end
 
-  def core_numbers(graph) do
+  def core_numbers(%Yog.DAG{}) do
+    raise ArgumentError, "core_numbers/1 requires an undirected graph"
+  end
+
+  def core_numbers(%Yog.Graph{kind: :undirected} = graph) do
     out_edges = graph.out_edges
     nodes = Map.keys(graph.nodes)
 
@@ -200,6 +216,10 @@ defmodule Yog.Connectivity.KCore do
       end
 
     do_calculate_core_numbers(out_edges, nodes, degrees, max_deg)
+  end
+
+  def core_numbers(other) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
   end
 
   defp do_calculate_core_numbers(out_edges, nodes, degrees, max_deg) do

@@ -116,7 +116,10 @@ defmodule Yog.Connectivity.SCC do
       2
   """
   @spec strongly_connected_components(Yog.graph()) :: [[Yog.node_id()]]
-  def strongly_connected_components(graph) do
+  def strongly_connected_components(%Yog.DAG{graph: graph}),
+    do: strongly_connected_components(graph)
+
+  def strongly_connected_components(%Yog.Graph{} = graph) do
     out_edges = graph.out_edges
     nodes = Map.keys(graph.nodes)
 
@@ -124,6 +127,10 @@ defmodule Yog.Connectivity.SCC do
       do_tarjan_all(nodes, out_edges, 0, %{}, %{}, [], %{}, [])
 
     final_sccs
+  end
+
+  def strongly_connected_components(other) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
   end
 
   defp do_tarjan_all([], _, idx, ids, lows, st, os, sccs),
@@ -250,7 +257,9 @@ defmodule Yog.Connectivity.SCC do
       3
   """
   @spec kosaraju(Yog.graph()) :: [[Yog.node_id()]]
-  def kosaraju(graph) do
+  def kosaraju(%Yog.DAG{graph: graph}), do: kosaraju(graph)
+
+  def kosaraju(%Yog.Graph{} = graph) do
     out_edges = graph.out_edges
     in_edges = graph.in_edges
     nodes = Map.keys(graph.nodes)
@@ -272,6 +281,10 @@ defmodule Yog.Connectivity.SCC do
       )
 
     sccs
+  end
+
+  def kosaraju(other) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
   end
 
   defp kosaraju_first_pass([], _, order, visited), do: {order, visited}

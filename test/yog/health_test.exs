@@ -358,4 +358,65 @@ defmodule Yog.HealthTest do
     assert Health.average_local_efficiency(g, custom_opts) == 0.0
     assert Health.efficiency(g, 0, 3, custom_opts) == 1.0 / 6.0
   end
+
+  describe "input validation across health metrics" do
+    test "raises ArgumentError on non-struct inputs" do
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Health.diameter(:invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Health.radius(:invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Health.eccentricity(:invalid, 1)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Health.assortativity(:invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Health.average_path_length(:invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Health.efficiency(:invalid, 1, 2)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Health.global_efficiency(:invalid)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Health.local_efficiency(:invalid, 1)
+      end
+
+      assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
+        Health.average_local_efficiency(:invalid)
+      end
+    end
+
+    test "supports Yog.DAG structs across health metrics" do
+      g = Yog.directed() |> Yog.add_edge_ensure(1, 2, 1)
+      {:ok, dag} = Yog.DAG.from_graph(g)
+
+      # In a multi-node DAG, reverse paths do not exist, so diameter/radius/APL return nil
+      assert Health.diameter(dag) == nil
+      assert Health.radius(dag) == nil
+      assert Health.eccentricity(dag, 1) == 1
+      assert is_float(Health.assortativity(dag))
+      assert Health.average_path_length(dag) == nil
+      assert Health.efficiency(dag, 1, 2) == 1.0
+      assert Health.global_efficiency(dag) >= 0.0
+      assert Health.local_efficiency(dag, 1) >= 0.0
+      assert Health.average_local_efficiency(dag) >= 0.0
+
+      # Single-node DAG tests
+      {:ok, single_dag} = Yog.DAG.from_graph(Yog.directed() |> Yog.add_node(1, nil))
+      assert Health.diameter(single_dag) == 0
+      assert Health.radius(single_dag) == 0
+    end
+  end
 end

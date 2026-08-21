@@ -94,7 +94,9 @@ defmodule Yog.Connectivity.Reachability do
       0
   """
   @spec counts(Yog.graph(), direction()) :: %{Yog.node_id() => integer()}
-  def counts(graph, direction) do
+  def counts(%Yog.DAG{graph: graph}, direction), do: counts(graph, direction)
+
+  def counts(%Yog.Graph{} = graph, direction) when direction in [:ancestors, :descendants] do
     case Yog.Traversal.topological_sort(graph) do
       {:ok, sorted} ->
         solve_acyclic_counts(graph, sorted, direction)
@@ -102,6 +104,15 @@ defmodule Yog.Connectivity.Reachability do
       {:error, :contains_cycle} ->
         solve_cyclic_counts(graph, direction)
     end
+  end
+
+  def counts(%Yog.Graph{}, direction) do
+    raise ArgumentError,
+          "expected direction :ancestors or :descendants, got: #{inspect(direction)}"
+  end
+
+  def counts(other, _direction) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
   end
 
   # ============================================================
@@ -190,7 +201,10 @@ defmodule Yog.Connectivity.Reachability do
       true
   """
   @spec counts_estimate(Yog.graph(), direction()) :: %{Yog.node_id() => integer()}
-  def counts_estimate(graph, direction) do
+  def counts_estimate(%Yog.DAG{graph: graph}, direction), do: counts_estimate(graph, direction)
+
+  def counts_estimate(%Yog.Graph{} = graph, direction)
+      when direction in [:ancestors, :descendants] do
     case Yog.Traversal.topological_sort(graph) do
       {:ok, sorted} ->
         solve_acyclic_hll(graph, sorted, direction)
@@ -198,6 +212,15 @@ defmodule Yog.Connectivity.Reachability do
       {:error, :contains_cycle} ->
         solve_cyclic_hll(graph, direction)
     end
+  end
+
+  def counts_estimate(%Yog.Graph{}, direction) do
+    raise ArgumentError,
+          "expected direction :ancestors or :descendants, got: #{inspect(direction)}"
+  end
+
+  def counts_estimate(other, _direction) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
   end
 
   # HyperLogLog-based counting for acyclic graphs

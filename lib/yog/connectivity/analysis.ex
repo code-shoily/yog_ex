@@ -52,15 +52,29 @@ defmodule Yog.Connectivity.Analysis do
   Analyzes an **undirected graph** to find all bridges and articulation points.
   """
   @spec analyze(keyword() | Yog.graph()) :: connectivity_results()
-  def analyze(options_or_graph) do
-    graph =
-      if is_list(options_or_graph) do
-        Keyword.fetch!(options_or_graph, :in)
-      else
-        options_or_graph
-      end
+  def analyze(%Yog.DAG{graph: graph}), do: do_analyze(graph)
+  def analyze(%Yog.Graph{} = graph), do: do_analyze(graph)
 
-    do_analyze(graph)
+  def analyze(options) when is_list(options) do
+    case Keyword.fetch(options, :in) do
+      {:ok, %Yog.DAG{graph: graph}} ->
+        do_analyze(graph)
+
+      {:ok, %Yog.Graph{} = graph} ->
+        do_analyze(graph)
+
+      {:ok, other} ->
+        raise ArgumentError,
+              "expected option :in to be a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
+
+      :error ->
+        raise ArgumentError, "expected keyword list with :in option, got: #{inspect(options)}"
+    end
+  end
+
+  def analyze(other) do
+    raise ArgumentError,
+          "expected a Yog.Graph, Yog.DAG, or keyword list with :in option, got: #{inspect(other)}"
   end
 
   defp do_analyze(graph) do

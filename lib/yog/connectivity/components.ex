@@ -112,7 +112,9 @@ defmodule Yog.Connectivity.Components do
       2
   """
   @spec connected_components(Yog.graph()) :: [component()]
-  def connected_components(graph) do
+  def connected_components(%Yog.DAG{graph: graph}), do: connected_components(graph)
+
+  def connected_components(%Yog.Graph{} = graph) do
     out_edges = graph.out_edges
     nodes = Map.keys(graph.nodes)
 
@@ -120,6 +122,10 @@ defmodule Yog.Connectivity.Components do
       do_components_all(nodes, out_edges, %{}, [])
 
     components
+  end
+
+  def connected_components(other) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
   end
 
   defp do_components_all([], _, _, comps), do: {%{}, comps}
@@ -189,7 +195,10 @@ defmodule Yog.Connectivity.Components do
       2
   """
   @spec weakly_connected_components(Yog.graph()) :: [component()]
-  def weakly_connected_components(graph) do
+  def weakly_connected_components(%Yog.DAG{graph: graph}),
+    do: weakly_connected_components(graph)
+
+  def weakly_connected_components(%Yog.Graph{} = graph) do
     out_edges = graph.out_edges
     in_edges = graph.in_edges
     nodes = Map.keys(graph.nodes)
@@ -198,6 +207,10 @@ defmodule Yog.Connectivity.Components do
       do_wcc_all(nodes, out_edges, in_edges, %{}, [])
 
     components
+  end
+
+  def weakly_connected_components(other) do
+    raise ArgumentError, "expected a Yog.Graph or Yog.DAG struct, got: #{inspect(other)}"
   end
 
   defp do_wcc_all([], _, _, _, comps), do: {%{}, comps}
