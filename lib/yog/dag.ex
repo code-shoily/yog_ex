@@ -430,7 +430,7 @@ defmodule Yog.DAG do
       5
   """
   @spec shortest_path(t(), Yog.node_id(), Yog.node_id()) ::
-          {:ok, Yog.Path.t()} | :error
+          {:ok, Yog.Pathfinding.Path.t()} | :error
   defdelegate shortest_path(dag, from, to), to: Yog.DAG.Algorithm
 
   @doc """
@@ -493,7 +493,7 @@ defmodule Yog.DAG do
   Time complexity: $\\mathcal{O}(V + E)$
   """
   @spec longest_path(t(), Yog.node_id(), Yog.node_id()) ::
-          {:ok, Yog.Path.t()} | :error
+          {:ok, Yog.Pathfinding.Path.t()} | :error
   defdelegate longest_path(dag, from, to), to: Yog.DAG.Algorithm
 
   @doc """
