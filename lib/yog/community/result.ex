@@ -48,6 +48,10 @@ defmodule Yog.Community.Result do
     %__MODULE__{assignments: assignments, num_communities: num}
   end
 
+  def new(other) do
+    raise ArgumentError, "expected a map of assignments, got: #{inspect(other)}"
+  end
+
   @doc """
   Creates a community result with explicit metadata and optional pre-computed values.
 
@@ -62,7 +66,10 @@ defmodule Yog.Community.Result do
       2
   """
   @spec new(%{node_id() => community_id()}, map(), keyword()) :: t()
-  def new(assignments, metadata, opts \\ []) when is_map(assignments) and is_map(metadata) do
+  def new(assignments, metadata, opts \\ [])
+
+  def new(assignments, metadata, opts)
+      when is_map(assignments) and is_map(metadata) and is_list(opts) do
     num =
       case Keyword.get(opts, :num_communities) do
         nil ->
@@ -78,13 +85,31 @@ defmodule Yog.Community.Result do
     %__MODULE__{assignments: assignments, num_communities: num, metadata: metadata}
   end
 
+  def new(assignments, metadata, opts) do
+    cond do
+      not is_map(assignments) ->
+        raise ArgumentError, "expected a map of assignments, got: #{inspect(assignments)}"
+
+      not is_map(metadata) ->
+        raise ArgumentError, "expected metadata map, got: #{inspect(metadata)}"
+
+      not is_list(opts) ->
+        raise ArgumentError, "expected options keyword list, got: #{inspect(opts)}"
+    end
+  end
+
   @doc """
   Backward compatibility: convert from legacy map format.
   """
   @spec from_map(map()) :: t()
-  def from_map(%{assignments: asgn, num_communities: num} = map) do
+  def from_map(%{assignments: asgn, num_communities: num} = map) when is_map(asgn) do
     metadata = Map.get(map, :metadata, %{})
     %__MODULE__{assignments: asgn, num_communities: num, metadata: metadata}
+  end
+
+  def from_map(other) do
+    raise ArgumentError,
+          "expected a legacy map with :assignments and :num_communities, got: #{inspect(other)}"
   end
 
   @doc """
@@ -96,5 +121,9 @@ defmodule Yog.Community.Result do
       assignments: result.assignments,
       num_communities: result.num_communities
     }
+  end
+
+  def to_map(other) do
+    raise ArgumentError, "expected a Yog.Community.Result struct, got: #{inspect(other)}"
   end
 end

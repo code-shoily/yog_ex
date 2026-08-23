@@ -76,8 +76,16 @@ defmodule Yog.Community.LocalCommunity do
       true
   """
   @spec detect(Yog.graph(), seeds: [Yog.node_id()]) :: MapSet.t(Yog.node_id())
-  def detect(graph, seeds: seeds) do
+  def detect(%Yog.Graph{} = graph, seeds: seeds) do
     detect_with(graph, seeds, default_options(), fn _ -> 1.0 end)
+  end
+
+  def detect(%Yog.Graph{}, opts) do
+    raise ArgumentError, "expected opts with :seeds, got: #{inspect(opts)}"
+  end
+
+  def detect(other, _opts) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
   end
 
   @doc """
@@ -96,14 +104,25 @@ defmodule Yog.Community.LocalCommunity do
       iex> MapSet.member?(community, 2)
       true
   """
-  @spec detect_with_options(Yog.graph(), [Yog.node_id()], keyword()) :: MapSet.t(Yog.node_id())
-  def detect_with_options(graph, seeds, opts) do
+  @spec detect_with_options(Yog.graph(), [Yog.node_id()], keyword() | map()) ::
+          MapSet.t(Yog.node_id())
+  def detect_with_options(%Yog.Graph{} = graph, seeds, opts) when is_list(opts) or is_map(opts) do
+    opts_map = Map.new(opts)
+
     options = %{
-      alpha: Keyword.get(opts, :alpha, 1.0),
-      max_iterations: Keyword.get(opts, :max_iterations, 1000)
+      alpha: Map.get(opts_map, :alpha, 1.0),
+      max_iterations: Map.get(opts_map, :max_iterations, 1000)
     }
 
     detect_with(graph, seeds, options, fn _ -> 1.0 end)
+  end
+
+  def detect_with_options(%Yog.Graph{}, _seeds, opts) do
+    raise ArgumentError, "expected options keyword list or map, got: #{inspect(opts)}"
+  end
+
+  def detect_with_options(other, _seeds, _opts) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
   end
 
   @doc """
@@ -111,9 +130,22 @@ defmodule Yog.Community.LocalCommunity do
 
   The weight function transforms edge weights to floats for calculations.
   """
-  @spec detect_with(Yog.graph(), [Yog.node_id()], local_options(), (any() -> float())) ::
+  @spec detect_with(Yog.graph(), [Yog.node_id()], local_options() | map(), (any() -> float())) ::
           MapSet.t(Yog.node_id())
-  def detect_with(graph, seeds, options, weight_fn) do
+  def detect_with(%Yog.Graph{} = graph, seeds, options, weight_fn)
+      when is_list(seeds) and (is_map(options) or is_list(options)) and is_function(weight_fn, 1) do
+    opts_map = Map.new(options)
+
+    if not (is_number(opts_map.alpha) and opts_map.alpha > 0) do
+      raise ArgumentError,
+            "expected alpha to be a positive number, got: #{inspect(opts_map.alpha)}"
+    end
+
+    if not (is_integer(opts_map.max_iterations) and opts_map.max_iterations >= 0) do
+      raise ArgumentError,
+            "expected max_iterations to be an integer >= 0, got: #{inspect(opts_map.max_iterations)}"
+    end
+
     seeds_set = MapSet.new(seeds)
     initial_s = seeds_set
 
@@ -131,11 +163,28 @@ defmodule Yog.Community.LocalCommunity do
       frontier,
       internal_weights,
       degrees_cache,
-      options,
+      opts_map,
       0,
       weight_fn,
       seeds_set
     )
+  end
+
+  def detect_with(%Yog.Graph{}, seeds, _options, _weight_fn) when not is_list(seeds) do
+    raise ArgumentError, "expected seeds to be a list of node IDs, got: #{inspect(seeds)}"
+  end
+
+  def detect_with(%Yog.Graph{}, _seeds, options, _weight_fn)
+      when not (is_map(options) or is_list(options)) do
+    raise ArgumentError, "expected options map or keyword list, got: #{inspect(options)}"
+  end
+
+  def detect_with(%Yog.Graph{}, _seeds, _options, weight_fn) when not is_function(weight_fn, 1) do
+    raise ArgumentError, "expected weight_fn to be a 1-arity function, got: #{inspect(weight_fn)}"
+  end
+
+  def detect_with(other, _seeds, _options, _weight_fn) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
   end
 
   # ============================================================

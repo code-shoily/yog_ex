@@ -105,8 +105,12 @@ defmodule Yog.Community.Infomap do
       IO.inspect(communities.num_communities)
   """
   @spec detect(Yog.graph()) :: Result.t()
-  def detect(graph) do
+  def detect(%Yog.Graph{} = graph) do
     detect_with_options(graph, default_options())
+  end
+
+  def detect(other) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
   end
 
   @doc """
@@ -125,12 +129,13 @@ defmodule Yog.Community.Infomap do
       communities = Yog.Community.Infomap.detect_with_options(graph, options)
   """
   @spec detect_with_options(Yog.graph(), options() | keyword()) :: Result.t()
-  def detect_with_options(graph, opts) when is_list(opts) do
+  def detect_with_options(%Yog.Graph{} = graph, opts) when is_list(opts) do
     detect_with_options(graph, Map.new(opts))
   end
 
-  def detect_with_options(graph, opts) when is_map(opts) do
+  def detect_with_options(%Yog.Graph{} = graph, opts) when is_map(opts) do
     options = Map.merge(default_options(), opts)
+    validate_infomap_options!(options)
     nodes = Map.keys(graph.nodes)
     n = length(nodes)
 
@@ -154,6 +159,27 @@ defmodule Yog.Community.Infomap do
           optimize_map_equation(graph, pagerank, initial_assignments, nodes, options)
 
         Result.new(final_assignments)
+    end
+  end
+
+  def detect_with_options(%Yog.Graph{}, opts) do
+    raise ArgumentError, "expected options keyword list or map, got: #{inspect(opts)}"
+  end
+
+  def detect_with_options(other, _opts) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
+  end
+
+  defp validate_infomap_options!(options) do
+    if not (is_integer(options.max_pagerank_iters) and options.max_pagerank_iters >= 0) do
+      raise ArgumentError,
+            "expected max_pagerank_iters to be an integer >= 0, got: #{inspect(options.max_pagerank_iters)}"
+    end
+
+    if not (is_number(options.teleport_prob) and options.teleport_prob >= 0.0 and
+              options.teleport_prob <= 1.0) do
+      raise ArgumentError,
+            "expected teleport_prob to be a number between 0.0 and 1.0, got: #{inspect(options.teleport_prob)}"
     end
   end
 
@@ -396,8 +422,16 @@ defmodule Yog.Community.Infomap do
         p_loop = stats.p_loop
 
         if p_loop > 0 do
-          h_p =
-            -Enum.sum(
+          exit_term =
+            if stats.q_exit > 0 do
+              ratio = stats.q_exit / p_loop
+              ratio * :math.log2(ratio)
+            else
+              0.0
+            end
+
+          node_term =
+            Enum.sum(
               Enum.map(stats.nodes, fn u ->
                 p_u = Map.get(pagerank, u, 0.0)
 
@@ -410,12 +444,7 @@ defmodule Yog.Community.Infomap do
               end)
             )
 
-          -if stats.q_exit > 0 do
-            ratio = stats.q_exit / p_loop
-            ratio * :math.log2(ratio)
-          else
-            0.0
-          end
+          h_p = -(exit_term + node_term)
 
           p_loop * h_p
         else

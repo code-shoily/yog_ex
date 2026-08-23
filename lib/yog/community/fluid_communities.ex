@@ -84,8 +84,12 @@ defmodule Yog.Community.FluidCommunities do
       IO.inspect(communities.num_communities)
   """
   @spec detect(Yog.graph()) :: Result.t()
-  def detect(graph) do
+  def detect(%Yog.Graph{} = graph) do
     detect_with_options(graph, [])
+  end
+
+  def detect(other) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
   end
 
   @doc """
@@ -106,12 +110,23 @@ defmodule Yog.Community.FluidCommunities do
       )
   """
   @spec detect_with_options(Yog.graph(), keyword() | map()) :: Result.t()
-  def detect_with_options(graph, opts) when is_list(opts) do
+  def detect_with_options(%Yog.Graph{} = graph, opts) when is_list(opts) do
     detect_with_options(graph, Map.new(opts))
   end
 
-  def detect_with_options(graph, opts) when is_map(opts) do
+  def detect_with_options(%Yog.Graph{} = graph, opts) when is_map(opts) do
     options = Map.merge(default_options(), opts)
+
+    if not (is_integer(options.target_communities) and options.target_communities >= 1) do
+      raise ArgumentError,
+            "expected target_communities to be an integer >= 1, got: #{inspect(options.target_communities)}"
+    end
+
+    if not (is_integer(options.max_iterations) and options.max_iterations >= 0) do
+      raise ArgumentError,
+            "expected max_iterations to be an integer >= 0, got: #{inspect(options.max_iterations)}"
+    end
+
     all_nodes = Map.keys(graph.nodes)
     k = min(options.target_communities, length(all_nodes))
 
@@ -120,6 +135,14 @@ defmodule Yog.Community.FluidCommunities do
       1 -> Result.new(Map.new(all_nodes, fn n -> {n, 0} end))
       _ -> initialize_and_run(graph, all_nodes, k, options)
     end
+  end
+
+  def detect_with_options(%Yog.Graph{}, opts) do
+    raise ArgumentError, "expected options keyword list or map, got: #{inspect(opts)}"
+  end
+
+  def detect_with_options(other, _opts) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
   end
 
   defp initialize_and_run(graph, all_nodes, k, options) do

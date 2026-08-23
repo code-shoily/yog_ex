@@ -41,12 +41,26 @@ defmodule Yog.Community.Dendrogram do
     %__MODULE__{levels: levels}
   end
 
+  def new(other) do
+    raise ArgumentError, "expected a list of community levels, got: #{inspect(other)}"
+  end
+
   @doc """
   Creates a new dendrogram with merge order tracking.
   """
   @spec new([Result.t()], [{non_neg_integer(), non_neg_integer()}]) :: t()
   def new(levels, merge_order) when is_list(levels) and is_list(merge_order) do
     %__MODULE__{levels: levels, merge_order: merge_order}
+  end
+
+  def new(levels, merge_order) do
+    cond do
+      not is_list(levels) ->
+        raise ArgumentError, "expected a list of community levels, got: #{inspect(levels)}"
+
+      not is_list(merge_order) ->
+        raise ArgumentError, "expected merge order list, got: #{inspect(merge_order)}"
+    end
   end
 
   @doc """
@@ -56,6 +70,10 @@ defmodule Yog.Community.Dendrogram do
   def finest(%__MODULE__{levels: [first | _]}), do: first
   def finest(%__MODULE__{levels: []}), do: Result.new(%{})
 
+  def finest(other) do
+    raise ArgumentError, "expected a Yog.Community.Dendrogram struct, got: #{inspect(other)}"
+  end
+
   @doc """
   Get the coarsest partition (fewest communities).
   """
@@ -64,22 +82,42 @@ defmodule Yog.Community.Dendrogram do
     List.last(levels) || Result.new(%{})
   end
 
+  def coarsest(other) do
+    raise ArgumentError, "expected a Yog.Community.Dendrogram struct, got: #{inspect(other)}"
+  end
+
   @doc """
   Get partition with approximately n communities.
 
   Returns the first level with <= n communities.
   """
   @spec at_level(t(), non_neg_integer()) :: Result.t() | nil
-  def at_level(%__MODULE__{levels: levels}, n) do
+  def at_level(%__MODULE__{levels: levels}, n) when is_integer(n) and n >= 0 do
     Enum.find(levels, fn level -> level.num_communities <= n end)
+  end
+
+  def at_level(%__MODULE__{}, n) do
+    raise ArgumentError, "expected non-negative integer n, got: #{inspect(n)}"
+  end
+
+  def at_level(other, _n) do
+    raise ArgumentError, "expected a Yog.Community.Dendrogram struct, got: #{inspect(other)}"
   end
 
   @doc """
   Get partition at a specific level index.
   """
   @spec get_level(t(), non_neg_integer()) :: Result.t() | nil
-  def get_level(%__MODULE__{levels: levels}, index) do
+  def get_level(%__MODULE__{levels: levels}, index) when is_integer(index) and index >= 0 do
     Enum.at(levels, index)
+  end
+
+  def get_level(%__MODULE__{}, index) do
+    raise ArgumentError, "expected non-negative integer index, got: #{inspect(index)}"
+  end
+
+  def get_level(other, _index) do
+    raise ArgumentError, "expected a Yog.Community.Dendrogram struct, got: #{inspect(other)}"
   end
 
   @doc """
@@ -90,18 +128,26 @@ defmodule Yog.Community.Dendrogram do
     length(levels)
   end
 
+  def num_levels(other) do
+    raise ArgumentError, "expected a Yog.Community.Dendrogram struct, got: #{inspect(other)}"
+  end
+
   @doc """
   Backward compatibility: convert from legacy map format.
   """
   @spec from_map(map()) :: t()
-  def from_map(%{levels: levels, merge_order: merge_order}) do
+  def from_map(%{levels: levels, merge_order: merge_order}) when is_list(levels) do
     converted_levels = Enum.map(levels, &Result.from_map/1)
     %__MODULE__{levels: converted_levels, merge_order: merge_order}
   end
 
-  def from_map(%{levels: levels}) do
+  def from_map(%{levels: levels}) when is_list(levels) do
     converted_levels = Enum.map(levels, &Result.from_map/1)
     %__MODULE__{levels: converted_levels}
+  end
+
+  def from_map(other) do
+    raise ArgumentError, "expected a map with :levels, got: #{inspect(other)}"
   end
 
   @doc """
@@ -113,6 +159,10 @@ defmodule Yog.Community.Dendrogram do
       levels: Enum.map(levels, &Result.to_map/1),
       merge_order: merge_order
     }
+  end
+
+  def to_map(other) do
+    raise ArgumentError, "expected a Yog.Community.Dendrogram struct, got: #{inspect(other)}"
   end
 
   @doc """
@@ -140,5 +190,9 @@ defmodule Yog.Community.Dendrogram do
       end)
 
     Result.new(final_assignments)
+  end
+
+  def flatten_to_original(other) do
+    raise ArgumentError, "expected a Yog.Community.Dendrogram struct, got: #{inspect(other)}"
   end
 end

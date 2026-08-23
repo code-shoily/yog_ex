@@ -83,8 +83,12 @@ defmodule Yog.Community.Louvain do
   Detects communities using the Louvain algorithm with default options.
   """
   @spec detect(Yog.graph()) :: Result.t()
-  def detect(graph) do
+  def detect(%Yog.Graph{} = graph) do
     detect_with_options(graph, [])
+  end
+
+  def detect(other) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
   end
 
   @doc """
@@ -97,18 +101,24 @@ defmodule Yog.Community.Louvain do
     * `:resolution` - Resolution parameter (gamma) (default: 1.0)
     * `:seed` - Random seed for tie-breaking (default: 42)
   """
-  @spec detect_with_options(Yog.graph(), keyword()) :: Result.t()
-  def detect_with_options(graph, opts) do
+  @spec detect_with_options(Yog.graph(), keyword() | map()) :: Result.t()
+  def detect_with_options(%Yog.Graph{} = graph, opts) do
     {communities, _stats} = detect_with_stats(graph, opts)
     communities
+  end
+
+  def detect_with_options(other, _opts) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
   end
 
   @doc """
   Detects communities and returns statistics for debugging/analysis.
   """
-  @spec detect_with_stats(Yog.graph(), keyword()) :: {Result.t(), louvain_stats()}
-  def detect_with_stats(graph, opts) do
-    options = Map.merge(default_options(), Map.new(opts))
+  @spec detect_with_stats(Yog.graph(), keyword() | map()) :: {Result.t(), louvain_stats()}
+  def detect_with_stats(%Yog.Graph{} = graph, opts) when is_list(opts) or is_map(opts) do
+    opts_map = Map.new(opts)
+    options = Map.merge(default_options(), opts_map)
+    validate_louvain_options!(options)
 
     nodes = Map.keys(graph.nodes)
     total_weight = calculate_total_weight(graph)
@@ -130,20 +140,35 @@ defmodule Yog.Community.Louvain do
     {communities, final_stats}
   end
 
+  def detect_with_stats(%Yog.Graph{}, opts) do
+    raise ArgumentError, "expected options keyword list or map, got: #{inspect(opts)}"
+  end
+
+  def detect_with_stats(other, _opts) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
+  end
+
   @doc """
   Full hierarchical Louvain detection.
   """
   @spec detect_hierarchical(Yog.graph()) :: Dendrogram.t()
-  def detect_hierarchical(graph) do
+  def detect_hierarchical(%Yog.Graph{} = graph) do
     detect_hierarchical_with_options(graph, [])
+  end
+
+  def detect_hierarchical(other) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
   end
 
   @doc """
   Full hierarchical Louvain detection with custom options.
   """
-  @spec detect_hierarchical_with_options(Yog.graph(), keyword()) :: Dendrogram.t()
-  def detect_hierarchical_with_options(graph, opts) do
-    options = Map.merge(default_options(), Map.new(opts))
+  @spec detect_hierarchical_with_options(Yog.graph(), keyword() | map()) :: Dendrogram.t()
+  def detect_hierarchical_with_options(%Yog.Graph{} = graph, opts)
+      when is_list(opts) or is_map(opts) do
+    opts_map = Map.new(opts)
+    options = Map.merge(default_options(), opts_map)
+    validate_louvain_options!(options)
 
     nodes = Map.keys(graph.nodes)
     total_weight = calculate_total_weight(graph)
@@ -159,6 +184,31 @@ defmodule Yog.Community.Louvain do
     }
 
     do_louvain_hierarchical(graph, initial_state, [], 0, options)
+  end
+
+  def detect_hierarchical_with_options(%Yog.Graph{}, opts) do
+    raise ArgumentError, "expected options keyword list or map, got: #{inspect(opts)}"
+  end
+
+  def detect_hierarchical_with_options(other, _opts) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
+  end
+
+  defp validate_louvain_options!(options) do
+    if not (is_integer(options.max_iterations) and options.max_iterations >= 0) do
+      raise ArgumentError,
+            "expected max_iterations to be an integer >= 0, got: #{inspect(options.max_iterations)}"
+    end
+
+    if not (is_number(options.resolution) and options.resolution > 0) do
+      raise ArgumentError,
+            "expected resolution to be a positive number, got: #{inspect(options.resolution)}"
+    end
+
+    if not is_number(options.min_modularity_gain) do
+      raise ArgumentError,
+            "expected min_modularity_gain to be a number, got: #{inspect(options.min_modularity_gain)}"
+    end
   end
 
   # ============================================================

@@ -112,8 +112,12 @@ defmodule Yog.Community.Leiden do
       IO.inspect(communities.num_communities)
   """
   @spec detect(Yog.graph()) :: Result.t()
-  def detect(graph) do
+  def detect(%Yog.Graph{} = graph) do
     detect_with_options(graph, [])
+  end
+
+  def detect(other) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
   end
 
   @doc """
@@ -133,12 +137,13 @@ defmodule Yog.Community.Leiden do
       communities = Yog.Community.Leiden.detect_with_options(graph, options)
   """
   @spec detect_with_options(Yog.graph(), keyword() | map()) :: Result.t()
-  def detect_with_options(graph, opts) when is_list(opts) do
+  def detect_with_options(%Yog.Graph{} = graph, opts) when is_list(opts) do
     detect_with_options(graph, Map.new(opts))
   end
 
-  def detect_with_options(graph, opts) when is_map(opts) do
+  def detect_with_options(%Yog.Graph{} = graph, opts) when is_map(opts) do
     options = Map.merge(default_options(), opts)
+    validate_leiden_options!(options)
     nodes = Yog.all_nodes(graph)
 
     case length(nodes) do
@@ -170,6 +175,14 @@ defmodule Yog.Community.Leiden do
     end
   end
 
+  def detect_with_options(%Yog.Graph{}, opts) do
+    raise ArgumentError, "expected options keyword list or map, got: #{inspect(opts)}"
+  end
+
+  def detect_with_options(other, _opts) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
+  end
+
   @doc """
   Full hierarchical Leiden detection.
 
@@ -190,8 +203,12 @@ defmodule Yog.Community.Leiden do
       IO.inspect(length(dendrogram.levels))
   """
   @spec detect_hierarchical(Yog.graph()) :: Dendrogram.t()
-  def detect_hierarchical(graph) do
+  def detect_hierarchical(%Yog.Graph{} = graph) do
     detect_hierarchical_with_options(graph, [])
+  end
+
+  def detect_hierarchical(other) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
   end
 
   @doc """
@@ -215,12 +232,13 @@ defmodule Yog.Community.Leiden do
   """
   @spec detect_hierarchical_with_options(Yog.graph(), keyword() | map()) ::
           Dendrogram.t()
-  def detect_hierarchical_with_options(graph, opts) when is_list(opts) do
+  def detect_hierarchical_with_options(%Yog.Graph{} = graph, opts) when is_list(opts) do
     detect_hierarchical_with_options(graph, Map.new(opts))
   end
 
-  def detect_hierarchical_with_options(graph, opts) when is_map(opts) do
+  def detect_hierarchical_with_options(%Yog.Graph{} = graph, opts) when is_map(opts) do
     options = Map.merge(default_options(), opts)
+    validate_leiden_options!(options)
     nodes = Yog.all_nodes(graph)
     total_weight = calculate_total_weight(graph)
 
@@ -235,6 +253,31 @@ defmodule Yog.Community.Leiden do
     }
 
     do_leiden_hierarchical(graph, initial_state, [], 0, options)
+  end
+
+  def detect_hierarchical_with_options(%Yog.Graph{}, opts) do
+    raise ArgumentError, "expected options keyword list or map, got: #{inspect(opts)}"
+  end
+
+  def detect_hierarchical_with_options(other, _opts) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
+  end
+
+  defp validate_leiden_options!(options) do
+    if not (is_integer(options.max_iterations) and options.max_iterations >= 0) do
+      raise ArgumentError,
+            "expected max_iterations to be an integer >= 0, got: #{inspect(options.max_iterations)}"
+    end
+
+    if not (is_integer(options.refinement_iterations) and options.refinement_iterations >= 0) do
+      raise ArgumentError,
+            "expected refinement_iterations to be an integer >= 0, got: #{inspect(options.refinement_iterations)}"
+    end
+
+    if not (is_number(options.resolution) and options.resolution > 0) do
+      raise ArgumentError,
+            "expected resolution to be a positive number, got: #{inspect(options.resolution)}"
+    end
   end
 
   # =============================================================================

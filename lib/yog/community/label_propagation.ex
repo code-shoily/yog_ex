@@ -54,8 +54,12 @@ defmodule Yog.Community.LabelPropagation do
       true
   """
   @spec detect(Yog.graph()) :: Result.t()
-  def detect(graph) do
+  def detect(%Yog.Graph{} = graph) do
     detect_with_options(graph, [])
+  end
+
+  def detect(other) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
   end
 
   @doc """
@@ -79,10 +83,15 @@ defmodule Yog.Community.LabelPropagation do
       iex> is_map(communities.assignments)
       true
   """
-  @spec detect_with_options(Yog.graph(), keyword()) :: Result.t()
-  def detect_with_options(graph, opts) do
-    max_iterations = Keyword.get(opts, :max_iterations, 100)
-    seed = Keyword.get(opts, :seed, 0)
+  @spec detect_with_options(Yog.graph(), keyword() | map()) :: Result.t()
+  def detect_with_options(%Yog.Graph{} = graph, opts) when is_list(opts) or is_map(opts) do
+    opts_map = Map.new(opts)
+    options = Map.merge(default_options(), opts_map)
+
+    if not (is_integer(options.max_iterations) and options.max_iterations >= 0) do
+      raise ArgumentError,
+            "expected max_iterations to be an integer >= 0, got: #{inspect(options.max_iterations)}"
+    end
 
     nodes = Map.keys(graph.nodes)
 
@@ -93,7 +102,8 @@ defmodule Yog.Community.LabelPropagation do
       initial_labels = Map.new(nodes, fn node -> {node, node} end)
 
       # Run label propagation
-      final_labels = propagate_labels(graph, nodes, initial_labels, max_iterations, seed)
+      final_labels =
+        propagate_labels(graph, nodes, initial_labels, options.max_iterations, options.seed)
 
       # Renumber communities to be 0, 1, 2, ...
       unique_labels = final_labels |> Map.values() |> Enum.uniq() |> Enum.sort()
@@ -106,6 +116,14 @@ defmodule Yog.Community.LabelPropagation do
 
       Result.new(assignments)
     end
+  end
+
+  def detect_with_options(%Yog.Graph{}, opts) do
+    raise ArgumentError, "expected options keyword list or map, got: #{inspect(opts)}"
+  end
+
+  def detect_with_options(other, _opts) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
   end
 
   # ============================================================

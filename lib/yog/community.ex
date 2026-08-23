@@ -198,6 +198,10 @@ defmodule Yog.Community do
     end)
   end
 
+  def to_dict(other) do
+    raise ArgumentError, "expected a Yog.Community.Result struct, got: #{inspect(other)}"
+  end
+
   @doc """
   Returns the community ID with the largest number of nodes.
 
@@ -234,6 +238,10 @@ defmodule Yog.Community do
     end
   end
 
+  def largest(other) do
+    raise ArgumentError, "expected a Yog.Community.Result struct, got: #{inspect(other)}"
+  end
+
   @doc """
   Returns a dictionary mapping community IDs to their sizes (number of nodes).
 
@@ -256,6 +264,10 @@ defmodule Yog.Community do
       current_size = Map.get(acc, community, 0)
       Map.put(acc, community, current_size + 1)
     end)
+  end
+
+  def sizes(other) do
+    raise ArgumentError, "expected a Yog.Community.Result struct, got: #{inspect(other)}"
   end
 
   @doc """
@@ -281,6 +293,8 @@ defmodule Yog.Community do
   """
   @spec merge(communities() | map(), source: community_id(), target: community_id()) ::
           communities() | map()
+  def merge(communities, opts)
+
   def merge(%Result{} = communities, source: source, target: target) do
     source_exists =
       Enum.any?(Map.values(communities.assignments), fn comm -> comm == source end)
@@ -316,7 +330,11 @@ defmodule Yog.Community do
   end
 
   # Legacy map support
-  def merge(%{assignments: _, num_communities: _} = communities, source: source, target: target) do
+  def merge(%{assignments: asgn, num_communities: _} = communities,
+        source: source,
+        target: target
+      )
+      when is_map(asgn) do
     source_exists =
       Enum.any?(Map.values(communities.assignments), fn comm -> comm == source end)
 
@@ -349,6 +367,18 @@ defmodule Yog.Community do
     }
   end
 
+  def merge(other, opts) do
+    cond do
+      not (match?(%Result{}, other) or (is_map(other) and is_map(Map.get(other, :assignments)))) ->
+        raise ArgumentError,
+              "expected a Yog.Community.Result struct or map with :assignments, got: #{inspect(other)}"
+
+      not (is_list(opts) and Keyword.has_key?(opts, :source) and Keyword.has_key?(opts, :target)) ->
+        raise ArgumentError,
+              "expected opts with :source and :target community IDs, got: #{inspect(opts)}"
+    end
+  end
+
   @doc """
   Returns all nodes belonging to a specific community.
 
@@ -373,6 +403,10 @@ defmodule Yog.Community do
     end)
   end
 
+  def nodes_in(other, _community_id) do
+    raise ArgumentError, "expected a Yog.Community.Result struct, got: #{inspect(other)}"
+  end
+
   @doc """
   Returns the community ID for a specific node.
 
@@ -389,6 +423,10 @@ defmodule Yog.Community do
   @spec for_node(communities(), Yog.node_id()) :: {:ok, community_id()} | :error
   def for_node(%Result{} = communities, node) do
     Map.fetch(communities.assignments, node)
+  end
+
+  def for_node(other, _node) do
+    raise ArgumentError, "expected a Yog.Community.Result struct, got: #{inspect(other)}"
   end
 
   # ============================================================

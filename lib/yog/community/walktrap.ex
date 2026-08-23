@@ -80,8 +80,12 @@ defmodule Yog.Community.Walktrap do
       IO.inspect(communities.num_communities)
   """
   @spec detect(Yog.graph()) :: Result.t()
-  def detect(graph) do
+  def detect(%Yog.Graph{} = graph) do
     detect_with_options(graph, [])
+  end
+
+  def detect(other) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
   end
 
   @doc """
@@ -100,12 +104,13 @@ defmodule Yog.Community.Walktrap do
       )
   """
   @spec detect_with_options(Yog.graph(), keyword() | map()) :: Result.t()
-  def detect_with_options(graph, opts) when is_list(opts) do
+  def detect_with_options(%Yog.Graph{} = graph, opts) when is_list(opts) do
     detect_with_options(graph, Map.new(opts))
   end
 
-  def detect_with_options(graph, opts) when is_map(opts) do
+  def detect_with_options(%Yog.Graph{} = graph, opts) when is_map(opts) do
     options = Map.merge(default_options(), opts)
+    validate_walktrap_options!(options)
     nodes = Map.keys(graph.nodes)
 
     case length(nodes) do
@@ -131,6 +136,14 @@ defmodule Yog.Community.Walktrap do
     end
   end
 
+  def detect_with_options(%Yog.Graph{}, opts) do
+    raise ArgumentError, "expected options keyword list or map, got: #{inspect(opts)}"
+  end
+
+  def detect_with_options(other, _opts) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
+  end
+
   @doc """
   Full hierarchical Walktrap detection.
 
@@ -147,10 +160,12 @@ defmodule Yog.Community.Walktrap do
       IO.inspect(length(dendrogram.levels))
   """
   @spec detect_hierarchical(Yog.graph(), integer()) :: Dendrogram.t()
-  def detect_hierarchical(
-        %Yog.Graph{out_edges: out_edges, nodes: nodes} = graph,
-        walk_length \\ 4
-      ) do
+  def detect_hierarchical(graph, walk_length \\ 4)
+
+  def detect_hierarchical(%Yog.Graph{} = graph, walk_length)
+      when is_integer(walk_length) and walk_length >= 1 do
+    nodes = graph.nodes
+    out_edges = graph.out_edges
     node_list = Map.keys(nodes)
 
     p_t = compute_pt(graph, node_list, walk_length)
@@ -191,6 +206,28 @@ defmodule Yog.Community.Walktrap do
     )
   end
 
+  def detect_hierarchical(%Yog.Graph{}, walk_length) do
+    raise ArgumentError,
+          "expected walk_length to be an integer >= 1, got: #{inspect(walk_length)}"
+  end
+
+  def detect_hierarchical(other, _walk_length) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
+  end
+
+  defp validate_walktrap_options!(options) do
+    if not (is_integer(options.walk_length) and options.walk_length >= 1) do
+      raise ArgumentError,
+            "expected walk_length to be an integer >= 1, got: #{inspect(options.walk_length)}"
+    end
+
+    if options.target_communities != nil and
+         not (is_integer(options.target_communities) and options.target_communities >= 1) do
+      raise ArgumentError,
+            "expected target_communities to be nil or an integer >= 1, got: #{inspect(options.target_communities)}"
+    end
+  end
+
   # =============================================================================
   # RANDOM WALK COMPUTATION
   # =============================================================================
@@ -216,9 +253,13 @@ defmodule Yog.Community.Walktrap do
         {u, row}
       end)
 
-    Enum.reduce(1..(t - 1), p1, fn _, p_acc ->
-      multiply_sparse_matrices(p_acc, p1)
-    end)
+    if t <= 1 do
+      p1
+    else
+      Enum.reduce(2..t, p1, fn _, p_acc ->
+        multiply_sparse_matrices(p_acc, p1)
+      end)
+    end
   end
 
   defp multiply_sparse_matrices(a, b) do

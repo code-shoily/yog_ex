@@ -103,15 +103,23 @@ defmodule Yog.Community.GirvanNewman do
     end
   end
 
+  def edge_betweenness(other) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
+  end
+
   @doc """
   Detects communities using Girvan-Newman with default options.
 
   Returns the modularity-maximizing partition across the dendrogram.
   """
   @spec detect(Yog.graph()) :: Result.t()
-  def detect(graph) do
+  def detect(%Yog.Graph{} = graph) do
     {:ok, communities} = detect_with_options(graph, [])
     communities
+  end
+
+  def detect(other) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
   end
 
   @doc """
@@ -129,12 +137,19 @@ defmodule Yog.Community.GirvanNewman do
   """
   @spec detect_with_options(Yog.graph(), keyword() | map()) ::
           {:ok, Result.t()} | {:error, String.t()}
-  def detect_with_options(graph, opts) when is_list(opts) do
+  def detect_with_options(%Yog.Graph{} = graph, opts) when is_list(opts) do
     detect_with_options(graph, Map.new(opts))
   end
 
-  def detect_with_options(graph, opts) when is_map(opts) do
+  def detect_with_options(%Yog.Graph{} = graph, opts) when is_map(opts) do
     options = Map.merge(default_options(), opts)
+
+    if options.target_communities != nil and
+         not (is_integer(options.target_communities) and options.target_communities >= 1) do
+      raise ArgumentError,
+            "expected target_communities to be nil or an integer >= 1, got: #{inspect(options.target_communities)}"
+    end
+
     dendrogram = detect_hierarchical(graph)
 
     case options.target_communities do
@@ -152,6 +167,14 @@ defmodule Yog.Community.GirvanNewman do
     end
   end
 
+  def detect_with_options(%Yog.Graph{}, opts) do
+    raise ArgumentError, "expected options keyword list or map, got: #{inspect(opts)}"
+  end
+
+  def detect_with_options(other, _opts) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
+  end
+
   @doc """
   Full hierarchical Girvan-Newman detection.
 
@@ -163,9 +186,13 @@ defmodule Yog.Community.GirvanNewman do
       IO.inspect(length(dendrogram.levels))
   """
   @spec detect_hierarchical(Yog.graph()) :: Dendrogram.t()
-  def detect_hierarchical(graph) do
+  def detect_hierarchical(%Yog.Graph{} = graph) do
     initial_comms = find_connected_components(graph)
     do_gn_split(graph, [initial_comms], initial_comms.num_communities)
+  end
+
+  def detect_hierarchical(other) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
   end
 
   # =============================================================================

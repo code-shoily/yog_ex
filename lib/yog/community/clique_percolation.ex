@@ -84,8 +84,12 @@ defmodule Yog.Community.CliquePercolation do
       IO.inspect(overlapping.num_communities)
   """
   @spec detect_overlapping(Yog.graph()) :: Overlapping.t()
-  def detect_overlapping(graph) do
+  def detect_overlapping(%Yog.Graph{} = graph) do
     detect_overlapping_with_options(graph, [])
+  end
+
+  def detect_overlapping(other) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
   end
 
   @doc """
@@ -103,13 +107,17 @@ defmodule Yog.Community.CliquePercolation do
   """
   @spec detect_overlapping_with_options(Yog.graph(), keyword() | map()) ::
           Overlapping.t()
-  def detect_overlapping_with_options(graph, opts) when is_list(opts) do
+  def detect_overlapping_with_options(%Yog.Graph{} = graph, opts) when is_list(opts) do
     detect_overlapping_with_options(graph, Map.new(opts))
   end
 
-  def detect_overlapping_with_options(graph, opts) when is_map(opts) do
+  def detect_overlapping_with_options(%Yog.Graph{} = graph, opts) when is_map(opts) do
     options = Map.merge(default_options(), opts)
     k = options.k
+
+    if not (is_integer(k) and k >= 1) do
+      raise ArgumentError, "expected k to be an integer >= 1, got: #{inspect(k)}"
+    end
 
     maximal_cliques = Clique.all_maximal_cliques(graph)
     estimated_cliques = estimate_k_cliques(maximal_cliques, k)
@@ -162,6 +170,14 @@ defmodule Yog.Community.CliquePercolation do
     end
   end
 
+  def detect_overlapping_with_options(%Yog.Graph{}, opts) do
+    raise ArgumentError, "expected options keyword list or map, got: #{inspect(opts)}"
+  end
+
+  def detect_overlapping_with_options(other, _opts) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
+  end
+
   @doc """
   Converts overlapping communities to standard communities.
 
@@ -174,8 +190,12 @@ defmodule Yog.Community.CliquePercolation do
       IO.inspect(communities.num_communities)
   """
   @spec to_communities(Overlapping.t()) :: Result.t()
-  def to_communities(overlapping) do
+  def to_communities(%Overlapping{} = overlapping) do
     Overlapping.to_result(overlapping)
+  end
+
+  def to_communities(other) do
+    raise ArgumentError, "expected a Yog.Community.Overlapping struct, got: #{inspect(other)}"
   end
 
   # =============================================================================

@@ -39,9 +39,10 @@ defmodule Yog.Community.Metrics do
 
   def modularity(
         %Yog.Graph{out_edges: out_edges, in_edges: in_edges, kind: kind} = _graph,
-        communities,
+        %{assignments: assignments},
         opts
-      ) do
+      )
+      when is_map(assignments) and is_list(opts) do
     total_weight =
       List.foldl(Map.keys(out_edges), 0.0, fn node, acc ->
         edges = Map.get(out_edges, node, %{})
@@ -54,7 +55,7 @@ defmodule Yog.Community.Metrics do
       m = if kind == :undirected, do: total_weight / 2.0, else: total_weight
       gamma = Keyword.get(opts, :resolution, 1.0)
 
-      community_nodes = group_nodes_by_community(communities.assignments)
+      community_nodes = group_nodes_by_community(assignments)
 
       List.foldl(Map.to_list(community_nodes), 0.0, fn {_, nodes_in_comm}, acc ->
         node_set = MapSet.new(nodes_in_comm)
@@ -103,6 +104,20 @@ defmodule Yog.Community.Metrics do
     end
   end
 
+  def modularity(graph, communities, opts) do
+    cond do
+      not match?(%Yog.Graph{}, graph) ->
+        raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(graph)}"
+
+      not (is_map(communities) and is_map(Map.get(communities, :assignments))) ->
+        raise ArgumentError,
+              "expected a Yog.Community.Result or map with :assignments, got: #{inspect(communities)}"
+
+      not is_list(opts) ->
+        raise ArgumentError, "expected options keyword list, got: #{inspect(opts)}"
+    end
+  end
+
   @doc """
   Counts the total number of triangles in the graph.
 
@@ -120,7 +135,7 @@ defmodule Yog.Community.Metrics do
       1
   """
   @spec count_triangles(Yog.graph()) :: integer()
-  def count_triangles(graph) do
+  def count_triangles(%Yog.Graph{} = graph) do
     neighbor_sets = get_neighbor_sets(graph)
     node_list = Map.keys(graph.nodes)
 
@@ -141,6 +156,10 @@ defmodule Yog.Community.Metrics do
     end)
   end
 
+  def count_triangles(other) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
+  end
+
   @doc """
   Returns the number of triangles each node participates in.
 
@@ -155,7 +174,7 @@ defmodule Yog.Community.Metrics do
       %{1 => 1, 2 => 1, 3 => 1}
   """
   @spec triangles_per_node(Yog.graph()) :: %{Yog.node_id() => integer()}
-  def triangles_per_node(graph) do
+  def triangles_per_node(%Yog.Graph{} = graph) do
     neighbor_sets = get_neighbor_sets(graph)
     node_list = Map.keys(graph.nodes)
 
@@ -175,6 +194,10 @@ defmodule Yog.Community.Metrics do
 
       Map.put(acc, node, count)
     end)
+  end
+
+  def triangles_per_node(other) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
   end
 
   @doc """
@@ -214,6 +237,10 @@ defmodule Yog.Community.Metrics do
     end
   end
 
+  def clustering_coefficient(other, _node) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
+  end
+
   @doc """
   Calculates the average clustering coefficient for the entire graph.
   """
@@ -227,6 +254,10 @@ defmodule Yog.Community.Metrics do
       total = Enum.sum(Enum.map(node_list, fn node -> clustering_coefficient(graph, node) end))
       total / length(node_list)
     end
+  end
+
+  def average_clustering_coefficient(other) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
   end
 
   @doc """
@@ -261,6 +292,10 @@ defmodule Yog.Community.Metrics do
     if total_triples == 0, do: 0.0, else: 3.0 * total_triangles / total_triples
   end
 
+  def transitivity(other) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
+  end
+
   @doc """
   Calculates the graph density.
   """
@@ -272,12 +307,17 @@ defmodule Yog.Community.Metrics do
     if n < 2, do: 0.0, else: 2.0 * m / (n * (n - 1))
   end
 
+  def density(other) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
+  end
+
   @doc """
   Calculates the density of edges within a specific set of nodes.
   """
   @spec community_density(Yog.graph(), MapSet.t(Yog.node_id())) :: float()
   def community_density(%Yog.Graph{out_edges: out_edges}, nodes) do
-    node_list = MapSet.to_list(nodes)
+    node_set = if is_struct(nodes, MapSet), do: nodes, else: MapSet.new(nodes)
+    node_list = MapSet.to_list(node_set)
     n = length(node_list)
 
     if n < 2 do
@@ -286,7 +326,7 @@ defmodule Yog.Community.Metrics do
       internal_edges =
         List.foldl(node_list, 0, fn i, acc ->
           successors = Map.keys(get_successors_map(out_edges, i))
-          count = Enum.count(successors, fn j -> j > i and MapSet.member?(nodes, j) end)
+          count = Enum.count(successors, fn j -> j > i and MapSet.member?(node_set, j) end)
           acc + count
         end)
 
@@ -294,20 +334,37 @@ defmodule Yog.Community.Metrics do
     end
   end
 
+  def community_density(other, _nodes) do
+    raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(other)}"
+  end
+
   @doc """
   Calculates the average density across all communities.
   """
-  def average_community_density(graph, %Result{assignments: assignments}) do
+  def average_community_density(%Yog.Graph{} = graph, %Result{assignments: assignments}) do
     average_community_density(graph, %{assignments: assignments})
   end
 
-  def average_community_density(graph, %{assignments: assignments}) do
+  def average_community_density(%Yog.Graph{} = graph, %{assignments: assignments})
+      when is_map(assignments) do
     assignments
     |> group_nodes_by_community()
     |> Enum.map(fn {_, nodes} -> community_density(graph, MapSet.new(nodes)) end)
     |> then(fn densities ->
       if densities == [], do: 0.0, else: Enum.sum(densities) / length(densities)
     end)
+  end
+
+  def average_community_density(graph, communities) do
+    cond do
+      not match?(%Yog.Graph{}, graph) ->
+        raise ArgumentError, "expected a Yog.Graph struct, got: #{inspect(graph)}"
+
+      not (match?(%Result{}, communities) or
+               (is_map(communities) and is_map(Map.get(communities, :assignments)))) ->
+        raise ArgumentError,
+              "expected a Yog.Community.Result or map with :assignments, got: #{inspect(communities)}"
+    end
   end
 
   # ============= NMI =============
@@ -327,7 +384,7 @@ defmodule Yog.Community.Metrics do
       1.0
   """
   @spec nmi(%{Yog.node_id() => integer()}, %{Yog.node_id() => integer()}) :: float()
-  def nmi(detected, truth) do
+  def nmi(detected, truth) when is_map(detected) and is_map(truth) do
     nodes = Map.keys(truth)
     n = length(nodes)
 
@@ -349,6 +406,16 @@ defmodule Yog.Community.Metrics do
       else
         2.0 * mi / denominator
       end
+    end
+  end
+
+  def nmi(detected, truth) do
+    cond do
+      not is_map(detected) ->
+        raise ArgumentError, "expected detected assignments map, got: #{inspect(detected)}"
+
+      not is_map(truth) ->
+        raise ArgumentError, "expected truth assignments map, got: #{inspect(truth)}"
     end
   end
 

@@ -64,6 +64,10 @@ defmodule Yog.Community.Overlapping do
     }
   end
 
+  def new(other) do
+    raise ArgumentError, "expected a map of memberships, got: #{inspect(other)}"
+  end
+
   @doc """
   Creates an overlapping community result with explicit metadata and optional pre-computed values.
 
@@ -73,7 +77,10 @@ defmodule Yog.Community.Overlapping do
   - `:community_index` - Pre-computed inverted index for O(1) queries
   """
   @spec new(%{node_id() => [community_id()]}, map(), keyword()) :: t()
-  def new(memberships, metadata, opts \\ []) when is_map(memberships) and is_map(metadata) do
+  def new(memberships, metadata, opts \\ [])
+
+  def new(memberships, metadata, opts)
+      when is_map(memberships) and is_map(metadata) and is_list(opts) do
     num =
       case Keyword.get(opts, :num_communities) do
         nil ->
@@ -99,6 +106,19 @@ defmodule Yog.Community.Overlapping do
       community_index: community_index,
       metadata: metadata
     }
+  end
+
+  def new(memberships, metadata, opts) do
+    cond do
+      not is_map(memberships) ->
+        raise ArgumentError, "expected a map of memberships, got: #{inspect(memberships)}"
+
+      not is_map(metadata) ->
+        raise ArgumentError, "expected metadata map, got: #{inspect(metadata)}"
+
+      not is_list(opts) ->
+        raise ArgumentError, "expected options keyword list, got: #{inspect(opts)}"
+    end
   end
 
   defp build_community_index(memberships) do
@@ -132,12 +152,20 @@ defmodule Yog.Community.Overlapping do
     Result.new(assignments, meta, num_communities: actual_num)
   end
 
+  def to_result(other) do
+    raise ArgumentError, "expected a Yog.Community.Overlapping struct, got: #{inspect(other)}"
+  end
+
   @doc """
   Get all communities a node belongs to.
   """
   @spec communities_for_node(t(), node_id()) :: [community_id()]
   def communities_for_node(%__MODULE__{memberships: m}, node) do
     Map.get(m, node, [])
+  end
+
+  def communities_for_node(other, _node) do
+    raise ArgumentError, "expected a Yog.Community.Overlapping struct, got: #{inspect(other)}"
   end
 
   @doc """
@@ -151,11 +179,15 @@ defmodule Yog.Community.Overlapping do
   end
 
   # Fallback for legacy structs without index
-  def nodes_in_community(%__MODULE__{memberships: m}, community_id) do
+  def nodes_in_community(%__MODULE__{memberships: m}, community_id) when is_map(m) do
     m
     |> Enum.filter(fn {_node, comms} -> community_id in comms end)
     |> Enum.map(fn {node, _} -> node end)
     |> MapSet.new()
+  end
+
+  def nodes_in_community(other, _community_id) do
+    raise ArgumentError, "expected a Yog.Community.Overlapping struct, got: #{inspect(other)}"
   end
 
   @doc """
@@ -168,11 +200,15 @@ defmodule Yog.Community.Overlapping do
     MapSet.size(MapSet.intersection(nodes_a, nodes_b))
   end
 
+  def overlap(other, _comm_a, _comm_b) do
+    raise ArgumentError, "expected a Yog.Community.Overlapping struct, got: #{inspect(other)}"
+  end
+
   @doc """
   Backward compatibility: convert from legacy map format.
   """
   @spec from_map(map()) :: t()
-  def from_map(%{memberships: m, num_communities: n} = map) do
+  def from_map(%{memberships: m, num_communities: n} = map) when is_map(m) do
     metadata = Map.get(map, :metadata, %{})
 
     community_index = build_community_index(m)
@@ -185,11 +221,20 @@ defmodule Yog.Community.Overlapping do
     }
   end
 
+  def from_map(other) do
+    raise ArgumentError,
+          "expected a map with :memberships and :num_communities, got: #{inspect(other)}"
+  end
+
   @doc """
   Convert to legacy map format.
   """
   @spec to_map(t()) :: map()
   def to_map(%__MODULE__{memberships: m, num_communities: n}) do
     %{memberships: m, num_communities: n}
+  end
+
+  def to_map(other) do
+    raise ArgumentError, "expected a Yog.Community.Overlapping struct, got: #{inspect(other)}"
   end
 end

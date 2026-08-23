@@ -477,4 +477,238 @@ defmodule Yog.CommunityTest do
       assert result.num_communities >= 1
     end
   end
+
+  # ============= Input and Option Validation =============
+
+  describe "input and option validation" do
+    test "Yog.Community functions validate arguments" do
+      assert_raise ArgumentError, fn -> Community.to_dict(:not_a_result) end
+      assert_raise ArgumentError, fn -> Community.largest(:not_a_result) end
+      assert_raise ArgumentError, fn -> Community.sizes(:not_a_result) end
+      assert_raise ArgumentError, fn -> Community.merge(:not_a_result, source: 0, target: 1) end
+      assert_raise ArgumentError, fn -> Community.nodes_in(:not_a_result, 0) end
+      assert_raise ArgumentError, fn -> Community.for_node(:not_a_result, 1) end
+    end
+
+    test "Louvain validates graph and options" do
+      assert_raise ArgumentError, fn -> Community.Louvain.detect(:not_a_graph) end
+
+      assert_raise ArgumentError, fn ->
+        Community.Louvain.detect_with_options(:not_a_graph, [])
+      end
+
+      assert_raise ArgumentError, fn ->
+        Community.Louvain.detect_with_options(Yog.undirected(), :invalid)
+      end
+
+      assert_raise ArgumentError, fn ->
+        Community.Louvain.detect_with_options(Yog.undirected(), max_iterations: -1)
+      end
+
+      assert_raise ArgumentError, fn -> Community.Louvain.detect_hierarchical(:not_a_graph) end
+    end
+
+    test "Leiden validates graph and options" do
+      assert_raise ArgumentError, fn -> Community.Leiden.detect(:not_a_graph) end
+      assert_raise ArgumentError, fn -> Community.Leiden.detect_with_options(:not_a_graph, []) end
+
+      assert_raise ArgumentError, fn ->
+        Community.Leiden.detect_with_options(Yog.undirected(), :invalid)
+      end
+
+      assert_raise ArgumentError, fn ->
+        Community.Leiden.detect_with_options(Yog.undirected(), max_iterations: -1)
+      end
+
+      assert_raise ArgumentError, fn -> Community.Leiden.detect_hierarchical(:not_a_graph) end
+    end
+
+    test "LabelPropagation validates graph and options" do
+      assert_raise ArgumentError, fn -> Community.LabelPropagation.detect(:not_a_graph) end
+
+      assert_raise ArgumentError, fn ->
+        Community.LabelPropagation.detect_with_options(:not_a_graph, [])
+      end
+
+      assert_raise ArgumentError, fn ->
+        Community.LabelPropagation.detect_with_options(Yog.undirected(), :invalid)
+      end
+
+      assert_raise ArgumentError, fn ->
+        Community.LabelPropagation.detect_with_options(Yog.undirected(), max_iterations: -1)
+      end
+    end
+
+    test "Walktrap validates graph and options" do
+      assert_raise ArgumentError, fn -> Community.Walktrap.detect(:not_a_graph) end
+
+      assert_raise ArgumentError, fn ->
+        Community.Walktrap.detect_with_options(:not_a_graph, [])
+      end
+
+      assert_raise ArgumentError, fn ->
+        Community.Walktrap.detect_with_options(Yog.undirected(), :invalid)
+      end
+
+      assert_raise ArgumentError, fn ->
+        Community.Walktrap.detect_with_options(Yog.undirected(), walk_length: 0)
+      end
+
+      assert_raise ArgumentError, fn -> Community.Walktrap.detect_hierarchical(:not_a_graph) end
+
+      assert_raise ArgumentError, fn ->
+        Community.Walktrap.detect_hierarchical(Yog.undirected(), 0)
+      end
+    end
+
+    test "Infomap validates graph and options" do
+      assert_raise ArgumentError, fn -> Community.Infomap.detect(:not_a_graph) end
+
+      assert_raise ArgumentError, fn ->
+        Community.Infomap.detect_with_options(:not_a_graph, [])
+      end
+
+      assert_raise ArgumentError, fn ->
+        Community.Infomap.detect_with_options(Yog.undirected(), :invalid)
+      end
+
+      assert_raise ArgumentError, fn ->
+        Community.Infomap.detect_with_options(Yog.undirected(), max_pagerank_iters: -1)
+      end
+
+      assert_raise ArgumentError, fn ->
+        Community.Infomap.detect_with_options(Yog.undirected(), teleport_prob: 1.5)
+      end
+    end
+
+    test "GirvanNewman validates graph and options" do
+      assert_raise ArgumentError, fn -> Community.GirvanNewman.detect(:not_a_graph) end
+      assert_raise ArgumentError, fn -> Community.GirvanNewman.edge_betweenness(:not_a_graph) end
+
+      assert_raise ArgumentError, fn ->
+        Community.GirvanNewman.detect_with_options(:not_a_graph, [])
+      end
+
+      assert_raise ArgumentError, fn ->
+        Community.GirvanNewman.detect_with_options(Yog.undirected(), :invalid)
+      end
+
+      assert_raise ArgumentError, fn ->
+        Community.GirvanNewman.detect_with_options(Yog.undirected(), target_communities: 0)
+      end
+
+      assert_raise ArgumentError, fn ->
+        Community.GirvanNewman.detect_hierarchical(:not_a_graph)
+      end
+    end
+
+    test "CliquePercolation validates graph and options" do
+      assert_raise ArgumentError, fn ->
+        Community.CliquePercolation.detect_overlapping(:not_a_graph)
+      end
+
+      assert_raise ArgumentError, fn ->
+        Community.CliquePercolation.detect_overlapping_with_options(:not_a_graph, [])
+      end
+
+      assert_raise ArgumentError, fn ->
+        Community.CliquePercolation.detect_overlapping_with_options(Yog.undirected(), :invalid)
+      end
+
+      assert_raise ArgumentError, fn ->
+        Community.CliquePercolation.detect_overlapping_with_options(Yog.undirected(), k: 0)
+      end
+
+      assert_raise ArgumentError, fn ->
+        Community.CliquePercolation.to_communities(:not_overlapping)
+      end
+    end
+
+    test "FluidCommunities validates graph and options" do
+      assert_raise ArgumentError, fn -> Community.FluidCommunities.detect(:not_a_graph) end
+
+      assert_raise ArgumentError, fn ->
+        Community.FluidCommunities.detect_with_options(:not_a_graph, [])
+      end
+
+      assert_raise ArgumentError, fn ->
+        Community.FluidCommunities.detect_with_options(Yog.undirected(), :invalid)
+      end
+
+      assert_raise ArgumentError, fn ->
+        Community.FluidCommunities.detect_with_options(Yog.undirected(), target_communities: 0)
+      end
+    end
+
+    test "LocalCommunity validates graph and options" do
+      assert_raise ArgumentError, fn ->
+        Community.LocalCommunity.detect(:not_a_graph, seeds: [1])
+      end
+
+      assert_raise ArgumentError, fn ->
+        Community.LocalCommunity.detect_with_options(:not_a_graph, [1], [])
+      end
+
+      assert_raise ArgumentError, fn ->
+        Community.LocalCommunity.detect_with_options(Yog.undirected(), [1], :invalid)
+      end
+
+      assert_raise ArgumentError, fn ->
+        Community.LocalCommunity.detect_with(Yog.undirected(), :not_a_list, %{}, fn _ -> 1.0 end)
+      end
+    end
+
+    test "Metrics validates graph and inputs" do
+      assert_raise ArgumentError, fn ->
+        Community.Metrics.modularity(:not_a_graph, Community.Result.new(%{}))
+      end
+
+      assert_raise ArgumentError, fn -> Community.Metrics.count_triangles(:not_a_graph) end
+      assert_raise ArgumentError, fn -> Community.Metrics.triangles_per_node(:not_a_graph) end
+
+      assert_raise ArgumentError, fn ->
+        Community.Metrics.clustering_coefficient(:not_a_graph, 1)
+      end
+
+      assert_raise ArgumentError, fn ->
+        Community.Metrics.average_clustering_coefficient(:not_a_graph)
+      end
+
+      assert_raise ArgumentError, fn -> Community.Metrics.transitivity(:not_a_graph) end
+      assert_raise ArgumentError, fn -> Community.Metrics.density(:not_a_graph) end
+
+      assert_raise ArgumentError, fn ->
+        Community.Metrics.community_density(:not_a_graph, MapSet.new())
+      end
+
+      assert_raise ArgumentError, fn ->
+        Community.Metrics.average_community_density(:not_a_graph, Community.Result.new(%{}))
+      end
+
+      assert_raise ArgumentError, fn -> Community.Metrics.nmi(:not_a_map, %{}) end
+    end
+
+    test "Result, Overlapping, Dendrogram validate structs" do
+      assert_raise ArgumentError, fn -> Community.Result.new(:invalid) end
+      assert_raise ArgumentError, fn -> Community.Result.from_map(:invalid) end
+      assert_raise ArgumentError, fn -> Community.Result.to_map(:invalid) end
+
+      assert_raise ArgumentError, fn -> Community.Overlapping.new(:invalid) end
+      assert_raise ArgumentError, fn -> Community.Overlapping.to_result(:invalid) end
+
+      assert_raise ArgumentError, fn ->
+        Community.Overlapping.communities_for_node(:invalid, 1)
+      end
+
+      assert_raise ArgumentError, fn -> Community.Overlapping.nodes_in_community(:invalid, 0) end
+      assert_raise ArgumentError, fn -> Community.Overlapping.overlap(:invalid, 0, 1) end
+
+      assert_raise ArgumentError, fn -> Community.Dendrogram.new(:invalid) end
+      assert_raise ArgumentError, fn -> Community.Dendrogram.finest(:invalid) end
+      assert_raise ArgumentError, fn -> Community.Dendrogram.coarsest(:invalid) end
+      assert_raise ArgumentError, fn -> Community.Dendrogram.at_level(:invalid, 1) end
+      assert_raise ArgumentError, fn -> Community.Dendrogram.num_levels(:invalid) end
+      assert_raise ArgumentError, fn -> Community.Dendrogram.flatten_to_original(:invalid) end
+    end
+  end
 end
