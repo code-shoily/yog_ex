@@ -40,7 +40,7 @@ YogEx provides comprehensive graph algorithms organized into modules:
 
 ### Core Capabilities
 
-**[Pathfinding & Flow](https://hexdocs.pm/yog_ex/Yog.Pathfinding.html)** — Shortest paths (Dijkstra, A*, Bellman-Ford, Floyd-Warshall, Johnson's), maximum flow (Edmonds-Karp), min-cut (Stoer-Wagner), and implicit state-space search for on-demand graphs.
+**[Pathfinding & Flow](https://hexdocs.pm/yog_ex/Yog.Pathfinding.html)** — Shortest paths (Dijkstra, A*, Bellman-Ford, Floyd-Warshall, Johnson's), maximum flow (Edmonds-Karp, Dinic, Push-Relabel), min-cut (source/sink and global Stoer-Wagner), min-cost flow (Successive Shortest Path and Network Simplex), and implicit state-space search for on-demand graphs.
 
 **[Network Analysis](https://hexdocs.pm/yog_ex/Yog.Centrality.html)** — Centrality measures (PageRank, betweenness, closeness, eigenvector, Katz) and network health metrics.
 

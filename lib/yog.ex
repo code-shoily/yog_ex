@@ -9,26 +9,21 @@ defmodule Yog do
 
   ```elixir
   # Find shortest path using Dijkstra's algorithm
-  {:ok, graph} =
+  graph =
     Yog.directed()
     |> Yog.add_node(1, "Start")
     |> Yog.add_node(2, "Middle")
     |> Yog.add_node(3, "End")
-    |> Yog.add_edges([{1, 2, 5}, {2, 3, 3}, {1, 3, 10}])
+    |> Yog.add_edge_ensure(from: 1, to: 2, with: 5)
+    |> Yog.add_edge_ensure(from: 2, to: 3, with: 3)
+    |> Yog.add_edge_ensure(from: 1, to: 3, with: 10)
 
-  case Yog.Pathfinding.Dijkstra.shortest_path(
-         graph,
-         from: 1,
-         to: 3,
-         with_zero: 0,
-         with_add: &Kernel.+/2,
-         with_compare: &Kernel.<=/2
-       ) do
+  case Yog.Pathfinding.shortest_path(in: graph, from: 1, to: 3) do
     {:ok, path} ->
-      # Path: %{nodes: [1, 2, 3], total_weight: 8}
-      IO.puts("Shortest path found!")
+      # %Yog.Pathfinding.Path{nodes: [1, 2, 3], weight: 8}
+      IO.puts("Shortest path weight: \#{path.weight}")
 
-    _ ->
+    :error ->
       IO.puts("No path exists")
   end
   ```

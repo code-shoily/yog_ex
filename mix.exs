@@ -123,12 +123,16 @@ defmodule YogEx.MixProject do
          [filename: "mermaid_complete_guide", title: "Mermaid Complete Guide"]},
         {"livebooks/how_to/layout_guide.livemd",
          [filename: "layout_guide", title: "Layout Guide"]},
+        {"livebooks/projects/disaster_relief_supply.livemd",
+         [filename: "disaster_relief_supply", title: "Disaster Relief Supply Network"]},
+        {"livebooks/projects/maze_grid_lab.livemd",
+         [filename: "maze_grid_lab", title: "Maze & Grid Lab"]},
         {"livebooks/projects/package_dependency_resolver.livemd",
          [filename: "package_dependency_resolver", title: "Package Dependency Resolver"]},
-        {"livebooks/projects/transit_route_planner.livemd",
-         [filename: "transit_route_planner", title: "Transit Route Planner"]},
         {"livebooks/projects/social_network_analyzer.livemd",
          [filename: "social_network_analyzer", title: "Social Network Analyzer"]},
+        {"livebooks/projects/transit_route_planner.livemd",
+         [filename: "transit_route_planner", title: "Transit Route Planner"]},
         "ALGORITHMS.md",
         "PROPERTIES.md",
         {"test/oracle/README.md", [filename: "oracle_readme", title: "Oracle Tests"]},
@@ -212,7 +216,10 @@ defmodule YogEx.MixProject do
           "livebooks/gallery/maze_gallery.livemd"
         ],
         "Projects (Livebook)": [
+          "livebooks/projects/disaster_relief_supply.livemd",
+          "livebooks/projects/maze_grid_lab.livemd",
           "livebooks/projects/package_dependency_resolver.livemd",
+          "livebooks/projects/social_network_analyzer.livemd",
           "livebooks/projects/transit_route_planner.livemd"
         ],
         Reference: [
