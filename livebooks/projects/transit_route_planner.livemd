@@ -11,12 +11,14 @@ Mix.install([
 ## Introduction
 
 Urban transit systems are among the most intricate real-world networks. Modern metropolitan areas combine diverse transit modalities:
-- **Express Rail / Metro**: Fast, high-frequency, higher capacity, accessible.
-- **City & Commuter Buses**: Flexible, widespread coverage, economical, subject to surface traffic.
-- **Ferries & Water Taxis**: High-speed waterway corridors connecting islands and harborfronts.
-- **Pedestrian Walkways**: Short transfer corridors, greenways, and staircases linking adjacent districts.
+
+* **Express Rail / Metro**: Fast, high-frequency, higher capacity, accessible.
+* **City & Commuter Buses**: Flexible, widespread coverage, economical, subject to surface traffic.
+* **Ferries & Water Taxis**: High-speed waterway corridors connecting islands and harborfronts.
+* **Pedestrian Walkways**: Short transfer corridors, greenways, and staircases linking adjacent districts.
 
 Between any two stations, passengers frequently have multiple transportation choices. For example, traveling from **Central Hub** to the **Waterfront** might offer:
+
 1. A 5-minute **Metro** ride ($2.50)
 2. A 12-minute **Heritage Streetcar** ($1.25)
 3. An 18-minute scenic **Promenade Walk** ($0.00)
@@ -24,11 +26,29 @@ Between any two stations, passengers frequently have multiple transportation cho
 Because multiple distinct connections exist between the same pair of stations, this domain cannot be accurately modeled with a simple graph without loss of information. It is a textbook application for a **Multigraph** (`Yog.Multi`).
 
 ### Key Engineering Questions Addressed
+
 1. **Multimodal Representation**: How do we model multiple concurrent transit links with heterogeneous metadata (duration, fare, accessibility, line names)?
 2. **Multi-Criteria Optimization**: How do we collapse parallel multigraph edges into simple graphs tailored to individual passenger preferences (fastest trip vs. cheapest budget vs. wheelchair-only)?
 3. **Shortest-Path Itineraries**: How do we compute end-to-end multi-leg transit itineraries using Dijkstra pathfinding?
 4. **Isochrone Mapping**: How do we calculate and visualize travel-time reachability zones from a central hub?
 5. **Network Resilience & Detour Routing**: How does the transit network adapt when key corridors suffer service disruptions?
+
+### Yog Concepts Covered
+
+By the end, you will know how to:
+
+* Model parallel transit choices with `Yog.Multi`.
+* Store rich route metadata on multigraph edges.
+* Collapse a multigraph into simple weighted graphs for different optimization goals.
+* Run Dijkstra shortest paths over time- and cost-weighted graphs.
+* Recover leg-by-leg itineraries from selected edge metadata.
+* Compute single-source travel-time reachability for isochrone-style analysis.
+* Simulate service disruption by removing nodes and recomputing routes.
+* Render multigraphs and highlighted paths with DOT.
+
+### Why Yog Fits This Problem
+
+Transit systems are naturally multigraphs: two stations may be connected by a metro, a bus, a walking path, and a ferry, all with different costs and constraints. `Yog.Multi` lets you model those choices directly, then collapse them into ordinary Yog graphs only when an algorithm such as shortest path needs a single edge weight per station pair.
 
 ---
 
@@ -150,6 +170,8 @@ IO.puts("Stations (Nodes): #{Multi.order(transit_mg)}")
 IO.puts("Physical Route Segments (Edges): #{Multi.size(transit_mg)}")
 ```
 
+Expected result: the multigraph should preserve every route option as its own edge, including parallel alternatives between the same two stations.
+
 Let's inspect the parallel edges between **Central Hub** and **Waterfront Pier**:
 
 ```elixir
@@ -167,11 +189,12 @@ end)
 To help transit planners and commuters understand the system, we can render the multigraph using `Yog.Multi.DOT`.
 
 We apply custom visual encoding:
-- **Metro & Express Rail**: Solid thick lines with vibrant line colors (Red `#e11d48`, Green `#16a34a`, Blue `#2563eb`, Yellow `#ca8a04`, Indigo `#4f46e5`).
-- **City & Commuter Bus**: Amber dashed lines (`#ea580c`, `dashed`).
-- **Ferry & Water Taxi**: Cyan dotted lines (`#0891b2`, `dotted`).
-- **Walking Paths**: Neutral gray thin dotted lines (`#94a3b8`, `dotted`).
-- **Hub Stations**: Distinct shapes (e.g. `doublecircle` for intermodal hubs, `box` for terminals).
+
+* **Metro & Express Rail**: Solid thick lines with vibrant line colors (Red `#e11d48`, Green `#16a34a`, Blue `#2563eb`, Yellow `#ca8a04`, Indigo `#4f46e5`).
+* **City & Commuter Bus**: Amber dashed lines (`#ea580c`, `dashed`).
+* **Ferry & Water Taxi**: Cyan dotted lines (`#0891b2`, `dotted`).
+* **Walking Paths**: Neutral gray thin dotted lines (`#94a3b8`, `dotted`).
+* **Hub Stations**: Distinct shapes (e.g. `doublecircle` for intermodal hubs, `box` for terminals).
 
 ```elixir
 mode_color = fn data ->
@@ -202,14 +225,11 @@ end
 dot_opts = %{
   Yog.Multi.DOT.default_options()
   | rankdir: :lr,
-    default_node_attributes: [
-      {:shape, :box},
-      {:style, "filled,rounded"},
-      {:fillcolor, "#f1f5f9"},
-      {:color, "#475569"},
-      {:fontname, "Inter,Helvetica,Arial"},
-      {:fontsize, 11}
-    ],
+    node_shape: :box,
+    node_style: :filled,
+    node_color: "#f1f5f9",
+    node_fontname: "Inter,Helvetica,Arial",
+    node_fontsize: 11,
     node_attributes: fn node_id, data ->
       case data.type do
         "intermodal_hub" ->
@@ -246,6 +266,8 @@ dot_source = Yog.Multi.DOT.to_dot(transit_mg, dot_opts)
 Kino.VizJS.render(dot_source)
 ```
 
+Expected result: the visualization should show multiple styled connections between several station pairs, making mode choice visible instead of hidden inside one collapsed edge.
+
 Notice how parallel edges between stations like `central` $\leftrightarrow$ `waterfront` and `central` $\leftrightarrow$ `arts_district` are naturally distinguished with individual curves, styles, and timing labels.
 
 ---
@@ -253,6 +275,7 @@ Notice how parallel edges between stations like `central` $\leftrightarrow$ `wat
 ## Section 3: Multi-Criteria Edge Collapsing Strategies
 
 Different travelers have fundamentally different routing objectives:
+
 1. **The Commuter (Time-Conscious)**: Prioritizes minimal travel duration, willing to pay standard or express fares.
 2. **The Budget Traveler**: Prioritizes lowest monetary expense, willing to walk or ride buses.
 3. **The Mobility-Limited Traveler**: Requires 100% wheelchair-accessible vehicles and elevators, strictly avoiding staircases or inaccessible docks.
@@ -340,6 +363,8 @@ accessible_mg =
 IO.puts("Accessible multigraph has #{Multi.size(accessible_mg)} edges (#{Multi.size(transit_mg) - Multi.size(accessible_mg)} inaccessible paths pruned).")
 ```
 
+Expected result: each collapsed simple graph has one chosen route per connected station pair, but the chosen route differs depending on whether you optimize for duration, cost, or accessibility.
+
 ---
 
 ## Section 4: Optimal Route Solving (Fastest vs. Cheapest)
@@ -368,6 +393,8 @@ IO.puts("💰 CHEAPEST ROUTE: $#{:erlang.float_to_binary(cheapest_path.weight * 
 IO.puts("   Stations: #{Enum.join(cheapest_path.nodes, " ➔ ")}")
 IO.puts("==================================================")
 ```
+
+Expected result: fastest and cheapest routes may use different station sequences or different route modes. This demonstrates why preserving parallel edges until the optimization criterion is known matters.
 
 ### Reconstructing Detailed Leg-by-Leg Itineraries
 
@@ -405,18 +432,22 @@ end)
 IO.puts("Total: #{c_dur} mins, $#{:erlang.float_to_binary(c_cost * 1.0, decimals: 2)}")
 ```
 
+Expected result: the itinerary step reconstructs the human-readable route metadata that was selected during multigraph collapse, such as line name, mode, duration, and fare.
+
 Notice the compelling trade-off:
-- The **Fastest route** utilizes high-speed rail lines (Yellow Line to Red Line) into the downtown core, reaching Harbor Island in **41 minutes** for **$8.75**.
-- The **Cheapest route** utilizes a commuter bus and city connections combined with a scenic walking transfer, reaching Harbor Island for only **$6.75** at the expense of an extra 17 minutes!
+
+* The **Fastest route** utilizes high-speed rail lines (Yellow Line to Red Line) into the downtown core, reaching Harbor Island in **41 minutes** for **$8.75**.
+* The **Cheapest route** utilizes a commuter bus and city connections combined with a scenic walking transfer, reaching Harbor Island for only **$6.75** at the expense of an extra 17 minutes!
 
 ---
 
 ## Section 5: Route Visualization & Itinerary Highlighting
 
 Now let's visualize the winning fastest path on the municipal transit diagram. We highlight:
-- The active path in bold neon emerald (`#10b981`, `penwidth: 4.5`).
-- The Origin and Destination stations with distinctive badges.
-- All unused background lines dimmed to soft slate gray (`#cbd5e1`).
+
+* The active path in bold neon emerald (`#10b981`, `penwidth: 4.5`).
+* The Origin and Destination stations with distinctive badges.
+* All unused background lines dimmed to soft slate gray (`#cbd5e1`).
 
 ```elixir
 path_edges =
@@ -431,14 +462,11 @@ path_nodes_set = MapSet.new(fastest_path.nodes)
 itinerary_dot_opts = %{
   Yog.Render.DOT.default_options()
   | rankdir: :lr,
-    default_node_attributes: [
-      {:shape, :box},
-      {:style, "filled,rounded"},
-      {:fillcolor, "#f8fafc"},
-      {:color, "#cbd5e1"},
-      {:fontname, "Inter,Helvetica,Arial"},
-      {:fontsize, 10}
-    ],
+    node_shape: :box,
+    node_style: :filled,
+    node_color: "#f8fafc",
+    node_fontname: "Inter,Helvetica,Arial",
+    node_fontsize: 10,
     node_attributes: fn id, name ->
       cond do
         id == origin ->
@@ -506,9 +534,10 @@ end)
 ### Classifying Commute Tiers
 
 We group stations into municipal commuter tiers:
-- **Tier 1 (Inner Core $\le 7$ mins)**: Immediate downtown connections (Waterfront, Arts District, Uptown).
-- **Tier 2 (Mid-City $8 - 15$ mins)**: Rapid transit access (Stadium, Tech Park, University, Medical Center).
-- **Tier 3 (Regional Outer Belt $> 15$ mins)**: Airport, Suburbs, Offshore Island.
+
+* **Tier 1 (Inner Core $\le 7$ mins)**: Immediate downtown connections (Waterfront, Arts District, Uptown).
+* **Tier 2 (Mid-City $8 - 15$ mins)**: Rapid transit access (Stadium, Tech Park, University, Medical Center).
+* **Tier 3 (Regional Outer Belt $> 15$ mins)**: Airport, Suburbs, Offshore Island.
 
 ```elixir
 tier_color = fn minutes ->
@@ -548,6 +577,8 @@ isochrone_dot = Yog.Render.DOT.to_dot(time_graph, isochrone_dot_opts)
 Kino.VizJS.render(isochrone_dot)
 ```
 
+Expected result: stations closer to Central Hub should fall into lower commute tiers, while airport/suburban/island destinations appear in outer travel-time bands.
+
 ---
 
 ## Section 7: Network Resilience & Service Disruption Detours
@@ -584,6 +615,8 @@ case Yog.Pathfinding.shortest_path(in: disrupted_graph, from: "suburb_north", to
     IO.puts("\n❌ NO DETOUR AVAILABLE: Network partitioned!")
 end
 ```
+
+Expected result: if redundancy exists, the system should find a longer detour rather than declaring the trip impossible.
 
 The system automatically discovers an outer ring detour:
 **Northgate Heights** $\to$ **Civic Stadium** (via Crosstown Bus 7) $\to$ **Airport** (via South Link Bus 33), bypassing the central downtown bottleneck entirely!
@@ -632,6 +665,14 @@ detour_dot_opts = %{
 
 Kino.VizJS.render(Yog.Render.DOT.to_dot(disrupted_graph, detour_dot_opts))
 ```
+
+### Try Changing This
+
+* Change `origin` and `destination` to plan a different trip.
+* Modify `fastest_route_combiner` to penalize walking or transfers instead of using duration alone.
+* Change `cheapest_route_combiner` to prefer accessible routes when costs tie.
+* Remove a different station in the disruption section and see whether the network remains connected.
+* Add a new route to `transit_network.json` and observe how it affects the fastest, cheapest, and accessible graphs.
 
 ---
 

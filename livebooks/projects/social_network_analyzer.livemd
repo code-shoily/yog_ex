@@ -11,17 +11,35 @@ Mix.install([
 ## Introduction
 
 Social network analysis (SNA) is one of the foundational disciplines in graph theory and computational social science. It provides the mathematical machinery to understand:
-- **Community Structure**: How do individuals naturally cluster into tightly-knit subgroups or echo chambers?
-- **Leadership vs. Gatekeeping**: Is the most popular member (highest degree) also the one controlling the flow of information across the network (highest betweenness)?
-- **Network Vulnerability**: Which members serve as critical structural bridges, whose departure would partition or fragment the organization?
-- **Information Diffusion**: How rapidly does a new idea, product adoption, or rumor cascade across the network depending on which member originates the broadcast?
+
+* **Community Structure**: How do individuals naturally cluster into tightly-knit subgroups or echo chambers?
+* **Leadership vs. Gatekeeping**: Is the most popular member (highest degree) also the one controlling the flow of information across the network (highest betweenness)?
+* **Network Vulnerability**: Which members serve as critical structural bridges, whose departure would partition or fragment the organization?
+* **Information Diffusion**: How rapidly does a new idea, product adoption, or rumor cascade across the network depending on which member originates the broadcast?
 
 ### The Zachary Karate Club Case Study
+
 In 1977, sociologist Wayne W. Zachary published an iconic study of a university karate club observed over three years. During the study, a political conflict erupted between the head instructor ("Mr. Hi", Node 1) and the club's administrator/president ("Officer", Node 34). The club subsequently split into two independent factions.
 
 Because the true historical split is known, Zachary's Karate Club has become the canonical "gold standard" benchmark for validating **community detection algorithms**, **modularity optimization**, and **centrality scoring**.
 
 In this project, we will use `Yog`'s algorithms (`Yog.Community`, `Yog.Centrality`, `Yog.Connectivity`, and `Yog.Render`) to perform a comprehensive social network analysis on this dataset.
+
+### Yog Concepts Covered
+
+By the end, you will know how to:
+
+* Build a weighted undirected graph from JSON data.
+* Interpret `order` as `|V|`, `edge_count` as `|E|`, and density for simple undirected networks.
+* Detect communities with Louvain modularity optimization.
+* Compare degree, betweenness, closeness, and PageRank centrality.
+* Use articulation points and bridges to reason about network vulnerability.
+* Render a graph with DOT using custom node and edge attributes.
+* Run a small Monte Carlo diffusion simulation over graph neighborhoods.
+
+### Why Yog Fits This Problem
+
+Social network analysis usually combines several graph tasks: construction, metrics, community detection, connectivity, visualization, and simulation. Yog keeps those tasks on one graph representation, so you can move from data ingestion to analysis without converting between multiple libraries or formats.
 
 ---
 
@@ -90,18 +108,20 @@ social_graph =
 
 social_graph =
   Enum.reduce(edges_data, social_graph, fn e, g ->
-    Yog.Model.add_edge_ensure!(g, e["source"], e["target"], e["weight"])
+    Yog.Model.add_edge_ensure(g, e["source"], e["target"], e["weight"])
   end)
 
 n = Yog.order(social_graph)
-m = Yog.size(social_graph)
+m = Yog.edge_count(social_graph)
 density = 2 * m / (n * (n - 1))
 
 IO.puts("=== Network Summary ===")
-IO.puts("Members (V): #{n}")
-IO.puts("Interpersonal Ties (E): #{m}")
+IO.puts("Members (n = |V|): #{n}")
+IO.puts("Interpersonal Ties (m = |E|): #{m}")
 IO.puts("Network Density: #{Float.round(density, 4)} (#{:erlang.float_to_binary(density * 100, decimals: 1)}% of all possible friendships exist)")
 ```
+
+Expected result: the full Karate Club dataset has 34 members and 78 undirected friendship ties. Yog's `edge_count/1` counts each undirected tie once, so the density formula uses the standard simple-graph denominator `n * (n - 1) / 2`.
 
 ---
 
@@ -111,9 +131,11 @@ Can algorithmic community detection predict the real-world club schism without k
 
 We apply the **Louvain method** (`Yog.Community.Louvain.detect/1`), a greedy modularity maximization algorithm:
 
-$$Q = \frac{1}{2m} \sum_{ij} \left[ A_{ij} - \frac{k_i k_j}{2m} \right] \delta(c_i, c_j)$$
+$$Q = \frac{1}{2W} \sum_{ij} \left[ A_{ij} - \frac{k_i k_j}{2W} \right] \delta(c_i, c_j)$$
 
-where $A_{ij}$ is edge weight, $k_i$ is degree, and $\delta(c_i, c_j) = 1$ when members $i$ and $j$ are placed in the same community.
+where $A_{ij}$ is the weighted edge strength between members $i$ and $j$, $k_i$ is the weighted degree (strength) of node $i$, $W$ is the total undirected edge weight, and $\delta(c_i, c_j) = 1$ when members $i$ and $j$ are placed in the same community.
+
+This is separate from the earlier unweighted edge count $m = |E|$ used for density. In Yog, `Yog.edge_count/1` counts each undirected friendship once, while modularity uses the graph's edge weights.
 
 ```elixir
 # Detect communities using Louvain modularity optimization
@@ -126,6 +148,8 @@ IO.puts("Modularity (Q): #{Float.round(modularity_score, 4)}")
 ```
 
 A modularity score $Q > 0.3$ is typically considered strong evidence of significant modular community structure in complex networks.
+
+Expected result: the Karate Club graph should produce a positive modularity score with a small number of communities that broadly align with the historical split. Exact community IDs are arbitrary labels and should not be interpreted as stable names.
 
 ### Ground-Truth Comparison: Evaluating Split Accuracy
 
@@ -193,9 +217,12 @@ Enum.each(top_brokers, fn m ->
 end)
 ```
 
+Expected result: the highest-degree members are usually faction leaders, while high-betweenness members are the social brokers connecting otherwise separated groups. This is the main difference between popularity and brokerage.
+
 ### Strategic Insight: The Hidden Power of Node 3 (Brian)
-- **Node 1 (Mr. Hi)** and **Node 34 (Officer)** naturally have the highest degree and PageRank because they are the formal leaders.
-- However, **Node 3 (Brian)** possesses an extraordinary Betweenness score despite having a lower degree. Brian maintains friendships across both factions, serving as the indispensable bridge through which rumors, compromises, and social influence must pass!
+
+* **Node 1 (Mr. Hi)** and **Node 34 (Officer)** naturally have the highest degree and PageRank because they are the formal leaders.
+* However, **Node 3 (Brian)** possesses an extraordinary Betweenness score despite having a lower degree. Brian maintains friendships across both factions, serving as the indispensable bridge through which rumors, compromises, and social influence must pass!
 
 ---
 
@@ -204,10 +231,11 @@ end)
 We now render the social network using `Yog.Render.DOT`.
 
 Visual encoding:
-- **Node Colors**: Tinted by detected Louvain community (e.g. Emerald for Community 0, Indigo for Community 1, Amber for Community 2).
-- **Node Size**: Proportional to **Betweenness Centrality**, making structural gatekeepers visually prominent.
-- **Node Borders**: Thick borders for key faction leaders (Mr. Hi and Officer).
-- **Cross-Community Edges (Bridges)**: Rendered in dashed red/gray to emphasize inter-faction tension.
+
+* **Node Colors**: Tinted by detected Louvain community (e.g. Emerald for Community 0, Indigo for Community 1, Amber for Community 2).
+* **Node Size**: Proportional to **Betweenness Centrality**, making structural gatekeepers visually prominent.
+* **Node Borders**: Thick borders for key faction leaders (Mr. Hi and Officer).
+* **Cross-Community Edges (Bridges)**: Rendered in dashed red/gray to emphasize inter-faction tension.
 
 ```elixir
 # Map each community ID to a distinct hex color
@@ -224,12 +252,10 @@ max_btw = Enum.max(Map.values(btw_scores))
 dot_opts = %{
   Yog.Render.DOT.default_options()
   | layout: :neato,
-    default_node_attributes: [
-      {:shape, :circle},
-      {:style, "filled"},
-      {:fontname, "Inter,Helvetica,Arial"},
-      {:fontsize, 9}
-    ],
+    node_shape: :circle,
+    node_style: :filled,
+    node_fontname: "Inter,Helvetica,Arial",
+    node_fontsize: 9,
     node_attributes: fn id, _data ->
       comm = community_result.assignments[id]
       color = Map.get(community_colors, comm, "#64748b")
@@ -291,6 +317,8 @@ IO.puts("Bridges: #{inspect(connectivity.bridges)}")
 IO.puts("Articulation Points (Cut Vertices): #{inspect(connectivity.articulation_points)}")
 ```
 
+Expected result: articulation points identify members whose removal can split the friendship network. In social terms, these are structurally important brokers or local gatekeepers, not necessarily the most popular people.
+
 Let's test the impact of an articulation point or key broker being removed from the network:
 
 ```elixir
@@ -315,6 +343,7 @@ Notice that removing Node 1 detaches several peripheral students (such as Nodes 
 How does a message or cultural trend propagate through this community?
 
 We implement an **Independent Cascade Model** (often used to model viral social media spreads and epidemiology):
+
 1. **Initial Seed**: At $t = 0$, an initial set of "activated" seed members receives the information.
 2. **Diffusion Rounds**: In each round $t + 1$, each newly activated node $u$ has a single chance to convince each inactive neighbor $v$.
 3. The transmission probability is modeled as $p = 1 - e^{-\lambda \cdot w_{uv}}$, where $w_{uv}$ is friendship interaction strength.
@@ -379,8 +408,9 @@ end
 ### Monte Carlo Experiment: Seeding Broker vs. Seeding Peripheral Member
 
 We run 50 Monte Carlo trials comparing information diffusion from:
-- **Seed A**: Node 1 (Mr. Hi - Top Leader / Broker)
-- **Seed B**: Node 17 (Peter - Low-degree Peripheral Member)
+
+* **Seed A**: Node 1 (Mr. Hi - Top Leader / Broker)
+* **Seed B**: Node 17 (Peter - Low-degree Peripheral Member)
 
 ```elixir
 trials = 50
@@ -411,7 +441,15 @@ IO.puts("📢 Seed: Node 17 (Peripheral Member)")
 IO.puts("   Average Reach: #{Float.round(avg_node17, 1)} / #{n} members (#{Float.round(avg_node17 / n * 100, 1)}% of club)")
 ```
 
-Seeding the information at a central influencer or structural broker achieves nearly **$3\times$** the reach of seeding at a peripheral member!
+Expected result: seeding the information at a central influencer or structural broker should usually reach substantially more of the network than seeding from a peripheral member. Because this is a Monte Carlo simulation, exact values depend on the random seed and probability model.
+
+### Try Changing This
+
+* Sort the centrality leaderboard by `degree`, `closeness`, or `pagerank` instead of `betweenness`.
+* Change the diffusion seed from node `1` to node `34` or node `3` and compare average reach.
+* Increase or decrease `base_prob` in `DiffusionSimulator.simulate/3` to model stronger or weaker social influence.
+* Remove node `3` instead of node `1` and compare the resulting connected components.
+* Try a different DOT layout such as `:fdp` or `:sfdp` if Graphviz supports it in your environment.
 
 ---
 

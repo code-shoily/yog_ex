@@ -22,6 +22,22 @@ When you run `mix compile`, the build tool must answer several critical question
 
 In this project, we will construct a production-style package dependency resolver and parallel build scheduler using `Yog.DAG`, `Yog.Transform`, and `Yog.Render`.
 
+### Yog Concepts Covered
+
+By the end, you will know how to:
+
+* Model prerequisite relationships as a directed graph.
+* Validate a graph as a DAG with `Yog.DAG.from_graph/1`.
+* Detect dependency cycles before scheduling work.
+* Remove redundant direct dependencies with transitive reduction.
+* Group packages into parallel build waves with topological generations.
+* Use DAG reachability for critical-path and incremental-build analysis.
+* Render dependency graphs with DOT and Mermaid.
+
+### Why Yog Fits This Problem
+
+Dependency resolution is a natural graph problem: packages are nodes, dependency constraints are directed edges, and build scheduling is topological ordering. Yog gives you both a general graph model for construction and a dedicated `Yog.DAG` layer once acyclicity has been validated.
+
 ---
 
 ## Section 1: Ingesting the Package Manifest
@@ -102,6 +118,8 @@ graph =
 IO.puts("Graph constructed: #{Yog.node_count(graph)} packages, #{Yog.edge_count(graph)} dependency links.")
 ```
 
+Expected result: the graph should contain all packages from the manifest, including packages with no dependencies, and one directed edge for every declared prerequisite relationship.
+
 ```elixir
 # Visualizing the raw dependency network
 dot_opts = %{
@@ -136,6 +154,8 @@ case Yog.DAG.from_graph(graph) do
 end
 ```
 
+Expected result: the original manifest should validate as a DAG. The next cell intentionally introduces a bad edge to show how Yog catches dependency cycles.
+
 Let's test what happens when an invalid circular dependency is introduced (e.g. `phoenix` mistakenly depending on `my_app`):
 
 ```elixir
@@ -155,7 +175,7 @@ end
 
 ## Section 3: Transitive Reduction (Pruning Redundant Edges)
 
-Often, manifests declare redundant dependencies. For instance, `my_app` directly declares `jason` and `telemetry`, but `phoenix` already depends on both. 
+Often, manifests declare redundant dependencies. For instance, `my_app` directly declares `jason` and `telemetry`, but `phoenix` already depends on both.
 
 `Yog.Transform.transitive_reduction/1` removes these bypass shortcuts without altering the reachability or build constraints:
 
@@ -166,6 +186,8 @@ IO.puts("Original dependency count: #{Yog.edge_count(graph)}")
 IO.puts("Reduced dependency count:  #{Yog.edge_count(reduced_graph)}")
 IO.puts("Pruned #{Yog.edge_count(graph) - Yog.edge_count(reduced_graph)} redundant transitive edges!")
 ```
+
+Expected result: the reduced graph should have fewer or equal dependency links while preserving reachability. That means the build constraints are unchanged, but the visual and scheduling graph is simpler.
 
 ```elixir
 # Visualizing the streamlined dependency graph
@@ -187,6 +209,7 @@ Kino.VizJS.render(reduced_dot)
 A classic sequential topological sort (`Yog.DAG.topological_sort/1`) produces a single sequential sequence of packages to build. However, modern multicore CPUs can compile multiple packages in parallel.
 
 `Yog.DAG.topological_generations/1` organizes the packages into **concurrency waves** (generations):
+
 * **Generation 0**: Leaf packages with no prerequisites (they can all compile immediately in parallel).
 * **Generation $i+1$**: Packages whose prerequisites are all satisfied by Generation $\le i$.
 
@@ -207,6 +230,8 @@ end)
 max_parallelism = generations |> Enum.map(&length/1) |> Enum.max()
 IO.puts("\nPeak Concurrency Width: #{max_parallelism} parallel jobs")
 ```
+
+Expected result: packages in the same stage can be compiled concurrently; only the transition between stages is sequential.
 
 Now let's create a beautiful visualization where **each build stage is assigned a distinct color**:
 
@@ -250,7 +275,7 @@ Kino.VizJS.render(Yog.Render.DOT.to_dot(reduced_graph, stage_dot_opts))
 
 ## Section 5: Critical Path Analysis (Longest Path)
 
-In project scheduling (PERT/CPM), the **Critical Path** is the longest sequence of dependent tasks through the network. 
+In project scheduling (PERT/CPM), the **Critical Path** is the longest sequence of dependent tasks through the network.
 
 No matter how many CPU cores you have, your build can **never** finish faster than the total time taken by the packages along the critical path!
 
@@ -266,6 +291,8 @@ critical_time =
 
 IO.puts("Minimum theoretical build time: #{critical_time} seconds")
 ```
+
+Expected result: the critical path is the lower bound for build time even with unlimited workers, because every package on that path depends on the previous one.
 
 Let's highlight the critical path edges in bold red on the diagram:
 
@@ -329,6 +356,7 @@ BuildRunner.run(generations, compile_times)
 When a developer edits code in a low-level dependency like `telemetry`, which packages need to be recompiled?
 
 In a DAG where edges are `dependency -> consumer`:
+
 * The **blast radius** of a package is its set of **descendants** (`Yog.DAG.descendants/2`).
 * Unaffected packages can be retrieved directly from the compilation cache.
 
@@ -362,6 +390,13 @@ cache_dot_opts = %{
 
 Kino.VizJS.render(Yog.Render.DOT.to_dot(reduced_graph, cache_dot_opts))
 ```
+
+### Try Changing This
+
+* Add a new dependency from `"phoenix"` to `"my_app"` and confirm `Yog.DAG.from_graph/1` rejects the cycle.
+* Increase the compile time for `"phoenix"` or `"ecto_sql"` and rerun the critical-path section.
+* Change `changed_package` from `"telemetry"` to `"jason"` or `"plug_crypto"` and compare the blast radius.
+* Remove a redundant dependency from the JSON manifest and see whether transitive reduction still prunes anything.
 
 ---
 
