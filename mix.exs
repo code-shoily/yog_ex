@@ -123,6 +123,8 @@ defmodule YogEx.MixProject do
          [filename: "mermaid_complete_guide", title: "Mermaid Complete Guide"]},
         {"livebooks/how_to/layout_guide.livemd",
          [filename: "layout_guide", title: "Layout Guide"]},
+        {"livebooks/projects/package_dependency_resolver.livemd",
+         [filename: "package_dependency_resolver", title: "Package Dependency Resolver"]},
         "ALGORITHMS.md",
         "PROPERTIES.md",
         {"test/oracle/README.md", [filename: "oracle_readme", title: "Oracle Tests"]},
@@ -204,6 +206,9 @@ defmodule YogEx.MixProject do
           "livebooks/how_to/mermaid_complete_guide.livemd",
           "livebooks/gallery/graph_catalog.livemd",
           "livebooks/gallery/maze_gallery.livemd"
+        ],
+        "Projects (Livebook)": [
+          "livebooks/projects/package_dependency_resolver.livemd"
         ],
         Reference: [
           "ALGORITHMS.md",

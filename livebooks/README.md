@@ -33,6 +33,10 @@ Interactive showcases of complex topologies, visual layouts, and algorithm compa
 *   [graph_catalog.livemd](file:///home/mafinar/repos/elixir/yog_ex/livebooks/gallery/graph_catalog.livemd): A gallery of pre-constructed classic graphs (cliques, stars, wheels, grids, bipartite graphs) rendered in diverse formats.
 *   [maze_gallery.livemd](file:///home/mafinar/repos/elixir/yog_ex/livebooks/gallery/maze_gallery.livemd): Side-by-side comparison of all 11+ supported maze generation algorithms with Unicode grids, solved paths, and spanning tree layouts.
 
+### 4. [Projects](file:///home/mafinar/repos/elixir/yog_ex/livebooks/projects/)
+Real-world, end-to-end practical applications solving concrete engineering problems with rich visual outputs:
+*   [package_dependency_resolver.livemd](file:///home/mafinar/repos/elixir/yog_ex/livebooks/projects/package_dependency_resolver.livemd): Package dependency resolver & parallel build runner. Features DAG cycle detection, transitive reduction, parallel build wave scheduling (`topological_generations/1`), critical path compilation analysis (`longest_path/1`), asynchronous build execution simulation, and cache invalidation blast radius analysis.
+
 ---
 
 ## How to Run the Livebooks
