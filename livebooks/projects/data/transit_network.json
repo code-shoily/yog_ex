@@ -1,0 +1,299 @@
+{
+  "network_name": "Metropolitan Transit Authority (MTA)",
+  "version": "1.0",
+  "stations": [
+    {"id": "central", "name": "Central Hub", "zone": 1, "type": "intermodal_hub"},
+    {"id": "uptown", "name": "Uptown Financial", "zone": 1, "type": "metro_station"},
+    {"id": "waterfront", "name": "Waterfront Pier", "zone": 1, "type": "ferry_terminal"},
+    {"id": "arts_district", "name": "Arts & Theater", "zone": 1, "type": "metro_station"},
+    {"id": "tech_park", "name": "Innovation Tech Park", "zone": 2, "type": "commuter_station"},
+    {"id": "medical_center", "name": "Regional Medical Center", "zone": 2, "type": "transit_center"},
+    {"id": "university", "name": "Metropolitan University", "zone": 2, "type": "campus_station"},
+    {"id": "stadium", "name": "Civic Stadium & Arena", "zone": 2, "type": "event_station"},
+    {"id": "suburb_north", "name": "Northgate Heights", "zone": 3, "type": "park_and_ride"},
+    {"id": "suburb_east", "name": "Eastfield Junction", "zone": 3, "type": "park_and_ride"},
+    {"id": "airport", "name": "International Airport", "zone": 3, "type": "terminal_station"},
+    {"id": "harbor_island", "name": "Harbor Island Park", "zone": 1, "type": "island_dock"}
+  ],
+  "routes": [
+    {
+      "from": "central",
+      "to": "waterfront",
+      "mode": "metro",
+      "line": "Red Line",
+      "duration_min": 5,
+      "cost": 2.50,
+      "accessible": true
+    },
+    {
+      "from": "central",
+      "to": "waterfront",
+      "mode": "streetcar",
+      "line": "Heritage Tram",
+      "duration_min": 12,
+      "cost": 1.25,
+      "accessible": true
+    },
+    {
+      "from": "central",
+      "to": "waterfront",
+      "mode": "walk",
+      "line": "Harbor Promenade",
+      "duration_min": 18,
+      "cost": 0.00,
+      "accessible": true
+    },
+    {
+      "from": "central",
+      "to": "arts_district",
+      "mode": "metro",
+      "line": "Green Line",
+      "duration_min": 6,
+      "cost": 2.50,
+      "accessible": true
+    },
+    {
+      "from": "central",
+      "to": "arts_district",
+      "mode": "bus",
+      "line": "City Bus 10",
+      "duration_min": 14,
+      "cost": 1.50,
+      "accessible": true
+    },
+    {
+      "from": "central",
+      "to": "arts_district",
+      "mode": "walk",
+      "line": "Cultural Boulevard",
+      "duration_min": 16,
+      "cost": 0.00,
+      "accessible": true
+    },
+    {
+      "from": "central",
+      "to": "uptown",
+      "mode": "metro",
+      "line": "Red Line",
+      "duration_min": 7,
+      "cost": 2.50,
+      "accessible": true
+    },
+    {
+      "from": "central",
+      "to": "uptown",
+      "mode": "bus",
+      "line": "City Bus 14",
+      "duration_min": 15,
+      "cost": 1.50,
+      "accessible": true
+    },
+    {
+      "from": "central",
+      "to": "tech_park",
+      "mode": "metro",
+      "line": "Blue Line",
+      "duration_min": 11,
+      "cost": 2.75,
+      "accessible": true
+    },
+    {
+      "from": "central",
+      "to": "tech_park",
+      "mode": "bus",
+      "line": "Express Bus 42",
+      "duration_min": 22,
+      "cost": 1.75,
+      "accessible": true
+    },
+    {
+      "from": "central",
+      "to": "stadium",
+      "mode": "metro",
+      "line": "Red Line",
+      "duration_min": 8,
+      "cost": 2.50,
+      "accessible": true
+    },
+    {
+      "from": "central",
+      "to": "stadium",
+      "mode": "walk",
+      "line": "Stadium Greenway",
+      "duration_min": 24,
+      "cost": 0.00,
+      "accessible": true
+    },
+    {
+      "from": "central",
+      "to": "airport",
+      "mode": "express_rail",
+      "line": "Airport Express",
+      "duration_min": 16,
+      "cost": 7.50,
+      "accessible": true
+    },
+    {
+      "from": "central",
+      "to": "airport",
+      "mode": "bus",
+      "line": "Bus 100 Airport",
+      "duration_min": 42,
+      "cost": 2.00,
+      "accessible": true
+    },
+    {
+      "from": "arts_district",
+      "to": "uptown",
+      "mode": "metro",
+      "line": "Green Line",
+      "duration_min": 5,
+      "cost": 2.50,
+      "accessible": true
+    },
+    {
+      "from": "arts_district",
+      "to": "uptown",
+      "mode": "walk",
+      "line": "Historic Alley (Stairs)",
+      "duration_min": 9,
+      "cost": 0.00,
+      "accessible": false
+    },
+    {
+      "from": "arts_district",
+      "to": "university",
+      "mode": "metro",
+      "line": "Green Line",
+      "duration_min": 7,
+      "cost": 2.50,
+      "accessible": true
+    },
+    {
+      "from": "arts_district",
+      "to": "university",
+      "mode": "bus",
+      "line": "Campus Shuttle",
+      "duration_min": 11,
+      "cost": 0.00,
+      "accessible": true
+    },
+    {
+      "from": "arts_district",
+      "to": "university",
+      "mode": "walk",
+      "line": "University Way",
+      "duration_min": 18,
+      "cost": 0.00,
+      "accessible": true
+    },
+    {
+      "from": "uptown",
+      "to": "medical_center",
+      "mode": "metro",
+      "line": "Red Line",
+      "duration_min": 8,
+      "cost": 2.50,
+      "accessible": true
+    },
+    {
+      "from": "uptown",
+      "to": "medical_center",
+      "mode": "bus",
+      "line": "City Bus 88",
+      "duration_min": 16,
+      "cost": 1.50,
+      "accessible": true
+    },
+    {
+      "from": "uptown",
+      "to": "suburb_north",
+      "mode": "metro",
+      "line": "Yellow Line",
+      "duration_min": 15,
+      "cost": 2.75,
+      "accessible": true
+    },
+    {
+      "from": "uptown",
+      "to": "suburb_north",
+      "mode": "bus",
+      "line": "Commuter Bus 12",
+      "duration_min": 28,
+      "cost": 1.75,
+      "accessible": true
+    },
+    {
+      "from": "suburb_north",
+      "to": "stadium",
+      "mode": "bus",
+      "line": "Crosstown Bus 7",
+      "duration_min": 18,
+      "cost": 1.75,
+      "accessible": true
+    },
+    {
+      "from": "tech_park",
+      "to": "suburb_east",
+      "mode": "metro",
+      "line": "Blue Line",
+      "duration_min": 14,
+      "cost": 2.75,
+      "accessible": true
+    },
+    {
+      "from": "tech_park",
+      "to": "suburb_east",
+      "mode": "bus",
+      "line": "Commuter Bus 50",
+      "duration_min": 24,
+      "cost": 1.75,
+      "accessible": true
+    },
+    {
+      "from": "medical_center",
+      "to": "university",
+      "mode": "bus",
+      "line": "Health Link Shuttle",
+      "duration_min": 9,
+      "cost": 1.00,
+      "accessible": true
+    },
+    {
+      "from": "medical_center",
+      "to": "university",
+      "mode": "walk",
+      "line": "Campus Medical Trail",
+      "duration_min": 14,
+      "cost": 0.00,
+      "accessible": true
+    },
+    {
+      "from": "waterfront",
+      "to": "harbor_island",
+      "mode": "ferry",
+      "line": "Harbor Ferry Line",
+      "duration_min": 14,
+      "cost": 3.50,
+      "accessible": true
+    },
+    {
+      "from": "waterfront",
+      "to": "harbor_island",
+      "mode": "water_taxi",
+      "line": "Express Water Taxi",
+      "duration_min": 6,
+      "cost": 8.00,
+      "accessible": false
+    },
+    {
+      "from": "stadium",
+      "to": "airport",
+      "mode": "bus",
+      "line": "South Link 33",
+      "duration_min": 26,
+      "cost": 2.00,
+      "accessible": true
+    }
+  ]
+}

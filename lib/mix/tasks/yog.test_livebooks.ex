@@ -27,6 +27,11 @@ defmodule KinoMock do
     @moduledoc false
     def new(mermaid_source), do: mermaid_source
   end
+
+  defmodule DataTable do
+    @moduledoc false
+    def new(data, _opts \\ []), do: data
+  end
 end
 
 defmodule Mix.Tasks.Yog.TestLivebooks do

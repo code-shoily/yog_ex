@@ -36,6 +36,7 @@ Interactive showcases of complex topologies, visual layouts, and algorithm compa
 ### 4. [Projects](file:///home/mafinar/repos/elixir/yog_ex/livebooks/projects/)
 Real-world, end-to-end practical applications solving concrete engineering problems with rich visual outputs:
 *   [package_dependency_resolver.livemd](file:///home/mafinar/repos/elixir/yog_ex/livebooks/projects/package_dependency_resolver.livemd): Package dependency resolver & parallel build runner. Features DAG cycle detection, transitive reduction, parallel build wave scheduling (`topological_generations/1`), critical path compilation analysis (`longest_path/1`), asynchronous build execution simulation, and cache invalidation blast radius analysis.
+*   [transit_route_planner.livemd](file:///home/mafinar/repos/elixir/yog_ex/livebooks/projects/transit_route_planner.livemd): Multi-modal transit route planner & isochrone engine. Features multigraph modeling (`Yog.Multi`), multi-criteria edge collapsing (`to_simple_graph/2` for fastest vs. cheapest vs. accessible), Dijkstra multi-leg itinerary pathfinding (`shortest_path/1`), travel-time commuter isochrone mapping (`single_source_distances/1`), and transit disruption fault-tolerance rerouting.
 
 ---
 

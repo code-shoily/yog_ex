@@ -125,6 +125,8 @@ defmodule YogEx.MixProject do
          [filename: "layout_guide", title: "Layout Guide"]},
         {"livebooks/projects/package_dependency_resolver.livemd",
          [filename: "package_dependency_resolver", title: "Package Dependency Resolver"]},
+        {"livebooks/projects/transit_route_planner.livemd",
+         [filename: "transit_route_planner", title: "Transit Route Planner"]},
         "ALGORITHMS.md",
         "PROPERTIES.md",
         {"test/oracle/README.md", [filename: "oracle_readme", title: "Oracle Tests"]},
@@ -208,7 +210,8 @@ defmodule YogEx.MixProject do
           "livebooks/gallery/maze_gallery.livemd"
         ],
         "Projects (Livebook)": [
-          "livebooks/projects/package_dependency_resolver.livemd"
+          "livebooks/projects/package_dependency_resolver.livemd",
+          "livebooks/projects/transit_route_planner.livemd"
         ],
         Reference: [
           "ALGORITHMS.md",
