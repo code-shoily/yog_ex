@@ -127,6 +127,8 @@ defmodule YogEx.MixProject do
          [filename: "package_dependency_resolver", title: "Package Dependency Resolver"]},
         {"livebooks/projects/transit_route_planner.livemd",
          [filename: "transit_route_planner", title: "Transit Route Planner"]},
+        {"livebooks/projects/social_network_analyzer.livemd",
+         [filename: "social_network_analyzer", title: "Social Network Analyzer"]},
         "ALGORITHMS.md",
         "PROPERTIES.md",
         {"test/oracle/README.md", [filename: "oracle_readme", title: "Oracle Tests"]},
