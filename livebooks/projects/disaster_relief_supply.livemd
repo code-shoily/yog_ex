@@ -1,0 +1,422 @@
+# Project: Disaster Relief Supply Network
+
+```elixir
+Mix.install([
+  {:yog_ex, path: "../.."},
+  {:kino_vizjs, "~> 0.9.0"}
+])
+```
+
+## Scenario
+
+A coastal region has just been hit by a cyclone. Relief planners need to move emergency supplies from warehouses to field hubs and finally to shelters.
+
+This project models that logistics network as a directed graph where each edge has a throughput capacity: trucks per hour, pallets per day, water tankers per shift, or any other consistent unit.
+
+We will use Yog to answer practical questions:
+
+* What is the maximum amount of aid that can reach the affected area?
+* Which roads or transfer points are the true bottlenecks?
+* How much capacity remains after a bridge closure?
+* Can we satisfy shelter demand at minimum transportation cost?
+
+## Yog Concepts Covered
+
+* Directed weighted graphs as capacity networks
+* Max-flow with `Yog.Flow.MaxFlow.dinic/3`
+* Min-cut extraction with `Yog.Flow.MaxFlow.min_cut/1`
+* Scenario analysis by rebuilding/removing capacity
+* Minimum-cost flow with `Yog.Flow.SuccessiveShortestPath.min_cost_flow/4`
+* DOT rendering with domain-specific labels and highlights
+
+## Why Yog Fits This Problem
+
+Disaster logistics is graph-shaped: supplies originate at depots, pass through constrained routes, and terminate at demand centers. Yog lets us keep the model directly in Elixir data, then run flow algorithms on the same graph we use for reporting and visualization.
+
+The important modeling trick is to add a virtual `:source` and `:sink`:
+
+* `:source` connects to all supply depots with their available inventory.
+* All demand shelters connect to `:sink` with their requested capacity.
+* The max-flow value then answers: “How much total demand can the current logistics network serve?”
+
+## 1. Build the Relief Network
+
+```elixir
+alias Yog.Flow.MaxFlow
+alias Yog.Flow.SuccessiveShortestPath
+
+nodes = %{
+  source: "Emergency Stockpile",
+  north_depot: "North Depot",
+  south_depot: "South Depot",
+  airport: "Regional Airport",
+  port: "Temporary Port",
+  city_hub: "City Hub",
+  hill_hub: "Hill Hub",
+  shelter_a: "Shelter A",
+  shelter_b: "Shelter B",
+  shelter_c: "Shelter C",
+  sink: "People Needing Aid"
+}
+
+capacity_edges = [
+  {:source, :north_depot, 70},
+  {:source, :south_depot, 60},
+  {:source, :airport, 45},
+
+  {:north_depot, :city_hub, 40},
+  {:north_depot, :hill_hub, 25},
+  {:south_depot, :city_hub, 35},
+  {:south_depot, :port, 30},
+  {:airport, :hill_hub, 35},
+  {:airport, :city_hub, 15},
+  {:port, :city_hub, 25},
+  {:port, :shelter_c, 20},
+
+  {:city_hub, :shelter_a, 45},
+  {:city_hub, :shelter_b, 35},
+  {:hill_hub, :shelter_b, 30},
+  {:hill_hub, :shelter_c, 30},
+
+  {:shelter_a, :sink, 50},
+  {:shelter_b, :sink, 55},
+  {:shelter_c, :sink, 40}
+]
+
+relief_graph =
+  Yog.directed()
+  |> then(fn graph ->
+    Enum.reduce(nodes, graph, fn {id, label}, acc ->
+      Yog.add_node(acc, id, label)
+    end)
+  end)
+  |> Yog.add_edges!(capacity_edges)
+
+%{
+  locations: Yog.order(relief_graph),
+  routes: Yog.edge_count(relief_graph),
+  requested_relief_units: 50 + 55 + 40,
+  available_relief_units: 70 + 60 + 45
+}
+```
+
+The network has more inventory than requested demand, but capacity in the middle of the network may still prevent all supplies from reaching shelters.
+
+## 2. Visualize the Capacity Network
+
+```elixir
+node_groups = %{
+  [:source] => "#111827",
+  [:north_depot, :south_depot, :airport] => "#2563eb",
+  [:port, :city_hub, :hill_hub] => "#7c3aed",
+  [:shelter_a, :shelter_b, :shelter_c] => "#16a34a",
+  [:sink] => "#dc2626"
+}
+
+node_color = fn id ->
+  Enum.find_value(node_groups, "#64748b", fn {ids, color} ->
+    if id in ids, do: color
+  end)
+end
+
+capacity_options = %{
+  Yog.Render.DOT.default_options()
+  | rankdir: :lr,
+    node_shape: :box,
+    node_style: :filled,
+    node_color: "#eff6ff",
+    node_fontname: "Inter,Helvetica,Arial",
+    node_fontsize: 10,
+    edge_fontsize: 9,
+    edge_label: fn capacity -> "cap #{capacity}" end,
+    node_label: fn _id, label -> label end,
+    node_attributes: fn id, _label ->
+      [
+        {:fillcolor, node_color.(id)},
+        {:fontcolor, "white"},
+        {:color, node_color.(id)}
+      ]
+    end
+}
+
+Kino.VizJS.render(Yog.Render.DOT.to_dot(relief_graph, capacity_options), height: "640px")
+```
+
+## 3. Maximum Deliverable Aid
+
+```elixir
+result = MaxFlow.dinic(relief_graph, :source, :sink)
+
+%{
+  maximum_deliverable_units: result.max_flow,
+  requested_units: 145,
+  unmet_units: max(145 - result.max_flow, 0),
+  service_level: Float.round(result.max_flow / 145 * 100, 1)
+}
+```
+
+Expected result: the network should deliver less than the total available inventory if the transfer routes or final shelter approaches are the limiting factor.
+
+## 4. Find the Bottleneck Cut
+
+The min-cut separates nodes still reachable from `:source` in the residual network from nodes that are no longer reachable after max-flow is saturated. Its crossing capacity equals the max-flow value.
+
+```elixir
+min_cut = MaxFlow.min_cut(result)
+
+source_side = MapSet.new(min_cut.source_side)
+
+cut_edges =
+  relief_graph
+  |> Yog.all_edges()
+  |> Enum.filter(fn {from, to, _capacity} ->
+    MapSet.member?(source_side, from) and not MapSet.member?(source_side, to)
+  end)
+
+%{
+  cut_value: min_cut.cut_value,
+  source_side: Enum.sort(min_cut.source_side),
+  sink_side: Enum.sort(min_cut.sink_side),
+  bottleneck_routes: cut_edges
+}
+```
+
+In operations terms, these are the routes where added capacity would be most meaningful. Improving non-cut edges may help local robustness, but it will not increase total throughput until the current cut is addressed.
+
+## 5. Visualize the Cut
+
+```elixir
+cut_options =
+  min_cut
+  |> Yog.Render.DOT.cut_to_options(capacity_options)
+  |> Map.merge(%{
+    edge_attributes: fn from, to, _capacity ->
+      if Enum.any?(cut_edges, fn {u, v, _} -> u == from and v == to end) do
+        [{:color, "#dc2626"}, {:penwidth, "4"}]
+      else
+        []
+      end
+    end
+  })
+
+Kino.VizJS.render(Yog.Render.DOT.to_dot(relief_graph, cut_options), height: "640px")
+```
+
+Red routes are the operational bottlenecks. In a real incident dashboard, these would be candidates for military bridging, temporary ferries, traffic control, fuel priority, or convoy scheduling.
+
+## 6. What If a Bridge Fails?
+
+Suppose flooding closes the route from the city hub to Shelter A. Rebuild the capacity network without that edge and recompute max-flow.
+
+```elixir
+failed_route = {:city_hub, :shelter_a}
+
+failed_edges =
+  Enum.reject(capacity_edges, fn {from, to, _capacity} ->
+    {from, to} == failed_route
+  end)
+
+failed_graph =
+  Yog.directed()
+  |> then(fn graph ->
+    Enum.reduce(nodes, graph, fn {id, label}, acc ->
+      Yog.add_node(acc, id, label)
+    end)
+  end)
+  |> Yog.add_edges!(failed_edges)
+
+failed_result = MaxFlow.dinic(failed_graph, :source, :sink)
+
+%{
+  normal_max_flow: result.max_flow,
+  after_bridge_failure: failed_result.max_flow,
+  lost_capacity: result.max_flow - failed_result.max_flow,
+  unmet_units_after_failure: max(145 - failed_result.max_flow, 0)
+}
+```
+
+This is where flow models become useful for preparedness: you can simulate closures before they happen and identify routes where redundancy matters most.
+
+## 7. Add a Relief Shuttle and Recompute
+
+Now suppose emergency crews establish a temporary shuttle from the hill hub to Shelter A.
+
+```elixir
+mitigation_edges = failed_edges ++ [{:hill_hub, :shelter_a, 20}]
+
+mitigated_graph =
+  Yog.directed()
+  |> then(fn graph ->
+    Enum.reduce(nodes, graph, fn {id, label}, acc ->
+      Yog.add_node(acc, id, label)
+    end)
+  end)
+  |> Yog.add_edges!(mitigation_edges)
+
+mitigated_result = MaxFlow.dinic(mitigated_graph, :source, :sink)
+
+%{
+  after_failure: failed_result.max_flow,
+  with_temporary_shuttle: mitigated_result.max_flow,
+  recovered_units: mitigated_result.max_flow - failed_result.max_flow,
+  remaining_gap: max(145 - mitigated_result.max_flow, 0)
+}
+```
+
+The same graph model supports both emergency response and planning exercises: remove damaged links, add temporary links, and compare throughput.
+
+## 8. Cheapest Feasible Allocation
+
+Max-flow asks only whether capacity exists. Logistics teams also care about cost: rough roads, air drops, ferries, fuel, and security escorts all have different unit costs.
+
+For minimum-cost flow, each node has a demand:
+
+* negative demand means supply,
+* positive demand means required delivery,
+* zero means transshipment.
+
+Each edge stores `{capacity, cost_per_unit}`.
+
+```elixir
+cost_nodes = %{
+  north_depot: {"North Depot", -55},
+  south_depot: {"South Depot", -45},
+  airport: {"Regional Airport", -35},
+  port: {"Temporary Port", 0},
+  city_hub: {"City Hub", 0},
+  hill_hub: {"Hill Hub", 0},
+  shelter_a: {"Shelter A", 45},
+  shelter_b: {"Shelter B", 50},
+  shelter_c: {"Shelter C", 40}
+}
+
+cost_edges = [
+  {:north_depot, :city_hub, {40, 2}},
+  {:north_depot, :hill_hub, {25, 4}},
+  {:south_depot, :city_hub, {35, 3}},
+  {:south_depot, :port, {30, 2}},
+  {:airport, :hill_hub, {35, 7}},
+  {:airport, :city_hub, {15, 6}},
+  {:port, :city_hub, {25, 2}},
+  {:port, :shelter_c, {20, 3}},
+  {:city_hub, :shelter_a, {45, 2}},
+  {:city_hub, :shelter_b, {35, 2}},
+  {:hill_hub, :shelter_b, {30, 3}},
+  {:hill_hub, :shelter_c, {30, 2}}
+]
+
+cost_graph =
+  Yog.directed()
+  |> then(fn graph ->
+    Enum.reduce(cost_nodes, graph, fn {id, data}, acc ->
+      Yog.add_node(acc, id, data)
+    end)
+  end)
+  |> Yog.add_edges!(cost_edges)
+
+get_demand = fn {_label, demand} -> demand end
+get_capacity = fn {capacity, _cost} -> capacity end
+get_cost = fn {_capacity, cost} -> cost end
+
+min_cost_result =
+  SuccessiveShortestPath.min_cost_flow(cost_graph, get_demand, get_capacity, get_cost)
+
+min_cost_result
+```
+
+## 9. Inspect the Shipment Plan
+
+```elixir
+shipment_plan =
+  case min_cost_result do
+    {:ok, %{cost: total_cost, flow: flow}} ->
+      used_routes =
+        flow
+        |> Enum.filter(fn {_from, _to, amount} -> amount > 0 end)
+        |> Enum.sort_by(fn {from, to, _amount} -> {to_string(from), to_string(to)} end)
+
+      %{
+        total_transport_cost: total_cost,
+        used_routes: used_routes
+      }
+
+    {:error, reason} ->
+      %{error: reason}
+  end
+
+shipment_plan
+```
+
+This is the difference between “can we deliver enough?” and “what should the dispatch plan be?” Max-flow gives the capacity ceiling; min-cost flow gives a cost-aware allocation when demands are explicit.
+
+## 10. Visualize the Shipment Plan
+
+```elixir
+used_route_set =
+  case min_cost_result do
+    {:ok, %{flow: flow}} ->
+      flow
+      |> Enum.filter(fn {_from, _to, amount} -> amount > 0 end)
+      |> Enum.map(fn {from, to, _amount} -> {from, to} end)
+      |> MapSet.new()
+
+    {:error, _reason} ->
+      MapSet.new()
+  end
+
+cost_options = %{
+  Yog.Render.DOT.default_options()
+  | rankdir: :lr,
+    node_shape: :box,
+    node_style: :filled,
+    node_color: "#f8fafc",
+    node_fontname: "Inter,Helvetica,Arial",
+    node_fontsize: 10,
+    edge_fontsize: 9,
+    node_label: fn _id, {label, demand} ->
+      cond do
+        demand < 0 -> "#{label}\nsupply #{abs(demand)}"
+        demand > 0 -> "#{label}\ndemand #{demand}"
+        true -> label
+      end
+    end,
+    edge_label: fn {capacity, cost} -> "cap #{capacity}, cost #{cost}" end,
+    node_attributes: fn _id, {_label, demand} ->
+      cond do
+        demand < 0 -> [{:fillcolor, "#2563eb"}, {:fontcolor, "white"}]
+        demand > 0 -> [{:fillcolor, "#16a34a"}, {:fontcolor, "white"}]
+        true -> [{:fillcolor, "#7c3aed"}, {:fontcolor, "white"}]
+      end
+    end,
+    edge_attributes: fn from, to, _edge_data ->
+      if MapSet.member?(used_route_set, {from, to}) do
+        [{:color, "#ea580c"}, {:penwidth, "3"}]
+      else
+        [{:color, "#cbd5e1"}]
+      end
+    end
+}
+
+Kino.VizJS.render(Yog.Render.DOT.to_dot(cost_graph, cost_options), height: "640px")
+```
+
+Orange routes are used by the minimum-cost dispatch plan.
+
+## Try Changing This
+
+* Reduce `{:city_hub, :shelter_b, 35}` to `20` and watch the min-cut shift.
+* Increase `{:hill_hub, :shelter_a, 20}` to `40` in the mitigation scenario.
+* Raise airport costs in `cost_edges` to model limited aircraft fuel.
+* Increase Shelter C demand and rebalance depot supply.
+* Add a new `:military_bridge` transshipment node with high capacity but high cost.
+
+## Conclusion
+
+This project is a compact example of Yog as a domain modeling tool:
+
+* Build a graph from problem facts.
+* Run an algorithm that matches the operational question.
+* Interpret the output as a planning decision.
+* Re-run the model under failures and mitigations.
+
+For disaster relief, max-flow tells you the best possible throughput, min-cut identifies bottlenecks, and min-cost flow turns feasible delivery into an actionable shipment plan.

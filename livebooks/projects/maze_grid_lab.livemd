@@ -1,0 +1,388 @@
+# Project: Maze & Grid Lab — Generation, Pathfinding, and Wrapping Worlds
+
+```elixir
+Mix.install([
+  {:yog_ex, path: "../.."},
+  {:kino_vizjs, "~> 0.9.0"}
+])
+```
+
+## Introduction
+
+Grids are one of the most familiar graph domains: game maps, mazes, warehouse aisles, robot navigation fields, image pixels, tile worlds, and cellular automata can all be modeled as nodes connected by legal moves.
+
+In this project, we use Yog to move between three related views of a grid world:
+
+1. **Grid as data** — a rectangular matrix of cells.
+2. **Grid as graph** — cells become nodes; legal moves become edges.
+3. **Grid as navigable world** — graph algorithms solve paths, components, reachability, and wrapping maps.
+
+### Yog Concepts Covered
+
+By the end, you will know how to:
+
+* Build grid graphs from 2D lists with `Yog.Builder.Grid`.
+* Use movement predicates to model walls and walkable terrain.
+* Generate perfect mazes with `Yog.Generator.Maze`.
+* Solve mazes with `Yog.Pathfinding.shortest_path/1`.
+* Compare maze-generation algorithms by path length and corridor texture.
+* Analyze obstacle fields with connected components.
+* Model Pac-Man-style wrapping maps with `Yog.Builder.Toroidal`.
+* Render grid worlds and solved paths with `Yog.Render.ASCII`.
+
+### Why Yog Fits This Problem
+
+Many graph libraries expose generic nodes and edges but leave grid modeling to users. Yog includes grid builders, toroidal builders, maze generators, coordinate conversion helpers, pathfinding, connectivity, and ASCII rendering in one place. That makes grid worlds a compact showcase for Yog as both an algorithms library and a practical modeling toolkit.
+
+---
+
+## Section 1: Turning a Tile Map into a Graph
+
+We start with a small hand-authored dungeon map. Open cells are walkable; `#` cells are walls; `S` is the start; `G` is the goal.
+
+```elixir
+alias Yog.Builder.Grid
+alias Yog.Connectivity
+alias Yog.Pathfinding
+alias Yog.Render.ASCII
+
+world = [
+  ["S", ".", ".", "#", ".", ".", "."],
+  ["#", "#", ".", "#", ".", "#", "."],
+  [".", ".", ".", ".", ".", "#", "."],
+  [".", "#", "#", "#", ".", ".", "."],
+  [".", ".", ".", ".", "#", "#", "G"]
+]
+
+rows = length(world)
+cols = length(hd(world))
+walkable = Grid.including(["S", ".", "G"])
+
+grid = Grid.from_2d_list(world, :undirected, walkable)
+graph = Grid.to_graph(grid)
+
+{:ok, start_node} = Grid.find_node(grid, &(&1 == "S"))
+{:ok, goal_node} = Grid.find_node(grid, &(&1 == "G"))
+
+IO.puts("Grid dimensions: #{rows} rows × #{cols} cols")
+IO.puts("Graph nodes: #{Yog.order(graph)}")
+IO.puts("Walkable movement edges: #{Yog.edge_count(graph)}")
+IO.puts("Start node: #{start_node} at #{inspect(Grid.id_to_coord(start_node, cols))}")
+IO.puts("Goal node:  #{goal_node} at #{inspect(Grid.id_to_coord(goal_node, cols))}")
+```
+
+Expected result: every cell exists as a graph node, but movement edges only connect adjacent walkable cells. Walls remain visible as cell data but do not receive movement edges through `walkable` transitions.
+
+```elixir
+cell_symbols =
+  for row <- 0..(rows - 1), col <- 0..(cols - 1), into: %{} do
+    id = Grid.coord_to_id(row, col, cols)
+    {:ok, value} = Grid.get_cell(grid, row, col)
+
+    symbol =
+      case value do
+        "#" -> "█"
+        "S" -> "S"
+        "G" -> "G"
+        _ -> "·"
+      end
+
+    {id, symbol}
+  end
+
+IO.puts(ASCII.grid_to_string_unicode(grid, cell_symbols))
+```
+
+---
+
+## Section 2: Solving the Grid World
+
+Because the grid graph is unweighted, every movement has equal cost. Dijkstra's shortest path gives the minimum number of steps from `S` to `G`.
+
+```elixir
+{:ok, path} = Pathfinding.shortest_path(in: graph, from: start_node, to: goal_node)
+path_set = MapSet.new(path.nodes)
+
+solution_symbols =
+  Map.new(cell_symbols, fn {id, symbol} ->
+    cond do
+      id == start_node -> {id, "S"}
+      id == goal_node -> {id, "G"}
+      MapSet.member?(path_set, id) -> {id, "•"}
+      true -> {id, symbol}
+    end
+  end)
+
+IO.puts("Shortest path length: #{path.weight} steps")
+IO.puts("Path coordinates:")
+IO.inspect(Enum.map(path.nodes, &Grid.id_to_coord(&1, cols)))
+IO.puts(ASCII.grid_to_string_unicode(grid, solution_symbols))
+```
+
+Expected result: the solved path threads through the open cells while avoiding walls. The path weight is the number of grid moves because every edge has the default weight `1`.
+
+---
+
+## Section 3: Connectivity After Obstacles
+
+Obstacle-heavy maps may split the walkable region into disconnected islands. Yog's connectivity tools can quantify whether a start and goal are even in the same navigable region.
+
+```elixir
+components = Connectivity.connected_components(graph)
+walkable_nodes =
+  Enum.filter(Yog.all_nodes(graph), fn id ->
+    value = Yog.node(graph, id)
+    value in ["S", ".", "G"]
+  end)
+
+non_isolated_components =
+  components
+  |> Enum.filter(fn component -> Enum.any?(component, &(&1 in walkable_nodes)) end)
+  |> Enum.sort_by(&length/1, :desc)
+
+IO.puts("Connected components in full cell graph: #{length(components)}")
+IO.puts("Largest navigable component size: #{length(hd(non_isolated_components))}")
+IO.puts("Start and goal connected?: #{Enum.any?(non_isolated_components, fn comp -> start_node in comp and goal_node in comp end)}")
+```
+
+Expected result: if `Start and goal connected?` is `true`, pathfinding can succeed. If it is `false`, no graph search can find a route without changing the map.
+
+---
+
+## Section 4: Generating a Perfect Maze
+
+A **perfect maze** is a spanning tree of the grid cells: every cell is reachable, and there is exactly one simple path between any two cells. Yog's maze generators return `Yog.Builder.GridGraph` structures that can be rendered directly or converted to ordinary graphs.
+
+```elixir
+maze_rows = 12
+maze_cols = 18
+
+maze = Yog.Generator.Maze.recursive_backtracker(maze_rows, maze_cols, seed: 42)
+maze_graph = Yog.Builder.GridGraph.to_graph(maze)
+
+maze_start = Yog.Builder.GridGraph.coord_to_id(maze, 0, 0)
+maze_exit = Yog.Builder.GridGraph.coord_to_id(maze, maze_rows - 1, maze_cols - 1)
+
+IO.puts("Maze cells: #{Yog.order(maze_graph)}")
+IO.puts("Maze passages: #{Yog.edge_count(maze_graph)}")
+IO.puts("Perfect maze check: passages = cells - 1? #{Yog.edge_count(maze_graph) == Yog.order(maze_graph) - 1}")
+IO.puts(ASCII.grid_to_string_unicode(maze))
+```
+
+Expected result: the recursive backtracker creates a perfect maze. For a perfect maze with `N` cells, the passage graph has `N - 1` edges.
+
+---
+
+## Section 5: Solving the Generated Maze
+
+```elixir
+{:ok, maze_path} = Pathfinding.shortest_path(in: maze_graph, from: maze_start, to: maze_exit)
+
+maze_occupants =
+  maze_path.nodes
+  |> Map.new(fn id -> {id, "•"} end)
+  |> Map.put(maze_start, "S")
+  |> Map.put(maze_exit, "E")
+
+IO.puts("Maze solution length: #{maze_path.weight} steps")
+IO.puts(ASCII.grid_to_string_unicode(maze, maze_occupants))
+```
+
+Expected result: the path is unique because the maze is a tree. Dijkstra still works, but there are no alternative cycles to choose from.
+
+---
+
+## Section 6: Comparing Maze Generator Textures
+
+Different maze algorithms create different visual and structural textures. Some produce strong directional bias; others produce more organic uniform mazes.
+
+```elixir
+size = 14
+
+algorithms = [
+  {"Binary Tree", &Yog.Generator.Maze.binary_tree/3},
+  {"Sidewinder", &Yog.Generator.Maze.sidewinder/3},
+  {"Recursive Backtracker", &Yog.Generator.Maze.recursive_backtracker/3},
+  {"Kruskal", &Yog.Generator.Maze.kruskal/3},
+  {"Wilson", &Yog.Generator.Maze.wilson/3}
+]
+
+results =
+  for {name, generator} <- algorithms do
+    generated = generator.(size, size, seed: 7)
+    generated_graph = Yog.Builder.GridGraph.to_graph(generated)
+    start = Yog.Builder.GridGraph.coord_to_id(generated, 0, 0)
+    exit = Yog.Builder.GridGraph.coord_to_id(generated, size - 1, size - 1)
+    {:ok, solved} = Pathfinding.shortest_path(in: generated_graph, from: start, to: exit)
+
+    %{
+      algorithm: name,
+      nodes: Yog.order(generated_graph),
+      passages: Yog.edge_count(generated_graph),
+      path_length: solved.weight
+    }
+  end
+
+Enum.each(results, fn row ->
+  IO.puts("#{String.pad_trailing(row.algorithm, 24)} | passages: #{row.passages} | solution: #{row.path_length} steps")
+end)
+```
+
+Expected result: every perfect-maze algorithm should produce `nodes - 1` passages, but the route length can vary significantly because each algorithm creates different corridor structure.
+
+---
+
+## Section 7: Weighted Terrain — When Shortest Steps Are Not Cheapest
+
+Real grid worlds often have terrain costs. A route with more steps may be preferable if it avoids expensive cells like mud or water.
+
+```elixir
+terrain = [
+  ["S", ".", ".", "m", "m", "."],
+  [".", "#", ".", "m", "#", "."],
+  [".", "#", ".", ".", ".", "."],
+  [".", ".", ".", "#", "w", "G"]
+]
+
+terrain_rows = length(terrain)
+terrain_cols = length(hd(terrain))
+terrain_walkable = Grid.avoiding("#")
+terrain_grid = Grid.from_2d_list(terrain, :undirected, terrain_walkable)
+terrain_unweighted_graph = Grid.to_graph(terrain_grid)
+
+{:ok, terrain_start} = Grid.find_node(terrain_grid, &(&1 == "S"))
+{:ok, terrain_goal} = Grid.find_node(terrain_grid, &(&1 == "G"))
+
+cell_cost = fn
+  "S" -> 1
+  "G" -> 1
+  "." -> 1
+  "m" -> 5
+  "w" -> 9
+  _ -> 1
+end
+
+terrain_weighted_graph =
+  Enum.reduce(Yog.all_edges(terrain_unweighted_graph), Yog.undirected(), fn {from, to, _}, acc ->
+    from_value = Yog.node(terrain_unweighted_graph, from)
+    to_value = Yog.node(terrain_unweighted_graph, to)
+
+    acc
+    |> Yog.add_node(from, from_value)
+    |> Yog.add_node(to, to_value)
+    |> Yog.add_edge_ensure(from, to, cell_cost.(to_value))
+  end)
+
+{:ok, fewest_steps} = Pathfinding.shortest_path(in: terrain_unweighted_graph, from: terrain_start, to: terrain_goal)
+{:ok, cheapest_cost} = Pathfinding.shortest_path(in: terrain_weighted_graph, from: terrain_start, to: terrain_goal)
+
+IO.puts("Fewest-step path: #{fewest_steps.weight} steps")
+IO.puts("Lowest-cost path: #{cheapest_cost.weight} total terrain cost")
+IO.puts("Fewest-step coordinates: #{inspect(Enum.map(fewest_steps.nodes, &Grid.id_to_coord(&1, terrain_cols)))}")
+IO.puts("Lowest-cost coordinates: #{inspect(Enum.map(cheapest_cost.nodes, &Grid.id_to_coord(&1, terrain_cols)))}")
+```
+
+Expected result: the lowest-cost path may differ from the fewest-step path because mud (`m`) and water (`w`) are more expensive than open ground.
+
+```elixir
+weighted_path_set = MapSet.new(cheapest_cost.nodes)
+
+terrain_symbols =
+  for row <- 0..(terrain_rows - 1), col <- 0..(terrain_cols - 1), into: %{} do
+    id = Grid.coord_to_id(row, col, terrain_cols)
+    {:ok, value} = Grid.get_cell(terrain_grid, row, col)
+
+    symbol =
+      cond do
+        id == terrain_start -> "S"
+        id == terrain_goal -> "G"
+        MapSet.member?(weighted_path_set, id) -> "•"
+        value == "#" -> "█"
+        value == "m" -> "m"
+        value == "w" -> "w"
+        true -> "·"
+      end
+
+    {id, symbol}
+  end
+
+IO.puts(ASCII.grid_to_string_unicode(terrain_grid, terrain_symbols))
+```
+
+---
+
+## Section 8: Toroidal Wrapping Worlds
+
+A toroidal grid wraps at its boundaries. Moving left from the left edge appears on the right edge; moving up from the top appears at the bottom. This is useful for games, simulations, cellular automata, and maps where edges should not behave like hard boundaries.
+
+```elixir
+alias Yog.Builder.Toroidal
+
+toroidal_data =
+  for row <- 0..4 do
+    for col <- 0..6 do
+      {row, col}
+    end
+  end
+
+toroidal_grid = Toroidal.from_2d_list(toroidal_data, :undirected, Toroidal.always())
+toroidal_graph = Toroidal.to_graph(toroidal_grid)
+
+wrap_start = Toroidal.coord_to_id(2, 0, 7)
+wrap_goal = Toroidal.coord_to_id(2, 6, 7)
+
+regular_distance = Grid.manhattan_distance(wrap_start, wrap_goal, 7)
+wrapped_distance = Toroidal.toroidal_manhattan_distance(wrap_start, wrap_goal, 7, 5)
+{:ok, wrapped_path} = Pathfinding.shortest_path(in: toroidal_graph, from: wrap_start, to: wrap_goal)
+
+IO.puts("Regular Manhattan distance from left edge to right edge: #{regular_distance}")
+IO.puts("Toroidal Manhattan distance with wrapping: #{wrapped_distance}")
+IO.puts("Actual graph shortest path: #{wrapped_path.weight}")
+```
+
+Expected result: the wrapping path from column `0` to column `6` is one step, not six steps, because the grid edge wraps around.
+
+```elixir
+wrap_path_set = MapSet.new(wrapped_path.nodes)
+
+wrap_symbols =
+  for row <- 0..4, col <- 0..6, into: %{} do
+    id = Toroidal.coord_to_id(row, col, 7)
+
+    symbol =
+      cond do
+        id == wrap_start -> "S"
+        id == wrap_goal -> "G"
+        MapSet.member?(wrap_path_set, id) -> "•"
+        true -> "·"
+      end
+
+    {id, symbol}
+  end
+
+IO.puts(ASCII.grid_to_string_unicode(toroidal_grid, wrap_symbols))
+```
+
+---
+
+## Try Changing This
+
+* Change `world` by adding or removing `#` walls and rerun the pathfinding section.
+* Replace `Grid.rook()` with `Grid.queen()` via `from_2d_list_with_topology/4` to allow diagonal movement.
+* Try larger mazes by changing `maze_rows` and `maze_cols`.
+* Swap `recursive_backtracker/3` for `binary_tree/3`, `sidewinder/3`, `kruskal/3`, or `wilson/3`.
+* Change terrain costs for `"m"` and `"w"` to see when the weighted path changes.
+* Change the toroidal start/goal cells and compare regular vs. wrapped distance.
+
+---
+
+## Conclusion & Key Takeaways
+
+In this project, we used Yog to build and analyze grid worlds end to end:
+
+1. **Grid Modeling**: Converted 2D tile maps into ordinary Yog graphs with coordinate-aware helpers.
+2. **Maze Generation**: Generated perfect mazes as spanning trees over grid cells.
+3. **Pathfinding**: Solved both unweighted and weighted navigation problems.
+4. **Connectivity**: Checked whether obstacle layouts split the traversable world.
+5. **Toroidal Topology**: Modeled wrapping maps where boundary movement changes shortest paths.
+6. **Rendering**: Used ASCII/Unicode rendering to make graph algorithms visible as spatial worlds.
