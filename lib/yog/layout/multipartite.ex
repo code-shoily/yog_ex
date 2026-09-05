@@ -55,7 +55,7 @@ defmodule Yog.Layout.Multipartite do
       [1, 2, 3]
 
   """
-  @spec layout(Graph.t(), [[Graph.node_id()]], keyword()) :: %{
+  @spec layout(Graph.t() | Yog.DAG.t(), [[Graph.node_id()]], keyword()) :: %{
           Graph.node_id() => {float(), float()}
         }
   def layout(graph, layers, opts \\ [])

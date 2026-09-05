@@ -118,64 +118,74 @@ defmodule Yog.IO.GEXFTest do
 
   test "input and options validation" do
     assert_raise ArgumentError, ~r/expected node_fmt to be an arity-1 function/, fn ->
-      GEXF.options_with(:invalid, & &1)
+      apply(GEXF, :options_with, [:invalid, & &1])
     end
 
     assert_raise ArgumentError, ~r/expected edge_fmt to be an arity-1 function/, fn ->
-      GEXF.options_with(& &1, :invalid)
+      apply(GEXF, :options_with, [& &1, :invalid])
     end
 
     assert_raise ArgumentError, ~r/expected node_attr to be an arity-1 function/, fn ->
-      GEXF.serialize_with_options(:invalid, & &1, GEXF.default_options(), Yog.directed())
+      apply(GEXF, :serialize_with_options, [
+        :invalid,
+        & &1,
+        GEXF.default_options(),
+        Yog.directed()
+      ])
     end
 
     assert_raise ArgumentError, ~r/expected edge_attr to be an arity-1 function/, fn ->
-      GEXF.serialize_with_options(& &1, :invalid, GEXF.default_options(), Yog.directed())
+      apply(GEXF, :serialize_with_options, [
+        & &1,
+        :invalid,
+        GEXF.default_options(),
+        Yog.directed()
+      ])
     end
 
     assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
-      GEXF.serialize_with_options(& &1, & &1, GEXF.default_options(), :not_a_graph)
+      apply(GEXF, :serialize_with_options, [& &1, & &1, GEXF.default_options(), :not_a_graph])
     end
 
     assert_raise ArgumentError, ~r/expected valid gexf_options tuple/, fn ->
-      GEXF.serialize_with_options(
+      apply(GEXF, :serialize_with_options, [
         & &1,
         & &1,
         :invalid_options,
         Yog.directed()
-      )
+      ])
     end
 
     assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
-      GEXF.write(123, Yog.directed())
+      apply(GEXF, :write, [123, Yog.directed()])
     end
 
     assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
-      GEXF.write_with(123, & &1, & &1, Yog.directed())
+      apply(GEXF, :write_with, [123, & &1, & &1, Yog.directed()])
     end
 
     assert_raise ArgumentError, ~r/expected xml to be a binary string/, fn ->
-      GEXF.deserialize(123)
+      apply(GEXF, :deserialize, [123])
     end
 
     assert_raise ArgumentError, ~r/expected node_folder to be an arity-1 function/, fn ->
-      GEXF.deserialize_with(:invalid, & &1, "<gexf></gexf>")
+      apply(GEXF, :deserialize_with, [:invalid, & &1, "<gexf></gexf>"])
     end
 
     assert_raise ArgumentError, ~r/expected edge_folder to be an arity-1 function/, fn ->
-      GEXF.deserialize_with(& &1, :invalid, "<gexf></gexf>")
+      apply(GEXF, :deserialize_with, [& &1, :invalid, "<gexf></gexf>"])
     end
 
     assert_raise ArgumentError, ~r/expected xml to be a binary string/, fn ->
-      GEXF.deserialize_with(& &1, & &1, 123)
+      apply(GEXF, :deserialize_with, [& &1, & &1, 123])
     end
 
     assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
-      GEXF.read(123)
+      apply(GEXF, :read, [123])
     end
 
     assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
-      GEXF.read_with(123, & &1, & &1)
+      apply(GEXF, :read_with, [123, & &1, & &1])
     end
   end
 

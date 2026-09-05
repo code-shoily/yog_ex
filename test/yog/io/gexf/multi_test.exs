@@ -86,64 +86,79 @@ defmodule Yog.IO.GEXF.MultiTest do
 
   test "input and options validation" do
     assert_raise ArgumentError, ~r/expected node_fmt to be an arity-1 function/, fn ->
-      Multi.options_with(:invalid, & &1)
+      apply(Multi, :options_with, [:invalid, & &1])
     end
 
     assert_raise ArgumentError, ~r/expected edge_fmt to be an arity-1 function/, fn ->
-      Multi.options_with(& &1, :invalid)
+      apply(Multi, :options_with, [& &1, :invalid])
     end
 
     assert_raise ArgumentError, ~r/expected node_attr to be an arity-1 function/, fn ->
-      Multi.serialize_with_options(:invalid, & &1, Multi.default_options(), Yog.Multi.directed())
+      apply(Multi, :serialize_with_options, [
+        :invalid,
+        & &1,
+        Multi.default_options(),
+        Yog.Multi.directed()
+      ])
     end
 
     assert_raise ArgumentError, ~r/expected edge_attr to be an arity-1 function/, fn ->
-      Multi.serialize_with_options(& &1, :invalid, Multi.default_options(), Yog.Multi.directed())
+      apply(Multi, :serialize_with_options, [
+        & &1,
+        :invalid,
+        Multi.default_options(),
+        Yog.Multi.directed()
+      ])
     end
 
     assert_raise ArgumentError, ~r/expected a Yog.Multi.Graph struct/, fn ->
-      Multi.serialize_with_options(& &1, & &1, Multi.default_options(), :not_a_multigraph)
+      apply(Multi, :serialize_with_options, [
+        & &1,
+        & &1,
+        Multi.default_options(),
+        :not_a_multigraph
+      ])
     end
 
     assert_raise ArgumentError, ~r/expected valid gexf_options tuple/, fn ->
-      Multi.serialize_with_options(
+      apply(Multi, :serialize_with_options, [
         & &1,
         & &1,
         :invalid_options,
         Yog.Multi.directed()
-      )
+      ])
     end
 
     assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
-      Multi.write(123, Yog.Multi.directed())
+      apply(Multi, :write, [123, Yog.Multi.directed()])
     end
 
     assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
-      Multi.write_with(123, & &1, & &1, Yog.Multi.directed())
+      apply(Multi, :write_with, [123, & &1, & &1, Yog.Multi.directed()])
     end
 
     assert_raise ArgumentError, ~r/expected xml to be a binary string/, fn ->
-      Multi.deserialize(123)
+      apply(Multi, :deserialize, [123])
     end
 
     assert_raise ArgumentError, ~r/expected node_folder to be an arity-1 function/, fn ->
-      Multi.deserialize_with(:invalid, & &1, "<gexf></gexf>")
+      apply(Multi, :deserialize_with, [:invalid, & &1, "<gexf></gexf>"])
     end
 
     assert_raise ArgumentError, ~r/expected edge_folder to be an arity-1 function/, fn ->
-      Multi.deserialize_with(& &1, :invalid, "<gexf></gexf>")
+      apply(Multi, :deserialize_with, [& &1, :invalid, "<gexf></gexf>"])
     end
 
     assert_raise ArgumentError, ~r/expected xml to be a binary string/, fn ->
-      Multi.deserialize_with(& &1, & &1, 123)
+      apply(Multi, :deserialize_with, [& &1, & &1, 123])
     end
 
     assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
-      Multi.read(123)
+      apply(Multi, :read, [123])
     end
 
     assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
-      Multi.read_with(123, & &1, & &1)
+      apply(Multi, :read_with, [123, & &1, & &1])
     end
   end
 

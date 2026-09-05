@@ -88,31 +88,31 @@ defmodule Yog.IO.LEDATest do
 
   test "input and option validation" do
     assert_raise ArgumentError, ~r/expected node_serializer to be an arity-1 function/, fn ->
-      LEDA.options_with(:invalid, &to_string/1, & &1, & &1)
+      apply(LEDA, :options_with, [:invalid, &to_string/1, & &1, & &1])
     end
 
     assert_raise ArgumentError, ~r/expected edge_serializer to be an arity-1 function/, fn ->
-      LEDA.options_with(&to_string/1, :invalid, & &1, & &1)
+      apply(LEDA, :options_with, [&to_string/1, :invalid, & &1, & &1])
     end
 
     assert_raise ArgumentError, ~r/expected node_deserializer to be an arity-1 function/, fn ->
-      LEDA.options_with(&to_string/1, &to_string/1, :invalid, & &1)
+      apply(LEDA, :options_with, [&to_string/1, &to_string/1, :invalid, & &1])
     end
 
     assert_raise ArgumentError, ~r/expected edge_deserializer to be an arity-1 function/, fn ->
-      LEDA.options_with(&to_string/1, &to_string/1, & &1, :invalid)
+      apply(LEDA, :options_with, [&to_string/1, &to_string/1, & &1, :invalid])
     end
 
     assert_raise ArgumentError, ~r/expected opts to be a keyword list/, fn ->
-      LEDA.options_with(&to_string/1, &to_string/1, & &1, & &1, :invalid_opts)
+      apply(LEDA, :options_with, [&to_string/1, &to_string/1, & &1, & &1, :invalid_opts])
     end
 
     assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
-      LEDA.serialize(:not_a_graph)
+      apply(LEDA, :serialize, [:not_a_graph])
     end
 
     assert_raise ArgumentError, ~r/expected valid leda_options tuple/, fn ->
-      LEDA.serialize_with(:invalid_opts, Yog.directed())
+      apply(LEDA, :serialize_with, [:invalid_opts, Yog.directed()])
     end
   end
 
@@ -171,15 +171,15 @@ defmodule Yog.IO.LEDATest do
 
   test "parse_with input validation" do
     assert_raise ArgumentError, ~r/expected input to be a binary string/, fn ->
-      LEDA.parse(123)
+      apply(LEDA, :parse, [123])
     end
 
     assert_raise ArgumentError, ~r/expected node_parser to be an arity-1 function/, fn ->
-      LEDA.parse_with("LEDA.GRAPH", :invalid, & &1)
+      apply(LEDA, :parse_with, ["LEDA.GRAPH", :invalid, & &1])
     end
 
     assert_raise ArgumentError, ~r/expected edge_parser to be an arity-1 function/, fn ->
-      LEDA.parse_with("LEDA.GRAPH", & &1, :invalid)
+      apply(LEDA, :parse_with, ["LEDA.GRAPH", & &1, :invalid])
     end
   end
 

@@ -48,7 +48,7 @@ defmodule Yog.Layout.Grid do
       {0.0, 50.0}
 
   """
-  @spec layout(Graph.t(), keyword()) :: %{Graph.node_id() => {float(), float()}}
+  @spec layout(Graph.t() | Yog.DAG.t(), keyword()) :: %{Graph.node_id() => {float(), float()}}
   def layout(graph, opts)
 
   def layout(%Yog.DAG{graph: graph}, opts), do: layout(graph, opts)

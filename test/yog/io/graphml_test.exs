@@ -803,68 +803,83 @@ defmodule Yog.IO.GraphMLTest do
     end
 
     assert_raise ArgumentError, ~r/expected :node_formatter to be an arity-1 function/, fn ->
-      GraphML.options_with(2, true, node_formatter: :invalid)
+      apply(GraphML, :options_with, [2, true, [node_formatter: :invalid]])
     end
 
     assert_raise ArgumentError, ~r/expected :edge_formatter to be an arity-1 function/, fn ->
-      GraphML.options_with(2, true, edge_formatter: :invalid)
+      apply(GraphML, :options_with, [2, true, [edge_formatter: :invalid]])
     end
 
     assert_raise ArgumentError, ~r/expected node_attr to be an arity-1 function/, fn ->
-      GraphML.serialize_with_options(:invalid, & &1, GraphML.default_options(), Yog.directed())
+      apply(GraphML, :serialize_with_options, [
+        :invalid,
+        & &1,
+        GraphML.default_options(),
+        Yog.directed()
+      ])
     end
 
     assert_raise ArgumentError, ~r/expected edge_attr to be an arity-1 function/, fn ->
-      GraphML.serialize_with_options(& &1, :invalid, GraphML.default_options(), Yog.directed())
+      apply(GraphML, :serialize_with_options, [
+        & &1,
+        :invalid,
+        GraphML.default_options(),
+        Yog.directed()
+      ])
     end
 
     assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
-      GraphML.serialize_with_options(& &1, & &1, GraphML.default_options(), :not_a_graph)
+      apply(GraphML, :serialize_with_options, [
+        & &1,
+        & &1,
+        GraphML.default_options(),
+        :not_a_graph
+      ])
     end
 
     assert_raise ArgumentError, ~r/expected valid graphml_options tuple/, fn ->
-      GraphML.serialize_with_options(
+      apply(GraphML, :serialize_with_options, [
         & &1,
         & &1,
         :invalid_options,
         Yog.directed()
-      )
+      ])
     end
 
     assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
-      GraphML.write(123, Yog.directed())
+      apply(GraphML, :write, [123, Yog.directed()])
     end
 
     assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
-      GraphML.write_with(123, & &1, & &1, Yog.directed())
+      apply(GraphML, :write_with, [123, & &1, & &1, Yog.directed()])
     end
 
     assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
-      GraphML.write_with_types(123, & &1, & &1, Yog.directed())
+      apply(GraphML, :write_with_types, [123, & &1, & &1, Yog.directed()])
     end
 
     assert_raise ArgumentError, ~r/expected xml to be a binary string/, fn ->
-      GraphML.deserialize(123)
+      apply(GraphML, :deserialize, [123])
     end
 
     assert_raise ArgumentError, ~r/expected node_folder to be an arity-1 function/, fn ->
-      GraphML.deserialize_with(:invalid, & &1, "<graphml></graphml>")
+      apply(GraphML, :deserialize_with, [:invalid, & &1, "<graphml></graphml>"])
     end
 
     assert_raise ArgumentError, ~r/expected edge_folder to be an arity-1 function/, fn ->
-      GraphML.deserialize_with(& &1, :invalid, "<graphml></graphml>")
+      apply(GraphML, :deserialize_with, [& &1, :invalid, "<graphml></graphml>"])
     end
 
     assert_raise ArgumentError, ~r/expected xml to be a binary string/, fn ->
-      GraphML.deserialize_with(& &1, & &1, 123)
+      apply(GraphML, :deserialize_with, [& &1, & &1, 123])
     end
 
     assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
-      GraphML.read(123)
+      apply(GraphML, :read, [123])
     end
 
     assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
-      GraphML.read_with(123, & &1, & &1)
+      apply(GraphML, :read_with, [123, & &1, & &1])
     end
   end
 

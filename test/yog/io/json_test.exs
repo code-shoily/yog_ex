@@ -120,63 +120,63 @@ defmodule Yog.IO.JSONTest do
 
   test "input and options validation" do
     assert_raise ArgumentError, ~r/expected node_serializer to be an arity-1 function/, fn ->
-      JSON.export_options_with(:invalid, & &1)
+      apply(JSON, :export_options_with, [:invalid, & &1])
     end
 
     assert_raise ArgumentError, ~r/expected edge_serializer to be an arity-1 function/, fn ->
-      JSON.export_options_with(& &1, :invalid)
+      apply(JSON, :export_options_with, [& &1, :invalid])
     end
 
     assert_raise ArgumentError, ~r/expected opts to be a keyword list/, fn ->
-      JSON.export_options_with(& &1, & &1, :invalid)
+      apply(JSON, :export_options_with, [& &1, & &1, :invalid])
     end
 
     assert_raise ArgumentError, ~r/expected node_formatter to be an arity-1 function/, fn ->
-      JSON.export_options_with(& &1, & &1, node_formatter: :invalid)
+      apply(JSON, :export_options_with, [& &1, & &1, [node_formatter: :invalid]])
     end
 
     assert_raise ArgumentError, ~r/expected edge_formatter to be an arity-1 function/, fn ->
-      JSON.export_options_with(& &1, & &1, edge_formatter: :invalid)
+      apply(JSON, :export_options_with, [& &1, & &1, [edge_formatter: :invalid]])
     end
 
     assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
-      JSON.to_json(:not_a_graph)
+      apply(JSON, :to_json, [:not_a_graph])
     end
 
     assert_raise ArgumentError, ~r/expected valid json_export_options tuple/, fn ->
-      JSON.to_json(Yog.directed(), :invalid_options)
+      apply(JSON, :to_json, [Yog.directed(), :invalid_options])
     end
 
     assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
-      JSON.to_json_file(Yog.directed(), 123)
+      apply(JSON, :to_json_file, [Yog.directed(), 123])
     end
 
     assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
-      JSON.write(123, Yog.directed())
+      apply(JSON, :write, [123, Yog.directed()])
     end
 
     assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
-      JSON.write_with(123, JSON.default_export_options(), Yog.directed())
+      apply(JSON, :write_with, [123, JSON.default_export_options(), Yog.directed()])
     end
 
     assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
-      JSON.to_json_file_multi(%{kind: :directed, nodes: %{}, edges: %{}}, 123)
+      apply(JSON, :to_json_file_multi, [%{kind: :directed, nodes: %{}, edges: %{}}, 123])
     end
 
     assert_raise ArgumentError, ~r/expected input to be a binary string or map/, fn ->
-      JSON.json_type(123)
+      apply(JSON, :json_type, [123])
     end
 
     assert_raise ArgumentError, ~r/expected json_string to be a binary string/, fn ->
-      JSON.from_json(123)
+      apply(JSON, :from_json, [123])
     end
 
     assert_raise ArgumentError, ~r/expected json_string to be a binary string/, fn ->
-      JSON.from_json!(123)
+      apply(JSON, :from_json!, [123])
     end
 
     assert_raise ArgumentError, ~r/expected map to be a map/, fn ->
-      JSON.from_map(123)
+      apply(JSON, :from_map, [123])
     end
   end
 

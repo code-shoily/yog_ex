@@ -198,6 +198,7 @@ defmodule YogEx.MixProject do
           "livebooks/guides/06_network_flow.livemd",
           "livebooks/how_to/maze_generation.livemd",
           "livebooks/how_to/layout_guide.livemd",
+          "livebooks/how_to/dot_complete_guide.livemd",
           "livebooks/how_to/import_export.livemd",
           "livebooks/how_to/multigraphs_and_collapsing.livemd",
           "livebooks/how_to/mermaid_complete_guide.livemd",

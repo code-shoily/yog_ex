@@ -45,7 +45,7 @@ defmodule Yog.Layout.Circular do
       [1, 2, 3]
 
   """
-  @spec layout(Graph.t(), keyword()) :: %{Graph.node_id() => {float(), float()}}
+  @spec layout(Graph.t() | Yog.DAG.t(), keyword()) :: %{Graph.node_id() => {float(), float()}}
   def layout(graph, opts \\ [])
 
   def layout(%Yog.DAG{graph: graph}, opts), do: layout(graph, opts)

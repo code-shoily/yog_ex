@@ -53,6 +53,7 @@ defmodule Yog.Layout do
 
   """
 
+  alias Yog.DAG
   alias Yog.Graph
   alias Yog.Layout.Circular
   alias Yog.Layout.Geometry
@@ -69,7 +70,7 @@ defmodule Yog.Layout do
 
   Delegates to `Yog.Layout.Circular.layout/2`.
   """
-  @spec circular(Graph.t(), keyword()) :: %{Graph.node_id() => {float(), float()}}
+  @spec circular(Graph.t() | DAG.t(), keyword()) :: %{Graph.node_id() => {float(), float()}}
   def circular(graph, opts \\ []) do
     Circular.layout(graph, opts)
   end
@@ -79,7 +80,7 @@ defmodule Yog.Layout do
 
   Delegates to `Yog.Layout.Random.layout/2`.
   """
-  @spec random(Graph.t(), keyword()) :: %{Graph.node_id() => {float(), float()}}
+  @spec random(Graph.t() | DAG.t(), keyword()) :: %{Graph.node_id() => {float(), float()}}
   def random(graph, opts \\ []) do
     Random.layout(graph, opts)
   end
@@ -89,7 +90,7 @@ defmodule Yog.Layout do
 
   Delegates to `Yog.Layout.Spring.layout/2`.
   """
-  @spec spring(Graph.t(), keyword()) :: %{Graph.node_id() => {float(), float()}}
+  @spec spring(Graph.t() | DAG.t(), keyword()) :: %{Graph.node_id() => {float(), float()}}
   def spring(graph, opts \\ []) do
     Spring.layout(graph, opts)
   end
@@ -99,7 +100,9 @@ defmodule Yog.Layout do
 
   Delegates to `Yog.Layout.Tutte.layout/3`.
   """
-  @spec tutte(Graph.t(), [Graph.node_id()], keyword()) :: %{Graph.node_id() => {float(), float()}}
+  @spec tutte(Graph.t() | DAG.t(), [Graph.node_id()], keyword()) :: %{
+          Graph.node_id() => {float(), float()}
+        }
   def tutte(graph, boundary_nodes, opts \\ []) do
     Tutte.layout(graph, boundary_nodes, opts)
   end
@@ -109,7 +112,7 @@ defmodule Yog.Layout do
 
   Delegates to `Yog.Layout.Shell.layout/3`.
   """
-  @spec shell(Graph.t(), [[Graph.node_id()]], keyword()) :: %{
+  @spec shell(Graph.t() | DAG.t(), [[Graph.node_id()]], keyword()) :: %{
           Graph.node_id() => {float(), float()}
         }
   def shell(graph, shells, opts \\ []) do
@@ -121,7 +124,7 @@ defmodule Yog.Layout do
 
   Delegates to `Yog.Layout.Multipartite.layout/3`.
   """
-  @spec multipartite(Graph.t(), [[Graph.node_id()]], keyword()) :: %{
+  @spec multipartite(Graph.t() | DAG.t(), [[Graph.node_id()]], keyword()) :: %{
           Graph.node_id() => {float(), float()}
         }
   def multipartite(graph, layers, opts \\ []) do
@@ -133,7 +136,7 @@ defmodule Yog.Layout do
 
   Delegates to `Yog.Layout.Grid.layout/2`.
   """
-  @spec grid(Graph.t(), keyword()) :: %{Graph.node_id() => {float(), float()}}
+  @spec grid(Graph.t() | DAG.t(), keyword()) :: %{Graph.node_id() => {float(), float()}}
   def grid(graph, opts) do
     Grid.layout(graph, opts)
   end
@@ -143,7 +146,7 @@ defmodule Yog.Layout do
 
   Delegates to `Yog.Layout.GraphViz.layout/2`.
   """
-  @spec graphviz(Graph.t() | Yog.Multi.Graph.t(), keyword()) :: %{
+  @spec graphviz(Graph.t() | DAG.t() | Yog.Multi.Graph.t(), keyword()) :: %{
           any() => {float(), float()}
         }
   def graphviz(graph, opts \\ []) do
@@ -206,7 +209,7 @@ defmodule Yog.Layout do
 
   """
   @spec manual(
-          Graph.t(),
+          Graph.t() | DAG.t(),
           %{Graph.node_id() => {float(), float()}},
           keyword()
         ) :: %{Graph.node_id() => {float(), float()}}

@@ -313,10 +313,14 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 |-----------|--------|---------|-----------------|------------------|
 | Circular | `Yog.Layout.Circular` | Spaces nodes uniformly along a circle | O(V) | O(V) |
 | Random | `Yog.Layout.Random` | Distributes nodes randomly in a bounding box | O(V) | O(V) |
-| Spring | `Yog.Layout.Spring` | Fruchterman-Reingold force-directed layout | O(I · (V² + E)) | O(V) |
+| Spring | `Yog.Layout.Spring` | Fruchterman-Reingold force-directed layout (with Barnes-Hut O(V log V)) | O(I · (V² + E)) | O(V) |
 | Tutte | `Yog.Layout.Tutte` | Barycentric planar layout pinning boundary nodes | O(I · (V + E)) | O(V) |
 | Shell | `Yog.Layout.Shell` | Arranges nodes in concentric circle shells | O(V) | O(V) |
 | Multipartite | `Yog.Layout.Multipartite` | Layers partitioned nodes in parallel rows/columns | O(V) | O(V) |
+| Grid | `Yog.Layout.Grid` | Places nodes on a 2D row/column matrix | O(V) | O(V) |
+| Manual | `Yog.Layout` (`manual/3`) | Explicit coordinates with customizable missing-node fallback strategies | O(V) | O(V) |
+| GraphViz Import | `Yog.Layout.GraphViz` | Imports layout coordinates from external GraphViz engines (`dot`, `neato`, etc.) | External CLI | O(V) |
+| Geometry Helpers | `Yog.Layout.Geometry` | Converts center coordinates to bounding rects, anchors, and connector endpoints | O(V + E) | O(V + E) |
 
 ## Rendering
 
@@ -326,7 +330,6 @@ Complete reference of all algorithms implemented in YogEx, organized by category
 | DOT Export | `Yog.Render.DOT` | Graphviz DOT format | O(V+E) | O(V+E) |
 | Mermaid Export | `Yog.Render.Mermaid` | Mermaid.js diagram format | O(V+E) | O(V+E) |
 | SVG Render | `Yog.Render.SVG` | Pure Elixir SVG generator (with multigraph, curved parallel edges, self-loops, and arrowhead marker offsets) | O(V+E) | O(V+E) |
-| Vega-Lite Render | `Yog.Render.VegaLite` | Vega-Lite JSON plot specification | O(V+E) | O(V+E) |
 
 ## Data Structures
 

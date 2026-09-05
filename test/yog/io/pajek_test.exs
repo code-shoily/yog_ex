@@ -150,71 +150,71 @@ defmodule Yog.IO.PajekTest do
 
   test "input and options validation" do
     assert_raise ArgumentError, ~r/expected node_label to be an arity-1 function/, fn ->
-      Pajek.options_with(:invalid, & &1, & &1, false, false)
+      apply(Pajek, :options_with, [:invalid, & &1, & &1, false, false])
     end
 
     assert_raise ArgumentError, ~r/expected edge_weight to be an arity-1 function/, fn ->
-      Pajek.options_with(& &1, :invalid, & &1, false, false)
+      apply(Pajek, :options_with, [& &1, :invalid, & &1, false, false])
     end
 
     assert_raise ArgumentError, ~r/expected node_attributes to be an arity-1 function/, fn ->
-      Pajek.options_with(& &1, & &1, :invalid, false, false)
+      apply(Pajek, :options_with, [& &1, & &1, :invalid, false, false])
     end
 
     assert_raise ArgumentError, ~r/expected include_coordinates to be a boolean/, fn ->
-      Pajek.options_with(& &1, & &1, & &1, :invalid, false)
+      apply(Pajek, :options_with, [& &1, & &1, & &1, :invalid, false])
     end
 
     assert_raise ArgumentError, ~r/expected include_visuals to be a boolean/, fn ->
-      Pajek.options_with(& &1, & &1, & &1, false, :invalid)
+      apply(Pajek, :options_with, [& &1, & &1, & &1, false, :invalid])
     end
 
     assert_raise ArgumentError, ~r/expected opts to be a keyword list/, fn ->
-      Pajek.options_with(& &1, & &1, & &1, false, false, :invalid)
+      apply(Pajek, :options_with, [& &1, & &1, & &1, false, false, :invalid])
     end
 
     assert_raise ArgumentError, ~r/expected node_formatter to be an arity-1 function/, fn ->
-      Pajek.options_with(& &1, & &1, & &1, false, false, node_formatter: :invalid)
+      apply(Pajek, :options_with, [& &1, & &1, & &1, false, false, [node_formatter: :invalid]])
     end
 
     assert_raise ArgumentError, ~r/expected edge_formatter to be an arity-1 function/, fn ->
-      Pajek.options_with(& &1, & &1, & &1, false, false, edge_formatter: :invalid)
+      apply(Pajek, :options_with, [& &1, & &1, & &1, false, false, [edge_formatter: :invalid]])
     end
 
     assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
-      Pajek.serialize(:not_a_graph)
+      apply(Pajek, :serialize, [:not_a_graph])
     end
 
     assert_raise ArgumentError, ~r/expected valid pajek_options tuple/, fn ->
-      Pajek.serialize_with(:invalid, Yog.directed())
+      apply(Pajek, :serialize_with, [:invalid, Yog.directed()])
     end
 
     assert_raise ArgumentError, ~r/expected input to be a binary string/, fn ->
-      Pajek.parse(123)
+      apply(Pajek, :parse, [123])
     end
 
     assert_raise ArgumentError, ~r/expected node_parser to be an arity-1 function/, fn ->
-      Pajek.parse_with("*Vertices 1", :invalid, & &1)
+      apply(Pajek, :parse_with, ["*Vertices 1", :invalid, & &1])
     end
 
     assert_raise ArgumentError, ~r/expected edge_parser to be an arity-1 function/, fn ->
-      Pajek.parse_with("*Vertices 1", & &1, :invalid)
+      apply(Pajek, :parse_with, ["*Vertices 1", & &1, :invalid])
     end
 
     assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
-      Pajek.read(123)
+      apply(Pajek, :read, [123])
     end
 
     assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
-      Pajek.read_with(123, & &1, & &1)
+      apply(Pajek, :read_with, [123, & &1, & &1])
     end
 
     assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
-      Pajek.write(123, Yog.directed())
+      apply(Pajek, :write, [123, Yog.directed()])
     end
 
     assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
-      Pajek.write_with(123, Pajek.default_options(), Yog.directed())
+      apply(Pajek, :write_with, [123, Pajek.default_options(), Yog.directed()])
     end
   end
 

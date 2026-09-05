@@ -68,27 +68,27 @@ defmodule Yog.IO.MatrixMarketTest do
 
     test "input and options validation" do
       assert_raise ArgumentError, ~r/expected weight_formatter to be an arity-1 function/, fn ->
-        MatrixMarket.options_with(:invalid)
+        apply(MatrixMarket, :options_with, [:invalid])
       end
 
       assert_raise ArgumentError, ~r/expected opts to be a keyword list/, fn ->
-        MatrixMarket.options_with(fn w -> w end, :invalid_opts)
+        apply(MatrixMarket, :options_with, [fn w -> w end, :invalid_opts])
       end
 
       assert_raise ArgumentError, ~r/expected node_formatter to be an arity-1 function/, fn ->
-        MatrixMarket.options_with(fn w -> w end, node_formatter: :invalid)
+        apply(MatrixMarket, :options_with, [fn w -> w end, [node_formatter: :invalid]])
       end
 
       assert_raise ArgumentError, ~r/expected edge_formatter to be an arity-1 function/, fn ->
-        MatrixMarket.options_with(fn w -> w end, edge_formatter: :invalid)
+        apply(MatrixMarket, :options_with, [fn w -> w end, [edge_formatter: :invalid]])
       end
 
       assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
-        MatrixMarket.serialize(:not_a_graph)
+        apply(MatrixMarket, :serialize, [:not_a_graph])
       end
 
       assert_raise ArgumentError, ~r/expected valid options tuple/, fn ->
-        MatrixMarket.serialize_with(:invalid_opts, Yog.directed())
+        apply(MatrixMarket, :serialize_with, [:invalid_opts, Yog.directed()])
       end
     end
   end
@@ -225,19 +225,22 @@ defmodule Yog.IO.MatrixMarketTest do
 
     test "input validation errors for parse" do
       assert_raise ArgumentError, ~r/expected input to be a binary string/, fn ->
-        MatrixMarket.parse(123)
+        apply(MatrixMarket, :parse, [123])
       end
 
       assert_raise ArgumentError, ~r/Invalid graph type/, fn ->
-        MatrixMarket.parse("%%MatrixMarket matrix coordinate real general\n1 1 0", :invalid_kind)
+        apply(MatrixMarket, :parse, [
+          "%%MatrixMarket matrix coordinate real general\n1 1 0",
+          :invalid_kind
+        ])
       end
 
       assert_raise ArgumentError, ~r/expected node_parser to be an arity-1 function/, fn ->
-        MatrixMarket.parse_with("header", :directed, :invalid, fn w -> w end)
+        apply(MatrixMarket, :parse_with, ["header", :directed, :invalid, fn w -> w end])
       end
 
       assert_raise ArgumentError, ~r/expected edge_parser to be an arity-1 function/, fn ->
-        MatrixMarket.parse_with("header", :directed, fn id -> id end, :invalid)
+        apply(MatrixMarket, :parse_with, ["header", :directed, fn id -> id end, :invalid])
       end
     end
   end

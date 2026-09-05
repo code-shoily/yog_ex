@@ -39,7 +39,7 @@ defmodule Yog.Layout.GraphViz do
       # positions = Yog.Layout.GraphViz.layout(graph, engine: :dot)
       # => %{1 => {27.0, 90.0}, 2 => {27.0, 18.0}}
   """
-  @spec layout(Yog.Graph.t() | Yog.Multi.Graph.t(), keyword()) :: %{
+  @spec layout(Yog.Graph.t() | Yog.DAG.t() | Yog.Multi.Graph.t(), keyword()) :: %{
           any() => {float(), float()}
         }
   def layout(graph, opts \\ [])

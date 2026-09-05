@@ -29,7 +29,7 @@ This guide covers the full controlled-placement workflow:
 4. Transform and fit pipeline for multi-view layouts
 5. DOT fixed-position output with `neato`/`fdp`
 6. Importing positions from a GraphViz layout run
-7. Geometry helpers (coming soon)
+7. Geometry helpers for rect-based renderers
 8. When to use GraphViz rank controls vs explicit coordinates
 
 ---

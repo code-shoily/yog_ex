@@ -170,7 +170,7 @@ defmodule Yog.IO.MatrixTest do
 
     test "raises ArgumentError when input is not a graph or DAG struct" do
       assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
-        Matrix.to_matrix(:not_a_graph)
+        apply(Matrix, :to_matrix, [:not_a_graph])
       end
     end
   end
@@ -213,11 +213,11 @@ defmodule Yog.IO.MatrixTest do
 
     test "input validation for to_string/2" do
       assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
-        Matrix.to_string(:not_a_graph)
+        apply(Matrix, :to_string, [:not_a_graph])
       end
 
       assert_raise ArgumentError, ~r/expected opts to be a keyword list/, fn ->
-        Matrix.to_string(Yog.undirected(), :invalid_opts)
+        apply(Matrix, :to_string, [Yog.undirected(), :invalid_opts])
       end
 
       assert_raise ArgumentError, ~r/expected weight_formatter to be an arity-1 function/, fn ->

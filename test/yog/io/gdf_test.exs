@@ -189,53 +189,53 @@ defmodule Yog.IO.GDFTest do
 
   test "input and options validation" do
     assert_raise ArgumentError, ~r/expected node_attr to be an arity-1 function/, fn ->
-      GDF.serialize_with(:invalid, & &1, GDF.default_options(), Yog.directed())
+      apply(GDF, :serialize_with, [:invalid, & &1, GDF.default_options(), Yog.directed()])
     end
 
     assert_raise ArgumentError, ~r/expected edge_attr to be an arity-1 function/, fn ->
-      GDF.serialize_with(& &1, :invalid, GDF.default_options(), Yog.directed())
+      apply(GDF, :serialize_with, [& &1, :invalid, GDF.default_options(), Yog.directed()])
     end
 
     assert_raise ArgumentError, ~r/expected valid gdf_options tuple/, fn ->
-      GDF.serialize_with(& &1, & &1, :invalid_options, Yog.directed())
+      apply(GDF, :serialize_with, [& &1, & &1, :invalid_options, Yog.directed()])
     end
 
     assert_raise ArgumentError, ~r/expected a Yog.Graph or Yog.DAG struct/, fn ->
-      GDF.serialize(:not_a_graph)
+      apply(GDF, :serialize, [:not_a_graph])
     end
 
     assert_raise ArgumentError, ~r/expected gdf to be a binary string/, fn ->
-      GDF.deserialize(123)
+      apply(GDF, :deserialize, [123])
     end
 
     assert_raise ArgumentError, ~r/expected node_folder to be an arity-1 function/, fn ->
-      GDF.deserialize_with(:invalid, & &1, "nodedef>name VARCHAR")
+      apply(GDF, :deserialize_with, [:invalid, & &1, "nodedef>name VARCHAR"])
     end
 
     assert_raise ArgumentError, ~r/expected edge_folder to be an arity-1 function/, fn ->
-      GDF.deserialize_with(& &1, :invalid, "nodedef>name VARCHAR")
+      apply(GDF, :deserialize_with, [& &1, :invalid, "nodedef>name VARCHAR"])
     end
 
     assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
-      GDF.read(123)
+      apply(GDF, :read, [123])
     end
 
     assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
-      GDF.read_with(123, & &1, & &1)
+      apply(GDF, :read_with, [123, & &1, & &1])
     end
 
     assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
-      GDF.write(123, Yog.directed())
+      apply(GDF, :write, [123, Yog.directed()])
     end
 
     assert_raise ArgumentError, ~r/expected path to be a binary string/, fn ->
-      GDF.write_with(
+      apply(GDF, :write_with, [
         123,
         fn d -> %{"label" => d} end,
         fn d -> %{"label" => d} end,
         GDF.default_options(),
         Yog.directed()
-      )
+      ])
     end
   end
 
