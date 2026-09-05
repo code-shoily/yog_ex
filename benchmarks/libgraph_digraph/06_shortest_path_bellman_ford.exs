@@ -63,7 +63,7 @@ Benchee.run(
         from: 0,
         to: 25,
         zero: 0,
-        combine: &(&1 + &2),
+        add: &(&1 + &2),
         compare: compare_fn
       )
     end,

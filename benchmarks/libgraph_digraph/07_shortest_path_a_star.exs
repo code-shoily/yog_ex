@@ -79,7 +79,7 @@ Benchee.run(
         to: goal,
         heuristic: h,
         zero: 0,
-        combine: &(&1 + &2),
+        add: &(&1 + &2),
         compare: compare_fn
       )
     end,
