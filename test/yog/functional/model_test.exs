@@ -397,4 +397,260 @@ defmodule Yog.Functional.ModelTest do
       assert {:ok, :loop} = Model.get_edge(graph, 1, 1)
     end
   end
+
+  describe "pre-1.0 confidence: functional model edge cases" do
+    test "empty graph behavior across operations" do
+      g_dir = Model.new(:directed)
+      g_undir = Model.new(:undirected)
+
+      for g <- [g_dir, g_undir] do
+        assert Model.empty?(g)
+        assert Model.size(g) == 0
+        assert Model.edges(g) == []
+        assert Model.nodes(g) == []
+        refute Model.has_node?(g, :nonexistent)
+        refute Model.has_edge?(g, :u, :v)
+        assert Model.get_node(g, :nonexistent) == {:error, :not_found}
+        assert Model.get_edge(g, :u, :v) == {:error, :not_found}
+        assert Model.out_degree(g, :u) == {:error, :not_found}
+        assert Model.in_degree(g, :u) == {:error, :not_found}
+        assert Model.degree(g, :u) == {:error, :not_found}
+        assert Model.out_neighbors(g, :u) == {:error, :not_found}
+        assert Model.in_neighbors(g, :u) == {:error, :not_found}
+        assert Model.match(g, :u) == {:error, :not_found}
+        assert Model.match_any(g) == {:error, :empty}
+
+        # Conversion to and from empty adjacency graph
+        adj = Model.to_adjacency_graph(g)
+        assert adj.kind == g.direction
+        assert map_size(adj.nodes) == 0
+        assert map_size(adj.out_edges) == 0
+        assert map_size(adj.in_edges) == 0
+
+        restored = Model.from_adjacency_graph(adj)
+        assert restored.direction == g.direction
+        assert Model.empty?(restored)
+      end
+    end
+
+    test "isolated nodes in directed and undirected graphs" do
+      g =
+        Model.empty()
+        |> Model.put_node(1, "isolated_1")
+        |> Model.put_node(2, "isolated_2")
+
+      assert Model.size(g) == 2
+      assert Model.edges(g) == []
+      assert Model.has_node?(g, 1)
+      assert Model.has_node?(g, 2)
+      assert {:ok, 0} = Model.out_degree(g, 1)
+      assert {:ok, 0} = Model.in_degree(g, 1)
+      assert {:ok, 0} = Model.degree(g, 1)
+      assert {:ok, %{}} = Model.out_neighbors(g, 1)
+      assert {:ok, %{}} = Model.in_neighbors(g, 1)
+
+      # Match an isolated node
+      {:ok, ctx, remaining} = Model.match(g, 1)
+      assert ctx.id == 1
+      assert ctx.label == "isolated_1"
+      assert ctx.in_edges == %{}
+      assert ctx.out_edges == %{}
+      assert Model.size(remaining) == 1
+      assert Model.has_node?(remaining, 2)
+      refute Model.has_node?(remaining, 1)
+
+      # Embed isolated node back
+      restored = Model.embed(ctx, remaining)
+      assert Model.size(restored) == 2
+      assert Model.has_node?(restored, 1)
+      assert {:ok, 0} = Model.degree(restored, 1)
+    end
+
+    test "self-loops on directed and undirected graphs" do
+      # Directed graph with self-loop
+      g_dir =
+        Model.empty()
+        |> Model.put_node(1, "node1")
+        |> Model.add_edge!(1, 1, :self_dir)
+
+      assert Model.has_edge?(g_dir, 1, 1)
+      assert {:ok, :self_dir} = Model.get_edge(g_dir, 1, 1)
+      assert {:ok, 1} = Model.out_degree(g_dir, 1)
+      assert {:ok, 1} = Model.in_degree(g_dir, 1)
+      assert {:ok, 2} = Model.degree(g_dir, 1)
+
+      # Match node with self-loop
+      {:ok, ctx_dir, shrunken_dir} = Model.match(g_dir, 1)
+      assert ctx_dir.out_edges == %{1 => :self_dir}
+      assert ctx_dir.in_edges == %{1 => :self_dir}
+      assert Model.empty?(shrunken_dir)
+
+      # Restoring node with self-loop via embed
+      restored_dir = Model.embed(ctx_dir, shrunken_dir)
+      assert Model.has_edge?(restored_dir, 1, 1)
+      assert {:ok, :self_dir} = Model.get_edge(restored_dir, 1, 1)
+
+      # Undirected graph with self-loop
+      g_undir =
+        Model.new(:undirected)
+        |> Model.put_node(1, "node1")
+        |> Model.add_edge!(1, 1, :self_undir)
+
+      assert Model.has_edge?(g_undir, 1, 1)
+      assert {:ok, :self_undir} = Model.get_edge(g_undir, 1, 1)
+
+      # Match and embed undirected self-loop
+      {:ok, ctx_undir, shrunken_undir} = Model.match(g_undir, 1)
+      assert Model.empty?(shrunken_undir)
+      restored_undir = Model.embed(ctx_undir, shrunken_undir)
+      assert restored_undir.direction == :undirected
+      assert Model.has_edge?(restored_undir, 1, 1)
+    end
+
+    test "direction preservation through from_adjacency_graph and to_adjacency_graph" do
+      for dir <- [:directed, :undirected] do
+        adj =
+          Yog.new(dir)
+          |> Yog.add_node(1, "A")
+          |> Yog.add_node(2, "B")
+          |> Yog.add_edge_ensure(from: 1, to: 2, with: "w")
+
+        f_graph = Model.from_adjacency_graph(adj)
+        assert f_graph.direction == dir
+
+        adj_converted = Model.to_adjacency_graph(f_graph)
+        assert adj_converted.kind == dir
+
+        f_graph_roundtrip = Model.from_adjacency_graph(adj_converted)
+        assert f_graph_roundtrip.direction == dir
+      end
+    end
+
+    test "embed does not reverse edge orientation in directed graphs" do
+      # Graph: 1 -> 2 with label :one_to_two, and 2 -> 3 with label :two_to_three
+      g =
+        Model.empty()
+        |> Model.put_node(1, "first")
+        |> Model.put_node(2, "middle")
+        |> Model.put_node(3, "last")
+        |> Model.add_edge!(1, 2, :one_to_two)
+        |> Model.add_edge!(2, 3, :two_to_three)
+
+      # Match middle node (has incoming from 1 and outgoing to 3)
+      {:ok, ctx, shrunken} = Model.match(g, 2)
+      assert ctx.in_edges == %{1 => :one_to_two}
+      assert ctx.out_edges == %{3 => :two_to_three}
+
+      # In shrunken graph, node 2 and its edges are gone
+      refute Model.has_edge?(shrunken, 1, 2)
+      refute Model.has_edge?(shrunken, 2, 3)
+
+      # Embed node 2 back
+      restored = Model.embed(ctx, shrunken)
+
+      # Verify orientation: 1 -> 2 must exist, 2 -> 1 must NOT exist
+      assert Model.has_edge?(restored, 1, 2)
+      assert {:ok, :one_to_two} = Model.get_edge(restored, 1, 2)
+      refute Model.has_edge?(restored, 2, 1)
+      assert Model.get_edge(restored, 2, 1) == {:error, :not_found}
+
+      # Verify orientation: 2 -> 3 must exist, 3 -> 2 must NOT exist
+      assert Model.has_edge?(restored, 2, 3)
+      assert {:ok, :two_to_three} = Model.get_edge(restored, 2, 3)
+      refute Model.has_edge?(restored, 3, 2)
+      assert Model.get_edge(restored, 3, 2) == {:error, :not_found}
+
+      # Verify in_neighbors and out_neighbors for all nodes
+      assert {:ok, %{2 => :one_to_two}} = Model.out_neighbors(restored, 1)
+      assert {:ok, %{}} = Model.in_neighbors(restored, 1)
+
+      assert {:ok, %{1 => :one_to_two}} = Model.in_neighbors(restored, 2)
+      assert {:ok, %{3 => :two_to_three}} = Model.out_neighbors(restored, 2)
+
+      assert {:ok, %{2 => :two_to_three}} = Model.in_neighbors(restored, 3)
+      assert {:ok, %{}} = Model.out_neighbors(restored, 3)
+    end
+
+    test "match and embed behavior after removing and restoring multiple contexts" do
+      # Create a triangle: 1 -> 2 -> 3 -> 1
+      g =
+        Model.empty()
+        |> Model.put_node(1, "A")
+        |> Model.put_node(2, "B")
+        |> Model.put_node(3, "C")
+        |> Model.add_edge!(1, 2, 12)
+        |> Model.add_edge!(2, 3, 23)
+        |> Model.add_edge!(3, 1, 31)
+
+      # Match node 1, then node 2 sequentially
+      {:ok, ctx1, g_after_1} = Model.match(g, 1)
+      {:ok, ctx2, g_after_2} = Model.match(g_after_1, 2)
+
+      assert Model.size(g_after_2) == 1
+      assert Model.has_node?(g_after_2, 3)
+
+      # Restore in LIFO order (2, then 1)
+      g_restored_2 = Model.embed(ctx2, g_after_2)
+      assert Model.has_edge?(g_restored_2, 2, 3)
+      # Edge 1 -> 2 is not yet present because node 1 is not in g_restored_2
+      refute Model.has_edge?(g_restored_2, 1, 2)
+
+      g_restored_all = Model.embed(ctx1, g_restored_2)
+      assert Model.has_edge?(g_restored_all, 1, 2)
+      assert Model.has_edge?(g_restored_all, 2, 3)
+      assert Model.has_edge?(g_restored_all, 3, 1)
+      assert Model.size(g_restored_all) == 3
+
+      # Roundtrip identity check: structure of g_restored_all matches original g
+      for id <- [1, 2, 3] do
+        assert {:ok, orig_ctx} = Model.get_node(g, id)
+        assert {:ok, rest_ctx} = Model.get_node(g_restored_all, id)
+        assert orig_ctx.id == rest_ctx.id
+        assert orig_ctx.label == rest_ctx.label
+        assert orig_ctx.in_edges == rest_ctx.in_edges
+        assert orig_ctx.out_edges == rest_ctx.out_edges
+      end
+    end
+
+    test "roundtrip conversion preserves node set and edge set for directed and undirected graphs" do
+      # Directed graph with varying weights and isolated node
+      adj_dir =
+        Yog.directed()
+        |> Yog.add_node(1, "alpha")
+        |> Yog.add_node(2, "beta")
+        |> Yog.add_node(3, "gamma")
+        |> Yog.add_node(4, "isolated")
+        |> Yog.add_edge_ensure(from: 1, to: 2, with: 10)
+        |> Yog.add_edge_ensure(from: 2, to: 3, with: 20)
+        |> Yog.add_edge_ensure(from: 3, to: 1, with: 30)
+        |> Yog.add_edge_ensure(from: 1, to: 1, with: 99)
+
+      f_dir = Model.from_adjacency_graph(adj_dir)
+      adj_dir_back = Model.to_adjacency_graph(f_dir)
+
+      assert adj_dir_back.kind == adj_dir.kind
+      assert adj_dir_back.nodes == adj_dir.nodes
+      assert Yog.all_edges(adj_dir_back) |> Enum.sort() == Yog.all_edges(adj_dir) |> Enum.sort()
+
+      # Undirected graph with varying weights and isolated node
+      adj_undir =
+        Yog.undirected()
+        |> Yog.add_node("x", 100)
+        |> Yog.add_node("y", 200)
+        |> Yog.add_node("z", 300)
+        |> Yog.add_node("iso", 400)
+        |> Yog.add_edge_ensure(from: "x", to: "y", with: 5)
+        |> Yog.add_edge_ensure(from: "y", to: "z", with: 15)
+        |> Yog.add_edge_ensure(from: "x", to: "x", with: 50)
+
+      f_undir = Model.from_adjacency_graph(adj_undir)
+      adj_undir_back = Model.to_adjacency_graph(f_undir)
+
+      assert adj_undir_back.kind == adj_undir.kind
+      assert adj_undir_back.nodes == adj_undir.nodes
+
+      assert Yog.all_edges(adj_undir_back) |> Enum.sort() ==
+               Yog.all_edges(adj_undir) |> Enum.sort()
+    end
+  end
 end
