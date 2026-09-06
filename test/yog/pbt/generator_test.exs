@@ -396,9 +396,12 @@ defmodule Yog.PBT.GeneratorTest do
               assert deg >= 1 and deg <= 8
             end
 
-          {:error, _} ->
+          {:error, :max_retries_exceeded} ->
             # Retry limit exceeded - acceptable for some parameter combinations
             :ok
+
+          {:error, reason} ->
+            flunk("Unexpected error generating power law graph: #{inspect(reason)}")
         end
       end
     end

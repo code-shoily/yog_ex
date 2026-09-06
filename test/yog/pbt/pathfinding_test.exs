@@ -30,7 +30,8 @@ defmodule Yog.PBT.PathfindingTest do
             assert d_path.weight == length(d_path.nodes) - 1
 
           {nil, :error} ->
-            assert true
+            # Both agree: no path exists
+            :ok
 
           _ ->
             flunk(
@@ -61,7 +62,8 @@ defmodule Yog.PBT.PathfindingTest do
             assert d.weight == a.weight
 
           {:error, {:error, :no_path}, :error} ->
-            assert true
+            # All three agree: no path exists
+            :ok
 
           _ ->
             flunk("Inconsistent shortest path weights between algorithms")
@@ -120,7 +122,8 @@ defmodule Yog.PBT.PathfindingTest do
             assert d_p.weight == bi_p.weight
 
           {:error, :error} ->
-            assert true
+            # Both agree: no path exists
+            :ok
 
           _ ->
             flunk("Inconsistent results in Bidirectional comparison")
@@ -273,8 +276,7 @@ defmodule Yog.PBT.PathfindingTest do
             end
 
           {:error, :negative_cycle} ->
-            # Skip graphs with negative cycles (shouldn't happen with unit weights anyway)
-            :ok
+            flunk("Unit weight graphs cannot contain negative cycles")
         end
       end
     end
@@ -330,7 +332,8 @@ defmodule Yog.PBT.PathfindingTest do
             assert List.last(path) == t
 
           {{:error, :no_path}, nil} ->
-            assert true
+            # Both agree: no path exists
+            :ok
 
           _ ->
             flunk("Mismatch: sp=#{inspect(sp_result)}, dist=#{inspect(expected_dist)}")
@@ -354,7 +357,8 @@ defmodule Yog.PBT.PathfindingTest do
             assert length(bfs_path) == length(d_path.nodes)
 
           {{:error, :no_path}, :error} ->
-            assert true
+            # Both agree: no path exists
+            :ok
 
           _ ->
             flunk(
@@ -380,7 +384,8 @@ defmodule Yog.PBT.PathfindingTest do
             assert length(st_path) == length(ts_path)
 
           {{:error, :no_path}, {:error, :no_path}} ->
-            assert true
+            # Symmetric: neither direction has a path
+            :ok
 
           _ ->
             flunk(
@@ -408,8 +413,8 @@ defmodule Yog.PBT.PathfindingTest do
 
           case {st, tu, su} do
             {{:ok, _}, {:ok, _}, {:ok, _}} ->
-              # Both segments exist, s->u should exist
-              assert true
+              # Both segments exist and transitive path exists
+              :ok
 
             {{:ok, _}, {:ok, _}, {:error, :no_path}} ->
               # This violates triangle inequality - should not happen!
@@ -418,8 +423,8 @@ defmodule Yog.PBT.PathfindingTest do
               )
 
             _ ->
-              # Other cases are fine
-              assert true
+              # At least one segment does not exist, so reachability is not implied
+              :ok
           end
         end
       end
@@ -443,7 +448,7 @@ defmodule Yog.PBT.PathfindingTest do
             assert length(path) >= 2
 
           {:error, :no_path} ->
-            assert true
+            :ok
         end
       end
     end
