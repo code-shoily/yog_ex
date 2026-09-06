@@ -1378,4 +1378,254 @@ defmodule Yog.Flow.MaxFlowTest do
       end
     end
   end
+
+  describe "deterministic edge-case fixtures and min-cut invariants" do
+    # Helper to assert that sink is unreachable from source in residual graph
+    # via edges with strictly positive residual capacity
+    defp assert_no_augmenting_path(result, zero \\ 0, compare \\ &Yog.Utils.compare/2) do
+      residual = result.residual_graph
+      out_edges = residual.out_edges
+      source = result.source
+      sink = result.sink
+
+      queue = :queue.in(source, :queue.new())
+      visited = MapSet.new([source])
+
+      reachable = check_reachability(queue, out_edges, zero, compare, visited)
+
+      refute MapSet.member?(reachable, sink),
+             "Sink #{inspect(sink)} is reachable in residual graph from source #{inspect(source)}"
+    end
+
+    defp check_reachability(queue, out_edges, zero, compare, visited) do
+      case :queue.out(queue) do
+        {:empty, _} ->
+          visited
+
+        {{:value, current}, rest_q} ->
+          neighbors =
+            case Map.fetch(out_edges, current) do
+              {:ok, edges} ->
+                edges
+                |> Map.to_list()
+                |> Enum.filter(fn {_to, cap} -> compare.(cap, zero) == :gt end)
+                |> Enum.map(fn {to, _} -> to end)
+
+              :error ->
+                []
+            end
+
+          {next_q, next_visited} =
+            List.foldl(neighbors, {rest_q, visited}, fn neighbor, {q_acc, v_acc} ->
+              if MapSet.member?(v_acc, neighbor) do
+                {q_acc, v_acc}
+              else
+                {:queue.in(neighbor, q_acc), MapSet.put(v_acc, neighbor)}
+              end
+            end)
+
+          check_reachability(next_q, out_edges, zero, compare, next_visited)
+      end
+    end
+
+    test "fixture: disconnected source and sink has 0 flow and trivial min-cut" do
+      # Source "s" has path to "a", but "t" is completely isolated
+      {:ok, graph} =
+        Yog.directed()
+        |> Yog.add_node("s", "source")
+        |> Yog.add_node("a", "node_a")
+        |> Yog.add_node("t", "sink")
+        |> Yog.add_edge("s", "a", 15)
+
+      for algo <- [:edmonds_karp, :dinic] do
+        result = apply(MaxFlow, algo, [graph, "s", "t"])
+        assert result.max_flow == 0
+        assert_no_augmenting_path(result)
+
+        cut = MaxFlow.min_cut(result)
+        assert cut.cut_value == 0
+        assert MapSet.member?(cut.source_side, "s")
+        assert MapSet.member?(cut.source_side, "a")
+        assert MapSet.member?(cut.sink_side, "t")
+        assert MapSet.size(cut.source_side) == 2
+        assert MapSet.size(cut.sink_side) == 1
+      end
+    end
+
+    test "fixture: zero-capacity edges allow 0 flow" do
+      # All paths have capacity 0
+      {:ok, graph} =
+        Yog.directed()
+        |> Yog.add_node(1, "s")
+        |> Yog.add_node(2, "a")
+        |> Yog.add_node(3, "t")
+        |> Yog.add_edges([
+          {1, 2, 0},
+          {2, 3, 0}
+        ])
+
+      for algo <- [:edmonds_karp, :dinic] do
+        result = apply(MaxFlow, algo, [graph, 1, 3])
+        assert result.max_flow == 0
+        assert_no_augmenting_path(result)
+
+        cut = MaxFlow.min_cut(result)
+        assert cut.cut_value == 0
+        assert MapSet.member?(cut.source_side, 1)
+        assert MapSet.member?(cut.sink_side, 3)
+      end
+    end
+
+    test "fixture: single bottleneck edge constrains flow" do
+      # s -(100)-> a -(7)-> b -(100)-> t
+      # Bottleneck is a -> b with capacity 7
+      {:ok, graph} =
+        Yog.directed()
+        |> Yog.add_node(:s, "source")
+        |> Yog.add_node(:a, "mid1")
+        |> Yog.add_node(:b, "mid2")
+        |> Yog.add_node(:t, "sink")
+        |> Yog.add_edges([
+          {:s, :a, 100},
+          {:a, :b, 7},
+          {:b, :t, 100}
+        ])
+
+      for algo <- [:edmonds_karp, :dinic] do
+        result = apply(MaxFlow, algo, [graph, :s, :t])
+        assert result.max_flow == 7
+        assert_no_augmenting_path(result)
+
+        cut = MaxFlow.min_cut(result)
+        assert cut.cut_value == 7
+        # Residual of s->a has 93, so :s and :a are on source_side
+        # a->b is saturated (0 residual), so :b and :t are on sink_side
+        assert cut.source_side == MapSet.new([:s, :a])
+        assert cut.sink_side == MapSet.new([:b, :t])
+      end
+    end
+
+    test "fixture: diamond network with two equal paths" do
+      #       /-(10)-> a -(10)-\
+      #     s                   t
+      #       \-(10)-> b -(10)-/
+      # Max flow: 10 + 10 = 20
+      {:ok, graph} =
+        Yog.directed()
+        |> Yog.add_node("s", nil)
+        |> Yog.add_node("a", nil)
+        |> Yog.add_node("b", nil)
+        |> Yog.add_node("t", nil)
+        |> Yog.add_edges([
+          {"s", "a", 10},
+          {"s", "b", 10},
+          {"a", "t", 10},
+          {"b", "t", 10}
+        ])
+
+      for algo <- [:edmonds_karp, :dinic] do
+        result = apply(MaxFlow, algo, [graph, "s", "t"])
+        assert result.max_flow == 20
+        assert_no_augmenting_path(result)
+
+        cut = MaxFlow.min_cut(result)
+        assert cut.cut_value == 20
+        # All outgoing edges from s are saturated
+        assert MapSet.member?(cut.source_side, "s")
+        assert MapSet.member?(cut.sink_side, "t")
+      end
+    end
+
+    test "fixture: source-side supply limited" do
+      # Source supply is limited to 12 total, while sink can receive 100
+      # s -(5)-> a -(50)-> t
+      # s -(7)-> b -(50)-> t
+      # Max flow: 5 + 7 = 12
+      {:ok, graph} =
+        Yog.directed()
+        |> Yog.add_node(1, "s")
+        |> Yog.add_node(2, "a")
+        |> Yog.add_node(3, "b")
+        |> Yog.add_node(4, "t")
+        |> Yog.add_edges([
+          {1, 2, 5},
+          {1, 3, 7},
+          {2, 4, 50},
+          {3, 4, 50}
+        ])
+
+      for algo <- [:edmonds_karp, :dinic] do
+        result = apply(MaxFlow, algo, [graph, 1, 4])
+        assert result.max_flow == 12
+        assert_no_augmenting_path(result)
+
+        cut = MaxFlow.min_cut(result)
+        assert cut.cut_value == 12
+        # Edges from 1 to 2 and 1 to 3 are saturated; 1 is alone on source side
+        assert cut.source_side == MapSet.new([1])
+        assert cut.sink_side == MapSet.new([2, 3, 4])
+      end
+    end
+
+    test "fixture: sink-side demand limited" do
+      # Source can produce 100, but sink can only receive 13 total
+      # s -(50)-> a -(6)-> t
+      # s -(50)-> b -(7)-> t
+      # Max flow: 6 + 7 = 13
+      {:ok, graph} =
+        Yog.directed()
+        |> Yog.add_node("S", "source")
+        |> Yog.add_node("A", "mid1")
+        |> Yog.add_node("B", "mid2")
+        |> Yog.add_node("T", "sink")
+        |> Yog.add_edges([
+          {"S", "A", 50},
+          {"S", "B", 50},
+          {"A", "T", 6},
+          {"B", "T", 7}
+        ])
+
+      for algo <- [:edmonds_karp, :dinic] do
+        result = apply(MaxFlow, algo, [graph, "S", "T"])
+        assert result.max_flow == 13
+        assert_no_augmenting_path(result)
+
+        cut = MaxFlow.min_cut(result)
+        assert cut.cut_value == 13
+        # Residual s->a has 44, s->b has 43, so S, A, B are all on source side
+        assert cut.source_side == MapSet.new(["S", "A", "B"])
+        assert cut.sink_side == MapSet.new(["T"])
+      end
+    end
+
+    test "fixture: residual graph has no augmenting path after completion across complex topology" do
+      # Classic flow network with cross-edge:
+      # s -> a (10), s -> b (10), a -> b (1), a -> t (8), b -> t (12)
+      # Max flow is 19 (s->a pushes 9 [8 to t, 1 to b], s->b pushes 10 [to t], total to t = 19)
+      {:ok, graph} =
+        Yog.directed()
+        |> Yog.add_node(1, "s")
+        |> Yog.add_node(2, "a")
+        |> Yog.add_node(3, "b")
+        |> Yog.add_node(4, "t")
+        |> Yog.add_edges([
+          {1, 2, 10},
+          {1, 3, 10},
+          {2, 3, 1},
+          {2, 4, 8},
+          {3, 4, 12}
+        ])
+
+      for algo <- [:edmonds_karp, :dinic] do
+        result = apply(MaxFlow, algo, [graph, 1, 4])
+        assert result.max_flow == 19
+        assert_no_augmenting_path(result)
+
+        cut = MaxFlow.min_cut(result)
+        assert cut.cut_value == 19
+        # Max-flow min-cut theorem: cut value equals max flow
+        assert cut.cut_value == result.max_flow
+      end
+    end
+  end
 end
