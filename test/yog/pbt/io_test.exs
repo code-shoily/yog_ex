@@ -28,7 +28,7 @@ defmodule Yog.PBT.IOTest do
   end
 
   describe "TGF Properties" do
-    property "roundtrip: serialize -> parse preserves node count" do
+    property "roundtrip: serialize -> parse preserves full structure" do
       check all(graph <- string_graph_gen()) do
         options =
           TGF.options_with(fn data -> to_string(data) end, fn w -> {:some, to_string(w)} end)
@@ -41,8 +41,7 @@ defmodule Yog.PBT.IOTest do
         assert {:ok, {:tgf_result, parsed_graph, _warnings}} =
                  TGF.parse_with(tgf_string, graph.kind, node_parser, edge_parser)
 
-        assert Yog.node_count(parsed_graph) == Yog.node_count(graph)
-        assert Yog.edge_count(parsed_graph) == Yog.edge_count(graph)
+        assert graphs_structurally_equal?(parsed_graph, graph)
       end
     end
   end
@@ -59,12 +58,12 @@ defmodule Yog.PBT.IOTest do
   end
 
   describe "Pajek Properties" do
-    property "roundtrip: serialize -> parse preserves counts" do
+    property "roundtrip: serialize -> parse preserves kind, nodes, and connectivity" do
       check all(graph <- string_graph_gen()) do
         options =
           Pajek.options_with(
             &to_string/1,
-            fn _ -> :none end,
+            fn w -> {:some, to_string(w)} end,
             fn _ -> Pajek.default_node_attributes() end,
             false,
             false
@@ -72,41 +71,97 @@ defmodule Yog.PBT.IOTest do
 
         pajek_string = Pajek.serialize_with(options, graph)
 
-        assert {:ok, {:pajek_result, parsed_graph, _warnings}} = Pajek.parse(pajek_string)
+        node_parser = fn label -> label end
+
+        edge_parser = fn
+          {:some, weight} -> weight
+          :none -> nil
+        end
+
+        assert {:ok, {:pajek_result, parsed_graph, _warnings}} =
+                 Pajek.parse_with(pajek_string, node_parser, edge_parser)
 
         assert Yog.node_count(parsed_graph) == Yog.node_count(graph)
         assert Yog.edge_count(parsed_graph) == Yog.edge_count(graph)
+
+        # Node IDs and data are preserved
+        assert parsed_graph.nodes == graph.nodes
+
+        # Kind is preserved when edges exist (empty edge graphs default to :directed)
+        if Yog.edge_count(graph) > 0 do
+          assert parsed_graph.kind == graph.kind
+        end
+
+        # Edge connectivity (endpoints) is preserved; weights may be float-coerced
+        # by Pajek's parse_weight_value (e.g. "123" -> 123.0), so check endpoints only
+        orig_endpoints =
+          Yog.all_edges(graph)
+          |> Enum.map(fn {u, v, _w} ->
+            if graph.kind == :undirected and u > v, do: {v, u}, else: {u, v}
+          end)
+          |> Enum.sort()
+
+        parsed_endpoints =
+          Yog.all_edges(parsed_graph)
+          |> Enum.map(fn {u, v, _w} ->
+            if parsed_graph.kind == :undirected and u > v, do: {v, u}, else: {u, v}
+          end)
+          |> Enum.sort()
+
+        assert parsed_endpoints == orig_endpoints
       end
     end
   end
 
   describe "GraphML Properties" do
-    property "roundtrip: serialize -> parse preserves structure" do
+    property "roundtrip: serialize -> deserialize_with preserves full structure" do
       check all(graph <- string_graph_gen()) do
         xml = GraphML.serialize(graph)
-        assert {:ok, parsed_graph} = GraphML.deserialize(xml)
 
+        # deserialize_with lets us unwrap the attribute maps back to raw values
+        assert {:ok, parsed_graph} =
+                 GraphML.deserialize_with(
+                   fn attrs -> attrs["label"] end,
+                   fn attrs -> attrs["weight"] end,
+                   xml
+                 )
+
+        assert parsed_graph.kind == graph.kind
         assert Yog.node_count(parsed_graph) == Yog.node_count(graph)
         assert Yog.edge_count(parsed_graph) == Yog.edge_count(graph)
-        assert parsed_graph.kind == graph.kind
+        assert parsed_graph.nodes == graph.nodes
+        assert graphs_structurally_equal?(parsed_graph, graph)
       end
     end
   end
 
   describe "GDF Properties" do
-    property "roundtrip: serialize -> parse preserves counts" do
+    property "roundtrip: serialize -> deserialize_with preserves full structure (non-empty edges)" do
       check all(graph <- string_graph_gen()) do
         gdf_string = GDF.serialize(graph)
-        assert {:ok, parsed_graph} = GDF.deserialize(gdf_string)
+
+        assert {:ok, parsed_graph} =
+                 GDF.deserialize_with(
+                   fn attrs -> attrs["label"] end,
+                   fn attrs -> attrs["label"] end,
+                   gdf_string
+                 )
 
         assert Yog.node_count(parsed_graph) == Yog.node_count(graph)
         assert Yog.edge_count(parsed_graph) == Yog.edge_count(graph)
+        assert parsed_graph.nodes == graph.nodes
+
+        # GDF infers kind from the first edge's directed column;
+        # empty-edge graphs default to :directed, so only check kind when edges exist
+        if Yog.edge_count(graph) > 0 do
+          assert graphs_structurally_equal?(parsed_graph, graph)
+        end
       end
     end
   end
 
   describe "Matrix Market Properties" do
-    property "roundtrip: serialize -> parse preserves edge count" do
+    property "roundtrip: serialize -> parse preserves kind, node count, and edge count" do
       check all(graph <- Yog.Generators.graph_gen()) do
         # Matrix Market expects 1..N node IDs
         graph = graph |> reindex_graph() |> Yog.Transform.map_edges(fn _ -> 1.0 end)
@@ -117,12 +172,14 @@ defmodule Yog.PBT.IOTest do
                  MatrixMarket.parse(mm_string)
 
         assert Yog.edge_count(parsed_graph) == Yog.edge_count(graph)
+        assert Yog.node_count(parsed_graph) >= Yog.node_count(graph)
+        assert parsed_graph.kind == graph.kind
       end
     end
   end
 
   describe "LEDA Properties" do
-    property "roundtrip: serialize -> parse preserves node count" do
+    property "roundtrip: serialize -> parse preserves full structure" do
       check all(graph <- string_graph_gen()) do
         # LEDA uses 1..N internally and re-maps on output.
         # When parsed back, node IDs will be 1..N.
@@ -130,8 +187,11 @@ defmodule Yog.PBT.IOTest do
         leda_string = LEDA.serialize(graph)
         assert {:ok, {:leda_result, parsed_graph, _warnings}} = LEDA.parse(leda_string)
 
+        assert parsed_graph.kind == graph.kind
         assert Yog.node_count(parsed_graph) == Yog.node_count(graph)
         assert Yog.edge_count(parsed_graph) == Yog.edge_count(graph)
+        assert parsed_graph.nodes == graph.nodes
+        assert graphs_structurally_equal?(parsed_graph, graph)
       end
     end
   end
