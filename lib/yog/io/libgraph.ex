@@ -11,7 +11,7 @@ defmodule Yog.IO.Libgraph do
 
       defp deps do
         [
-          {:yog_ex, "~> 0.99.1"},
+          {:yog_ex, "~> 1.0"},
           {:libgraph, "~> 0.16"}  # Required for interoperability
         ]
       end
